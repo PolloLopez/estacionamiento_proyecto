@@ -1,7 +1,19 @@
-<h2>Estacionar auto</h2>
+<h2>Estacionar vehículo</h2>
+{% if error %}<p style="color:red">{{ error }}</p>{% endif %}
 <form method="post">
   {% csrf_token %}
-  <label>Correo:</label><input type="email" name="correo"><br>
-  <label>Patente:</label><input type="text" name="patente"><br>
+  <label>Correo del usuario:</label>
+  <input type="email" name="correo"><br>
+
+  <label>Patente del vehículo:</label>
+  <input type="text" name="patente"><br>
+
+  <label>Subcuadra:</label>
+  <select name="subcuadra_id">
+    {% for subcuadra in subcuadras %}
+      <option value="{{ subcuadra.id }}">{{ subcuadra }}</option>
+    {% endfor %}
+  </select><br>
+
   <button type="submit">Estacionar</button>
 </form>

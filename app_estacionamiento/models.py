@@ -102,3 +102,12 @@ class Infraccion(models.Model):
                 self.save()
                 return "Infracción cancelada y notificada"
         return "Infracción sigue activa"
+
+class Notificacion(models.Model):
+    destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    mensaje = models.TextField()
+    fecha = models.DateTimeField(auto_now_add=True)
+    leida = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Notificación para {self.destinatario.nombre}"

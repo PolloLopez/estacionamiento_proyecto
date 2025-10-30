@@ -4,6 +4,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
 from .estrategias import EstrategiaExencion
+from .factories import EstacionamientoFactory
+
 
 def registrar_infraccion(request):
     """
@@ -59,3 +61,83 @@ def registrar_infraccion(request):
         'subcuadras': Subcuadra.objects.all(),
         'inspectores': Usuario.objects.filter(es_inspector=True)
     })
+
+
+def estacionar_auto(request):
+    """
+    Vista para que un usuario estacione un vehículo en una subcuadra.
+    Valida que no haya otro estacionamiento activo.
+    # aplica Factory y validación
+    """
+    if request.method == 'POST':
+        correo = request.POST['correo']
+        patente = request.POST['patente']
+        subcuadra_id = request.POST['subcuadra_id']
+
+        try:
+            usuario = Usuario.objects.get(correo=correo)
+            vehiculo = Vehiculo.objects.get(patente=patente)
+            subcuadra = Subcuadra.objects.get(id=subcuadra_id)
+        except (Usuario.DoesNotExist, Vehiculo.DoesNotExist, Subcuadra.DoesNotExist):
+            return render(request, 'estacionar_auto.html', {
+                'error': 'Datos inválidos. Verificá correo, patente y subcuadra.',
+                'subcuadras': Subcuadra.objects.all()
+            })
+
+        # Validación: evitar duplicado
+        if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
+            return render(request, 'estacionar_auto.html', {
+                'error': 'Este vehículo ya tiene un estacionamiento activo.',
+                'subcuadras': Subcuadra.objects.all()
+            })
+
+        # Crear estacionamiento
+        EstacionamientoFactory.crear(vehiculo, subcuadra)
+        return redirect('home')
+
+    return render(request, 'estacionar_auto.html', {
+        'subcuadras': Subcuadra.objects.all()
+    })
+
+def finalizar_estacionamiento(request, estacionamiento_id):
+    """
+    Vista para finalizar un estacionamiento.
+    Valida que el usuario tenga saldo suficiente.
+    # aplica Strategy y validación
+    """
+    estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
+
+    if not estacionamiento.activo:
+        return render(request, 'finalizar_estacionamiento.html', {
+            'error': 'Este estacionamiento ya fue finalizado.',
+            'estacionamiento': estacionamiento
+        })
+
+    estrategia = EstrategiaExencion()
+    duracion = (timezone.now() - estacionamiento.hora_inicio).total_seconds() / 3600
+    costo_estimado = estrategia.calcular(estacionamiento.vehiculo, estacionamiento.subcuadra, duracion)
+
+    usuario = estacionamiento.vehiculo.usuarios.first()
+    if usuario.saldo < costo_estimado:
+        return render(request, 'finalizar_estacionamiento.html', {
+            'error': 'Saldo insuficiente para finalizar el estacionamiento.',
+            'estacionamiento': estacionamiento,
+            'costo_estimado': round(costo_estimado, 2)
+        })
+
+    # Finalizar y descontar saldo
+    estacionamiento.finalizar(estrategia)
+    usuario.saldo -= estacionamiento.costo
+    usuario.save()
+
+    return render(request, 'finalizar_estacionamiento.html', {
+        'mensaje': f'Estacionamiento finalizado. Costo: ${estacionamiento.costo}',
+        'estacionamiento': estacionamiento
+    })
+
+def home(request):
+    """
+    Vista principal del sistema.
+    Muestra opciones de navegación.
+    """
+    return render(request, 'home.html')

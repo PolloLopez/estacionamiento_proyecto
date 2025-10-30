@@ -5,8 +5,13 @@
     <title>Inicio</title>
 </head>
 <body>
-    <h1>Bienvenido al sitio</h1>
-    <a href="/contacto/">Ir a contacto</a> |
-    <a href="/sobre/">Sobre nosotros</a>
+<h1>Bienvenido al sistema de estacionamiento urbano</h1>
+
+<ul>
+  <li><a href="{% url 'estacionar_auto' %}">Estacionar vehículo</a></li>
+  <li><a href="{% url 'registrar_infraccion' %}">Registrar infracción</a></li>
+  <li><a href="/admin/">Panel de administración</a></li>
+</ul>
+
 </body>
 </html>

@@ -1,11 +1,16 @@
 # app_estacionamiento/urls.py
 
-from django.urls import path
+from django.urls import path, include
 from . import views
+from django.contrib import admin
 
 urlpatterns = [
-    path('', views.home, name='home'),
-    path('cargar-saldo/', views.cargar_saldo, name='cargar_saldo'),
+    path('admin/', admin.site.urls),
+    path('', include('app_estacionamiento.urls')),
+    path('infraccion/', views.registrar_infraccion, name='registrar_infraccion'),
     path('estacionar/', views.estacionar_auto, name='estacionar_auto'),
-    path('finalizar/<int:id>/', views.finalizar_estacionamiento, name='finalizar_estacionamiento'),
+    path('finalizar/<int:estacionamiento_id>/', views.finalizar_estacionamiento, name='finalizar_estacionamiento'),
+    path('estacionamiento/', views.home, name='estacionamiento_home'),
+    path('', views.home, name='home'),  # esto conecta la vista home a "/"
+
 ]
