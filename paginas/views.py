@@ -2,9 +2,6 @@ from django.shortcuts import render, redirect
 from .models import Comentario
 from .forms import ComentarioForm
 
-def home(request):
-    return render(request, 'home.html')
-
 def contacto(request):
     return render(request, 'contacto.html')
 
