@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Comentarios</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; background: #fafafa; }
+    form { margin-bottom: 2rem; }
+    input, textarea { width: 100%; margin: .5rem 0; padding: .5rem; }
+    button { padding: .5rem 1rem; background: #007BFF; color: white; border: none; border-radius: 4px; }
+    .comentario { background: white; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; box-shadow: 0 0 3px rgba(0,0,0,0.1); }
+    .fecha { color: #777; font-size: .9em; }
+  </style>
+</head>
+<body>
+  <h1>Dejá tu comentario</h1>
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Enviar</button>
+  </form>
+
+  <h2>Comentarios anteriores</h2>
+
+  {% for c in comentarios %}
+    <div class="comentario">
+      <strong>{{ c.nombre }}</strong> <span class="fecha">({{ c.fecha|date:"d/m/Y H:i" }})</span>
+      <p>{{ c.texto }}</p>
+    </div>
+  {% empty %}
+    <p>No hay comentarios aún.</p>
+  {% endfor %}
+
+  <p><a href="/">Volver al inicio</a></p>
+</body>
+</html>
