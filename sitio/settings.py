@@ -18,7 +18,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'app_estacionamiento',  # Tu app principal
+    'app_estacionamiento',
+    'paginas',
 ]
 
 # ⚙️ Middleware (control de peticiones)

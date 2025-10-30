@@ -1,0 +1,7 @@
+<h2>Cargar saldo</h2>
+<form method="post">
+  {% csrf_token %}
+  <label>Correo:</label><input type="email" name="correo"><br>
+  <label>Monto:</label><input type="number" step="0.01" name="monto"><br>
+  <button type="submit">Cargar</button>
+</form>

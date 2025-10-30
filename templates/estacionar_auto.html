@@ -1,0 +1,7 @@
+<h2>Estacionar auto</h2>
+<form method="post">
+  {% csrf_token %}
+  <label>Correo:</label><input type="email" name="correo"><br>
+  <label>Patente:</label><input type="text" name="patente"><br>
+  <button type="submit">Estacionar</button>
+</form>
