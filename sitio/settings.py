@@ -19,7 +19,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'app_estacionamiento',
-    'paginas',
 ]
 
 # ⚙️ Middleware (control de peticiones)
