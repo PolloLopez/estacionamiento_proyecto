@@ -1,4 +1,17 @@
-.venv/
-*.pyc
-__pycache__/
-db.sqlite3
+# este archivo es para que no suba a git los siguientes archivos:
+
+# Logs
+*.log
+
+# Archivos de migración viejos
+app_estacionamiento/migrations/*.py
+!app_estacionamiento/migrations/__init__.py
+
+# Archivos de cobertura de pruebas
+.coverage
+htmlcov/
+
+# Archivos de compilación
+build/
+dist/
+*.egg-info/
