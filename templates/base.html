@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+
+    {% load static %}
+
+    <!-- Título dinámico -->
+    <title>{% block title %}Estacionamiento Medido{% endblock %}</title>
+
+    <!-- Hoja de estilos global -->
+    <link rel="stylesheet" href="{% static 'css/global.css' %}">
+
+</head>
+<body>
+
+    <!-- ======= Encabezado / Navbar ======= -->
+    <header class="navbar">
+        <h1 class="logo">🚗 Estacionamiento Medido</h1>
+
+        <nav>
+            <ul class="nav-items">
+                <li><a href="{% url 'inicio' %}">🏠 Inicio</a></li>
+                <li><a href="{% url 'estacionar_auto' %}">🅿️ Estacionar</a></li>
+                <li><a href="{% url 'registrar_infraccion' %}">⚠️ Infracción</a></li>
+                <li><a href="/admin/">🔧 Admin</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- ======= Contenido dinámico ======= -->
+    <main class="container">
+        {% block content %}
+        <!-- Aquí se cargan las páginas -->
+        {% endblock %}
+    </main>
+
+    <!-- ======= Footer ======= -->
+    <footer class="footer">
+        <p>Sistema de Estacionamiento Medido — 2025</p>
+    </footer>
+
+</body>
+</html>
