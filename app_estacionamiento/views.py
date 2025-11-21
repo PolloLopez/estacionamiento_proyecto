@@ -1,4 +1,5 @@
-#app_estacionamiento/views.py
+#ESTACIONAMIENTO_APP/app_estacionamiento/views.py
+# Archivo: views.py - Vistas principales del sitio
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -61,7 +62,6 @@ def registrar_infraccion(request):
         'subcuadras': Subcuadra.objects.all(),
         'inspectores': Usuario.objects.filter(es_inspector=True)
     })
-
 
 def estacionar_auto(request):
     """

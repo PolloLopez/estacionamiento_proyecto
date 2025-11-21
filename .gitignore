@@ -1,17 +1,62 @@
-# este archivo es para que no suba a git los siguientes archivos:
+# Archivo .gitignore
+# Define los archivos y carpetas que no deben subirse al repositorio Git
+# ============================
+# 📌 ENTORNO VIRTUAL
+# ============================
+.venv/
+venv/
+env/
+ENV/
 
-# Logs
+# ============================
+# 📌 ARCHIVOS DE PYTHON
+# ============================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ============================
+# 📌 ARCHIVOS SENSIBLES
+# ============================
+*.env
+.env.*
+
+# ============================
+# 📌 DJANGO
+# ============================
+db.sqlite3
+media/
+staticfiles/
+
+# ============================
+# 📌 MIGRACIONES (solo contenido)
+# ============================
+**/migrations/*
+!**/migrations/__init__.py
+
+# ============================
+# 📌 ARCHIVOS DEL SISTEMA
+# ============================
 *.log
+*.pot
+*.pyc
+*.pyo
+*.mo
+*.swp
+.DS_Store
+Thumbs.db
 
-# Archivos de migración viejos
-app_estacionamiento/migrations/*.py
-!app_estacionamiento/migrations/__init__.py
+# ============================
+# 📌 ENTORNOS / CACHE / IDE
+# ============================
+.idea/
+.vscode/
+*.sqlite3-journal
+*.tmp
 
-# Archivos de cobertura de pruebas
-.coverage
-htmlcov/
-
-# Archivos de compilación
+# ============================
+# 📌 DISTRIBUCIÓN / COMPILACIÓN
+# ============================
 build/
 dist/
 *.egg-info/

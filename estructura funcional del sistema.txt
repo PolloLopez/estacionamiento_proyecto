@@ -1,0 +1,99 @@
+Perfectamente 👌 entendí todo, y te lo resumo para que confirmes antes de avanzar al **Día 2** (así arrancamos bien ordenados).
+
+---
+
+## 🧭 ESTRUCTURA FUNCIONAL DEL SISTEMA (versión actualizada)
+
+### 👤 **USUARIOS (conductores)**
+
+Desde `inicio.html`, podrán acceder a:
+
+1. **Ver estacionamiento activo**
+
+   * Si tiene uno, mostrar zona (no subcuadra), tiempo y costo estimado.
+   * Solo puede tener **un estacionamiento activo** a la vez.
+
+2. **Registrar estacionamiento**
+
+   * Permite registrar **auto o moto**.
+   * Se usará el template `estacionar_auto.html` (más adelante renombrado a `estacionar_vehiculo.html`).
+
+3. **Finalizar estacionamiento**
+
+   * Calcula el costo, descuenta saldo y cierra el registro.
+
+4. **Cargar saldo** 💳
+
+   * Se usará `cargar_saldo.html`.
+   * Más adelante se vinculará a **Mercado Pago**.
+
+5. **Historial de estacionamientos**
+
+   * Listado con fecha, calle y costo.
+   * (`resumen.html`).
+
+6. **Historial de infracciones**
+
+   * Muestra todas las infracciones de sus vehículos, con estado:
+
+     * ✅ Pagada
+     * 🚫 Impaga
+
+7. **Información general**
+
+   * Información útil del sistema, reglamento, etc.
+   * (`info.html`, antes `sobre.html`).
+
+---
+
+### 🕵️‍♂️ **INSPECTORES**
+
+Acceden desde `inicio.html` (según su tipo de usuario).
+
+1. **Verificar vehículo**
+
+   * Ingresar patente → mostrar estado:
+
+     * ✅ Pago
+     * 🚫 Impago
+     * 🟢 Exento (por calle o total)
+   * Si es exento por calle, el inspector puede **decidir si corresponde infracción** o no.
+   * Si es impago → opción **Registrar Infracción**.
+
+2. **Registrar estacionamiento manualmente**
+
+   * Para cobros presenciales.
+
+3. **Resumen general**
+
+   * Buscar por patente para listar **infracciones y estacionamientos**.
+
+---
+
+### 🧾 **VENDEDORES (comercios y quioscos)**
+
+* Pueden **registrar estacionamientos** a nombre de otros (usuarios).
+* Deben **rendir porcentaje** a la municipalidad.
+* Tendrán control de:
+
+  * Estacionamientos vendidos.
+  * Saldo a favor / deuda.
+  * Liquidaciones pendientes.
+
+---
+
+### 🏛️ **ADMINISTRADOR**
+
+* Tiene acceso total al sistema.
+* Puede:
+
+  * Registrar / modificar inspectores y vendedores.
+  * Regular **precios de estacionamiento**.
+  * Controlar **saldos y deudas de vendedores**.
+  * Definir **porcentaje de ganancia** de cada vendedor.
+  * Consultar toda la información general del sistema.
+
+---
+
+¿Querés que mañana arranquemos el **Día 2** implementando la estructura de templates base (`base.html`, `estilos.css`) y la organización visual según estos roles (usuario / inspector / vendedor / admin)?
+Así dejamos preparado el entorno para empezar luego con la lógica y permisos.

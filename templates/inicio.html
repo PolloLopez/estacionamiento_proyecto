@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8" />
-    <title>Inicio</title>
+    <meta charset="UTF-8">
+    <title>Inicio - Estacionamiento Medido</title>
 </head>
 <body>
-<h1>Bienvenido al sistema de estacionamiento</h1>
-<ul>
-  <li><a href="{% url 'estacionar_auto' %}">Estacionar vehículo</a></li>
-  <li><a href="{% url 'registrar_infraccion' %}">Registrar infracción</a></li>
-</ul>
+    <h1>🚗 Sistema de Estacionamiento Medido</h1>
 
+    <ul>
+        <li><a href="{% url 'estacionar_auto' %}">🅿️ Estacionar vehículo</a></li>
+        <li><a href="{% url 'registrar_infraccion' %}">⚠️ Registrar infracción</a></li>
+    </ul>
+
+    <p><a href="{% url 'admin:index' %}">Ir al panel de administración</a></p>
 </body>
 </html>
+
