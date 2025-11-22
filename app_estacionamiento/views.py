@@ -293,8 +293,11 @@ def resumen_caja(request):
     return render(request, 'vendedores/resumen_caja.html')
 
 # =========================================================
-# VIEWS ADMINISTRADOR DEL SISTEMA
-# =================================================
+# VIEWS LOGIN / LOGOUT
+# =========================================================
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Usuario
+
 def login_view(request):
     """
     Vista de login simple.
@@ -303,13 +306,13 @@ def login_view(request):
     - Redirige al inicio general.
     """
     if request.method == "POST":
-        correo = request.POST.get("correo")   # ⚠️ corregido: coincide con name="correo" en el form
+        correo = request.POST.get("correo")
         password = request.POST.get("password")
 
         try:
             usuario = Usuario.objects.get(correo=correo, password=password)
             request.session["usuario_id"] = usuario.id
-            return redirect("inicio")  # redirige al home
+            return redirect("inicio")
         except Usuario.DoesNotExist:
             return render(request, "login.html", {"error": "Correo o contraseña incorrectos"})
 
@@ -324,15 +327,3 @@ def logout_view(request):
     """
     request.session.flush()
     return redirect("login")
-    if request.method == "POST":
-        correo = request.POST.get("correo")
-        password = request.POST.get("password")
-
-        try:
-            usuario = Usuario.objects.get(correo=correo, password=password)
-            request.session["usuario_id"] = usuario.id
-            return redirect("inicio")  # redirige al home
-        except Usuario.DoesNotExist:
-            return render(request, "login.html", {"error": "Correo o contraseña incorrectos"})
-
-    return render(request, "login.html")
