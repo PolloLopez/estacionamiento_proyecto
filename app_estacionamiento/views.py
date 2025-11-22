@@ -102,10 +102,8 @@ def estacionar_vehiculo(request):
 def finalizar_estacionamiento(request, estacionamiento_id):
     """
     Finaliza un estacionamiento activo.
-    - Busca el estacionamiento por ID.
     - Calcula costo usando EstrategiaExencion.
-    - Valida que el usuario tenga saldo suficiente.
-    - Descuenta saldo y guarda cambios.
+    - Valida saldo y descuenta.
     """
     estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
 
@@ -233,7 +231,7 @@ def registrar_infraccion(request):
     Registro de infracción por inspector.
     - Valida inspector.
     - Verifica si el vehículo está exento.
-    - Si tiene estacionamiento activo, lo asocia.
+    - Si tiene estacionamiento activo, lo asocia y verifica cancelación.
     - Si no, crea infracción independiente.
     """
     usuario_id = request.session.get("usuario_id")
@@ -357,12 +355,14 @@ def login_view(request):
     if request.method == "POST":
         correo = request.POST.get("correo")
         password = request.POST.get("password")
+
         try:
             usuario = Usuario.objects.get(correo=correo, password=password)
             request.session["usuario_id"] = usuario.id
             return redirect("inicio")
         except Usuario.DoesNotExist:
             return render(request, "login.html", {"error": "Correo o contraseña incorrectos"})
+
     return render(request, "login.html")
 
 
