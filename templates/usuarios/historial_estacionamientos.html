@@ -3,21 +3,41 @@
 
 {% block content %}
 <section class="panel">
-  <h2>Historial de estacionamientos</h2>
-  <table class="table">
-    <thead><tr><th>Fecha</th><th>Zona</th><th>Duración</th><th>Costo</th></tr></thead>
-    <tbody>
-      {% for e in estacionamientos %}
-      <tr>
-        <td>{{ e.hora_inicio }}</td>
-        <td>{{ e.subcuadra }}</td>
-        <td>{{ e.duracion }}</td>
-        <td>${{ e.costo }}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="4">Aún no registraste estacionamientos</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <h2>📜 Historial de estacionamientos</h2>
+
+  {% if estacionamientos %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Fecha inicio</th>
+          <th>Fecha fin</th>
+          <th>Calle</th>
+          <th>Altura</th>
+          <th>Patente</th>
+          <th>Costo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in estacionamientos %}
+          <tr>
+            <td>{{ e.hora_inicio|date:"d/m/Y H:i" }}</td>
+            <td>
+              {% if e.hora_fin %}
+                {{ e.hora_fin|date:"d/m/Y H:i" }}
+              {% else %}
+                Activo
+              {% endif %}
+            </td>
+            <td>{{ e.subcuadra.calle }}</td>
+            <td>{{ e.subcuadra.altura }}</td>
+            <td>{{ e.vehiculo.patente }}</td>
+            <td>${{ e.costo }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No tenés estacionamientos registrados.</p>
+  {% endif %}
 </section>
 {% endblock %}

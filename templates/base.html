@@ -2,43 +2,63 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-
     {% load static %}
-
-    <!-- Título dinámico -->
     <title>{% block title %}Estacionamiento Medido{% endblock %}</title>
-
-    <!-- Hoja de estilos global -->
     <link rel="stylesheet" href="{% static 'css/global.css' %}">
-
 </head>
 <body>
 
-    <!-- ======= Encabezado / Navbar ======= -->
-    <header class="navbar">
-        <h1 class="logo">🚗 Estacionamiento Medido</h1>
+<header class="navbar">
+    <h1 class="logo">🚗 Estacionamiento Medido</h1>
 
-        <nav>
-            <ul class="nav-items">
-                <li><a href="{% url 'inicio' %}">🏠 Inicio</a></li>
-                <li><a href="{% url 'estacionar_auto' %}">🅿️ Estacionar</a></li>
-                <li><a href="{% url 'registrar_infraccion' %}">⚠️ Infracción</a></li>
-                <li><a href="/admin/">🔧 Admin</a></li>
-            </ul>
-        </nav>
-    </header>
+    <nav>
+        <ul class="nav-items">
+            <!-- Inicio general -->
+            <li><a href="{% url 'inicio' %}">🏠 Inicio</a></li>
 
-    <!-- ======= Contenido dinámico ======= -->
-    <main class="container">
-        {% block content %}
-        <!-- Aquí se cargan las páginas -->
-        {% endblock %}
-    </main>
+            <!-- Opciones para USUARIOS -->
+            {% if usuario and usuario.es_conductor %}
+                <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">🅿️ Estacionar</a></li>
+                <li><a href="{% url 'usuarios_historial_estacionamientos' %}">📜 Historial Estacionamientos</a></li>
+                <li><a href="{% url 'usuarios_historial_infracciones' %}">⚠️ Infracciones</a></li>
+                <li><a href="{% url 'usuarios_cargar_saldo' %}">💳 Cargar saldo</a></li>
+            {% endif %}
 
-    <!-- ======= Footer ======= -->
-    <footer class="footer">
-        <p>Sistema de Estacionamiento Medido — 2025</p>
-    </footer>
+            <!-- Opciones para INSPECTORES -->
+            {% if usuario and usuario.es_inspector %}
+                <li><a href="{% url 'inspectores_verificar_vehiculo' %}">🔍 Verificar vehículo</a></li>
+                <li><a href="{% url 'inspectores_registrar_estacionamiento_manual' %}">📝 Registrar estacionamiento manual</a></li>
+                <li><a href="{% url 'inspectores_registrar_infraccion' %}">⚠️ Registrar infracción</a></li>
+                <li><a href="{% url 'inspectores_resumen_infracciones' %}">📊 Resumen infracciones</a></li>
+                <li><a href="{% url 'inspectores_resumen_cobros' %}">💰 Resumen cobros</a></li>
+            {% endif %}
+
+            <!-- Opciones para VENDEDORES -->
+            {% if usuario and usuario.es_vendedor %}
+                <li><a href="{% url 'vendedores_estacionar' %}">🅿️ Registrar estacionamiento</a></li>
+                <li><a href="{% url 'vendedores_resumen_caja' %}">📊 Resumen caja</a></li>
+            {% endif %}
+
+            <!-- Opciones para ADMIN -->
+            {% if usuario and usuario.es_admin %}
+                <li><a href="/admin/">🔧 Panel Admin</a></li>
+            {% endif %}
+
+            <!-- 🔹 Cerrar sesión -->
+            {% if usuario %}
+                <li><a href="{% url 'logout' %}">🚪 Cerrar sesión</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+</header>
+
+<main class="container">
+    {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+    <p>Sistema de Estacionamiento Medido — 2025</p>
+</footer>
 
 </body>
 </html>

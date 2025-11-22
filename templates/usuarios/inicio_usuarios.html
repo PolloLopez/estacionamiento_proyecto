@@ -3,13 +3,31 @@
 
 {% block content %}
 <section class="panel">
+  <!-- Muestra el nombre del usuario -->
   <h2>Bienvenido, {{ usuario.nombre }}</h2>
   <p>Desde aquí podés gestionar tus estacionamientos y saldo.</p>
 
   <ul class="list">
-    <li><a class="btn" href="{% url 'usuarios_estacionar' %}">Estacionar vehículo</a></li>
-    <li><a class="btn" href="{% url 'usuarios_estacionar_rapido' %}">Estacionar rápido</a></li>
-    <li><a class="btn" href="{% url 'usuarios_finalizar' %}">Finalizar</a></li>
+    <!-- Botón para ir al formulario de estacionar vehículo -->
+    <li><a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar vehículo</a></li>
+
+    <!-- Botón de estacionamiento rápido (usa misma vista que estacionar) -->
+    <li><a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar rápido</a></li>
+
+    <!-- Itera sobre estacionamientos activos y genera un botón "Finalizar" para cada uno -->
+    {% for e in estacionamientos %}
+      <li>
+        {{ e.patente }} — {{ e.subcuadra.calle }} {{ e.subcuadra.altura }}
+        <a class="btn" href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_id=e.id %}">
+          Finalizar
+        </a>
+      </li>
+    {% empty %}
+      <!-- Si no hay estacionamientos activos, muestra mensaje -->
+      <li>No tenés estacionamientos activos.</li>
+    {% endfor %}
+
+    <!-- Botón para cargar saldo -->
     <li><a class="btn" href="{% url 'usuarios_cargar_saldo' %}">Cargar saldo</a></li>
   </ul>
 </section>

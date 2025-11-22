@@ -5,10 +5,17 @@
 <section class="panel">
   <h2>Finalizar estacionamiento</h2>
 
+  <!-- Si hay error, se muestra en rojo -->
   {% if error %}
-  <p class="error">{{ error }}</p>
+    <p class="error">{{ error }}</p>
   {% endif %}
 
+  <!-- Si hay mensaje de éxito, se muestra -->
+  {% if mensaje %}
+    <p class="success">{{ mensaje }}</p>
+  {% endif %}
+
+  <!-- Tarjeta con detalles del estacionamiento -->
   <div class="card">
     <h3>Detalles</h3>
     <p>Patente: <strong>{{ estacionamiento.vehiculo.patente }}</strong></p>
@@ -17,11 +24,13 @@
     <p>Costo calculado: <strong>${{ estacionamiento.costo }}</strong></p>
   </div>
 
-  <form method="post" action="{% url 'usuarios_finalizar' estacionamiento.id %}">
+  <!-- Formulario para confirmar finalización -->
+  <form method="post" action="{% url 'usuarios_finalizar_estacionamiento' estacionamiento.id %}">
     {% csrf_token %}
     <div class="form-row actions">
       <button class="btn primary">Pagar y finalizar</button>
-      <a class="btn link" href="{% url 'usuarios_panel' %}">Cancelar</a>
+      <!-- Botón de cancelar vuelve al inicio de usuarios -->
+      <a class="btn link" href="{% url 'inicio_usuarios' %}">Cancelar</a>
     </div>
   </form>
 </section>

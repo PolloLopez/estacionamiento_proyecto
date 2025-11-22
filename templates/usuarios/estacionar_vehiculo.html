@@ -4,8 +4,15 @@
 {% block content %}
 <section class="panel">
   <h2>Registrar estacionamiento</h2>
-  <form method="post" action="{% url 'usuarios_estacionar' %}">
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
+
+  <form method="post" action="{% url 'usuarios_estacionar_vehiculo' %}">
     {% csrf_token %}
+
+    <!-- Tipo de vehículo -->
     <div class="form-row">
       <label for="tipo">Tipo</label>
       <select id="tipo" name="tipo">
@@ -13,19 +20,42 @@
         <option value="moto">Moto</option>
       </select>
     </div>
+
+    <!-- Patente -->
     <div class="form-row">
       <label for="patente">Patente</label>
       <input id="patente" name="patente" required />
     </div>
+
+    <!-- Subcuadra -->
     <div class="form-row">
       <label for="subcuadra">Zona / Subcuadra</label>
-      <select id="subcuadra" name="subcuadra_id">{% for s in subcuadras %}<option value="{{ s.id }}">{{ s.calle }} {{ s.altura }}</option>{% endfor %}</select>
+      <select id="subcuadra" name="subcuadra_id">
+        {% for s in subcuadras %}
+          <option value="{{ s.id }}">{{ s.calle }} {{ s.altura }}</option>
+        {% endfor %}
+      </select>
     </div>
+
+    <!-- Duración en pasos de 0.5 hs -->
     <div class="form-row">
-      <label for="duracion">Duración estimada (horas)</label>
-      <input id="duracion" name="duracion" type="number" min="1" value="1" />
+      <label for="duracion">Duración estimada</label>
+      <select id="duracion" name="duracion">
+        <option value="0.5">0.5 hs</option>
+        <option value="1">1 hs</option>
+        <option value="1.5">1.5 hs</option>
+        <option value="2">2 hs</option>
+        <option value="2.5">2.5 hs</option>
+        <option value="3">3 hs</option>
+        <option value="3.5">3.5 hs</option>
+        <option value="4">4 hs</option>
+      </select>
     </div>
-    <div class="form-row actions"><button class="btn primary">Estacionar</button></div>
+
+    <!-- Botón de acción -->
+    <div class="form-row actions">
+      <button class="btn primary">Estacionar</button>
+    </div>
   </form>
 </section>
 {% endblock %}
