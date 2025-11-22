@@ -1,6 +1,6 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 # Archivo: views.py
-# Vistas del sistema organizadas por rol.
+# Vistas del sistema organizadas por rol, con login/logout y chequeos de sesión.
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -15,10 +15,12 @@ from decimal import Decimal, ROUND_HALF_UP
 def home(request):
     """
     Vista principal del sistema.
-    - Redirige automáticamente al inicio de usuarios.
-    - Se usa como punto de entrada general del sitio.
+    - Si hay usuario logueado, redirige al inicio de usuarios.
+    - Si no hay sesión, redirige al login.
     """
-    return redirect('inicio_usuarios')
+    if not request.session.get("usuario_id"):
+        return redirect("login")
+    return redirect("inicio_usuarios")
 
 
 # =========================================================
@@ -27,10 +29,14 @@ def home(request):
 def inicio_usuarios(request):
     """
     Pantalla inicial para usuarios.
-    - Muestra nombre del usuario.
+    - Muestra nombre del usuario logueado.
     - Lista estacionamientos activos asociados a sus vehículos.
     """
-    usuario = Usuario.objects.first()  # ⚠️ ejemplo: tomar el primer usuario
+    usuario_id = request.session.get("usuario_id")
+    if not usuario_id:
+        return redirect("login")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+
     estacionamientos_activos = Estacionamiento.objects.filter(
         vehiculo__usuarios=usuario,
         activo=True
@@ -41,12 +47,13 @@ def inicio_usuarios(request):
         "estacionamientos": estacionamientos_activos,
     })
 
+
 def estacionar_vehiculo(request):
     """
     Vista para registrar un nuevo estacionamiento.
-    - Valida que el usuario, vehículo y subcuadra existan.
-    - Verifica que el vehículo no tenga un estacionamiento activo.
-    - Permite duración en pasos de 0.5 horas (30 minutos).
+    - Valida usuario, vehículo y subcuadra.
+    - Verifica que el vehículo no tenga estacionamiento activo.
+    - Valida duración en pasos de 0.5 horas.
     - Usa EstacionamientoFactory para crear el registro.
     """
     if request.method == 'POST':
@@ -91,15 +98,14 @@ def estacionar_vehiculo(request):
         'subcuadras': Subcuadra.objects.all()
     })
 
+
 def finalizar_estacionamiento(request, estacionamiento_id):
     """
     Finaliza un estacionamiento activo.
     - Busca el estacionamiento por ID.
-    - Si ya está finalizado, muestra error.
     - Calcula costo usando EstrategiaExencion.
     - Valida que el usuario tenga saldo suficiente.
     - Descuenta saldo y guarda cambios.
-    - Devuelve plantilla con mensaje de éxito o error.
     """
     estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
 
@@ -112,12 +118,10 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     estrategia = EstrategiaExencion()
     duracion = (timezone.now() - estacionamiento.hora_inicio).total_seconds() / 3600
 
-    # Calcular costo como float
     costo_estimado = estrategia.calcular(
         estacionamiento.vehiculo, estacionamiento.subcuadra, duracion
     )
 
-    # Convertir a Decimal con 2 decimales
     costo_estimado_decimal = Decimal(str(costo_estimado)).quantize(
         Decimal("0.01"), rounding=ROUND_HALF_UP
     )
@@ -130,10 +134,7 @@ def finalizar_estacionamiento(request, estacionamiento_id):
             'costo_estimado': costo_estimado_decimal
         })
 
-    # Finalizar estacionamiento con estrategia
     estacionamiento.finalizar(estrategia)
-
-    # Descontar saldo usando Decimal
     usuario.saldo -= estacionamiento.costo
     usuario.save()
 
@@ -142,11 +143,16 @@ def finalizar_estacionamiento(request, estacionamiento_id):
         'estacionamiento': estacionamiento
     })
 
+
 def historial_estacionamientos(request):
     """
-    Muestra historial de estacionamientos del usuario.
+    Muestra historial de estacionamientos del usuario logueado.
     """
-    usuario = Usuario.objects.first()  # ⚠️ ejemplo: tomar el primer usuario
+    usuario_id = request.session.get("usuario_id")
+    if not usuario_id:
+        return redirect("login")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+
     estacionamientos = Estacionamiento.objects.filter(vehiculo__usuarios=usuario)
 
     return render(request, 'usuarios/historial_estacionamientos.html', {
@@ -156,29 +162,33 @@ def historial_estacionamientos(request):
 
 def historial_infracciones(request):
     """
-    Muestra historial de infracciones del usuario.
+    Muestra historial de infracciones del usuario logueado.
     """
-    usuario = Usuario.objects.first()  # ⚠️ ejemplo: tomar el primer usuario
+    usuario_id = request.session.get("usuario_id")
+    if not usuario_id:
+        return redirect("login")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+
     infracciones = Infraccion.objects.filter(vehiculo__usuarios=usuario)
 
     return render(request, 'usuarios/historial_infracciones.html', {
         'infracciones': infracciones
     })
 
+
 def cargar_saldo(request):
     """
     Vista para cargar saldo en la cuenta del usuario.
-    - Renderiza formulario de carga.
-    - La lógica de POST se puede implementar luego.
     """
     return render(request, 'usuarios/cargar_saldo.html')
+
 
 def consultar_deuda(request):
     """
     Vista para consultar deuda del usuario.
-    - Renderiza plantilla con información de deuda.
     """
     return render(request, 'usuarios/consultar_deuda.html')
+
 
 # =========================================================
 # VIEWS INSPECTORES
@@ -186,23 +196,37 @@ def consultar_deuda(request):
 def panel_inspectores(request):
     """
     Panel principal de inspectores.
-    - Desde aquí acceden a verificar vehículos e infracciones.
+    - Solo accesible si el usuario es inspector.
     """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.es_inspector:
+        return redirect("inicio")
     return render(request, 'inspectores/panel.html')
+
 
 def verificar_vehiculo(request):
     """
     Vista para verificar estado de un vehículo.
-    - Renderiza plantilla con formulario de verificación.
+    - Solo accesible a inspectores.
     """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.es_inspector:
+        return redirect("inicio")
     return render(request, 'inspectores/verificar_vehiculo.html')
+
 
 def registrar_estacionamiento_manual(request):
     """
     Vista para registrar estacionamiento manualmente (por inspector).
-    - Renderiza formulario de registro.
     """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.es_inspector:
+        return redirect("inicio")
     return render(request, 'inspectores/registrar_estacionamiento_manual.html')
+
 
 def registrar_infraccion(request):
     """
@@ -211,14 +235,14 @@ def registrar_infraccion(request):
     - Verifica si el vehículo está exento.
     - Si tiene estacionamiento activo, lo asocia.
     - Si no, crea infracción independiente.
-    - Devuelve mensaje de resultado.
     """
+    usuario_id = request.session.get("usuario_id")
+    inspector = get_object_or_404(Usuario, id=usuario_id, es_inspector=True)
+
     if request.method == 'POST':
-        inspector_id = request.POST['inspector_id']
         patente = request.POST['patente']
         subcuadra_id = request.POST['subcuadra_id']
 
-        inspector = get_object_or_404(Usuario, id=inspector_id, es_inspector=True)
         vehiculo = get_object_or_404(Vehiculo, patente=patente)
         subcuadra = get_object_or_404(Subcuadra, id=subcuadra_id)
 
@@ -226,6 +250,8 @@ def registrar_infraccion(request):
             mensaje = "El vehículo está exento."
         else:
             estacionamiento = Estacionamiento.objects.filter(
+                vehiculo=vehiculo
+estacionamiento = Estacionamiento.objects.filter(
                 vehiculo=vehiculo, subcuadra=subcuadra, activo=True
             ).first()
 
@@ -249,26 +275,37 @@ def registrar_infraccion(request):
 
         return render(request, 'inspectores/registrar_infraccion.html', {
             'mensaje': mensaje,
-            'inspectores': Usuario.objects.filter(es_inspector=True),
             'subcuadras': Subcuadra.objects.all()
         })
 
     return render(request, 'inspectores/registrar_infraccion.html', {
-        'inspectores': Usuario.objects.filter(es_inspector=True),
         'subcuadras': Subcuadra.objects.all()
     })
+
 
 def resumen_cobros(request):
     """
     Vista de resumen de cobros realizados por inspectores.
+    - Solo accesible a inspectores.
     """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.es_inspector:
+        return redirect("inicio")
     return render(request, 'inspectores/resumen_cobros.html')
+
 
 def resumen_infracciones(request):
     """
     Vista de resumen de infracciones registradas por inspectores.
+    - Solo accesible a inspectores.
     """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.es_inspector:
+        return redirect("inicio")
     return render(request, 'inspectores/resumen_infracciones.html')
+
 
 # =========================================================
 # VIEWS VENDEDORES
@@ -276,28 +313,42 @@ def resumen_infracciones(request):
 def panel_vendedores(request):
     """
     Panel principal de vendedores.
-    - Desde aquí acceden a registrar estacionamientos y ver caja.
+    - Solo accesible a vendedores.
     """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.es_vendedor:
+        return redirect("inicio")
     return render(request, 'vendedores/panel.html')
+
 
 def registrar_estacionamiento_vendedor(request):
     """
     Vista para que un vendedor registre un estacionamiento.
+    - Solo accesible a vendedores.
     """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.es_vendedor:
+        return redirect("inicio")
     return render(request, 'vendedores/registrar_estacionamiento.html')
+
 
 def resumen_caja(request):
     """
     Vista de resumen de caja de vendedores.
+    - Solo accesible a vendedores.
     """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario.es_vendedor:
+        return redirect("inicio")
     return render(request, 'vendedores/resumen_caja.html')
+
 
 # =========================================================
 # VIEWS LOGIN / LOGOUT
 # =========================================================
-from django.shortcuts import render, redirect, get_object_or_404
-from .models import Usuario
-
 def login_view(request):
     """
     Vista de login simple.
