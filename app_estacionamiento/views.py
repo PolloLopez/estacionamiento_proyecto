@@ -250,8 +250,6 @@ def registrar_infraccion(request):
             mensaje = "El vehículo está exento."
         else:
             estacionamiento = Estacionamiento.objects.filter(
-                vehiculo=vehiculo
-estacionamiento = Estacionamiento.objects.filter(
                 vehiculo=vehiculo, subcuadra=subcuadra, activo=True
             ).first()
 
@@ -359,14 +357,12 @@ def login_view(request):
     if request.method == "POST":
         correo = request.POST.get("correo")
         password = request.POST.get("password")
-
         try:
             usuario = Usuario.objects.get(correo=correo, password=password)
             request.session["usuario_id"] = usuario.id
             return redirect("inicio")
         except Usuario.DoesNotExist:
             return render(request, "login.html", {"error": "Correo o contraseña incorrectos"})
-
     return render(request, "login.html")
 
 
