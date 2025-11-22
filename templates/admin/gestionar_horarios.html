@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Gestionar Horarios{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Horarios y excepciones</h2>
+
+  <!-- Form para crear período -->
+  <form method="post" action="{% url 'admin_guardar_horario' %}" class="form">
+    {% csrf_token %}
+    <div class="form-row">
+      <label>Nombre</label>
+      <input name="nombre" required />
+    </div>
+    <div class="form-row">
+      <label>Inicio</label>
+      <input type="datetime-local" name="inicio" />
+    </div>
+    <div class="form-row">
+      <label>Fin</label>
+      <input type="datetime-local" name="fin" />
+    </div>
+    <div class="form-row actions">
+      <button class="btn primary">Guardar</button>
+    </div>
+  </form>
+
+  <h3>Horarios existentes</h3>
+  <table class="table">
+    <thead><tr><th>Nombre</th><th>Inicio</th><th>Fin</th><th>Acciones</th></tr></thead>
+    <tbody>
+      {% for h in horarios %}
+      <tr><td>{{ h.nombre }}</td><td>{{ h.inicio }}</td><td>{{ h.fin }}</td>
+      <td><a class="btn small" href="{% url 'admin_eliminar_horario' h.id %}">Eliminar</a></td></tr>
+      {% empty %}
+      <tr><td colspan="4">No hay horarios definidos</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

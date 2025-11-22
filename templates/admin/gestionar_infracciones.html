@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Gestionar Infracciones{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Infracciones</h2>
+
+  <form method="get" class="form-inline">
+    <input name="patente" placeholder="Buscar por patente" />
+    <button class="btn">Buscar</button>
+  </form>
+
+  <table class="table">
+    <thead><tr><th>Fecha</th><th>Patente</th><th>Inspector</th><th>Estado</th><th>Acciones</th></tr></thead>
+    <tbody>
+      {% for inf in infracciones %}
+      <tr>
+        <td>{{ inf.fecha }}</td>
+        <td>{{ inf.vehiculo.patente }}</td>
+        <td>{{ inf.inspector.nombre }}</td>
+        <td>{{ inf.cancelada|yesno:"Cancelada,Activa" }}</td>
+        <td>
+          <a class="btn small" href="{% url 'admin_ver_infraccion' inf.id %}">Ver</a>
+          <a class="btn small" href="{% url 'admin_cambiar_estado_infraccion' inf.id %}">Cambiar estado</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">No hay infracciones</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

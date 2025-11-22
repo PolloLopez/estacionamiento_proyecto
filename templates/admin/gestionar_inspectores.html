@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Gestionar Inspectores{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Inspectores</h2>
+
+  <!-- Nuevo inspector -->
+  <form method="post" action="{% url 'admin_crear_inspector' %}" class="form">
+    {% csrf_token %}
+    <div class="form-row">
+      <label for="nombre">Nombre</label>
+      <input id="nombre" name="nombre" required />
+    </div>
+    <div class="form-row actions"><button class="btn primary" type="submit">Crear inspector</button></div>
+  </form>
+
+  <!-- Tabla -->
+  <table class="table">
+    <thead><tr><th>Nombre</th><th>Email</th><th>Acciones</th></tr></thead>
+    <tbody>
+      {% for i in inspectores %}
+      <tr><td>{{ i.nombre }}</td><td>{{ i.correo }}</td>
+      <td>
+        <a class="btn small" href="{% url 'admin_editar_inspector' i.id %}">Editar</a>
+      </td></tr>
+      {% empty %}
+      <tr><td colspan="3">No hay inspectores</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

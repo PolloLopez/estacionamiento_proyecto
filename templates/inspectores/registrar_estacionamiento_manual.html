@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Registrar Estacionamiento Manual{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Registrar estacionamiento (cobro presencial)</h2>
+  <form method="post" action="{% url 'inspectores_registrar_estacionamiento_manual' %}" class="form">
+    {% csrf_token %}
+    <div class="form-row">
+      <label>Patente</label>
+      <input name="patente" required />
+    </div>
+    <div class="form-row">
+      <label>Tipo</label>
+      <select name="vehiculo_tipo"><option value="auto">Auto</option><option value="moto">Moto</option></select>
+    </div>
+    <div class="form-row">
+      <label>Duración (horas)</label>
+      <input name="duracion" type="number" min="1" value="1" />
+    </div>
+    <div class="form-row actions">
+      <button class="btn primary">Registrar y cobrar</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

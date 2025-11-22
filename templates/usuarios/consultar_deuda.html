@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Consultar Deuda{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Consultar deuda por vehículo</h2>
+  <form method="get" action="{% url 'usuarios_consultar_deuda' %}">
+    <div class="form-row">
+      <label>Patente</label>
+      <input name="patente" placeholder="ABC123" />
+    </div>
+    <div class="form-row actions"><button class="btn">Consultar</button></div>
+  </form>
+
+  {% if deuda is not None %}
+  <div class="card">
+    <p>Total deuda: <strong>${{ deuda.total }}</strong></p>
+    <a class="btn" href="{% url 'usuarios_pagar_estacionamiento' patente=consulta_patente %}">Pagar</a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,18 +1,33 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Inicio - Estacionamiento Medido</title>
-</head>
-<body>
-    <h1>🚗 Sistema de Estacionamiento Medido</h1>
+{% extends "base.html" %}
+{% load static %}
 
-    <ul>
-        <li><a href="{% url 'estacionar_auto' %}">🅿️ Estacionar vehículo</a></li>
-        <li><a href="{% url 'registrar_infraccion' %}">⚠️ Registrar infracción</a></li>
-    </ul>
+{% block title %}Inicio - Estacionamiento Medido{% endblock %}
 
-    <p><a href="{% url 'admin:index' %}">Ir al panel de administración</a></p>
-</body>
-</html>
+{% block content %}
+
+<h2 class="page-title">🚗 Sistema de Estacionamiento Medido</h2>
+
+<div class="card-grid">
+
+    <!-- Estacionar -->
+    <a href="{% url 'estacionar_auto' %}" class="card">
+        <h3>🅿️ Estacionar vehículo</h3>
+        <p>Iniciá un nuevo estacionamiento para auto o moto.</p>
+    </a>
+
+    <!-- Registrar infracción -->
+    <a href="{% url 'registrar_infraccion' %}" class="card warning">
+        <h3>⚠️ Registrar infracción</h3>
+        <p>Solo para inspectores municipales.</p>
+    </a>
+
+    <!-- Panel Admin -->
+    <a href="/admin/" class="card admin">
+        <h3>🔧 Panel administrativo</h3>
+        <p>Gestión interna del sistema.</p>
+    </a>
+
+</div>
+
+{% endblock %}
 

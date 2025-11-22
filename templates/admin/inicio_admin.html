@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Panel Admin — Estacionamiento Medido{% endblock %}
+
+{% block content %}
+<section class="panel admin-dashboard">
+  <h2>Administrador — Panel</h2>
+  <!-- Resumen rápido: números clave -->
+  <div class="grid">
+    <div class="card">Usuarios: <strong>{{ total_usuarios }}</strong></div>
+    <div class="card">Inspectores: <strong>{{ total_inspectores }}</strong></div>
+    <div class="card">Vendedores: <strong>{{ total_vendedores }}</strong></div>
+    <div class="card">Estacionamientos activos: <strong>{{ activos }}</strong></div>
+  </div>
+
+  <!-- Accesos rápidos -->
+  <nav class="admin-actions">
+    <a class="btn" href="{% url 'gestionar_usuarios' %}">Gestionar usuarios</a>
+    <a class="btn" href="{% url 'gestionar_inspectores' %}">Gestionar inspectores</a>
+    <a class="btn" href="{% url 'gestionar_vendedores' %}">Gestionar vendedores</a>
+    <a class="btn" href="{% url 'gestionar_tarifas' %}">Gestionar tarifas</a>
+    <a class="btn" href="{% url 'gestionar_horarios' %}">Gestionar horarios</a>
+    <a class="btn" href="{% url 'gestionar_infracciones' %}">Ver infracciones</a>
+  </nav>
+
+  <!-- Tabla de eventos recientes -->
+  <h3>Eventos recientes</h3>
+  <table class="table">
+    <thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th></tr></thead>
+    <tbody>
+      {% for ev in eventos_recientes %}
+      <tr><td>{{ ev.fecha }}</td><td>{{ ev.tipo }}</td><td>{{ ev.detalle }}</td></tr>
+      {% empty %}
+      <tr><td colspan="3">No hay eventos recientes</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

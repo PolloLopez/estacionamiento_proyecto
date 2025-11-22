@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Verificar Vehículo{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Verificar vehículo por patente</h2>
+
+  <!-- Form que envía la patente para verificar estado -->
+  <form method="post" action="{% url 'inspectores_verificar_vehiculo' %}" class="form-inline">
+    {% csrf_token %}
+    <input name="patente" placeholder="ABC123" required />
+    <button class="btn">Verificar</button>
+  </form>
+
+  <!-- Resultado: se muestra solo si context incluye 'resultado' -->
+  {% if resultado %}
+  <div class="result">
+    <h3>Resultado para {{ resultado.patente }}</h3>
+
+    <!-- Indica estado: Pagado/Impago/Exento -->
+    <p>Estado: <strong>{{ resultado.estado }}</strong></p>
+
+    <!-- Si es exento, mostrar alcance -->
+    {% if resultado.exento %}
+      <p>Exento: <strong>{{ resultado.exento_detalle }}</strong></p>
+    {% endif %}
+
+    <!-- Si impago, boton registrar infracción -->
+    {% if resultado.estado == "Impago" %}
+      <a class="btn danger" href="{% url 'inspectores_registrar_infraccion' %}?patente={{ resultado.patente }}">Registrar infracción</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

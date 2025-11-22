@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Estacionar rápido{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Estacionar rápido (sin registro)</h2>
+  <p>Ideal para turistas: completa patente y duracion. Se genera un recibo con un código simple.</p>
+
+  <form method="post" action="{% url 'usuarios_estacionar_rapido' %}">
+    {% csrf_token %}
+    <div class="form-row">
+      <label for="patente">Patente</label>
+      <input id="patente" name="patente" required />
+    </div>
+    <div class="form-row">
+      <label for="tipo">Tipo</label>
+      <select id="tipo" name="tipo"><option value="auto">Auto</option><option value="moto">Moto</option></select>
+    </div>
+    <div class="form-row">
+      <label for="duracion">Duración (horas)</label>
+      <input id="duracion" name="duracion" type="number" min="1" value="1" />
+    </div>
+
+    <div class="form-row actions">
+      <button class="btn primary">Generar estacionamiento rápido</button>
+    </div>
+  </form>
+
+  <p class="muted">Se generará un código/recibo rápido para mostrar al inspector en caso de control.</p>
+</section>
+{% endblock %}

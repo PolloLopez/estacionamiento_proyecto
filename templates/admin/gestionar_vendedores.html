@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Gestionar Vendedores{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Vendedores</h2>
+
+  <form method="post" action="{% url 'admin_crear_vendedor' %}">
+    {% csrf_token %}
+    <div class="form-row">
+      <label for="nombre">Nombre comercio</label>
+      <input id="nombre" name="nombre" required />
+    </div>
+    <div class="form-row actions">
+      <button class="btn primary">Crear vendedor</button>
+    </div>
+  </form>
+
+  <table class="table">
+    <thead><tr><th>Comercio</th><th>Balance</th><th>Acciones</th></tr></thead>
+    <tbody>
+      {% for v in vendedores %}
+      <tr><td>{{ v.nombre }}</td><td>${{ v.balance }}</td>
+      <td><a class="btn small" href="{% url 'admin_editar_vendedor' v.id %}">Editar</a></td></tr>
+      {% empty %}
+      <tr><td colspan="3">No hay vendedores</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

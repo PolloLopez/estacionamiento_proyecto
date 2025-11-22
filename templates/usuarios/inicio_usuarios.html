@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Inicio — Usuario{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Bienvenido, {{ usuario.nombre }}</h2>
+  <p>Desde aquí podés gestionar tus estacionamientos y saldo.</p>
+
+  <ul class="list">
+    <li><a class="btn" href="{% url 'usuarios_estacionar' %}">Estacionar vehículo</a></li>
+    <li><a class="btn" href="{% url 'usuarios_estacionar_rapido' %}">Estacionar rápido</a></li>
+    <li><a class="btn" href="{% url 'usuarios_finalizar' %}">Finalizar</a></li>
+    <li><a class="btn" href="{% url 'usuarios_cargar_saldo' %}">Cargar saldo</a></li>
+  </ul>
+</section>
+{% endblock %}

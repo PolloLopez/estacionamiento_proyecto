@@ -1,4 +1,23 @@
-<h2>Estacionamiento finalizado</h2>
-<p>Usuario: {{ usuario.nombre }}</p>
-<p>Costo: ${{ costo }}</p>
-<p>Saldo restante: ${{ usuario.saldo }}</p>
+{% extends "base.html" %}
+{% block title %}Resumen Infracciones{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Resumen de infracciones</h2>
+  <table class="table">
+    <thead><tr><th>Fecha</th><th>Patente</th><th>Inspector</th><th>Estado</th></tr></thead>
+    <tbody>
+      {% for inf in infracciones %}
+      <tr>
+        <td>{{ inf.fecha }}</td>
+        <td>{{ inf.vehiculo.patente }}</td>
+        <td>{{ inf.inspector.nombre }}</td>
+        <td>{{ inf.cancelada|yesno:"Cancelada,Activa" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">No hay infracciones</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

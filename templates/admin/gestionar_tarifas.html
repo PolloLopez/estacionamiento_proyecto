@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Gestionar Tarifas{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Tarifas del sistema</h2>
+  <!-- Form para crear / editar tarifa -->
+  <form method="post" action="{% url 'admin_guardar_tarifa' %}" class="form-inline">
+    {% csrf_token %}
+    <label for="precio">Precio por hora</label>
+    <input id="precio" name="precio_por_hora" type="number" step="0.01" required value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}" />
+    <button class="btn primary">Guardar</button>
+  </form>
+
+  <p class="muted">La tarifa se usará en el cálculo de costos al finalizar estacionamientos.</p>
+</section>
+{% endblock %}

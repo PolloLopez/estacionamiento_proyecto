@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Gestionar Usuarios{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Gestionar Usuarios</h2>
+  <!-- Buscador -->
+  <form method="get" class="form-inline">
+    <input name="q" placeholder="Buscar por nombre, email o DNI" value="{{ request.GET.q }}" />
+    <button class="btn">Buscar</button>
+  </form>
+
+  <!-- Tabla de usuarios -->
+  <table class="table">
+    <thead><tr><th>Nombre</th><th>Email</th><th>Saldo</th><th>Exento</th><th>Acciones</th></tr></thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <td>{{ u.nombre }}</td>
+        <td>{{ u.correo }}</td>
+        <td>${{ u.saldo }}</td>
+        <td>{{ u.es_exento|yesno:"Sí,No" }}</td>
+        <td>
+          <a class="btn small" href="{% url 'admin_editar_usuario' u.id %}">Editar</a>
+          <a class="btn small danger" href="{% url 'admin_eliminar_usuario' u.id %}">Eliminar</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">No hay usuarios</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

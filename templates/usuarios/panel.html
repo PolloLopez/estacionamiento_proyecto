@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Panel Usuario{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Mi cuenta</h2>
+
+  <!-- Mostrar estacionamiento activo si existe -->
+  {% if estacionamiento_activo %}
+  <div class="card">
+    <h3>Estacionamiento activo</h3>
+    <p>Zona: <strong>{{ estacionamiento_activo.subcuadra }}</strong></p>
+    <p>Inicio: {{ estacionamiento_activo.hora_inicio }}</p>
+    <p>Tiempo transcurrido: {{ estacionamiento_activo.tiempo }}</p>
+    <p>Costo estimado: <strong>${{ estacionamiento_activo.costo_estimado }}</strong></p>
+    <a class="btn" href="{% url 'finalizar_estacionamiento' estacionamiento_activo.id %}">Finalizar</a>
+  </div>
+  {% else %}
+  <p>No tenés estacionamientos activos.</p>
+  {% endif %}
+
+  <nav class="inline">
+    <a class="btn" href="{% url 'usuarios_estacionar' %}">Registrar estacionamiento</a>
+    <a class="btn" href="{% url 'usuarios_estacionar_rapido' %}">Estacionar rápido</a>
+    <a class="btn" href="{% url 'usuarios_cargar_saldo' %}">Cargar saldo</a>
+    <a class="btn" href="{% url 'usuarios_historial' %}">Historial</a>
+    <a class="btn" href="{% url 'usuarios_infracciones' %}">Mis infracciones</a>
+  </nav>
+
+  <h3>Saldo</h3>
+  <p><strong>${{ usuario.saldo }}</strong></p>
+</section>
+{% endblock %}
+

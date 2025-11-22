@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Estacionar rápido{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Estacionamiento rápido</h2>
+  <p>Formulario minimal para registrar un estacionamiento sin cuenta.</p>
+
+  <form method="post" action="{% url 'usuarios_estacionar_rapido' %}">
+    {% csrf_token %}
+    <div class="form-row">
+      <label>Patente</label>
+      <input name="patente" required />
+    </div>
+    <div class="form-row">
+      <label>Tipo</label>
+      <select name="tipo"><option value="auto">Auto</option><option value="moto">Moto</option></select>
+    </div>
+    <div class="form-row">
+      <label>Duración</label>
+      <input type="number" name="duracion" min="1" value="1" />
+    </div>
+    <div class="form-row actions">
+      <button class="btn primary">Generar</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Resumen de Caja{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Resumen de caja</h2>
+  <table class="table">
+    <thead><tr><th>Fecha</th><th>Patente</th><th>Monto</th><th>Cliente</th></tr></thead>
+    <tbody>
+      {% for r in registros %}
+      <tr><td>{{ r.fecha }}</td><td>{{ r.patente }}</td><td>${{ r.monto }}</td><td>{{ r.cliente }}</td></tr>
+      {% empty %}
+      <tr><td colspan="4">No hay movimientos</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

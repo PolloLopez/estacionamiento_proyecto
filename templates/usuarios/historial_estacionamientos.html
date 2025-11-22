@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Historial de Estacionamientos{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Historial de estacionamientos</h2>
+  <table class="table">
+    <thead><tr><th>Fecha</th><th>Zona</th><th>Duración</th><th>Costo</th></tr></thead>
+    <tbody>
+      {% for e in estacionamientos %}
+      <tr>
+        <td>{{ e.hora_inicio }}</td>
+        <td>{{ e.subcuadra }}</td>
+        <td>{{ e.duracion }}</td>
+        <td>${{ e.costo }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">Aún no registraste estacionamientos</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

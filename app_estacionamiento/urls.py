@@ -1,11 +1,17 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/urls.py
+# Archivo: app_estacionamiento/urls.py
+# Punto de entrada: acá se incluyen las rutas por rol
 
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 urlpatterns = [
+    # Home general del sistema → redirige a home de usuario
     path('', views.home, name='inicio'),
-    path('estacionar/', views.estacionar_auto, name='estacionar_auto'),
-    path('finalizar/<int:estacionamiento_id>/', views.finalizar_estacionamiento, name='finalizar_estacionamiento'),
-    path('infraccion/', views.registrar_infraccion, name='registrar_infraccion'),
+
+    # Rutas separadas por rol
+    path('usuarios/', include('app_estacionamiento.urls_usuarios')),
+    path('inspectores/', include('app_estacionamiento.urls_inspectores')),
+    path('vendedores/', include('app_estacionamiento.urls_vendedores')),
+    path('panel-admin/', include('app_estacionamiento.urls_admin_custom')),
 ]

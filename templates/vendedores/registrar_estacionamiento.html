@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Registrar Estacionamiento — Vendedor{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Registrar estacionamiento (a nombre de cliente)</h2>
+  <form method="post" action="{% url 'vendedores_registrar_estacionamiento' %}">
+    {% csrf_token %}
+    <div class="form-row">
+      <label>Patente</label>
+      <input name="patente" required />
+    </div>
+    <div class="form-row">
+      <label>Cliente (opcional)</label>
+      <input name="cliente_email" />
+    </div>
+    <div class="form-row">
+      <label>Duración (horas)</label>
+      <input name="duracion" type="number" min="1" value="1" />
+    </div>
+    <div class="form-row actions">
+      <button class="btn primary">Registrar y cobrar</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

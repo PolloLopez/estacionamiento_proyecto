@@ -1,0 +1,150 @@
+/* ===============================
+   ESTILOS GLOBALES GENERALES
+   =============================== */
+/* ===============================
+   VARIABLES DE COLOR (brand oficial)
+   =============================== */
+:root {
+    --verde: #8CC63F;
+    --verde-lima: #C6D92D;
+    --celeste: #7CC9E8;
+    --rosa: #E64594;
+    --gris-oscuro: #4A4A49;
+    --gris-claro: #f5f6f8;
+    --blanco: #ffffff;
+
+    --primary: var(--verde);
+    --primary-dark: #73A834;
+    --secondary: var(--celeste);
+    --danger: var(--rosa);
+}
+
+/* ===============================
+   RESET Y TIPOGRAFÍA GLOBAL
+   =============================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Arial", sans-serif;
+    background: var(--gris-claro);
+    color: var(--gris-oscuro);
+    padding-bottom: 3rem;
+}
+
+/* ===============================
+   NAVBAR
+   =============================== */
+.navbar {
+    background: var(--primary);
+    color: var(--blanco);
+    padding: 15px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar .logo {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.nav-items {
+    list-style: none;
+    display: flex;
+    gap: 18px;
+}
+
+.nav-items li a {
+    color: var(--blanco);
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.nav-items li a:hover {
+    color: var(--verde-lima);
+}
+
+/* ===============================
+   CONTENEDOR GENERAL
+   =============================== */
+.container {
+    width: 90%;
+    max-width: 900px;
+    margin: 30px auto;
+    background: var(--blanco);
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+
+/* ===============================
+   TITULOS
+   =============================== */
+h1, h2 {
+    margin-bottom: 20px;
+    color: var(--primary-dark);
+}
+
+/* ===============================
+   FORMULARIOS
+   =============================== */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+input, select {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+}
+
+button {
+    padding: 12px;
+    background: var(--primary);
+    color: var(--blanco);
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    background: var(--primary-dark);
+}
+
+/* Botón secundario */
+.btn-secondary {
+    background: var(--secondary);
+}
+
+.btn-secondary:hover {
+    background: #66B7D8;
+}
+
+/* Botón de alerta */
+.btn-danger {
+    background: var(--danger);
+}
+
+.btn-danger:hover {
+    background: #cb347f;
+}
+
+/* ===============================
+   FOOTER
+   =============================== */
+.footer {
+    text-align: center;
+    padding: 15px;
+    margin-top: 40px;
+    color: var(--gris-oscuro);
+    font-size: 0.9rem;
+}

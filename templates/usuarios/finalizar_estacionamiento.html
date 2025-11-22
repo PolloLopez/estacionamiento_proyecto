@@ -1,27 +1,28 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Finalizar Estacionamiento</title>
-</head>
-<body>
-    <h1>🕒 Finalizar Estacionamiento</h1>
+{% extends "base.html" %}
+{% block title %}Finalizar Estacionamiento{% endblock %}
 
-    {% if error %}
-        <p style="color:red;">{{ error }}</p>
-    {% endif %}
-    {% if mensaje %}
-        <p style="color:green;">{{ mensaje }}</p>
-    {% endif %}
+{% block content %}
+<section class="panel">
+  <h2>Finalizar estacionamiento</h2>
 
-    {% if costo_estimado %}
-        <p>Costo estimado: ${{ costo_estimado }}</p>
-    {% endif %}
+  {% if error %}
+  <p class="error">{{ error }}</p>
+  {% endif %}
 
-    <p>Vehículo: {{ estacionamiento.vehiculo.patente }}</p>
-    <p>Subcuadra: {{ estacionamiento.subcuadra.nombre }}</p>
+  <div class="card">
+    <h3>Detalles</h3>
+    <p>Patente: <strong>{{ estacionamiento.vehiculo.patente }}</strong></p>
     <p>Inicio: {{ estacionamiento.hora_inicio }}</p>
+    <p>Duración real: {{ estacionamiento.duracion_real }}</p>
+    <p>Costo calculado: <strong>${{ estacionamiento.costo }}</strong></p>
+  </div>
 
-    <p><a href="{% url 'inicio' %}">Volver al inicio</a></p>
-</body>
-</html>
+  <form method="post" action="{% url 'usuarios_finalizar' estacionamiento.id %}">
+    {% csrf_token %}
+    <div class="form-row actions">
+      <button class="btn primary">Pagar y finalizar</button>
+      <a class="btn link" href="{% url 'usuarios_panel' %}">Cancelar</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
