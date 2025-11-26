@@ -6,9 +6,8 @@ from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
 from .estrategias import EstrategiaExencion
 from .factories import EstacionamientoFactory
 from decimal import Decimal, ROUND_HALF_UP
-from .decorators import require_role
+from .decorators import require_role, require_login
 registros = Estacionamiento.objects.filter(...).order_by("-hora_inicio")
-
 
 # =========================================================
 # HOME GENERAL
