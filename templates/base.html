@@ -25,6 +25,8 @@
     {% if usuario and usuario.es_inspector %}
       <li><a href="{% url 'inspectores_verificar_vehiculo' %}">🔍 Verificar vehículo</a></li>
       <li><a href="{% url 'inspectores_registrar_infraccion' %}">⚠️ Registrar infracción</a></li>
+      <li><a href="{% url 'inspectores_registrar_estacionamiento_manual' %}">Registrar estacionamiento manual</a></li>
+      <li><a href="{% url 'inspectores_resumen_cobros' %}">Resumen cobros</a></li>
     {% endif %}
 
     {% if usuario and usuario.es_vendedor %}

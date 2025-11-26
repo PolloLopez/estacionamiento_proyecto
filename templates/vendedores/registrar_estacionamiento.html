@@ -4,7 +4,7 @@
 {% block content %}
 <section class="panel">
   <h2>Registrar estacionamiento (a nombre de cliente)</h2>
-  <form method="post" action="{% url 'vendedores_registrar_estacionamiento' %}">
+  <form method="post" action="{% url 'vendedores_estacionar' %}">
     {% csrf_token %}
     <div class="form-row">
       <label>Patente</label>

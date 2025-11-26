@@ -1,30 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Registrar Infracción{% endblock %}
-
 {% block content %}
 <section class="panel">
   <h2>Registrar infracción</h2>
-  <form method="post" action="{% url 'inspectores_registrar_infraccion' %}" class="form">
+
+  {% if mensaje %}
+    <p>{{ mensaje }}</p>
+  {% endif %}
+
+  <form method="post">
     {% csrf_token %}
-    <div class="form-row">
-      <label for="patente">Patente</label>
-      <input id="patente" name="patente" required />
-    </div>
-    <div class="form-row">
-      <label for="inspector_id">Inspector</label>
-      <select id="inspector_id" name="inspector_id">
-        {% for ins in inspectores %}<option value="{{ ins.id }}">{{ ins.nombre }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="form-row">
-      <label for="subcuadra">Subcuadra (opcional)</label>
-      <select id="subcuadra" name="subcuadra_id">
-        <option value="">-- Seleccione --</option>
-        {% for s in subcuadras %}<option value="{{ s.id }}">{{ s.calle }} {{ s.altura }}</option>{% endfor %}
-      </select>
-    </div>
-    <div class="form-row actions"><button class="btn danger" type="submit">Registrar infracción</button></div>
+    <label for="patente">Patente:</label>
+    <input id="patente" name="patente" value="{{ request.GET.patente }}" required />
+
+    <label for="subcuadra_id">Subcuadra:</label>
+    <select id="subcuadra_id" name="subcuadra_id">
+      {% for s in subcuadras %}
+        <option value="{{ s.id }}">{{ s }}</option>
+      {% endfor %}
+    </select>
+
+    <button class="btn danger">Registrar infracción</button>
   </form>
 </section>
 {% endblock %}
+
 

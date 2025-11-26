@@ -19,7 +19,7 @@ urlpatterns = [
     path('usuarios/historial/', views.historial_estacionamientos, name='usuarios_historial_estacionamientos'),
     path('usuarios/infracciones/', views.historial_infracciones, name='usuarios_historial_infracciones'),
 
-    # =========================
+    # ========================= 
     # INSPECTORES
     # =========================
     path('inspectores/', views.panel_inspectores, name='inspectores_panel'),

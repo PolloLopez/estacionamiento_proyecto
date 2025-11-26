@@ -7,12 +7,13 @@
 
   <!-- Si hay error, se muestra en rojo -->
   {% if error %}
-    <p class="error">{{ error }}</p>
+    <p style="color:red">{{ error }}</p>
   {% endif %}
 
   <!-- Si hay mensaje de éxito, se muestra -->
   {% if mensaje %}
-    <p class="success">{{ mensaje }}</p>
+    <p style="color:green">{{ mensaje }}</p>
+    <p>Saldo restante: ${{ usuario.saldo }}</p>
   {% endif %}
 
   <!-- Tarjeta con detalles del estacionamiento -->

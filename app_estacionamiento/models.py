@@ -14,7 +14,11 @@ class Usuario(models.Model):
     es_vendedor = models.BooleanField(default=False)   # Flag para distinguir vendedores
     es_admin = models.BooleanField(default=False)      # Flag para distinguir administradores
 
-        # Contraseña (para login simple)
+
+    # relación con vehículos
+    vehiculos = models.ManyToManyField("Vehiculo", related_name="usuarios", blank=True)
+
+    # Contraseña (para login simple)
     password = models.CharField(max_length=10, default="1234")
 
     def __str__(self):
@@ -23,7 +27,6 @@ class Usuario(models.Model):
 # 🚗 Vehículo asociado a uno o varios usuarios
 class Vehiculo(models.Model):
     patente = models.CharField(max_length=20, unique=True)  # Identificador único del vehículo
-    usuarios = models.ManyToManyField(Usuario, related_name='vehiculos')  # Relación N:M con usuarios
     exento_en_zona = models.BooleanField(default=False)  # Si está exento en toda la zona
     subcuadras_exentas = models.ManyToManyField('Subcuadra', blank=True)  # Exenciones específicas
 

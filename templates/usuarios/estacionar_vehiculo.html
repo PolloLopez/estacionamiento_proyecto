@@ -27,21 +27,10 @@
       <input id="patente" name="patente" required />
     </div>
 
-    <!-- Subcuadra -->
-    <div class="form-row">
-      <label for="subcuadra">Zona / Subcuadra</label>
-      <select id="subcuadra" name="subcuadra_id">
-        {% for s in subcuadras %}
-          <option value="{{ s.id }}">{{ s.calle }} {{ s.altura }}</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <!-- Duración en pasos de 0.5 hs -->
+    <!-- Duración -->
     <div class="form-row">
       <label for="duracion">Duración estimada</label>
       <select id="duracion" name="duracion">
-        <option value="0.5">0.5 hs</option>
         <option value="1">1 hs</option>
         <option value="1.5">1.5 hs</option>
         <option value="2">2 hs</option>
@@ -57,5 +46,6 @@
       <button class="btn primary">Estacionar</button>
     </div>
   </form>
+  {% if error %}<p style="color:red">{{ error }}</p>{% endif %}
 </section>
 {% endblock %}
