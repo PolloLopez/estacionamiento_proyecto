@@ -1,25 +1,17 @@
-# scripts/crear_usuarios.py
+import os
+import django
+
+# Configurar entorno Django
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "sitio.settings")
+django.setup()
+
 from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra
 
 def run():
     # Crear subcuadras de ejemplo
     zona_unica, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
-    calle21_300, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=200)
-    calle21_350, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=250)
     calle21_300, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=300)
     calle21_350, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=350)
-    calle22_300, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=200)
-    calle22_350, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=250)
-    calle22_300, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=300)
-    calle22_350, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=350)
-    calle23_200, _ = Subcuadra.objects.get_or_create(calle="Calle 23", altura=200)
-    calle23_250, _ = Subcuadra.objects.get_or_create(calle="Calle 23", altura=250)
-    calle23_300, _ = Subcuadra.objects.get_or_create(calle="Calle 23", altura=300)
-    calle23_350, _ = Subcuadra.objects.get_or_create(calle="Calle 23", altura=350)
-    calle24_300, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=200)
-    calle24_350, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=250)
-    calle24_300, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=300)
-    calle24_350, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=350)
 
     # Conductor
     juan, _ = Usuario.objects.get_or_create(
@@ -69,4 +61,7 @@ def run():
         }
     )
 
-    print("Usuarios y vehículos de prueba creados correctamente ✅")
+    print("✅ Base inicializada con usuarios, vehículos y subcuadras de prueba")
+
+if __name__ == "__main__":
+    run()

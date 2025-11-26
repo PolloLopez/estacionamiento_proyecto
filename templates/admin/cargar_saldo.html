@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Cargar saldo{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Cargar saldo a {{ usuario.nombre }}</h2>
+
+  {% if error %}
+    <p style="color:red">{{ error }}</p>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <label for="monto">Monto:</label>
+    <input id="monto" name="monto" type="number" step="0.01" required>
+    <button class="btn primary">Cargar</button>
+  </form>
+</section>
+{% endblock %}

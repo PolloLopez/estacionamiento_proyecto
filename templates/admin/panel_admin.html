@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Panel Municipal{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Panel Municipal</h2>
+
+  <h3>Inspectores</h3>
+  <ul>
+    {% for i in inspectores %}
+      <li>{{ i.nombre }} — Infracciones recientes: {{ infracciones_recientes|length }}</li>
+    {% endfor %}
+  </ul>
+
+  <h3>Vendedores</h3>
+  <ul>
+    {% for v in vendedores %}
+      <li>{{ v.nombre }} — Estacionamientos registrados: {{ estacionamientos_vendedores }}</li>
+    {% endfor %}
+  </ul>
+
+  <h3>Usuarios</h3>
+  <ul>
+    {% for u in usuarios %}
+      <li>
+        {{ u.nombre }} — Saldo: ${{ u.saldo }}
+        <a href="{% url 'cargar_saldo' u.id %}" class="btn">Cargar saldo</a>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <p>Estacionamientos activos: {{ estacionamientos_activos }}</p>
+</section>
+{% endblock %}

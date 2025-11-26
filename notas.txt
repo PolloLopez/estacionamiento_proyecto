@@ -1,0 +1,19 @@
+🚀 Qué vas a tener después de correrlo
+Juan Pérez con vehículo ABC123 (normal, sin exenciones).
+
+Vehículo XYZ789 → exento en toda la zona.
+
+Vehículo LMN456 → exento en subcuadras específicas (Calle 21.300 y Calle 21.350).
+
+Subcuadras creadas: "Zona Única", "Calle 21.300", "Calle 21.350".
+
+Inspector, vendedor y admin listos para probar roles.
+
+✅ Flujo de prueba rápido
+Logueate como inspector.
+
+Ingresá patente XYZ789 → debería mostrar “Verificado exento en toda la zona”.
+
+Ingresá patente LMN456 → debería mostrar “Verificado exento en subcuadras: Calle 21.300, Calle 21.350”.
+
+Ingresá patente ABC123 → debería mostrar “Impago” si no tiene estacionamiento activo, o “Pagado” si lo tiene.
