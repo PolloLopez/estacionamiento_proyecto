@@ -4,7 +4,7 @@
 {% block content %}
 <section class="panel">
   <h2>Cargar saldo</h2>
-  <p>Seleccioná un monto y procesá el pago (ver integración MercadoPago luego).</p>
+  <p>Seleccioná un monto y procesá el pago (integración MercadoPago luego).</p>
 
   <form method="post" action="{% url 'usuarios_cargar_saldo' %}">
     {% csrf_token %}
@@ -12,7 +12,13 @@
       <label for="monto">Monto</label>
       <input id="monto" name="monto" type="number" min="1" step="0.01" required />
     </div>
-    <div class="form-row actions"><button class="btn primary">Cargar</button></div>
+    <div class="form-row actions">
+      <button class="btn primary">Cargar</button>
+    </div>
   </form>
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
 </section>
 {% endblock %}

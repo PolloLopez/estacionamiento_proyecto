@@ -5,30 +5,53 @@
 <section class="panel">
   <h2>Panel Municipal</h2>
 
-  <h3>Inspectores</h3>
-  <ul>
-    {% for i in inspectores %}
-      <li>{{ i.nombre }} — Infracciones recientes: {{ infracciones_recientes|length }}</li>
-    {% endfor %}
-  </ul>
+  <div class="filters">
+    <a href="?rol=" class="btn {% if not rol_seleccionado %}active{% endif %}">Todos</a>
+    <a href="?rol=vendedor" class="btn {% if rol_seleccionado == 'vendedor' %}active{% endif %}">Vendedores</a>
+    <a href="?rol=inspector" class="btn {% if rol_seleccionado == 'inspector' %}active{% endif %}">Inspectores</a>
+    <a href="?rol=conductor" class="btn {% if rol_seleccionado == 'conductor' %}active{% endif %}">Conductores</a>
+  </div>
 
-  <h3>Vendedores</h3>
-  <ul>
-    {% for v in vendedores %}
-      <li>{{ v.nombre }} — Estacionamientos registrados: {{ estacionamientos_vendedores }}</li>
-    {% endfor %}
-  </ul>
-
-  <h3>Usuarios</h3>
-  <ul>
-    {% for u in usuarios %}
-      <li>
-        {{ u.nombre }} — Saldo: ${{ u.saldo }}
-        <a href="{% url 'cargar_saldo' u.id %}" class="btn">Cargar saldo</a>
-      </li>
-    {% endfor %}
-  </ul>
+  <h3>Estacionamientos registrados</h3>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Patente</th>
+        <th>Subcuadra</th>
+        <th>Registrado por</th>
+        <th>Rol</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in estacionamientos %}
+        <tr>
+          <td>{{ e.hora_inicio }}</td>
+          <td>{{ e.vehiculo.patente }}</td>
+          <td>{{ e.subcuadra.calle }} {{ e.subcuadra.altura }}</td>
+          <td>{{ e.registrado_por.nombre }}</td>
+          <td>
+            {% if e.registrado_por.es_admin %}Admin{% endif %}
+            {% if e.registrado_por.es_inspector %}Inspector{% endif %}
+            {% if e.registrado_por.es_vendedor %}Vendedor{% endif %}
+            {% if e.registrado_por.es_conductor %}Conductor{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">No hay estacionamientos registrados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 
   <p>Estacionamientos activos: {{ estacionamientos_activos }}</p>
+
+  <h3>Infracciones recientes</h3>
+  <ul>
+    {% for inf in infracciones_recientes %}
+      <li>{{ inf.fecha }} — {{ inf.vehiculo.patente }} — Inspector: {{ inf.inspector.nombre }}</li>
+    {% empty %}
+      <li>No hay infracciones recientes.</li>
+    {% endfor %}
+  </ul>
 </section>
 {% endblock %}

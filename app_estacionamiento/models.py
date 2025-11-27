@@ -93,7 +93,15 @@ class Estacionamiento(models.Model):
         self.save()
         return self.costo
 
+    registrado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="estacionamientos_registrados"
+    )
 
+    
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)  # Vehículo infractor

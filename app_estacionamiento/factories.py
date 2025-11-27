@@ -4,9 +4,12 @@ from .models import Estacionamiento
 
 class EstacionamientoFactory:
     @staticmethod
-    def crear(vehiculo, subcuadra):
-        """
-        Crea un nuevo objeto Estacionamiento con los datos dados.
-        # acá se implementa Factory
-        """
-        return Estacionamiento.objects.create(vehiculo=vehiculo, subcuadra=subcuadra)
+    def crear(vehiculo, subcuadra, duracion, registrado_por=None):
+        estacionamiento = Estacionamiento.objects.create(
+            vehiculo=vehiculo,
+            subcuadra=subcuadra,
+            registrado_por=registrado_por
+        )
+        # lógica de duración, costo, etc.
+        return estacionamiento
+

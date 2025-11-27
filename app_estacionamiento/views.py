@@ -1,13 +1,12 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 
-from django.shortcuts import render, redirect, get_object_or_404, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
 from .estrategias import EstrategiaExencion
 from .factories import EstacionamientoFactory
 from decimal import Decimal, ROUND_HALF_UP
 from .decorators import require_role, require_login
-registros = Estacionamiento.objects.filter(...).order_by("-hora_inicio")
 
 # =========================================================
 # HOME GENERAL
@@ -45,44 +44,63 @@ def inicio(request):
 # =========================================================
 @require_role("admin")
 def panel_admin(request):
-    """
-    Panel de administración municipal.
-    Muestra menús de Inspectores, Vendedores y Usuarios con sus respectivos resúmenes.
-    """
-    # Resumen de inspectores
     inspectores = Usuario.objects.filter(es_inspector=True)
-    infracciones_recientes = Infraccion.objects.order_by('-fecha')[:5]
-
-    # Resumen de vendedores
     vendedores = Usuario.objects.filter(es_vendedor=True)
-    estacionamientos_vendedores = Estacionamiento.objects.filter(
-        vehiculo__usuarios__in=vendedores
-    ).count()
-
-    # Resumen de usuarios
     usuarios = Usuario.objects.filter(es_conductor=True)
+
+    # Filtro dinámico por rol
+    rol = request.GET.get("rol")
+    estacionamientos = Estacionamiento.objects.select_related("vehiculo", "subcuadra", "registrado_por")
+
+    if rol == "vendedor":
+        estacionamientos = estacionamientos.filter(registrado_por__in=vendedores)
+    elif rol == "inspector":
+        estacionamientos = estacionamientos.filter(registrado_por__in=inspectores)
+    elif rol == "conductor":
+        estacionamientos = estacionamientos.filter(registrado_por__in=usuarios)
+
+    estacionamientos = estacionamientos.order_by("-hora_inicio")
+
     estacionamientos_activos = Estacionamiento.objects.filter(activo=True).count()
+    infracciones_recientes = Infraccion.objects.order_by('-fecha')[:5]
 
     contexto = {
         "inspectores": inspectores,
-        "infracciones_recientes": infracciones_recientes,
         "vendedores": vendedores,
-        "estacionamientos_vendedores": estacionamientos_vendedores,
         "usuarios": usuarios,
+        "estacionamientos": estacionamientos,
         "estacionamientos_activos": estacionamientos_activos,
+        "infracciones_recientes": infracciones_recientes,
+        "rol_seleccionado": rol,
     }
     return render(request, "admin/panel_admin.html", contexto)
 
 # =========================================================
 # VIEWS USUARIOS
 # =========================================================
+@require_role("conductor")
+def cargar_saldo_usuario(request):
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+
+    if request.method == "POST":
+        monto = request.POST.get("monto")
+        try:
+            monto = float(monto)
+            usuario.saldo += monto
+            usuario.save()
+            return redirect("inicio_usuarios")
+        except ValueError:
+            return render(request, "usuarios/cargar_saldo.html", {
+                "usuario": usuario,
+                "error": "Monto inválido"
+            })
+
+    return render(request, "usuarios/cargar_saldo.html", {"usuario": usuario})
+
+
 @require_role("conductor", "inspector", "admin")
 def inicio_usuarios(request):
-    """
-    Pantalla inicial para usuarios.
-    - Muestra nombre del usuario logueado.
-    - Lista estacionamientos activos asociados a sus vehículos.
-    """
     usuario_id = request.session.get("usuario_id")
     if not usuario_id:
         return redirect("login")
@@ -136,7 +154,7 @@ def estacionar_vehiculo(request):
         # Validar duración
         try:
             duracion = Decimal(duracion)
-            if duracion <= 0 or (duracion * 2) % 1 != 0:
+            if duracion <= 0 or duracion % 1 != 0:
                 raise ValueError("Duración inválida")
         except Exception:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
@@ -147,10 +165,10 @@ def estacionar_vehiculo(request):
         subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
 
         # Crear estacionamiento
-        EstacionamientoFactory.crear(vehiculo, subcuadra, duracion)
+        EstacionamientoFactory.crear(vehiculo, subcuadra, duracion, registrado_por=usuario)
 
         # Redirigir al inicio del conductor
-        return redirect("inicio")
+        return redirect("inicio_usuarios")
 
     return render(request, 'usuarios/estacionar_vehiculo.html')
 
@@ -340,15 +358,91 @@ def verificar_vehiculo(request):
         "resultado": resultado
     })
 
+@require_role("inspector", "admin")
 def registrar_estacionamiento_manual(request):
     """
-    Vista para registrar estacionamiento manualmente (por inspector).
+    Vista para que un inspector registre un estacionamiento manualmente.
+    - Puede registrar cualquier patente.
+    - Usa siempre 'Zona Única' como subcuadra global.
     """
     usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
-    if not usuario.es_inspector:
-        return redirect("inicio")
-    return render(request, 'inspectores/registrar_estacionamiento_manual.html')
+    inspector = get_object_or_404(Usuario, id=usuario_id)
+
+    if request.method == "POST":
+        patente = request.POST.get("patente")
+        duracion = request.POST.get("duracion")
+
+        # Buscar o crear vehículo
+        vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+
+        # Validar que no tenga estacionamiento activo
+        if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
+            return render(request, "inspectores/registrar_estacionamiento_manual.html", {
+                "error": "El vehículo ya tiene un estacionamiento activo."
+            })
+
+        # Validar duración
+        try:
+            duracion = Decimal(duracion)
+            if duracion <= 0 or duracion % 1 != 0:
+                raise ValueError("Duración inválida")
+        except Exception:
+            return render(request, "inspectores/registrar_estacionamiento_manual.html", {
+                "error": "La duración debe ser en pasos de horas (ej: 1, 2)."
+            })
+
+        # Subcuadra única
+        subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
+
+        # Crear estacionamiento
+        EstacionamientoFactory.crear(vehiculo, subcuadra, duracion, registrado_por=inspector)
+
+        return redirect("inspectores_verificar_vehiculo")
+
+    return render(request, "inspectores/registrar_estacionamiento_manual.html")
+
+@require_role("vendedor", "admin")
+def registrar_estacionamiento_vendedor(request):
+    """
+    Vista para que un vendedor registre un estacionamiento.
+    - Solo accesible a vendedores.
+    - Usa siempre 'Zona Única' como subcuadra global.
+    """
+    usuario_id = request.session.get("usuario_id")
+    vendedor = get_object_or_404(Usuario, id=usuario_id)
+
+    if request.method == "POST":
+        patente = request.POST.get("patente")
+        duracion = request.POST.get("duracion")
+
+        # Buscar o crear vehículo
+        vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+
+        # Validar que no tenga estacionamiento activo
+        if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
+            return render(request, "vendedores/registrar_estacionamiento.html", {
+                "error": "El vehículo ya tiene un estacionamiento activo."
+            })
+
+        # Validar duración
+        try:
+            duracion = Decimal(duracion)
+            if duracion <= 0 or duracion % 1 != 0:
+                raise ValueError("Duración inválida")
+        except Exception:
+            return render(request, "vendedores/registrar_estacionamiento.html", {
+                "error": "La duración debe ser en pasos de horas (ej: 1, 2)."
+            })
+
+        # Subcuadra única
+        subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
+
+        # Crear estacionamiento
+        EstacionamientoFactory.crear(vehiculo, subcuadra, duracion, registrado_por=vendedor)
+
+        return redirect("vendedores_resumen_caja")
+
+    return render(request, "vendedores/registrar_estacionamiento.html")
 
 def registrar_infraccion(request):
     """
@@ -428,26 +522,12 @@ def panel_vendedores(request):
 
 
 @require_role("vendedor", "admin")
-def registrar_estacionamiento_vendedor(request):
-    """
-    Vista para que un vendedor registre un estacionamiento.
-    - Solo accesible a vendedores.
-    """
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
-    if not usuario.es_vendedor:
-        return redirect("inicio")
-    return render(request, 'vendedores/registrar_estacionamiento.html')
-
 def resumen_caja(request):
-    """
-    Vista de resumen de caja de vendedores.
-    - Solo accesible a vendedores.
-    """
     usuario_id = request.session.get("usuario_id")
     usuario = get_object_or_404(Usuario, id=usuario_id)
-    if not usuario.es_vendedor:
-        return redirect("inicio")
+
+    registros = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
+
     return render(request, 'vendedores/resumen_caja.html', {"registros": registros})
 
 # =========================================================

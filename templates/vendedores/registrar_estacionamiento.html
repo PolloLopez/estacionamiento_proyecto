@@ -4,7 +4,7 @@
 {% block content %}
 <section class="panel">
   <h2>Registrar estacionamiento (a nombre de cliente)</h2>
-  <form method="post" action="{% url 'vendedores_estacionar' %}">
+  <form method="post" action="{% url 'vendedores_registrar_estacionamiento' %}">
     {% csrf_token %}
     <div class="form-row">
       <label>Patente</label>
@@ -22,5 +22,9 @@
       <button class="btn primary">Registrar y cobrar</button>
     </div>
   </form>
+
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% endif %}
 </section>
 {% endblock %}
