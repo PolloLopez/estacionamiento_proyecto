@@ -46,12 +46,14 @@ class Vehiculo(models.Model):
 
 # 🏙️ Subcuadra representa una altura específica de una calle
 class Subcuadra(models.Model):
-    calle = models.CharField(max_length=100)  # Ejemplo: "Calle 21"
-    altura = models.IntegerField()            # Ejemplo: 300, 350, etc.
+    calle = models.CharField(max_length=100)
+    altura = models.IntegerField()
+
+    class Meta:
+        unique_together = ("calle", "altura")
 
     def __str__(self):
         return f"{self.calle}.{self.altura}"
-
 
 # 💰 Tarifa por hora de estacionamiento
 class Tarifa(models.Model):

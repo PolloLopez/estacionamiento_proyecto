@@ -3,29 +3,48 @@
 
 {% block content %}
 <section class="panel">
-  <h2>Verificar vehículo</h2>
+  <h2>🔍 Verificar vehículo</h2>
 
-  <!-- Form que envía la patente y subcuadra -->
-  <form method="post" action="{% url 'inspectores_verificar_vehiculo' %}">
-  {% csrf_token %}
-  <input name="patente" placeholder="ABC 123 / AA 123 ZZ" required />
-  <button class="btn">Verificar</button>
-</form>
+  <!-- Formulario de verificación -->
+  <form method="post" action="{% url 'inspectores_verificar_vehiculo' %}" class="form">
+    {% csrf_token %}
+    <div class="form-row">
+      <label for="patente">Patente</label>
+      <input id="patente" name="patente" placeholder="ABC 123 / AA 123 ZZ" required />
+    </div>
+    <div class="form-row actions">
+      <button class="btn primary">Verificar</button>
+    </div>
+  </form>
 
-{% if resultado %}
-  <h3>Patente: {{ resultado.patente }}</h3>
-  <p>Estado: <strong>{{ resultado.estado }}</strong></p>
+  <!-- Resultado de la verificación -->
+  {% if resultado %}
+    <div class="resultado">
+      <h3>Patente: <strong>{{ resultado.patente }}</strong></h3>
 
-  {% if resultado.detalle %}
-    <p>{{ resultado.detalle }}</p>
+      {% if resultado.estado == "Exento" %}
+        <p class="estado exento">✅ Estado: {{ resultado.estado }}</p>
+        <p><em>{{ resultado.detalle }}</em></p>
+
+      {% elif resultado.estado == "Pagado" %}
+        <p class="estado pagado">💰 Estado: {{ resultado.estado }}</p>
+        <p>{{ resultado.detalle }}</p>
+
+      {% elif resultado.estado == "Impago" %}
+        <p class="estado impago">⚠️ Estado: {{ resultado.estado }}</p>
+        {% if resultado.detalle %}
+          <p>{{ resultado.detalle }}</p>
+        {% endif %}
+        <a class="btn danger"
+           href="{% url 'inspectores_registrar_infraccion' %}?patente={{ resultado.patente }}">
+           ➕ Crear infracción
+        </a>
+
+      {% elif resultado.estado == "No registrado" %}
+        <p class="estado no-registrado">❓ Estado: {{ resultado.estado }}</p>
+        <p>Este vehículo no figura en el sistema.</p>
+      {% endif %}
+    </div>
   {% endif %}
-
-  {% if resultado.estado == "Impago" %}
-    <a class="btn danger"
-       href="{% url 'inspectores_registrar_infraccion' %}?patente={{ resultado.patente }}">
-       Crear infracción
-    </a>
-  {% elif resultado.estado == "Exento" %}
-    <p><em>{{ resultado.detalle }}</em></p>
-  {% endif %}
-{% endif %}
+</section>
+{% endblock %}

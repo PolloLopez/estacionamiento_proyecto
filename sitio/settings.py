@@ -67,11 +67,12 @@ AUTH_PASSWORD_VALIDATORS = []
 
 # 🌎 Config regional
 LANGUAGE_CODE = 'es-ar'
-TIME_ZONE = 'America/Argentina/Buenos_Aires'
 USE_I18N = True
 USE_TZ = True
+TIME_ZONE = 'America/Argentina/Buenos_Aires'
 
 # 🖼️ Archivos estáticos
 STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / "estacionamiento_app" / "static"]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -1,5 +1,2 @@
 prepara la vista cargar_saldo_usuario para que el botón en inicio_usuarios.html funcione sin romper la lógica de admin
 
-por ahora quedara inactiva hata vincularla con mercado pago / cuenta dni
-
-

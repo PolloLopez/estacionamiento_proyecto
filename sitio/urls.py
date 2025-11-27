@@ -33,6 +33,6 @@ urlpatterns = [
     path("vendedores/resumen/", views.resumen_caja, name="vendedores_resumen_caja"),
 
     # Admin municipal
-    path("admin/", views.panel_admin, name="panel_admin"),
+    path("panel-admin/", views.panel_admin, name="panel_admin"),
     path("admin/cargar_saldo/<int:usuario_id>/", views.cargar_saldo, name="cargar_saldo"),
 ]

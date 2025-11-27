@@ -189,27 +189,25 @@ def finalizar_estacionamiento(request, estacionamiento_id):
             'estacionamiento': estacionamiento
         })
 
-    # Estrategia de cálculo
+    # Calcular costo final y finalizar (usa estrategia por defecto o la pasada)
     from .estrategias import EstrategiaExencion
     estrategia = EstrategiaExencion()
+    estacionamiento.finalizar(estrategia)  # esto setea hora_fin, costo y activo=False
 
-    duracion = (timezone.now() - estacionamiento.hora_inicio).total_seconds() / 3600
-    costo_estimado = estrategia.calcular(estacionamiento.vehiculo, estacionamiento.subcuadra, duracion)
+    # Revalidar saldo contra el costo final
+    if usuario.saldo < estacionamiento.costo:
+        # Revertir la finalización si querés mantenerlo activo hasta que haya saldo
+        estacionamiento.activo = True
+        estacionamiento.hora_fin = None
+        estacionamiento.costo = 0
+        estacionamiento.save()
 
-    costo_estimado_decimal = Decimal(str(costo_estimado)).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP
-    )
-
-    # Validar saldo
-    if usuario.saldo < costo_estimado_decimal:
         return render(request, 'usuarios/finalizar_estacionamiento.html', {
             'error': 'Saldo insuficiente para finalizar.',
             'estacionamiento': estacionamiento,
-            'costo_estimado': costo_estimado_decimal
+            'costo_estimado': estacionamiento.costo
         })
 
-    # Finalizar y descontar
-    estacionamiento.finalizar(estrategia)
     usuario.saldo -= estacionamiento.costo
     usuario.save()
 
@@ -218,6 +216,7 @@ def finalizar_estacionamiento(request, estacionamiento_id):
         'estacionamiento': estacionamiento,
         'usuario': usuario
     })
+
 
 def historial_estacionamientos(request):
     """
@@ -249,6 +248,7 @@ def historial_infracciones(request):
         'infracciones': infracciones
     })
 
+@require_login
 def cargar_saldo(request, usuario_id):
     """
     Permite al admin cargar saldo a un usuario.
@@ -270,6 +270,7 @@ def cargar_saldo(request, usuario_id):
 
     return render(request, "admin/cargar_saldo.html", {"usuario": usuario})
 
+@require_login
 def consultar_deuda(request):
     """
     Vista para consultar deuda del usuario.
@@ -414,9 +415,18 @@ def registrar_estacionamiento_vendedor(request):
     if request.method == "POST":
         patente = request.POST.get("patente")
         duracion = request.POST.get("duracion")
+        cliente_email = request.POST.get("cliente_email", "").strip()
 
         # Buscar o crear vehículo
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+
+        # Asociar vehículo al cliente (si existe y si es ManyToMany)
+        if cliente_email:
+            cliente = Usuario.objects.filter(correo=cliente_email).first()
+            if cliente:
+                # si la relación es ManyToMany
+                if hasattr(cliente, "vehiculos"):
+                    cliente.vehiculos.add(vehiculo)
 
         # Validar que no tenga estacionamiento activo
         if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
@@ -424,7 +434,7 @@ def registrar_estacionamiento_vendedor(request):
                 "error": "El vehículo ya tiene un estacionamiento activo."
             })
 
-        # Validar duración
+        # Validar duración (múltiplos de 1 hora; usa (duracion*2)%1 != 0 si querés medias horas)
         try:
             duracion = Decimal(duracion)
             if duracion <= 0 or duracion % 1 != 0:

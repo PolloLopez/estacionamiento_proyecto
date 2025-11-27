@@ -4,30 +4,32 @@ from .models import Usuario
 
 def require_role(*roles):
     """
-    Decorador para restringir acceso a vistas según rol.
-    Ejemplo: @require_role("conductor", "admin")
+    Decorador que valida que el usuario esté logueado y tenga alguno de los roles permitidos.
     """
     def decorator(view_func):
         @wraps(view_func)
-        def wrapper(request, *args, **kwargs):
+        def _wrapped_view(request, *args, **kwargs):
+            # 1. Chequeo de sesión
             usuario_id = request.session.get("usuario_id")
             if not usuario_id:
                 return redirect("login")
 
             usuario = get_object_or_404(Usuario, id=usuario_id)
 
-            role_map = {
-                "admin": usuario.es_admin,
-                "inspector": usuario.es_inspector,
-                "vendedor": usuario.es_vendedor,
-                "conductor": usuario.es_conductor,
-            }
+            # 2. Chequeo de rol
+            rol_ok = False
+            for rol in roles:
+                if getattr(usuario, f"es_{rol}", False):
+                    rol_ok = True
+                    break
 
-            if any(role_map.get(r, False) for r in roles):
-                return view_func(request, *args, **kwargs)
+            # 3. Redirección segura si falla
+            if not rol_ok:
+                return redirect("inicio")
 
-            return redirect("inicio")
-        return wrapper
+            # Si todo bien, ejecuta la vista
+            return view_func(request, *args, **kwargs)
+        return _wrapped_view
     return decorator
 
 def require_login(view_func):
@@ -35,8 +37,9 @@ def require_login(view_func):
     Decorador que exige que el usuario esté logueado.
     """
     @wraps(view_func)
-    def wrapper(request, *args, **kwargs):
-        if not request.session.get("usuario_id"):
+    def _wrapped_view(request, *args, **kwargs):
+        usuario_id = request.session.get("usuario_id")
+        if not "usuario_id":
             return redirect("login")
         return view_func(request, *args, **kwargs)
-    return wrapper
+    return _wrapped_view
