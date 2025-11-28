@@ -1,14 +1,17 @@
 #app_estacionamiento/estrategias.py
+from decimal import Decimal
 from .models import Tarifa
 
 class EstrategiaExencion:
     def calcular(self, vehiculo, subcuadra, duracion_horas):
         # Exento en toda la zona
         if vehiculo.exento_en_zona:
-            return 0
+            return Decimal("0.00")
         # Exento en esta subcuadra
         if vehiculo.subcuadras_exentas.filter(id=subcuadra.id).exists():
-            return 0
+            return Decimal("0.00")
         # Tarifa normal
-        tarifa = Tarifa.objects.last() or Tarifa(precio_por_hora=100)
-        return duracion_horas * tarifa.precio_por_hora
+        tarifa = Tarifa.objects.last()
+        if not tarifa:
+            return Decimal(str(duracion_horas)) * Decimal("100.00")
+        return Decimal(str(duracion_horas)) * tarifa.precio_por_hora

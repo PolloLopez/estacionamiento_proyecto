@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 
 # 👤 Usuario del sistema (puede ser conductor, inspector, vendedor o admin)
 class Usuario(models.Model):
@@ -27,7 +28,8 @@ class Usuario(models.Model):
 # 🚗 Vehículo asociado a uno o varios usuarios
 class Vehiculo(models.Model):
     patente = models.CharField(max_length=20, unique=True)  # Identificador único del vehículo
-    exento_en_zona = models.BooleanField(default=False)  # Si está exento en toda la zona
+    usuarios = models.ManyToManyField(Usuario, related_name="vehiculos", blank=True)
+    exento_en_zona = models.BooleanField(default=False)  # exento total
     subcuadras_exentas = models.ManyToManyField('Subcuadra', blank=True)  # Exenciones específicas
 
     def __str__(self):
@@ -42,7 +44,6 @@ class Vehiculo(models.Model):
         if self.exento_en_zona:
             return True
         return self.subcuadras_exentas.filter(id=subcuadra.id).exists()
-
 
 # 🏙️ Subcuadra representa una altura específica de una calle
 class Subcuadra(models.Model):
@@ -65,36 +66,12 @@ class Tarifa(models.Model):
 
 # 🅿️ Estacionamiento en vía pública
 class Estacionamiento(models.Model):
-    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)  # Vehículo estacionado
-    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)  # Ubicación
-    hora_inicio = models.DateTimeField(default=timezone.now)  # Inicio del estacionamiento
-    hora_fin = models.DateTimeField(null=True, blank=True)    # Fin del estacionamiento
-    costo = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Costo calculado
-    activo = models.BooleanField(default=True)  # Flag para saber si sigue activo
-
-    def __str__(self):
-        return f"{self.vehiculo.patente} en {self.subcuadra}"
-
-    def finalizar(self, estrategia=None):
-        """
-        Finaliza el estacionamiento y calcula el costo.
-        - Usa una estrategia (Strategy Pattern) para calcular el costo.
-        - Si no se pasa estrategia, usa EstrategiaExencion por defecto.
-        - Marca el estacionamiento como inactivo y guarda el costo.
-        """
-        from .estrategias import EstrategiaExencion
-
-        self.hora_fin = timezone.now()
-        duracion = (self.hora_fin - self.hora_inicio).total_seconds() / 3600
-
-        if estrategia is None:
-            estrategia = EstrategiaExencion()
-
-        self.costo = round(estrategia.calcular(self.vehiculo, self.subcuadra, duracion), 2)
-        self.activo = False
-        self.save()
-        return self.costo
-
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
+    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)
+    hora_inicio = models.DateTimeField(default=timezone.now)
+    hora_fin = models.DateTimeField(null=True, blank=True)
+    costo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    activo = models.BooleanField(default=True)
     registrado_por = models.ForeignKey(
         Usuario,
         on_delete=models.SET_NULL,
@@ -102,6 +79,26 @@ class Estacionamiento(models.Model):
         blank=True,
         related_name="estacionamientos_registrados"
     )
+
+    def __str__(self):
+        return f"{self.vehiculo.patente} en {self.subcuadra}"
+
+    def finalizar(self, estrategia=None):
+        """
+        Finaliza el estacionamiento y calcula el costo.
+        """
+        from .estrategias import EstrategiaExencion
+        self.hora_fin = timezone.now()
+        duracion = (self.hora_fin - self.hora_inicio).total_seconds() / 3600
+
+        if estrategia is None:
+            estrategia = EstrategiaExencion()
+
+        costo = estrategia.calcular(self.vehiculo, self.subcuadra, duracion)
+        self.costo = Decimal(str(round(costo, 2)))  # siempre Decimal
+        self.activo = False
+        self.save()
+        return self.costo
 
     
 # 🚨 Infracción generada por un inspector
@@ -141,3 +138,4 @@ class Notificacion(models.Model):
 
     def __str__(self):
         return f"Notificación para {self.destinatario.nombre}"
+

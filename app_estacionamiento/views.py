@@ -98,6 +98,14 @@ def cargar_saldo_usuario(request):
 
     return render(request, "usuarios/cargar_saldo.html", {"usuario": usuario})
 
+def usuarios_historial(request):
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    estacionamientos = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
+    return render(request, "usuarios/historial_estacionamientos.html", {
+        "usuario": usuario,
+        "estacionamientos": estacionamientos
+    })
 
 @require_role("conductor", "inspector", "admin")
 def inicio_usuarios(request):
@@ -141,6 +149,12 @@ def estacionar_vehiculo(request):
         # Buscar o crear el vehículo
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
+        # 🚫 Validar exenciones: nunca debe estacionar
+        if vehiculo.exento_en_zona or vehiculo.subcuadras_exentas.exists():
+            return render(request, 'usuarios/estacionar_vehiculo.html', {
+        'error': 'Este vehículo está marcado como exento. No puede estacionar.'
+        })
+
         # Si es conductor, asociar el vehículo a su cuenta
         if usuario.es_conductor and vehiculo not in usuario.vehiculos.all():
             usuario.vehiculos.add(vehiculo)
@@ -158,7 +172,7 @@ def estacionar_vehiculo(request):
                 raise ValueError("Duración inválida")
         except Exception:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'La duración debe ser en pasos de horas (ej: 1, 2).'
+                'error': 'La duración debe ser en horas (ej: 1, 2).'
             })
 
         # Subcuadra única
@@ -173,49 +187,26 @@ def estacionar_vehiculo(request):
     return render(request, 'usuarios/estacionar_vehiculo.html')
 
 def finalizar_estacionamiento(request, estacionamiento_id):
-    """
-    Finaliza un estacionamiento activo.
-    - Calcula costo usando EstrategiaExencion.
-    - Valida saldo y descuenta al usuario logueado.
-    """
     usuario_id = request.session.get("usuario_id")
     usuario = get_object_or_404(Usuario, id=usuario_id)
-
     estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
 
     if not estacionamiento.activo:
-        return render(request, 'usuarios/finalizar_estacionamiento.html', {
-            'error': 'Este estacionamiento ya está finalizado.',
-            'estacionamiento': estacionamiento
-        })
+        return redirect("usuarios_historial")
 
-    # Calcular costo final y finalizar (usa estrategia por defecto o la pasada)
-    from .estrategias import EstrategiaExencion
-    estrategia = EstrategiaExencion()
-    estacionamiento.finalizar(estrategia)  # esto setea hora_fin, costo y activo=False
+    costo_final = estacionamiento.finalizar()
 
-    # Revalidar saldo contra el costo final
-    if usuario.saldo < estacionamiento.costo:
-        # Revertir la finalización si querés mantenerlo activo hasta que haya saldo
+    if usuario.saldo < costo_final:
+        # revertir correctamente
         estacionamiento.activo = True
         estacionamiento.hora_fin = None
-        estacionamiento.costo = 0
+        estacionamiento.costo = Decimal("0.00")
         estacionamiento.save()
+        return redirect("usuarios_historial")
 
-        return render(request, 'usuarios/finalizar_estacionamiento.html', {
-            'error': 'Saldo insuficiente para finalizar.',
-            'estacionamiento': estacionamiento,
-            'costo_estimado': estacionamiento.costo
-        })
-
-    usuario.saldo -= estacionamiento.costo
+    usuario.saldo -= costo_final
     usuario.save()
-
-    return render(request, 'usuarios/finalizar_estacionamiento.html', {
-        'mensaje': f'Estacionamiento finalizado. Costo: ${estacionamiento.costo}',
-        'estacionamiento': estacionamiento,
-        'usuario': usuario
-    })
+    return redirect("usuarios_historial")
 
 
 def historial_estacionamientos(request):
@@ -246,6 +237,15 @@ def historial_infracciones(request):
 
     return render(request, 'usuarios/historial_infracciones.html', {
         'infracciones': infracciones
+    })
+
+def usuarios_infracciones(request):
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+    infracciones = Infraccion.objects.filter(vehiculo__usuarios=usuario).order_by("-fecha")
+    return render(request, "usuarios/historial_infracciones.html", {
+        "usuario": usuario,
+        "infracciones": infracciones
     })
 
 @require_login
@@ -299,7 +299,7 @@ def verificar_vehiculo(request):
     - Si exento global → Verificado exento en toda la zona.
     - Si exento en subcuadras → se listan esas subcuadras.
     - Si tiene estacionamiento activo → Pagado.
-    - Si no → Impago (opción de multar).
+    - Si no → No registrado.
     """
     usuario_id = request.session.get("usuario_id")
     inspector = get_object_or_404(Usuario, id=usuario_id)
@@ -315,7 +315,7 @@ def verificar_vehiculo(request):
         try:
             vehiculo = Vehiculo.objects.get(patente=patente)
 
-            estado = "Impago"
+            estado = "No registrado"
             detalle = None
             exento = False
 

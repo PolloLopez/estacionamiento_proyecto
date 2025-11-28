@@ -25,7 +25,7 @@ def require_role(*roles):
 
             # 3. Redirección segura si falla
             if not rol_ok:
-                return redirect("inicio")
+                return redirect("login")
 
             # Si todo bien, ejecuta la vista
             return view_func(request, *args, **kwargs)
