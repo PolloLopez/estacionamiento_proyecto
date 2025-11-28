@@ -9,7 +9,7 @@ body {
 .navbar {
   background: #222;
   color: #fff;
-  padding: 1rem;
+  padding: 1rem; 
 }
 .navbar .nav-items {
   list-style: none;

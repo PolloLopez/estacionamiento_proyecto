@@ -1,7 +1,7 @@
 import pytest
 from django.urls import reverse
 from decimal import Decimal
-from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra, Estacionamiento
+from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
 
 @pytest.mark.django_db
 def test_usuario_finaliza_estacionamiento_con_saldo(client):
@@ -12,7 +12,7 @@ def test_usuario_finaliza_estacionamiento_con_saldo(client):
         saldo=Decimal("100.00")
     )
     vehiculo = Vehiculo.objects.create(patente="AAA111")
-    subcuadra = Subcuadra.objects.create(calle="Zona Única", altura=0)
+    subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
     est = Estacionamiento.objects.create(
         vehiculo=vehiculo,
         subcuadra=subcuadra,
@@ -46,7 +46,7 @@ def test_usuario_finaliza_estacionamiento_sin_saldo(client):
         saldo=Decimal("0.00")
     )
     vehiculo = Vehiculo.objects.create(patente="BBB222")
-    subcuadra = Subcuadra.objects.create(calle="Zona Única", altura=0)
+    subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
     est = Estacionamiento.objects.create(
         vehiculo=vehiculo,
         subcuadra=subcuadra,
@@ -75,9 +75,14 @@ def test_usuario_finaliza_estacionamiento_sin_saldo(client):
 
 @pytest.mark.django_db
 def test_inspector_verifica_vehiculo_sin_estacionamiento(client):
-    inspector = Usuario.objects.create(nombre="Insp", correo="insp@test.com", es_inspector=True)
+    inspector = Usuario.objects.create_user(
+    email="juan@test.com",
+    password="1234",
+    es_conductor=True
+)
+
     vehiculo = Vehiculo.objects.create(patente="NOPARK123")
-    subcuadra = Subcuadra.objects.create(calle="Zona Única", altura=0)
+    subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
 
     session = client.session
     session["usuario_id"] = inspector.id
@@ -102,9 +107,9 @@ def test_usuario_finaliza_estacionamiento_exento(client):
     # Vehículo marcado como exento en toda la zona
     vehiculo = Vehiculo.objects.create(
         patente="EXENTO999",
-        exento_en_zona=True
+        exento_global=True
     )
-    subcuadra = Subcuadra.objects.create(calle="Zona Única", altura=0)
+    subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
     est = Estacionamiento.objects.create(
         vehiculo=vehiculo,
         subcuadra=subcuadra,
@@ -129,3 +134,11 @@ def test_usuario_finaliza_estacionamiento_exento(client):
     assert est.costo == Decimal("0.00")
     # El saldo del usuario no debe haberse descontado
     assert usuario.saldo == Decimal("50.00")
+
+@pytest.mark.django_db
+def test_usuario_historial(client):
+    usuario = Usuario.objects.create_user(email="test@test.com", password="1234", es_conductor=True)
+    client.force_login(usuario)   # 👈 asegura login
+
+    response = client.get(reverse("usuarios_historial"))
+    assert response.status_code == 200

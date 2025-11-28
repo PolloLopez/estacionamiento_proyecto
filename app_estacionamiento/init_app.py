@@ -10,8 +10,8 @@ from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra
 def run():
     # Crear subcuadras de ejemplo
     zona_unica, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
-    calle21_300, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=300)
-    calle21_350, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=350)
+    calle21_400, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=400)
+    calle21_450, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=450)
 
     # Conductor
     juan, _ = Usuario.objects.get_or_create(
@@ -27,7 +27,7 @@ def run():
 
     # Vehículo con exención global
     vehiculo_exento_global, _ = Vehiculo.objects.get_or_create(patente="XYZ789")
-    vehiculo_exento_global.exento_en_zona = True
+    vehiculo_exento_global.exento_global = True
     vehiculo_exento_global.save()
 
     # Vehículo con exención en subcuadras específicas

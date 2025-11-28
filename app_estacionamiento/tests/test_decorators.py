@@ -11,7 +11,12 @@ def test_require_login_redirige_si_no_hay_sesion(client):
 
 @pytest.mark.django_db
 def test_require_role_redirige_si_no_tiene_rol(client):
-    usuario = Usuario.objects.create(nombre="Juan", correo="juan@test.com", es_conductor=False)
+    usuario = Usuario.objects.create_user(
+    email="juan@test.com",
+    password="1234",
+    es_conductor=True
+)
+
     session = client.session
     session["usuario_id"] = usuario.id
     session.save()
@@ -23,7 +28,12 @@ def test_require_role_redirige_si_no_tiene_rol(client):
 
 @pytest.mark.django_db
 def test_require_role_permite_si_tiene_rol(client):
-    usuario = Usuario.objects.create(nombre="Juan", correo="juan@test.com", es_conductor=True)
+    usuario = Usuario.objects.create_user(
+    email="juan@test.com",
+    password="1234",
+    es_conductor=True
+)
+
     session = client.session
     session["usuario_id"] = usuario.id
     session.save()

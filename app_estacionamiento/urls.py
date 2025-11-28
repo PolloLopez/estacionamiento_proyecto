@@ -17,6 +17,7 @@ urlpatterns = [
     path('usuarios/finalizar/<int:estacionamiento_id>/', views.finalizar_estacionamiento, name='usuarios_finalizar_estacionamiento'),
     path('usuarios/cargar-saldo/', views.cargar_saldo, name='usuarios_cargar_saldo'),
     path('usuarios/historial/', views.historial_estacionamientos, name='usuarios_historial_estacionamientos'),
+    path('usuarios/historial/', views.historial_estacionamientos, name='usuarios_historial'),
     path('usuarios/infracciones/', views.historial_infracciones, name='usuarios_historial_infracciones'),
 
     # ========================= 

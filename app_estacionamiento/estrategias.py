@@ -5,7 +5,7 @@ from .models import Tarifa
 class EstrategiaExencion:
     def calcular(self, vehiculo, subcuadra, duracion_horas):
         # Exento en toda la zona
-        if vehiculo.exento_en_zona:
+        if vehiculo.exento_global:
             return Decimal("0.00")
         # Exento en esta subcuadra
         if vehiculo.subcuadras_exentas.filter(id=subcuadra.id).exists():

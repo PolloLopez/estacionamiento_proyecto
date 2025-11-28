@@ -6,9 +6,14 @@ from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra, Estacionami
 
 @pytest.mark.django_db
 def test_finalizar_estacionamiento_calcula_costo_y_inactiva():
-    usuario = Usuario.objects.create(nombre="Juan", correo="juan@test.com")
+    usuario = Usuario.objects.create_user(
+    email="juan@test.com",
+    password="1234",
+    es_conductor=True
+)
+
     vehiculo = Vehiculo.objects.create(patente="ABC123")
-    subcuadra = Subcuadra.objects.create(calle="Zona Única", altura=0)
+    subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
 
     est = Estacionamiento.objects.create(vehiculo=vehiculo, subcuadra=subcuadra, registrado_por=usuario)
 

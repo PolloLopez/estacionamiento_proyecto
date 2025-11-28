@@ -62,6 +62,9 @@ DATABASES = {
     }
 }
 
+AUTH_USER_MODEL = "app_estacionamiento.Usuario"
+
+
 # 🔑 Validadores de contraseña
 AUTH_PASSWORD_VALIDATORS = []
 
@@ -73,6 +76,14 @@ TIME_ZONE = 'America/Argentina/Buenos_Aires'
 
 # 🖼️ Archivos estáticos
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / "estacionamiento_app" / "static"]
+STATICFILES_DIRS = [BASE_DIR / "static"]
+
+# 🖼️ Fotos infracciones
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+
+# Para producción (cuando uses collectstatic)
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

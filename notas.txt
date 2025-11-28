@@ -1,2 +1,6 @@
+createsuperuser --email admin@test.com --password 1234
+
 prepara la vista cargar_saldo_usuario para que el botón en inicio_usuarios.html funcione sin romper la lógica de admin
+
+
 

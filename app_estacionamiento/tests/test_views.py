@@ -11,7 +11,12 @@ def test_require_role_redirige_si_no_hay_sesion(client):
 
 @pytest.mark.django_db
 def test_inicio_usuarios_muestra_usuario(client):
-    usuario = Usuario.objects.create(nombre="Juan", correo="juan@test.com", es_conductor=True)
+    usuario = Usuario.objects.create_user(
+    email="juan@test.com",
+    password="1234",
+    es_conductor=True
+)
+
     client.session["usuario_id"] = usuario.id
     client.session.save()
 

@@ -1,49 +1,62 @@
+# app_estacionamiento/models.py
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 
-# 👤 Usuario del sistema (puede ser conductor, inspector, vendedor o admin)
-class Usuario(models.Model):
-    nombre = models.CharField(max_length=100)  # Nombre completo del usuario
-    correo = models.EmailField(unique=True)    # Correo único para login/identificación
-    saldo = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # Saldo disponible
+# 👤 Usuario del sistema (con roles y saldo)
+class UsuarioManager(BaseUserManager):
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("El correo es obligatorio")
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
 
-    # Flags de rol
-    es_conductor = models.BooleanField(default=True)   # Por defecto, todo usuario es conductor
-    es_inspector = models.BooleanField(default=False)  # Flag para distinguir inspectores
-    es_vendedor = models.BooleanField(default=False)   # Flag para distinguir vendedores
-    es_admin = models.BooleanField(default=False)      # Flag para distinguir administradores
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("es_admin", True)
+
+        return self.create_user(email, password, **extra_fields)
 
 
-    # relación con vehículos
-    vehiculos = models.ManyToManyField("Vehiculo", related_name="usuarios", blank=True)
+class Usuario(AbstractUser):
+    username = None
+    email = models.EmailField(unique=True)
 
-    # Contraseña (para login simple)
-    password = models.CharField(max_length=10, default="1234")
+    saldo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    es_conductor = models.BooleanField(default=True)
+    es_inspector = models.BooleanField(default=False)
+    es_vendedor = models.BooleanField(default=False)
+    es_admin = models.BooleanField(default=False)
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
+
+    objects = UsuarioManager()   
 
     def __str__(self):
-        return self.nombre
-
+        return self.email
+    
 # 🚗 Vehículo asociado a uno o varios usuarios
 class Vehiculo(models.Model):
-    patente = models.CharField(max_length=20, unique=True)  # Identificador único del vehículo
-    usuarios = models.ManyToManyField(Usuario, related_name="vehiculos", blank=True)
-    exento_en_zona = models.BooleanField(default=False)  # exento total
-    subcuadras_exentas = models.ManyToManyField('Subcuadra', blank=True)  # Exenciones específicas
+    patente = models.CharField(max_length=10, unique=True)  # Id del vehículo
+    usuarios = models.ManyToManyField(Usuario, related_name="vehiculos", blank=True) # vincula usuario / vehiculo
+    exento_global = models.BooleanField(default=False)  # exento total
+    exento_parcial = models.ManyToManyField("Subcuadra", blank=True)  # Exenciones específicas
 
     def __str__(self):
         return self.patente
 
     def esta_exento_en(self, subcuadra):
-        """
-        Verifica si el vehículo está exento en una subcuadra específica.
-        - Si tiene exención general, devuelve True.
-        - Si no, revisa si la subcuadra está en su lista de exenciones.
-        """
-        if self.exento_en_zona:
+        if self.exento_global:
             return True
-        return self.subcuadras_exentas.filter(id=subcuadra.id).exists()
+        return self.exento_parcial.filter(id=subcuadra.id).exists()
+
 
 # 🏙️ Subcuadra representa una altura específica de una calle
 class Subcuadra(models.Model):
@@ -103,32 +116,15 @@ class Estacionamiento(models.Model):
     
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
-    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)  # Vehículo infractor
-    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Inspector que la registró
-    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)  # Ubicación
-    estacionamiento = models.ForeignKey(Estacionamiento, on_delete=models.CASCADE, null=True, blank=True)  # Relación opcional
-    fecha = models.DateTimeField(default=timezone.now)  # Fecha de la infracción
-    cancelada = models.BooleanField(default=False)      # Si fue cancelada
-    notificada = models.BooleanField(default=False)     # Si se notificó al usuario
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
+    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # 👈 obligatorio
+    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE, null=True, blank=True)
+    motivo = models.CharField(max_length=255, default="Impago")
+    fecha = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Infracción a {self.vehiculo.patente} por {self.inspector.nombre}"
-
-    def verificar_cancelacion(self):
-        """
-        Verifica si el estacionamiento fue pagado dentro de los 15 minutos.
-        - Si se finalizó y se pagó en menos de 900 segundos, se cancela.
-        - Devuelve mensaje de estado.
-        """
-        if self.estacionamiento and self.estacionamiento.hora_fin:
-            diferencia = self.estacionamiento.hora_fin - self.fecha
-            if diferencia.total_seconds() <= 900:
-                self.cancelada = True
-                self.save()
-                return "Infracción cancelada y notificada"
-        return "Infracción sigue activa"
-
-
+        return f"Infracción de {self.vehiculo.patente} por {self.motivo}"
+    
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario que recibe la notificación
@@ -137,5 +133,4 @@ class Notificacion(models.Model):
     leida = models.BooleanField(default=False)  # Flag para saber si fue leída
 
     def __str__(self):
-        return f"Notificación para {self.destinatario.nombre}"
-
+        return f"Notificación para {self.destinatario.email}"

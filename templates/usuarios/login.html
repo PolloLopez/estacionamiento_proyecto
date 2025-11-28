@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<section class="panel auth-panel">
+  <h2>Iniciar sesión</h2>
+  <form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    <label for="id_username">Correo</label>
+    <input id="id_username" name="username" type="email" required />
+    <label for="id_password">Contraseña</label>
+    <input id="id_password" name="password" type="password" required />
+    <button type="submit">Entrar</button>
+
+    {% if form.errors %}
+      <p class="error">Correo o contraseña incorrectos</p>
+    {% endif %}
+  </form>
+</section>
+{% endblock %}

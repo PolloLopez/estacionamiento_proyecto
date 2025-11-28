@@ -6,8 +6,18 @@ from app_estacionamiento.models import Usuario, Vehiculo, Estacionamiento, Subcu
 
 @pytest.mark.django_db
 def test_vendedor_registra_estacionamiento(client):
-    vendedor = Usuario.objects.create(nombre="Vend", correo="vend@test.com", es_vendedor=True)
-    cliente = Usuario.objects.create(nombre="Cliente", correo="cli@test.com", es_conductor=True)
+    vendedor = Usuario.objects.create_user(
+    email="juan@test.com",
+    password="1234",
+    es_conductor=True
+)
+
+    cliente = Usuario.objects.create_user(
+    email="juan@test.com",
+    password="1234",
+    es_conductor=True
+)
+
 
     session = client.session
     session["usuario_id"] = vendedor.id

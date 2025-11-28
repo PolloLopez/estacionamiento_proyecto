@@ -4,20 +4,20 @@ from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra
 def run():
     # Crear subcuadras de ejemplo
     zona_unica, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
-    calle21_300, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=200)
-    calle21_350, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=250)
+    calle21_200, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=200)
+    calle21_250, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=250)
     calle21_300, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=300)
     calle21_350, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=350)
-    calle22_300, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=200)
-    calle22_350, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=250)
+    calle22_200, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=200)
+    calle22_250, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=250)
     calle22_300, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=300)
     calle22_350, _ = Subcuadra.objects.get_or_create(calle="Calle 22", altura=350)
     calle23_200, _ = Subcuadra.objects.get_or_create(calle="Calle 23", altura=200)
     calle23_250, _ = Subcuadra.objects.get_or_create(calle="Calle 23", altura=250)
     calle23_300, _ = Subcuadra.objects.get_or_create(calle="Calle 23", altura=300)
     calle23_350, _ = Subcuadra.objects.get_or_create(calle="Calle 23", altura=350)
-    calle24_300, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=200)
-    calle24_350, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=250)
+    calle24_200, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=200)
+    calle24_250, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=250)
     calle24_300, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=300)
     calle24_350, _ = Subcuadra.objects.get_or_create(calle="Calle 24", altura=350)
 
@@ -35,7 +35,7 @@ def run():
 
     # Vehículo con exención global
     vehiculo_exento_global, _ = Vehiculo.objects.get_or_create(patente="XYZ789")
-    vehiculo_exento_global.exento_en_zona = True
+    vehiculo_exento_global.exento_global = True
     vehiculo_exento_global.save()
 
     # Vehículo con exención en subcuadras específicas

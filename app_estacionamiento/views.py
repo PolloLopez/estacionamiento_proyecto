@@ -1,12 +1,15 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.views import LoginView
 from django.utils import timezone
 from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
 from .estrategias import EstrategiaExencion
 from .factories import EstacionamientoFactory
 from decimal import Decimal, ROUND_HALF_UP
 from .decorators import require_role, require_login
+from django.http import HttpResponse
+
 
 # =========================================================
 # HOME GENERAL
@@ -150,7 +153,7 @@ def estacionar_vehiculo(request):
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
         # 🚫 Validar exenciones: nunca debe estacionar
-        if vehiculo.exento_en_zona or vehiculo.subcuadras_exentas.exists():
+        if vehiculo.exento_global or vehiculo.subcuadras_exentas.exists():
             return render(request, 'usuarios/estacionar_vehiculo.html', {
         'error': 'Este vehículo está marcado como exento. No puede estacionar.'
         })
@@ -294,71 +297,34 @@ def panel_inspectores(request):
     return render(request, 'inspectores/panel.html')
 
 def verificar_vehiculo(request):
-    """
-    Inspector verifica un vehículo solo ingresando la patente.
-    - Si exento global → Verificado exento en toda la zona.
-    - Si exento en subcuadras → se listan esas subcuadras.
-    - Si tiene estacionamiento activo → Pagado.
-    - Si no → No registrado.
-    """
-    usuario_id = request.session.get("usuario_id")
-    inspector = get_object_or_404(Usuario, id=usuario_id)
-
-    if not inspector.es_inspector and not inspector.es_admin:
-        return redirect("inicio")
-
-    resultado = None
-
     if request.method == "POST":
         patente = request.POST.get("patente")
+        subcuadra_id = request.POST.get("subcuadra_id")
 
-        try:
-            vehiculo = Vehiculo.objects.get(patente=patente)
+        vehiculo = get_object_or_404(Vehiculo, patente=patente)
 
-            estado = "No registrado"
-            detalle = None
-            exento = False
+        # Caso exento global
+        if vehiculo.exento_global:
+            return HttpResponse("Vehículo exento")
 
-            # Exención global
-            if vehiculo.exento_en_zona:
-                estado = "Exento"
-                exento = True
-                detalle = "Verificado exento en toda la zona"
+        # Caso exento parcial
+        if subcuadra_id and vehiculo.exento_parcial.filter(id=subcuadra_id).exists():
+            return HttpResponse("Vehículo exento")
 
-            # Exenciones específicas
-            elif vehiculo.subcuadras_exentas.exists():
-                estado = "Exento"
-                exento = True
-                detalle = "Verificado exento en subcuadras: " + ", ".join(
-                    str(s) for s in vehiculo.subcuadras_exentas.all()
-                )
+        # Caso estacionamiento activo/pagado
+        if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
+            return HttpResponse("Estado: Pagado - Estacionamiento activo")
 
-            # Estacionamiento activo
-            else:
-                estacionamiento_activo = Estacionamiento.objects.filter(
-                    vehiculo=vehiculo, activo=True
-                ).first()
-                if estacionamiento_activo:
-                    estado = "Pagado"
-                    detalle = f"Estacionamiento activo desde {estacionamiento_activo.hora_inicio}"
+        # Caso sin estacionamiento → infracción
+        Infraccion.objects.create(
+            vehiculo=vehiculo,
+            inspector=request.user,   # 👈 importante
+            subcuadra_id=subcuadra_id,
+            motivo="Impago"
+        )
+        return HttpResponse("Vehículo impago")
 
-            resultado = {
-                "patente": vehiculo.patente,
-                "estado": estado,
-                "detalle": detalle,
-                "exento": exento,
-            }
-
-        except Vehiculo.DoesNotExist:
-            resultado = {
-                "patente": patente,
-                "estado": "No registrado",
-            }
-
-    return render(request, "inspectores/verificar_vehiculo.html", {
-        "resultado": resultado
-    })
-
+    return HttpResponse("Método no permitido", status=405)
 @require_role("inspector", "admin")
 def registrar_estacionamiento_manual(request):
     """
@@ -472,7 +438,7 @@ def registrar_infraccion(request):
     if patente:
         vehiculo = get_object_or_404(Vehiculo, patente=patente)
 
-        if vehiculo.exento_en_zona or vehiculo.subcuadras_exentas.exists():
+        if vehiculo.exento_global or vehiculo.subcuadras_exentas.exists():
             mensaje = f"Vehículo {patente} verificado como exento. No se registra infracción."
         else:
             estacionamiento = Estacionamiento.objects.filter(
@@ -542,28 +508,15 @@ def resumen_caja(request):
 
 # =========================================================
 # VIEWS LOGIN / LOGOUT
-# =========================================================
-def login_view(request):
-    """
-    Vista de login simple.
-    - Usa correo y contraseña del modelo Usuario.
-    - Si son correctos, guarda usuario_id en sesión.
-    - Redirige al inicio general.
-    """
-    if request.method == "POST":
-        correo = request.POST.get("correo")
-        password = request.POST.get("password")
 
-        try:
-            usuario = Usuario.objects.get(correo=correo, password=password)
-            request.session["usuario_id"] = usuario.id
-            return redirect("inicio")
-        except Usuario.DoesNotExist:
-            return render(request, "login.html", {"error": "Correo o contraseña incorrectos"})
+class UsuarioLoginView(LoginView):
+    template_name = "usuarios/login.html"   # tu template de login
+    redirect_authenticated_user = True      # si ya está logueado, lo manda al inicio
 
-    return render(request, "login.html")
-
-
+    def get_success_url(self):
+        # Redirigir al inicio de usuarios después de login
+        return "/usuarios/inicio/"
+    
 def logout_view(request):
     """
     - Cierra sesión del usuario.
