@@ -1,5 +1,4 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/urls_inspectores.py
-# Archivo: urls_inspectores.py
 # Rutas del inspector
 
 from django.urls import path

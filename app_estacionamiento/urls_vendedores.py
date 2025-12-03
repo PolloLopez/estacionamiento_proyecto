@@ -1,6 +1,4 @@
-# ESTACIONAMIENTO_APP/app_estacionamiento/urls_vendedores.py
-# Archivo: urls_vendedores.py
-# Rutas del vendedor
+# app_estacionamiento/tests/urls_vendedores.py
 
 from django.urls import path
 from . import views

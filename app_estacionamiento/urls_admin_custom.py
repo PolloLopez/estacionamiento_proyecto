@@ -1,5 +1,4 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/urls_admin_custom.py
-# Archivo: urls_admin_custom.py
 # Panel de administración del sistema
 
 from django.urls import path

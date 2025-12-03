@@ -1,8 +1,9 @@
+# sitio/urls.py
 from django.contrib import admin
-from django.urls import path
-from app_estacionamiento import views
+from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from app_estacionamiento import views
 
 urlpatterns = [
     # Home
@@ -10,9 +11,10 @@ urlpatterns = [
     path("home/", views.home, name="home"),
 
     # Usuarios
-    path("usuarios/login/", views.UsuarioLoginView.as_view(), name="login"),
-    path("usuarios/logout/", views.logout_view, name="logout"),
+    path("usuarios/login/", views.login_view, name="login"),
     path("usuarios/inicio/", views.inicio_usuarios, name="inicio_usuarios"),
+    path("usuarios/logout/", views.logout_view, name="logout"),
+
     path("usuarios/estacionar/", views.estacionar_vehiculo, name="usuarios_estacionar_vehiculo"),
     path("usuarios/finalizar/<int:estacionamiento_id>/", views.finalizar_estacionamiento, name="usuarios_finalizar_estacionamiento"),
     path("usuarios/historial/", views.historial_estacionamientos, name="usuarios_historial"),
@@ -35,4 +37,7 @@ urlpatterns = [
     # Admin municipal
     path("panel-admin/", views.panel_admin, name="panel_admin"),
     path("admin/cargar_saldo/<int:usuario_id>/", views.cargar_saldo, name="cargar_saldo"),
+
+    # Django admin
+    path("admin/", admin.site.urls),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

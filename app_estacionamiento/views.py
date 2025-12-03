@@ -2,27 +2,18 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.views import LoginView
+from django.contrib.auth import authenticate, login
 from django.utils import timezone
+from django.http import HttpResponse
 from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
 from .estrategias import EstrategiaExencion
 from .factories import EstacionamientoFactory
 from decimal import Decimal, ROUND_HALF_UP
 from .decorators import require_role, require_login
-from django.http import HttpResponse
+from app_estacionamiento.decorators import require_role
+from app_estacionamiento.models import Vehiculo, Subcuadra, Estacionamiento, Infraccion, Usuario
+from app_estacionamiento.estrategias import EstrategiaExencion
 
-
-# =========================================================
-# HOME GENERAL
-# =========================================================
-def home(request):
-    """
-    Vista principal del sistema.
-    - Si hay usuario logueado, redirige al inicio de usuarios.
-    - Si no hay sesión, redirige al login.
-    """
-    if not request.session.get("usuario_id"):
-        return redirect("login")
-    return redirect("inicio_usuarios")
 
 def inicio(request):
     usuario_id = request.session.get("usuario_id")
@@ -42,6 +33,40 @@ def inicio(request):
     else:
         return redirect("login")
 
+
+def login_view(request):
+    if request.method == "POST":
+        correo = request.POST.get("username")  # tu form usa "username"
+        password = request.POST.get("password")
+
+        try:
+            usuario = Usuario.objects.get(correo=correo)
+        except Usuario.DoesNotExist:
+            return render(request, "usuarios/login.html", {"form": {"errors": True}})
+
+        if usuario.check_password(password):
+            # Guardamos el usuario en la sesión (clave que usan tus decoradores)
+            request.session["usuario_id"] = usuario.id
+            return redirect("inicio_usuarios")
+        else:
+            return render(request, "usuarios/login.html", {"form": {"errors": True}})
+
+    return render(request, "usuarios/login.html")
+
+
+@require_role("conductor", "inspector", "vendedor", "admin")
+def inicio_usuarios(request):
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+
+    # Podés pasar estacionamientos activos si querés
+    estacionamientos = usuario.estacionamiento_set.filter(activo=True)
+
+    return render(
+        request,
+        "usuarios/inicio_usuarios.html",
+        {"usuario": usuario, "estacionamientos": estacionamientos},
+    )
 # =========================================================
 # VIEWS ADMIN
 # =========================================================
@@ -78,10 +103,7 @@ def panel_admin(request):
     }
     return render(request, "admin/panel_admin.html", contexto)
 
-# =========================================================
-# VIEWS USUARIOS
-# =========================================================
-@require_role("conductor")
+@require_role("admin")
 def cargar_saldo_usuario(request):
     usuario_id = request.session.get("usuario_id")
     usuario = get_object_or_404(Usuario, id=usuario_id)
@@ -101,32 +123,22 @@ def cargar_saldo_usuario(request):
 
     return render(request, "usuarios/cargar_saldo.html", {"usuario": usuario})
 
-def usuarios_historial(request):
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
-    estacionamientos = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
-    return render(request, "usuarios/historial_estacionamientos.html", {
-        "usuario": usuario,
-        "estacionamientos": estacionamientos
-    })
+# =========================================================
+# VIEWS USUARIOS
+# =========================================================
 
-@require_role("conductor", "inspector", "admin")
-def inicio_usuarios(request):
-    usuario_id = request.session.get("usuario_id")
-    if not usuario_id:
-        return redirect("login")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+def home(request):
+    """
+    Vista principal del sistema.
+    - Si hay usuario logueado, redirige al inicio de usuarios.
+    - Si no hay sesión, muestra login.
+    """
+    if not request.session.get("usuario_id"):
+        # antes: return redirect("login")
+        return render(request, "usuarios/login.html")
+    return redirect("inicio_usuarios")
 
-    estacionamientos_activos = Estacionamiento.objects.filter(
-        vehiculo__usuarios=usuario,
-        activo=True
-    )
-
-    return render(request, "usuarios/inicio_usuarios.html", {
-        "usuario": usuario,
-        "estacionamientos": estacionamientos_activos,
-    })
-
+@require_role("conductor")
 def estacionar_vehiculo(request):
     """
     Vista para registrar un estacionamiento.
@@ -137,7 +149,7 @@ def estacionar_vehiculo(request):
     # 🔒 Validar sesión
     usuario_id = request.session.get("usuario_id")
     if not usuario_id:
-        return redirect("login")
+        return render(request, "usuarios/login.html", {"error": "Debe iniciar sesión"})
 
     usuario = get_object_or_404(Usuario, id=usuario_id)
 
@@ -189,6 +201,25 @@ def estacionar_vehiculo(request):
 
     return render(request, 'usuarios/estacionar_vehiculo.html')
 
+@require_login
+def usuarios_historial(request):
+    """
+    Muestra el historial de estacionamientos del usuario logueado.
+    - Si no hay sesión → redirige a login (decorador).
+    - Si hay sesión → renderiza historial con estacionamientos.
+    """
+    usuario_id = request.session.get("usuario_id")
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+
+    estacionamientos = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
+
+    return render(request, "usuarios/historial.html", {
+        "usuario": usuario,
+        "estacionamientos": estacionamientos,
+    })
+
+
+@require_role("conductor")
 def finalizar_estacionamiento(request, estacionamiento_id):
     usuario_id = request.session.get("usuario_id")
     usuario = get_object_or_404(Usuario, id=usuario_id)
@@ -197,43 +228,48 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     if not estacionamiento.activo:
         return redirect("usuarios_historial")
 
+    # calcular costo sin cerrar
     costo_final = estacionamiento.finalizar()
 
     if usuario.saldo < costo_final:
-        # revertir correctamente
-        estacionamiento.activo = True
-        estacionamiento.hora_fin = None
-        estacionamiento.costo = Decimal("0.00")
-        estacionamiento.save()
+        # ❌ No alcanza saldo → no se finaliza
         return redirect("usuarios_historial")
+
+    # ✅ Si alcanza saldo → cerrar y descontar
+    estacionamiento.hora_fin = timezone.now()
+    estacionamiento.costo = costo_final
+    estacionamiento.activo = False
+    estacionamiento.save()
 
     usuario.saldo -= costo_final
     usuario.save()
     return redirect("usuarios_historial")
 
 
+@require_role("inspector", "admin", "conductor")
 def historial_estacionamientos(request):
     """
     Muestra historial de estacionamientos del usuario logueado.
     """
     usuario_id = request.session.get("usuario_id")
     if not usuario_id:
-        return redirect("login")
+        return render(request, "usuarios/login.html", {"error": "Debe iniciar sesión"})
     usuario = get_object_or_404(Usuario, id=usuario_id)
 
     estacionamientos = Estacionamiento.objects.filter(vehiculo__usuarios=usuario)
 
-    return render(request, 'usuarios/historial_estacionamientos.html', {
+    return render(request, 'usuarios/historial.html', {
         'estacionamientos': estacionamientos
     })
 
+@require_role("inspector", "admin")
 def historial_infracciones(request):
     """
     Muestra historial de infracciones del usuario logueado.
     """
     usuario_id = request.session.get("usuario_id")
     if not usuario_id:
-        return redirect("login")
+        return render(request, "usuarios/login.html", {"error": "Debe iniciar sesión"})
     usuario = get_object_or_404(Usuario, id=usuario_id)
 
     infracciones = Infraccion.objects.filter(vehiculo__usuarios=usuario)
@@ -242,6 +278,7 @@ def historial_infracciones(request):
         'infracciones': infracciones
     })
 
+@require_role("inspector", "admin")
 def usuarios_infracciones(request):
     usuario_id = request.session.get("usuario_id")
     usuario = get_object_or_404(Usuario, id=usuario_id)
@@ -251,7 +288,7 @@ def usuarios_infracciones(request):
         "infracciones": infracciones
     })
 
-@require_login
+@require_role("admin")
 def cargar_saldo(request, usuario_id):
     """
     Permite al admin cargar saldo a un usuario.
@@ -272,6 +309,7 @@ def cargar_saldo(request, usuario_id):
             })
 
     return render(request, "admin/cargar_saldo.html", {"usuario": usuario})
+    
 
 @require_login
 def consultar_deuda(request):
@@ -296,36 +334,64 @@ def panel_inspectores(request):
         return redirect("inicio")
     return render(request, 'inspectores/panel.html')
 
-def verificar_vehiculo(request):
-    if request.method == "POST":
-        patente = request.POST.get("patente")
-        subcuadra_id = request.POST.get("subcuadra_id")
 
-        vehiculo = get_object_or_404(Vehiculo, patente=patente)
+#    ============  en test solo @require_login   ============
+#              para produccion: @require_role("inspector")
+
+@require_login
+def verificar_vehiculo(request):
+    """
+    Verifica el estado de un vehículo:
+    - Exento global → mensaje directo
+    - Exento parcial → listado de subcuadras exentas
+    - Pagado → estacionamiento activo con costo > 0
+    - Impago → infracción
+    """
+    resultado = None
+
+    if request.method == "POST":
+        patente = (request.POST.get("patente") or "").strip().upper()
+        vehiculo = Vehiculo.objects.filter(patente=patente).first()
+
+        if not vehiculo:
+            resultado = {"patente": patente, "estado": "No registrado"}
+            return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
         # Caso exento global
         if vehiculo.exento_global:
-            return HttpResponse("Vehículo exento")
+            resultado = {"patente": patente, "estado": "Exento", "detalle": "Exento en todas las subcuadras"}
+            return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
         # Caso exento parcial
-        if subcuadra_id and vehiculo.exento_parcial.filter(id=subcuadra_id).exists():
-            return HttpResponse("Vehículo exento")
+        subcuadras_exentas = vehiculo.subcuadras_exentas.all()
+        if subcuadras_exentas.exists():
+            resultado = {
+                "patente": patente,
+                "estado": "Exento parcial",
+                "detalle": "Exento en las siguientes subcuadras:",
+                "subcuadras": subcuadras_exentas
+            }
+            return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Caso estacionamiento activo/pagado
-        if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
-            return HttpResponse("Estado: Pagado - Estacionamiento activo")
+        # Caso con estacionamiento activo
+        estacionamiento = Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).first()
+        if estacionamiento and estacionamiento.costo > 0:
+            resultado = {"patente": patente, "estado": "Pagado", "detalle": "Estacionamiento activo"}
+            return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Caso sin estacionamiento → infracción
+        # Caso impago → infracción
         Infraccion.objects.create(
             vehiculo=vehiculo,
-            inspector=request.user,   # 👈 importante
-            subcuadra_id=subcuadra_id,
-            motivo="Impago"
+            inspector=request.user if hasattr(request, "user") else None,
+            motivo="Impago",
+            fecha=timezone.now(),
         )
-        return HttpResponse("Vehículo impago")
+        resultado = {"patente": patente, "estado": "Impago", "detalle": "Se registró infracción"}
+        return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-    return HttpResponse("Método no permitido", status=405)
-@require_role("inspector", "admin")
+    return render(request, "inspectores/verificar_vehiculo.html")
+
+@require_role("inspector", "admin", "vendedor")
 def registrar_estacionamiento_manual(request):
     """
     Vista para que un inspector registre un estacionamiento manualmente.
@@ -368,7 +434,7 @@ def registrar_estacionamiento_manual(request):
 
     return render(request, "inspectores/registrar_estacionamiento_manual.html")
 
-@require_role("vendedor", "admin")
+@require_role("vendedor")
 def registrar_estacionamiento_vendedor(request):
     """
     Vista para que un vendedor registre un estacionamiento.
@@ -420,6 +486,7 @@ def registrar_estacionamiento_vendedor(request):
 
     return render(request, "vendedores/registrar_estacionamiento.html")
 
+@require_role("inspector")
 def registrar_infraccion(request):
     """
     Registrar infracción.
@@ -458,6 +525,7 @@ def registrar_infraccion(request):
         "mensaje": mensaje
     })
 
+@require_role("inspector", "vendedor", "admin")
 def resumen_cobros(request):
     """
     Vista de resumen de cobros realizados por inspectores.
@@ -469,6 +537,7 @@ def resumen_cobros(request):
         return redirect("inicio")
     return render(request, 'inspectores/resumen_cobros.html')
 
+@require_role("inspector", "admin")
 def resumen_infracciones(request):
     """
     Vista de resumen de infracciones registradas por inspectores.
@@ -510,17 +579,13 @@ def resumen_caja(request):
 # VIEWS LOGIN / LOGOUT
 
 class UsuarioLoginView(LoginView):
-    template_name = "usuarios/login.html"   # tu template de login
-    redirect_authenticated_user = True      # si ya está logueado, lo manda al inicio
+    template_name = "usuarios/login.html"
+    redirect_authenticated_user = True
 
-    def get_success_url(self):
-        # Redirigir al inicio de usuarios después de login
-        return "/usuarios/inicio/"
-    
 def logout_view(request):
     """
     - Cierra sesión del usuario.
     - Redirige al login.
     """
     request.session.flush()
-    return redirect("login")
+    return render(request, "usuarios/login.html", {"error": "Debe iniciar sesión"})

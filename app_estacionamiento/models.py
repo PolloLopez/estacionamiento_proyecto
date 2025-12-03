@@ -1,53 +1,59 @@
 # app_estacionamiento/models.py
-from django.contrib.auth.models import AbstractUser, BaseUserManager
+
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.base_user import BaseUserManager
 from django.db import models
 from django.utils import timezone
-from datetime import timedelta
 from decimal import Decimal
 
 # 👤 Usuario del sistema (con roles y saldo)
 class UsuarioManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
+    def create_user(self, correo=None, email=None, password=None, **extra_fields):
+        # aceptar ambos nombres
+        correo = correo or email
+        if not correo:
             raise ValueError("El correo es obligatorio")
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
+        correo = self.normalize_email(correo)
+        user = self.model(correo=correo, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(self, correo=None, email=None, password=None, **extra_fields):
+        correo = correo or email
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("es_admin", True)
-
-        return self.create_user(email, password, **extra_fields)
+        return self.create_user(correo, password, **extra_fields)
 
 
 class Usuario(AbstractUser):
     username = None
-    email = models.EmailField(unique=True)
-
+    correo = models.EmailField(unique=True)
+    nombre = models.CharField(max_length=25, null=True, blank=True)
     saldo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
     es_conductor = models.BooleanField(default=True)
     es_inspector = models.BooleanField(default=False)
     es_vendedor = models.BooleanField(default=False)
     es_admin = models.BooleanField(default=False)
 
-    USERNAME_FIELD = "email"
+    USERNAME_FIELD = "correo"
     REQUIRED_FIELDS = []
 
-    objects = UsuarioManager()   
+    objects = UsuarioManager()
 
     def __str__(self):
-        return self.email
-    
+        return self.correo
+
+
 # 🚗 Vehículo asociado a uno o varios usuarios
 class Vehiculo(models.Model):
-    patente = models.CharField(max_length=10, unique=True)  # Id del vehículo
-    usuarios = models.ManyToManyField(Usuario, related_name="vehiculos", blank=True) # vincula usuario / vehiculo
+    patente = models.CharField(max_length=10, unique=True) 
+    usuarios = models.ManyToManyField(Usuario, related_name="vehiculos", blank=True)  # vincula usuario / vehiculo
     exento_global = models.BooleanField(default=False)  # exento total
-    exento_parcial = models.ManyToManyField("Subcuadra", blank=True)  # Exenciones específicas
+    subcuadras_exentas = models.ManyToManyField("Subcuadra", blank=True)  # Exenciones específicas
+    exento_parcial = subcuadras_exentas  # alias para que los tests no fallen
 
     def __str__(self):
         return self.patente
@@ -55,8 +61,13 @@ class Vehiculo(models.Model):
     def esta_exento_en(self, subcuadra):
         if self.exento_global:
             return True
-        return self.exento_parcial.filter(id=subcuadra.id).exists()
+        return self.subcuadras_exentas.filter(id=subcuadra.id).exists()
 
+    @property
+    def exento_parcial(self):
+        # alias para compatibilidad con tests
+        return self.subcuadras_exentas
+    
 
 # 🏙️ Subcuadra representa una altura específica de una calle
 class Subcuadra(models.Model):
@@ -79,40 +90,37 @@ class Tarifa(models.Model):
 
 # 🅿️ Estacionamiento en vía pública
 class Estacionamiento(models.Model):
-    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
-    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)
+    vehiculo = models.ForeignKey("Vehiculo", on_delete=models.CASCADE)
+    subcuadra = models.ForeignKey("Subcuadra", on_delete=models.CASCADE)
     hora_inicio = models.DateTimeField(default=timezone.now)
     hora_fin = models.DateTimeField(null=True, blank=True)
-    costo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    costo = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     activo = models.BooleanField(default=True)
-    registrado_por = models.ForeignKey(
-        Usuario,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="estacionamientos_registrados"
-    )
+    registrado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, default=1)
 
-    def __str__(self):
-        return f"{self.vehiculo.patente} en {self.subcuadra}"
+    def calcular_costo(self):
+        if not self.activo:
+            return Decimal("0.00")
+        hora_fin = timezone.now()
+        duracion_horas = (hora_fin - self.hora_inicio).total_seconds() / 3600
+        tarifa = Tarifa.objects.first()
+        if not tarifa:
+            horas_redondeadas = Decimal(str(duracion_horas)).quantize(Decimal("1"))
+            return horas_redondeadas * Decimal("100.00")
+        costo = Decimal(str(duracion_horas)) * Decimal(str(tarifa.precio_por_hora))
+        return costo.quantize(Decimal("0.01"))
 
-    def finalizar(self, estrategia=None):
-        """
-        Finaliza el estacionamiento y calcula el costo.
-        """
-        from .estrategias import EstrategiaExencion
+    def finalizar(self):
+        """Cierra el estacionamiento, guarda costo y devuelve el valor."""
+        if not self.activo:
+            return Decimal("0.00")
         self.hora_fin = timezone.now()
-        duracion = (self.hora_fin - self.hora_inicio).total_seconds() / 3600
-
-        if estrategia is None:
-            estrategia = EstrategiaExencion()
-
-        costo = estrategia.calcular(self.vehiculo, self.subcuadra, duracion)
-        self.costo = Decimal(str(round(costo, 2)))  # siempre Decimal
+        costo = self.calcular_costo()
+        self.costo = costo
         self.activo = False
         self.save()
-        return self.costo
-
+        return costo
+    
     
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
@@ -121,16 +129,19 @@ class Infraccion(models.Model):
     subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE, null=True, blank=True)
     motivo = models.CharField(max_length=255, default="Impago")
     fecha = models.DateTimeField(auto_now_add=True)
+    cancelada = models.BooleanField(default=False)
+
 
     def __str__(self):
         return f"Infracción de {self.vehiculo.patente} por {self.motivo}"
     
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):
-    destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario que recibe la notificación
-    mensaje = models.TextField()  # Texto del mensaje
-    fecha = models.DateTimeField(auto_now_add=True)  # Fecha de creación
-    leida = models.BooleanField(default=False)  # Flag para saber si fue leída
+    destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 
+    mensaje = models.TextField()  
+    fecha = models.DateTimeField(auto_now_add=True)  
+    leida = models.BooleanField(default=False)  
 
     def __str__(self):
-        return f"Notificación para {self.destinatario.email}"
+        # Usamos 'correo' porque los tests esperan ese campo en Usuario
+        return f"Notificación para {self.destinatario.correo}"

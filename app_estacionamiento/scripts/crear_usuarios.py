@@ -1,4 +1,4 @@
-# scripts/crear_usuarios.py
+# app_estacionamiento/scripts/crear_usuarios.py
 from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra
 
 def run():
@@ -70,3 +70,4 @@ def run():
     )
 
     print("Usuarios y vehículos de prueba creados correctamente ✅")
+  

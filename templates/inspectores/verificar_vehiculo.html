@@ -5,44 +5,24 @@
 <section class="panel">
   <h2>🔍 Verificar vehículo</h2>
 
-  <!-- Formulario de verificación -->
-  <form method="post" action="{% url 'inspectores_verificar_vehiculo' %}" class="form">
+  <form method="post" action="{% url 'inspectores_verificar_vehiculo' %}">
     {% csrf_token %}
-    <div class="form-row">
-      <label for="patente">Patente</label>
-      <input id="patente" name="patente" placeholder="ABC 123 / AA 123 ZZ" required />
-    </div>
-    <div class="form-row actions">
-      <button class="btn primary">Verificar</button>
-    </div>
+    <label for="patente">Patente</label>
+    <input id="patente" name="patente" placeholder="ABC123" required />
+    <button class="btn primary">Verificar</button>
   </form>
 
-  <!-- Resultado de la verificación -->
   {% if resultado %}
     <div class="resultado">
-      <h3>Patente: <strong>{{ resultado.patente }}</strong></h3>
-
-      {% if resultado.estado == "Exento" %}
-        <p class="estado exento">✅ Estado: {{ resultado.estado }}</p>
-        <p><em>{{ resultado.detalle }}</em></p>
-
-      {% elif resultado.estado == "Pagado" %}
-        <p class="estado pagado">💰 Estado: {{ resultado.estado }}</p>
-        <p>{{ resultado.detalle }}</p>
-
-      {% elif resultado.estado == "Impago" %}
-        <p class="estado impago">⚠️ Estado: {{ resultado.estado }}</p>
-        {% if resultado.detalle %}
-          <p>{{ resultado.detalle }}</p>
-        {% endif %}
-        <a class="btn danger"
-           href="{% url 'inspectores_registrar_infraccion' %}?patente={{ resultado.patente }}">
-           ➕ Crear infracción
-        </a>
-
-      {% elif resultado.estado == "No registrado" %}
-        <p class="estado no-registrado">❓ Estado: {{ resultado.estado }}</p>
-        <p>Este vehículo no figura en el sistema.</p>
+      <h3>Patente: {{ resultado.patente }}</h3>
+      <p class="estado">{{ resultado.estado }}</p>
+      {% if resultado.detalle %}<p>{{ resultado.detalle }}</p>{% endif %}
+      {% if resultado.subcuadras %}
+        <ul>
+          {% for s in resultado.subcuadras %}
+            <li>{{ s.calle }} {{ s.altura }}</li>
+          {% endfor %}
+        </ul>
       {% endif %}
     </div>
   {% endif %}

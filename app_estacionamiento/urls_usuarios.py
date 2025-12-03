@@ -1,5 +1,4 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/urls_usuarios.py
-# Archivo: urls_usuarios.py
 # Rutas específicas del usuario final
 
 from django.urls import path
