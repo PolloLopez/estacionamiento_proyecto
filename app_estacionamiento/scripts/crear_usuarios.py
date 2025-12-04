@@ -1,8 +1,17 @@
-# app_estacionamiento/scripts/crear_usuarios.py
+import os
+import sys
+import django
+
+# Agregar la carpeta raíz al sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+# Inicializar Django con el settings correcto
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sitio.settings')
+django.setup()
+
 from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra, Infraccion
 
 def run():
-    
     # Crear subcuadras de ejemplo
     zona_unica, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
     calle21_200, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=200)
@@ -13,7 +22,7 @@ def run():
     # Conductor
     juan, _ = Usuario.objects.get_or_create(correo="juanperez@ejemplo.com")
     juan.nombre = "Juan Pérez"
-    juan.saldo = 1000   # saldo inicial para la demo
+    juan.saldo = 1000
     juan.es_admin = False
     juan.es_inspector = False
     juan.es_vendedor = False
@@ -36,7 +45,6 @@ def run():
     vehiculo_exento_sub, _ = Vehiculo.objects.get_or_create(patente="EXP123")
     vehiculo_exento_sub.subcuadras_exentas.add(calle21_300, calle21_350)
     vehiculo_exento_sub.save()
-    print("Subcuadras exentas de EXP123:", [s.calle + " " + str(s.altura) for s in vehiculo_exento_sub.subcuadras_exentas.all()])
 
     # Inspector
     inspector, _ = Usuario.objects.get_or_create(correo="garcia@ejemplo.com")
@@ -68,6 +76,10 @@ def run():
     admin.set_password("1234")
     admin.save()
 
-    # Mostrar en consola las patentes de Juan
+    # Mensajes de confirmación
     print("Vehículos de Juan:", [v.patente for v in juan.vehiculos.all()])
     print("Usuarios, vehículos y subcuadras de prueba creados correctamente ✅")
+
+
+if __name__ == "__main__":
+    run()
