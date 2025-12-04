@@ -13,6 +13,7 @@ urlpatterns = [
     # Historial de estacionamientos
     path("historial/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),
 
+
     # Historial de infracciones
     path("infracciones/", views.usuarios_infracciones, name="usuarios_infracciones"),
 

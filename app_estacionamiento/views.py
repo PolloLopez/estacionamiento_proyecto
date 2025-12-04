@@ -213,7 +213,7 @@ def usuarios_historial(request):
 
     estacionamientos = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
 
-    return render(request, "usuarios/historial.html", {
+    return render(request, "usuarios/historial_estacionamientos.html", {
         "usuario": usuario,
         "estacionamientos": estacionamientos,
     })
@@ -255,22 +255,14 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 
 
 
-@require_role("inspector", "admin", "conductor")
+@require_role("conductor")
 def historial_estacionamientos(request):
-    """
-    Muestra historial de estacionamientos del usuario logueado.
-    """
     usuario_id = request.session.get("usuario_id")
-    if not usuario_id:
-        return render(request, "usuarios/login.html", {"error": "Debe iniciar sesión"})
     usuario = get_object_or_404(Usuario, id=usuario_id)
+    estacionamientos = Estacionamiento.objects.filter(vehiculo__in=usuario.vehiculos.all()).order_by("-hora_inicio")
+    return render(request, "usuarios/historial.html", {"estacionamientos": estacionamientos})
 
-    estacionamientos = Estacionamiento.objects.filter(vehiculo__usuarios=usuario)
 
-    return render(request, "usuarios/historial.html", {
-        "estacionamientos": estacionamientos,
-        "usuario": usuario,
-    })
 
 @require_role("inspector", "admin")
 def usuarios_infracciones(request):
@@ -431,10 +423,10 @@ def registrar_infraccion(request):
         vehiculo = Vehiculo.objects.filter(patente=patente).first()
         estacionamiento = Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).first() if vehiculo else None
 
-        # Exento global o exento en la subcuadra actual → no se registra infracción
-        if vehiculo and (
-            vehiculo.exento_global or
-            (estacionamiento and estacionamiento.subcuadra in vehiculo.subcuadras_exentas.all())
+        if not vehiculo:
+            mensaje = f"⚠️ No se encontró vehículo con patente {patente}."
+        elif vehiculo.exento_global or (
+            estacionamiento and estacionamiento.subcuadra in vehiculo.subcuadras_exentas.all()
         ):
             mensaje = f"Vehículo {patente} verificado como exento en esta condición. No se registra infracción."
         else:
@@ -457,6 +449,7 @@ def registrar_infraccion(request):
             "patente": patente,
         },
     )
+
 
 @require_role("inspector", "admin", "vendedor")
 def registrar_estacionamiento_manual(request):

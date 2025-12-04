@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Historial de Estacionamientos{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>Historial de estacionamientos</h2>
+
+  {% if estacionamientos %}
+    <table>
+      <thead>
+        <tr>
+          <th>Patente</th>
+          <th>Inicio</th>
+          <th>Fin</th>
+          <th>Costo</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in estacionamientos %}
+          <tr>
+            <td>{{ e.vehiculo.patente }}</td>
+            <td>{{ e.hora_inicio }}</td>
+            <td>{{ e.hora_fin|default:"-" }}</td>
+            <td>${{ e.costo }}</td>
+            <td>
+              {% if e.activo %}
+                <span style="color:orange">Activo</span>
+              {% else %}
+                <span style="color:green">Finalizado</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No hay estacionamientos registrados.</p>
+  {% endif %}
+
+  <div class="actions">
+    <a href="{% url 'inicio_usuarios' %}" class="btn link">🏠 Volver al inicio</a>
+  </div>
+</section>
+{% endblock %}
