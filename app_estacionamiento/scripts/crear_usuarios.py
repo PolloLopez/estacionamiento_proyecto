@@ -2,8 +2,6 @@
 from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra, Infraccion
 
 def run():
-    # Eliminar la subcuadra San Martín 100 si existe
-    Subcuadra.objects.filter(calle="San Martin", altura=100).delete()
     
     # Crear subcuadras de ejemplo
     zona_unica, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
@@ -37,6 +35,8 @@ def run():
     # Vehículo con exención en subcuadras específicas
     vehiculo_exento_sub, _ = Vehiculo.objects.get_or_create(patente="EXP123")
     vehiculo_exento_sub.subcuadras_exentas.add(calle21_300, calle21_350)
+    vehiculo_exento_sub.save()
+    print("Subcuadras exentas de EXP123:", [s.calle + " " + str(s.altura) for s in vehiculo_exento_sub.subcuadras_exentas.all()])
 
     # Inspector
     inspector, _ = Usuario.objects.get_or_create(correo="garcia@ejemplo.com")
