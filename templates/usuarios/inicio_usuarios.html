@@ -12,24 +12,29 @@
     <!-- Botón para ir al formulario de estacionar vehículo -->
     <li><a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar vehículo</a></li>
 
-    <!-- Botón de estacionamiento rápido (usa misma vista que estacionar) -->
-    <li><a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar rápido</a></li>
-
     <!-- Itera sobre estacionamientos activos y genera un botón "Finalizar" para cada uno -->
     {% for e in estacionamientos %}
-      <li>
-        {{ e.patente }} — {{ e.subcuadra.calle }} {{ e.subcuadra.altura }}
-        <a class="btn" href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_id=e.id %}">
-          Finalizar
-        </a>
-      </li>
-    {% empty %}
-      <!-- Si no hay estacionamientos activos, muestra mensaje -->
-      <li>No tenés estacionamientos activos.</li>
-    {% endfor %}
+    <li>
+      🚗 {{ e.vehiculo.patente }} — {{ e.subcuadra.calle }} {{ e.subcuadra.altura }}
+      <br>
+      ⏰ Inicio: {{ e.hora_inicio|date:"d/m/Y H:i" }}
+      {% if e.hora_fin %}
+        — Fin: {{ e.hora_fin|date:"d/m/Y H:i" }}
+      {% else %}
+        — Fin: (activo)
+      {% endif %}
+      <br>
+      <a class="btn" href="{% url 'usuarios_finalizar_estacionamiento'   estacionamiento_id=e.id %}">
+        Finalizar
+      </a>
+    </li>
+  {% empty %}
+    <li>No tenés estacionamientos activos.</li>
+  {% endfor %}
+
 
     <!-- Botón para cargar saldo -->
-    <li><a class="btn" href="{% url 'usuarios_cargar_saldo' %}">Cargar saldo</a></li>
+    <!--<li><a class="btn" href="{% url 'usuarios_cargar_saldo' %}">Cargar saldo</a></li>-->
   </ul>
 </section>
 {% endblock %}

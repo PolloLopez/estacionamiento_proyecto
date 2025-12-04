@@ -1,4 +1,5 @@
 /* app_estacionamiento/static/app_estacionamiento/css/global.css */
+
 /* Reset básico */
 * {
   margin: 0;
@@ -9,14 +10,14 @@
 /* Tipografía y colores generales */
 body {
   font-family: "Segoe UI", Roboto, sans-serif;
-  background: #f4f6f9;
-  color: #333;
+  background: #f7f5ef; 
+  color: #2b2b2b;
   line-height: 1.6;
 }
 
 /* Navbar */
 .navbar {
-  background: #2c3e50;
+  background: #264653; 
   color: #fff;
   padding: 15px 20px;
   display: flex;
@@ -27,6 +28,7 @@ body {
 .logo {
   font-size: 1.5em;
   font-weight: bold;
+  color: #e9c46a; 
 }
 
 .nav-items {
@@ -46,7 +48,7 @@ body {
 }
 
 .nav-items a:hover {
-  text-decoration: underline;
+  color: #e9c46a; 
 }
 
 .nav-items .right {
@@ -65,13 +67,14 @@ body {
   background: #fff;
   margin: 20px auto;
   padding: 25px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-radius: 10px;
+  border: 2px solid #a8dadc; 
+  box-shadow: 0 4px 12px rgba(38,70,83,0.15);
 }
 
 .panel h2 {
   margin-bottom: 15px;
-  color: #2c3e50;
+  color: #6a4c93; 
   text-align: center;
 }
 
@@ -84,6 +87,7 @@ form {
 
 label {
   font-weight: bold;
+  color: #264653;
 }
 
 input, select, textarea {
@@ -91,42 +95,67 @@ input, select, textarea {
   border: 1px solid #ccc;
   border-radius: 6px;
   width: 100%;
+  background: #fdfdfd;
 }
 
 button, .btn {
-  padding: 10px 20px;
+  padding: 8px 22px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-weight: bold;
-  transition: background 0.3s ease;
+  transition: background 0.3s ease, transform 0.2s ease;
 }
 
+button:hover, .btn:hover {
+  transform: scale(1.05);
+}
+
+/* Botones */
 .btn.primary {
-  background: #3498db;
+  background: #2a9d8f; 
   color: #fff;
 }
 
 .btn.primary:hover {
-  background: #2980b9;
+  background: #21867a;
 }
 
 .btn.danger {
-  background: #e74c3c;
+  background: #e76f51; 
   color: #fff;
 }
 
 .btn.danger:hover {
-  background: #c0392b;
+  background: #c65b40;
 }
 
 .btn.success {
-  background: #2ecc71;
+  background: #6a4c93; 
   color: #fff;
 }
 
 .btn.success:hover {
-  background: #27ae60;
+  background: #563b77;
+}
+
+.btn.link {
+  background: transparent;
+  color: #264653;
+  text-decoration: underline;
+}
+
+/* Alertas */
+.alert {
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.alert.success {
+  background: #2a9d8f;
+  color: #fff;
+  font-weight: bold;
 }
 
 /* Tablas */
@@ -143,12 +172,12 @@ table th, table td {
 }
 
 table th {
-  background: #3498db;
+  background: #264653;
   color: #fff;
 }
 
 table tr:nth-child(even) {
-  background: #f9f9f9;
+  background: #f1f1f1;
 }
 
 /* Mensajes de estado */
@@ -156,17 +185,19 @@ table tr:nth-child(even) {
   margin-top: 25px;
   padding: 20px;
   border-radius: 6px;
-  background: #ecf0f1;
+  background: #e9c46a20; 
+  border: 1px solid #e9c46a;
 }
 
 .resultado h3 {
   margin-bottom: 10px;
+  color: #264653;
 }
 
 .resultado .estado {
   font-size: 1.2em;
   font-weight: bold;
-  color: #2c3e50;
+  color: #e76f51; 
 }
 
 .resultado ul {
@@ -176,7 +207,7 @@ table tr:nth-child(even) {
 
 /* Footer */
 .footer {
-  background: #2c3e50;
+  background: #264653;
   color: #fff;
   text-align: center;
   padding: 15px;

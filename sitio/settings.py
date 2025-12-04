@@ -12,6 +12,7 @@ ALLOWED_HOSTS = ["*"]
 
 # 🧩 Aplicaciones instaladas
 INSTALLED_APPS = [
+    "django_extensions",
     'django.contrib.staticfiles',
     'app_estacionamiento',
     'django.contrib.admin',
@@ -19,7 +20,6 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django_extensions',
 ]
 
 # ⚙️ Middleware (control de peticiones)

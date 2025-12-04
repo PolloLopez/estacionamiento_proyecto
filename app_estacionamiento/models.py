@@ -125,16 +125,17 @@ class Estacionamiento(models.Model):
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
-    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # 👈 obligatorio
+    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)  
     subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE, null=True, blank=True)
+    estacionamiento = models.ForeignKey(Estacionamiento, on_delete=models.SET_NULL, null=True, blank=True) 
     motivo = models.CharField(max_length=255, default="Impago")
     fecha = models.DateTimeField(auto_now_add=True)
     cancelada = models.BooleanField(default=False)
-
+    foto = models.ImageField(upload_to="infracciones/", null=True, blank=True) 
 
     def __str__(self):
         return f"Infracción de {self.vehiculo.patente} por {self.motivo}"
-    
+
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 

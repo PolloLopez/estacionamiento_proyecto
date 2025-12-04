@@ -1,8 +1,53 @@
-createsuperuser --email admin@test.com --password 1234
+Crear las migraciones (Django detecta los cambios en los modelos):
 
+bash
+python manage.py makemigrations
+Aplicar las migraciones a la base de datos:
+
+bash
+python manage.py migrate
+Levantar el servidor de desarrollo:
+
+bash
 python manage.py runserver
 
 
-funcion que al quedar con saldo menor a "x" , notificar al usuario que se le agota el saldo y se le va a cerrar el estacionamiento
+createsuperuser --email admin@test.com --password 1234
 
 
+falta, funcion que al quedar con saldo menor a "x" , notificar al usuario que se le agota el saldo y se le va a cerrar el estacionamiento
+
+debe quedar asi:
+
+@require_role("admin")
+def panel_admin(request):
+    inspectores = Usuario.objects.filter(es_inspector=True)
+    vendedores = Usuario.objects.filter(es_vendedor=True)
+    usuarios = Usuario.objects.filter(es_conductor=True)
+
+    # Filtro dinámico por rol
+    rol = request.GET.get("rol")
+    estacionamientos = Estacionamiento.objects.select_related("vehiculo", "subcuadra", "registrado_por")
+
+    if rol == "vendedor":
+        estacionamientos = estacionamientos.filter(registrado_por__in=vendedores)
+    elif rol == "inspector":
+        estacionamientos = estacionamientos.filter(registrado_por__in=inspectores)
+    elif rol == "conductor":
+        estacionamientos = estacionamientos.filter(registrado_por__in=usuarios)
+
+    estacionamientos = estacionamientos.order_by("-hora_inicio")
+
+    estacionamientos_activos = Estacionamiento.objects.filter(activo=True).count()
+    infracciones_recientes = Infraccion.objects.order_by('-fecha')[:5]
+
+    contexto = {
+        "inspectores": inspectores,
+        "vendedores": vendedores,
+        "usuarios": usuarios,
+        "estacionamientos": estacionamientos,
+        "estacionamientos_activos": estacionamientos_activos,
+        "infracciones_recientes": infracciones_recientes,
+        "rol_seleccionado": rol,
+    }
+    return render(request, "admin/panel_admin.html", contexto)

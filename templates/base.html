@@ -1,4 +1,3 @@
-<!--templates/base.html-->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,50 +5,55 @@
     {% load static %}
     <title>{% block title %}Estacionamiento Medido{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'app_estacionamiento/css/global.css' %}">
-
-
-
 </head>
 <body>
 
 <header class="navbar">
-    <h1 class="logo">🚗 Estacionamiento Medido</h1>
-
+    <h1 class="logo">Control de Estacionamiento</h1>
+ 
     <nav>
-  <ul class="nav-items">
-    <li><a href="{% url 'inicio' %}">🏠 Inicio</a></li>
+      <ul class="nav-items">
+        <li><a href="{% url 'inicio' %}">🏠 Inicio</a></li>
 
-    {% if usuario and usuario.es_conductor %}
-      <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">🅿️ Estacionar</a></li>
-      <li><a href="{% url 'usuarios_historial_estacionamientos' %}">📜 Historial</a></li>
-      <li><a href="{% url 'usuarios_historial_infracciones' %}">⚠️ Infracciones</a></li>
-      <li><a href="{% url 'usuarios_cargar_saldo' %}">💳 Cargar saldo</a></li>
-    {% endif %}
+        {% if request.user.es_conductor %}
+          <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">🅿️ Estacionar</a></li>
+          <li><a href="{% url 'usuarios_historial_estacionamientos' %}">📜 Historial</a></li>
+          <li><a href="{% url 'usuarios_historial_infracciones' %}">⚠️ Infracciones</a></li>
+          <li><a href="{% url 'usuarios_cargar_saldo' %}">💳 Cargar saldo</a></li>
+        {% endif %}
 
-    {% if usuario and usuario.es_inspector %}
-      <li><a href="{% url 'inspectores_verificar_vehiculo' %}">🔍 Verificar vehículo</a></li>
-      <li><a href="{% url 'inspectores_registrar_infraccion' %}">⚠️ Registrar infracción</a></li>
-      <li><a href="{% url 'inspectores_registrar_estacionamiento_manual' %}">Registrar estacionamiento manual</a></li>
-      <li><a href="{% url 'inspectores_resumen_cobros' %}">Resumen cobros</a></li>
-    {% endif %}
+        {% if request.user.es_inspector %}
+          <li><a href="{% url 'inspectores_verificar_vehiculo' %}">🔍 Verificar vehículo</a></li>
+          <li><a href="{% url 'inspectores_registrar_infraccion' %}">⚠️ Registrar infracción</a></li>
+          <li><a href="{% url 'inspectores_registrar_estacionamiento_manual' %}">📝 Registrar estacionamiento manual</a></li>
+          <li><a href="{% url 'inspectores_resumen_cobros' %}">💰 Resumen cobros</a></li>
+        {% endif %}
 
-    {% if usuario and usuario.es_vendedor %}
-      <li><a href="{% url 'vendedores_registrar_estacionamiento' %}">🅿️ Registrar estacionamiento</a></li>
-      <li><a href="{% url 'vendedores_resumen_caja' %}">📊 Resumen caja</a></li>
-    {% endif %}
+        {% if request.user.es_vendedor %}
+          <li><a href="{% url 'vendedores_registrar_estacionamiento' %}">🅿️ Registrar estacionamiento</a></li>
+          <li><a href="{% url 'vendedores_resumen_caja' %}">📊 Resumen caja</a></li>
+        {% endif %}
 
-    {% if usuario and usuario.es_admin %}
-      <li><a href="/admin/">🔧 Panel Admin</a></li>
-    {% endif %}
+        {% if request.user.es_admin %}
+          <li><a href="/admin/">🔧 Panel Admin</a></li>
+        {% endif %}
 
-    {% if usuario %}
-      <li class="right"><span>👤 {{ usuario.nombre }}</span></li>
-      <li><a href="{% url 'logout' %}">🚪 Cerrar sesión</a></li>
-    {% else %}
-      <li class="right"><a href="{% url 'login' %}">🔑 Iniciar sesión</a></li>
-    {% endif %}
-  </ul>
-</nav>
+        {% if request.user.is_authenticated %}
+          <!-- Mostrar nombre y rol -->
+          <li class="right">
+            <span>👤 {{ request.user.nombre }} —
+              {% if request.user.es_admin %}Administrador{% endif %}
+              {% if request.user.es_inspector %}Inspector{% endif %}
+              {% if request.user.es_vendedor %}Vendedor{% endif %}
+              {% if request.user.es_conductor %}Conductor{% endif %}
+            </span>
+          </li>
+          <li class="right"><a href="{% url 'logout' %}">🚪 Cerrar sesión</a></li>
+        {% else %}
+          <li class="right"><a href="{% url 'login' %}">🔑 Iniciar sesión</a></li>
+        {% endif %}
+      </ul>
+    </nav>
 </header>
 
 <main class="container">

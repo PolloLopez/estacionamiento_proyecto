@@ -24,6 +24,11 @@
           {% endfor %}
         </ul>
       {% endif %}
+      {% if resultado.registrar_infraccion_url %}
+        <a href="{{ resultado.registrar_infraccion_url }}" class="btn danger">
+          Registrar infracción
+        </a>
+      {% endif %}
     </div>
   {% endif %}
 </section>

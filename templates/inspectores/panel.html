@@ -6,10 +6,11 @@
   <h2>Inspector — Panel</h2>
 
   <nav class="inline">
-    <a class="btn" href="{% url 'inspectores_verificar_vehiculo' %}">Verificar vehículo</a>
-    <a class="btn" href="{% url 'inspectores_registrar_infraccion' %}">Registrar infracción</a>
-    <a class="btn" href="{% url 'inspectores_registrar_estacionamiento_manual' %}">Registrar cobro manual</a>
-    <a class="btn" href="{% url 'inspectores_resumen' %}">Resumen</a>
+    <a class="btn" href="{% url 'inspectores_verificar_vehiculo' %}">🔍 Verificar vehículo</a>
+    <a class="btn" href="{% url 'inspectores_registrar_infraccion' %}">⚠️ Registrar infracción</a>
+    <a class="btn" href="{% url 'inspectores_registrar_estacionamiento_manual' %}">📝 Registrar cobro manual</a>
+    <a class="btn" href="{% url 'inspectores_resumen_cobros' %}">💰 Resumen cobros</a>
+    <a class="btn" href="{% url 'inspectores_resumen_infracciones' %}">📑 Resumen infracciones</a>
   </nav>
 
   <h3>Resumen rápido</h3>
@@ -19,4 +20,5 @@
   </ul>
 </section>
 {% endblock %}
+
 

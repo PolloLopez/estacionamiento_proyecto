@@ -5,12 +5,12 @@
 <section class="panel">
   <h2>Vendedor — Panel</h2>
   <nav class="inline">
-    <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}">Registrar estacionamiento</a>
-    <a class="btn" href="{% url 'vendedores_resumen_caja' %}">Resumen de caja</a>
+    <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}">🅿️ Registrar estacionamiento</a>
+    <a class="btn" href="{% url 'vendedores_resumen_caja' %}">📊 Resumen de caja</a>
   </nav>
 
   <h3>Saldo y rendiciones</h3>
-  <p>Balance: <strong>${{ vendedor.balance }}</strong></p>
-  <p>Deuda a municipalidad: <strong>${{ vendedor.deuda }}</strong></p>
+  <p>Balance: <strong>${{ usuario.balance }}</strong></p>
+  <p>Deuda a municipalidad: <strong>${{ usuario.deuda }}</strong></p>
 </section>
 {% endblock %}

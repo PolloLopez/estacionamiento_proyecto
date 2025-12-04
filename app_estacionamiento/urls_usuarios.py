@@ -11,7 +11,7 @@ urlpatterns = [
     path("finalizar/<int:estacionamiento_id>/", views.finalizar_estacionamiento, name="usuarios_finalizar_estacionamiento"),
 
     # Historial de estacionamientos
-    path("historial/", views.usuarios_historial, name="usuarios_historial_estacionamientos"),
+    path("historial/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),
 
     # Historial de infracciones
     path("infracciones/", views.usuarios_infracciones, name="usuarios_infracciones"),
@@ -24,4 +24,4 @@ urlpatterns = [
 
     # Cargar saldo
     path("cargar-saldo/", views.cargar_saldo_usuario, name="usuarios_cargar_saldo"),
-]  
+]

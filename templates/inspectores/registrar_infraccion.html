@@ -5,24 +5,37 @@
   <h2>Registrar infracción</h2>
 
   {% if mensaje %}
-    <p>{{ mensaje }}</p>
+    <div class="alert success">
+      {{ mensaje }}
+    </div>
   {% endif %}
 
-  <form method="post">
+  <form id="infraccionForm" method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <label for="patente">Patente:</label>
-    <input id="patente" name="patente" value="{{ request.GET.patente }}" required />
+    <input id="patente" name="patente" value="{{ patente }}" readonly />
 
     <label for="subcuadra_id">Subcuadra:</label>
-    <select id="subcuadra_id" name="subcuadra_id">
+    <select id="subcuadra_id" name="subcuadra_id" required>
       {% for s in subcuadras %}
-        <option value="{{ s.id }}">{{ s }}</option>
+        <option value="{{ s.id }}">{{ s.calle }} {{ s.altura }}</option>
       {% endfor %}
     </select>
 
-    <button class="btn danger">Registrar infracción</button>
+    <label for="foto">Foto de la infracción:</label>
+    <input type="file" id="foto" name="foto" accept="image/*" required />
+
+    <button type="button" class="btn danger" onclick="confirmarActa()">
+      Grabar acta de infracción
+    </button>
+    <a href="{% url 'panel_inspectores' %}" class="btn link">🏠 Volver al inicio</a>
   </form>
 </section>
+
+<script>
+function confirmarActa() {
+  alert("Acta Generada");
+  document.getElementById("infraccionForm").submit();
+}
+</script>
 {% endblock %}
-
-

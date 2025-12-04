@@ -26,5 +26,17 @@
   {% if error %}
     <p class="error">{{ error }}</p>
   {% endif %}
+  <div class="actions">
+  {% if request.user.es_inspector %}
+    <a href="{% url 'panel_inspectores' %}" class="btn link">🏠 Volver al inicio</a>
+  {% elif request.user.es_vendedor %}
+    <a href="{% url 'panel_vendedores' %}" class="btn link">🏠 Volver al inicio</a>
+  {% elif request.user.es_admin %}
+    <a href="{% url 'panel_admin' %}" class="btn link">🏠 Volver al inicio</a>
+  {% else %}
+    <a href="{% url 'inicio_usuarios' %}" class="btn link">🏠 Volver al inicio</a>
+  {% endif %}
+</div>
+
 </section>
 {% endblock %}
