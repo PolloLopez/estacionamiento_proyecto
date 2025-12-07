@@ -22,7 +22,7 @@
         <td>{{ u.es_exento|yesno:"Sí,No" }}</td>
         <td>
           <a class="btn small" href="{% url 'admin_editar_usuario' u.id %}">Editar</a>
-          <a class="btn small danger" href="{% url 'admin_eliminar_usuario' u.id %}">Eliminar</a>
+          <a class="btn small alert" href="{% url 'admin_eliminar_usuario' u.id %}">Eliminar</a>
         </td>
       </tr>
       {% empty %}

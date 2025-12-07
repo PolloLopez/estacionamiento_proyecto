@@ -302,7 +302,6 @@ def cargar_saldo(request, usuario_id):
             })
 
     return render(request, "admin/cargar_saldo.html", {"usuario": usuario})
-    
 
 @require_login
 def consultar_deuda(request):

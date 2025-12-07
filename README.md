@@ -8,7 +8,7 @@ Permite administrar distintos roles de usuario (conductor, inspector, vendedor y
 ## ✨ Funcionalidad por rol
 
 ### 👤 Conductores
-- **Registro de estacionamiento:** el conductor ingresa la patente de su vehículo y selecciona la subcuadra donde estaciona.
+- **Registro de estacionamiento:** el conductor ingresa la patente de su vehículo y estaciona.
 - **Finalización de estacionamiento:** al terminar, puede finalizar el estacionamiento. El sistema calcula el costo según la duración y descuenta del saldo.
 - **Saldo:** cada conductor tiene una cuenta con saldo. Si no alcanza, no puede finalizar el estacionamiento y queda como impago.
 - **Historial:** puede consultar todos sus estacionamientos pasados y ver si están pagos o impagos.
