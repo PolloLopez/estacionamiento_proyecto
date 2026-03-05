@@ -29,7 +29,7 @@
   <form method="post" action="{% url 'usuarios_finalizar_estacionamiento' estacionamiento.id %}">
     {% csrf_token %}
     <div class="form-row actions">
-      <button class="btn primary">Pagar y finalizar</button>
+      <button class="btn-general">Pagar y finalizar</button>
       <!-- Botón de cancelar vuelve al inicio de usuarios -->
       <a class="btn link" href="{% url 'inicio_usuarios' %}">Cancelar</a>
     </div>

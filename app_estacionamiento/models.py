@@ -1,10 +1,13 @@
 # app_estacionamiento/models.py
 
+
+import math
+from decimal import Decimal
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.base_user import BaseUserManager
 from django.db import models
 from django.utils import timezone
-from decimal import Decimal
+from datetime import timedelta
 
 # 👤 Usuario del sistema (con roles y saldo)
 class UsuarioManager(BaseUserManager):
@@ -103,11 +106,15 @@ class Estacionamiento(models.Model):
             return Decimal("0.00")
         hora_fin = timezone.now()
         duracion_horas = (hora_fin - self.hora_inicio).total_seconds() / 3600
+
+        # Siempre al menos 1 hora, redondeando hacia arriba
+        horas_redondeadas = max(1, math.ceil(duracion_horas))
+
         tarifa = Tarifa.objects.first()
         if not tarifa:
-            horas_redondeadas = Decimal(str(duracion_horas)).quantize(Decimal("1"))
-            return horas_redondeadas * Decimal("100.00")
-        costo = Decimal(str(duracion_horas)) * Decimal(str(tarifa.precio_por_hora))
+            return Decimal(horas_redondeadas) * Decimal("100.00")
+
+        costo = Decimal(horas_redondeadas) * Decimal(str(tarifa.precio_por_hora))
         return costo.quantize(Decimal("0.01"))
 
     def finalizar(self):
@@ -120,8 +127,46 @@ class Estacionamiento(models.Model):
         self.activo = False
         self.save()
         return costo
-    
-    
+
+    def notificar_si_quedan_10_minutos(self):
+        """Crea una notificación si quedan <= 10 minutos para finalizar."""
+        if not self.hora_fin or not self.activo:
+            return None
+        restante = self.hora_fin - timezone.now()
+        if restante <= timedelta(minutes=10):
+            # Tomamos el primer usuario asociado al vehículo
+            destinatario = self.vehiculo.usuarios.first()
+            if destinatario:
+                Notificacion.objects.create(
+                    destinatario=destinatario,
+                    mensaje=f"⚠️ Tu estacionamiento en {self.subcuadra} vence en menos de 10 minutos. ¿Querés cargar más horas?"
+                )
+            return True
+        return False
+
+    def extender(self, horas_extra: int):
+        """Extiende el estacionamiento sumando horas."""
+        if self.hora_fin and self.activo:
+            self.hora_fin += timedelta(hours=horas_extra)
+            self.save()
+
+
+def calcular_costo(self):
+    if not self.activo:
+        return Decimal("0.00")
+    hora_fin = timezone.now()
+    duracion_horas = (hora_fin - self.hora_inicio).total_seconds() / 3600
+
+    # Siempre al menos 1 hora, redondeando hacia arriba
+    horas_redondeadas = max(1, math.ceil(duracion_horas))
+
+    tarifa = Tarifa.objects.first()
+    if not tarifa:
+        return Decimal(horas_redondeadas) * Decimal("100.00")
+
+    costo = Decimal(horas_redondeadas) * Decimal(str(tarifa.precio_por_hora))
+    return costo.quantize(Decimal("0.01"))
+
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)

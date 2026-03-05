@@ -1,9 +1,9 @@
 /* VARIABLES GLOBALES */
 :root {
   --color-principal: #84c9a1;
-  --color-secundario:rgb(26, 0, 170)0;
+  --color-secundario:#044b1f;
   --color-dark: #14495e;
-  --color-light: #f7f5ef;
+  --color-blanco: #fff;
   --color-alert: #e76f51;
   --font-main: "Segoe UI", Roboto, sans-serif;
   --transition-fast: 0.3s ease;
@@ -19,15 +19,64 @@
 
 body {
   font-family: var(--font-main);
-  background: var(--color-light);
+  background: var(--color-blanco);
   color: var(--color-dark);
   line-height: 1.6;
 }
 
+/* BOTON GENERAL */
+
+.btn-general {
+  background: var(--color-secundario);
+  color: var(--color-blanco);
+  padding: 12px 26px;
+  border: none;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Animaciones suaves */
+  transition:
+    background var(--transition-fast),
+    transform 0.15s ease,
+    box-shadow 0.25s ease;
+
+  /* Sombra elegante */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+/* Hover → más claro y levanta */
+.btn-general:hover {
+  background: #06602a;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+/* Active → se hunde suave */
+.btn-general:active {
+  transform: translateY(0px);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.14);
+}
+
+/* Deshabilitado */
+.btn-general:disabled {
+  background: #9bcfb3;
+  cursor: not-allowed;
+  transform: none;
+  opacity: 0.7;
+  box-shadow: none;
+}
+
+
+
 /* NAVBAR */
 .navbar {
   background: var(--color-principal);
-  color: #fff;
+  color: var(--color-blanco);
   height: var(--header-height);
   padding: 0 20px;
   display: flex;
@@ -60,7 +109,7 @@ body {
 }
 
 .nav-items li a {
-  color: #fff;
+  color: var(--color-blanco);
   text-decoration: none;
   font-weight: 600;
   padding: 8px 12px;
@@ -179,7 +228,7 @@ body {
 /* FOOTER */
 .footer {
   background: var(--color-principal);
-  color: #fff;
+  color: var(--color-blanco);
   text-align: center;
   font-size: larger;
   padding: 15px;
