@@ -1,0 +1,102 @@
+Plan de trabajo (días) - Refactorización y migración a arquitectura SaaS
+
+***Prioridades generales***
+1) Auditar proyecto actual (código muerto, arquitectura, seguridad, performance)
+2) Eliminar código muerto y limpiar imports
+3) Modularizar backend (apps por dominio + services)
+4) Crear API REST con DRF + JWT
+5) Crear frontend React (Next.js)
+6) Integrar MercadoPago
+7) Implementar roles y permisos adecuados
+
+---
+
+Día 1 - Auditoría y mapa de uso
+- Revisión final de rutas y URLs (sitio/urls.py vs app_estacionamiento/urls.py).
+- Mapear todos los modelos y vistas usados en producción (consultar templates / views).
+- Identificar funciones/métodos no usados y documentarlos (e.g., UsuarioLoginView, calcular_costo global, apy.py vacío).
+- Confirmar discrepancias entre `models.py` y migraciones (especialmente `Estacionamiento.registrado_por`).
+- Revisar templates para CSRF (`{% csrf_token %}` en todos los formularios POST).
+
+Día 2 - Eliminación de código muerto y limpieza inicial
+- Eliminar imports duplicados y referencias redundantes en `views.py`.
+- Eliminar archivos vacíos no utilizados (`apy.py`, `app_estacionamiento/management/commands/commands.py`).
+- Eliminar funciones duplicadas/inasistentes (`calcular_costo` global, `UsuarioLoginView` si no se usa).
+- Actualizar readme y notas internas para reflejar la base actual.
+
+Día 3 - Preparación para refactor y estructura de apps
+- Crear nueva estructura de apps (migrar lógica a nuevas apps):
+  - `accounts`: usuarios, roles, autenticación
+  - `municipios`: datos de municipios y configuración local
+  - `patentes`: vehículos, exenciones
+  - `estacionamientos`: gestión de estacionamientos
+  - `pagos`: pagos y MercadoPago
+  - `multas`: infracciones y documentos
+  - `inspectores`: lógica específica de inspectores (verificación, panel)
+- Definir los modelos base requeridos por tu roadmap (Municipio, ConfiguraciónMunicipio, Usuario, Patente, UsuarioPatente, Estacionamiento, Pago, Multa, Exento).
+- Crear esquema inicial de migraciones para estos modelos (mapeo de campos y relaciones).
+
+Día 4 - Servicios y lógica de negocio centralizada
+- Crear carpeta `services/` (o un módulo por app) y mover ahí las reglas de negocio:
+  - Cálculo de costo (estrategia de exención).
+  - Finalización de estacionamiento (verificación de saldo, cobro, cierre).
+  - Registro de infracciones.
+  - Manejo de exenciones.
+- Refactorizar `Estacionamiento` para que sea principalmente un contenedor de datos y use servicios para cálculos.
+- Agregar tests unitarios básicos para servicios (costo, cierre, exención).
+
+Día 5 - Implementar API REST (DRF) y JWT
+- Instalar `djangorestframework` y `djangorestframework-simplejwt`.
+- Crear app `api` con `serializers/`, `views/`, `routers/`.
+- Implementar endpoints principales:
+  - `POST /api/login/` (JWT)
+  - `GET /api/patentes/` (listado + filtros)
+  - `POST /api/estacionamientos/iniciar/`
+  - `GET /api/estacionamientos/activo/`
+  - `POST /api/pagos/crear/`
+  - `POST /api/mercadopago/webhook/`
+  - `POST /api/multas/crear/`
+  - `GET /api/inspectores/verificar/`
+- Asegurar que las vistas API validan permisos y pertenecen al municipio correcto.
+
+Día 6 - Refactorizar autenticación/roles y permisos
+- Migrar del esquema de session + `request.session["usuario_id"]` hacia el sistema de autenticación de Django (y luego a JWT para la API).
+- Implementar roles y permisos robustos usando Django Groups/Permissions o un modelo de roles explícito.
+- Crear middleware/decoration para validar roles en vistas tradicionales y endpoints API.
+- Actualizar templates y vistas para usar `request.user` y `logout` de Django.
+
+Día 7 - Integración MercadoPago y procesos de pago
+- Instalar `mercadopago` y configurar variables de entorno (ACCESS_TOKEN) en settings.
+- Implementar servicio para crear preferencias de pago y endpoints para crear pagos (`POST /api/pagos/crear`).
+- Implementar webhook `POST /api/mercadopago/webhook` que:
+  - valida la firma/entidad enviada
+  - marca pagos como aprobados
+  - acredita saldo al usuario correspondiente
+- Crear tests para el webhook y el flujo de pago.
+
+Día 8 - Frontend React / Next.js (estructura y primer flujo)
+- Crear proyecto Next.js en carpeta `frontend/` usando `npx create-next-app`.
+- Definir estructura de apps:
+  - `apps/usuario_app/`
+  - `apps/inspector_app/`
+  - `apps/admin_app/`
+  - `shared/` con `components/`, `hooks/`, `services/`, `utils/`
+- Implementar `services/api.js` con funciones para consumir los endpoints REST.
+- Crear pantallas básicas (login, mis-patentes, iniciar-estacionamiento, mi-saldo, historial).
+
+Día 9 - App inspector y panel admin en frontend
+- Para inspector: pantalla de ingreso de patente, consulta de estado, botón generar multa (foto, GPS, hora).
+- Para admin: pantallas de usuarios, patentes, exentos, multas, configuración de municipio, reportes.
+- Integrar con backend (JWT, permisos) y manejar estados de carga/errores.
+
+Día 10 - Auditoría final y mejoras de performance
+- Auditar consultas en backend (N+1) usando `django-debug-toolbar` o logging de queries.
+- Añadir `select_related` / `prefetch_related` donde haga falta.
+- Añadir índices en modelos críticos (roles, activo, fecha).
+- Ajustar migraciones finales y validar con PostgreSQL (local o contenedor).
+
+---
+
+⚠️ Nota: este plan es una guía orientativa. Cada día debe incluir pruebas y revisión de seguridad (CSRF, inyecciones, límites de tasa).
+
+✅ Próximo paso sugerido: comenzar por el Día 1 (auditoría de rutas y modelos) y documentar los hallazgos concretos en issues o notas para priorizar tareas.
