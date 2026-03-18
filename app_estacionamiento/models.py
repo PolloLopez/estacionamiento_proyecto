@@ -24,16 +24,36 @@ class UsuarioManager(BaseUserManager):
 
     def create_superuser(self, correo=None, email=None, password=None, **extra_fields):
         correo = correo or email
+        if not correo:
+            raise ValueError("El correo es obligatorio")
+
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("es_admin", True)
-        return self.create_user(correo, password, **extra_fields)
+
+        return self.create_user(correo=correo, password=password, **extra_fields)
+
+class Municipio(models.Model):
+    nombre = models.CharField(max_length=100)
+    activo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nombre
 
 
 class Usuario(AbstractUser):
+    objects = UsuarioManager()  # 👈 ESTO ES CLAVE
+
     username = None
-    correo = models.EmailField(unique=True)
-    nombre = models.CharField(max_length=25, null=True, blank=True)
+    correo = models.EmailField(unique=True, null=True, blank=True)
+
+    municipio = models.ForeignKey(
+    Municipio,
+    on_delete=models.CASCADE,
+    null=True,
+    blank=True
+    )
+
     saldo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     es_conductor = models.BooleanField(default=True)
@@ -42,6 +62,7 @@ class Usuario(AbstractUser):
     es_admin = models.BooleanField(default=False)
 
     USERNAME_FIELD = "correo"
+
     REQUIRED_FIELDS = []
 
     objects = UsuarioManager()
@@ -74,6 +95,13 @@ class Vehiculo(models.Model):
 
 # 🏙️ Subcuadra representa una altura específica de una calle
 class Subcuadra(models.Model):
+    municipio = models.ForeignKey(
+        Municipio,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
     calle = models.CharField(max_length=100)
     altura = models.IntegerField()
 
@@ -85,14 +113,27 @@ class Subcuadra(models.Model):
 
 # 💰 Tarifa por hora de estacionamiento
 class Tarifa(models.Model):
-    precio_por_hora = models.DecimalField(max_digits=6, decimal_places=2)  # Precio unitario
+    municipio = models.ForeignKey(
+        Municipio,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
+    precio_por_hora = models.DecimalField(max_digits=6, decimal_places=2)
 
     def __str__(self):
         return f"${self.precio_por_hora}/hora"
 
-
 # 🅿️ Estacionamiento en vía pública
 class Estacionamiento(models.Model):
+    municipio = models.ForeignKey(
+        Municipio,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
     vehiculo = models.ForeignKey("Vehiculo", on_delete=models.CASCADE)
     subcuadra = models.ForeignKey("Subcuadra", on_delete=models.CASCADE)
     hora_inicio = models.DateTimeField(default=timezone.now)
@@ -100,56 +141,6 @@ class Estacionamiento(models.Model):
     costo = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     activo = models.BooleanField(default=True)
     registrado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, default=1)
-
-    def calcular_costo(self):
-        if not self.activo:
-            return Decimal("0.00")
-        hora_fin = timezone.now()
-        duracion_horas = (hora_fin - self.hora_inicio).total_seconds() / 3600
-
-        # Siempre al menos 1 hora, redondeando hacia arriba
-        horas_redondeadas = max(1, math.ceil(duracion_horas))
-
-        tarifa = Tarifa.objects.first()
-        if not tarifa:
-            return Decimal(horas_redondeadas) * Decimal("100.00")
-
-        costo = Decimal(horas_redondeadas) * Decimal(str(tarifa.precio_por_hora))
-        return costo.quantize(Decimal("0.01"))
-
-    def finalizar(self):
-        """Cierra el estacionamiento, guarda costo y devuelve el valor."""
-        if not self.activo:
-            return Decimal("0.00")
-        self.hora_fin = timezone.now()
-        costo = self.calcular_costo()
-        self.costo = costo
-        self.activo = False
-        self.save()
-        return costo
-
-    def notificar_si_quedan_10_minutos(self):
-        """Crea una notificación si quedan <= 10 minutos para finalizar."""
-        if not self.hora_fin or not self.activo:
-            return None
-        restante = self.hora_fin - timezone.now()
-        if restante <= timedelta(minutes=10):
-            # Tomamos el primer usuario asociado al vehículo
-            destinatario = self.vehiculo.usuarios.first()
-            if destinatario:
-                Notificacion.objects.create(
-                    destinatario=destinatario,
-                    mensaje=f"⚠️ Tu estacionamiento en {self.subcuadra} vence en menos de 10 minutos. ¿Querés cargar más horas?"
-                )
-            return True
-        return False
-
-    def extender(self, horas_extra: int):
-        """Extiende el estacionamiento sumando horas."""
-        if self.hora_fin and self.activo:
-            self.hora_fin += timedelta(hours=horas_extra)
-            self.save()
-
 
 def calcular_costo(self):
     if not self.activo:
@@ -169,6 +160,13 @@ def calcular_costo(self):
 
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
+    municipio = models.ForeignKey(
+        Municipio,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
     inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)  
     subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE, null=True, blank=True)
@@ -177,10 +175,6 @@ class Infraccion(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
     cancelada = models.BooleanField(default=False)
     foto = models.ImageField(upload_to="infracciones/", null=True, blank=True) 
-
-    def __str__(self):
-        return f"Infracción de {self.vehiculo.patente} por {self.motivo}"
-
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 

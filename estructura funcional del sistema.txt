@@ -9,7 +9,7 @@ Desde `inicio.html`, podrán acceder a:
 1. **Ver estacionamiento activo**
 
    * Si tiene uno, mostrar zona (no subcuadra), tiempo y costo estimado.
-   * Solo puede tener **un estacionamiento activo** a la vez.
+
 
 2. **Registrar estacionamiento**
 
@@ -20,7 +20,7 @@ Desde `inicio.html`, podrán acceder a:
 3. **Finalizar estacionamiento**
 
    * Calcula el costo, descuenta saldo y cierra el registro.
-   (cuenta con salfo negativo que por defecto de gestiona el admin)
+   (cuenta con saldo negativo que por defecto de gestiona el admin)
 
 4. **Cargar saldo** 💳
 
@@ -37,7 +37,7 @@ Desde `inicio.html`, podrán acceder a:
    * Muestra todas las infracciones de sus vehículos, con estado:
 
      * ✅ Pagada
-     * 🚫 Impaga
+     * 🚫 Impaga opción Pagar desde la app.
 
 7. **Información general**
 
@@ -56,14 +56,15 @@ Acceden desde `inicio.html` (según su tipo de usuario).
 
      * ✅ Pago
      * 🚫 Impago
-     * 🟢 Exento (por calle o total)
-   * Si es exento por calle, el inspector puede **decidir si corresponde infracción** o no.
+     * 🟢 Exento (por subcuadra) muestra las subcuadras excentas y Geerar multa. El inspector decide.
+     * 🟢 Exento Total. 
    
-   * Si es impago → opción **Registrar Infracción**. (mas adelante se le solicitar una imagen para adjuntar a la infracción, en la que se registra fehca, hora y coordenadas del dispositivo)
+   
+   Al Registrar Infracción debe registrar fecha, hora y coordenadas del dispositivo. Tambien sobre la foto que le sacan al vehiculo.
 
 2. **Registrar estacionamiento manualmente**
 
-   * Para cobros presenciales.
+   * Para personas sin la app.
 
 3. **Resumen general**
 
@@ -73,8 +74,9 @@ Acceden desde `inicio.html` (según su tipo de usuario).
 
 ### 🧾 **VENDEDORES (comercios y quioscos)**
 
-* Pueden **registrar estacionamientos** a nombre de otros (usuarios).
+* Pueden **registrar estacionamientos de usuarios no registrados.
 * Deben **rendir porcentaje** a la municipalidad.
+* Pueden cobrar infracciones.
 * Tendrán control de:
 
   * Estacionamientos vendidos.
@@ -91,8 +93,15 @@ Acceden desde `inicio.html` (según su tipo de usuario).
   * Registrar / modificar inspectores y vendedores.
   * Regular **precios de estacionamiento**.
   * Gestionar horarios (al horario de finalizar deben cerrarse todos los estacionamientos).
+  * Tolerancia de infraccion.
   * Controlar **saldos y deudas de vendedores**.
   * Definir **porcentaje de ganancia** de cada vendedor.
   * Consultar toda la información general del sistema.
+  * Generar y administrar perfiles para inspectores / vendedores / usuarios
 
 ---
+
+### **INFRACCIONES**
+
+* Desde el momento que se genera la infraccion si el vehiculo registra estacionamiento dentro de los primeros "x" minutos (que asigna el admin) La infraccion se cancela automaticamete.
+Esta accion debe ser vista en el usuario que registra y en la infraccion con estado cancelada que genero el inspector

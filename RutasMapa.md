@@ -1,3 +1,4 @@
+//RutasMapa.md
 # Mapa de rutas actual (Django)
 
 ## 1) Rutas activas (definidas en `sitio/urls.py`)

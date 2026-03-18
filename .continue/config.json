@@ -1,0 +1,23 @@
+{
+  "models": [
+    {
+      "title": "Llama3 (Explicaciones)",
+      "provider": "ollama",
+      "model": "llama3"
+    },
+    {
+      "title": "DeepSeek Coder (Código)",
+      "provider": "ollama",
+      "model": "deepseek-coder"
+    }
+  ],
+  "tabAutocompleteModel": {
+    "title": "DeepSeek Autocomplete",
+    "provider": "ollama",
+    "model": "deepseek-coder"
+  },
+  "embeddingsProvider": {
+    "provider": "ollama",
+    "model": "nomic-embed-text"
+  }
+}

@@ -1,3 +1,4 @@
+//Actividades.txt
 Plan de trabajo (días) - Refactorización y migración a arquitectura SaaS
 
 ***Prioridades generales***
