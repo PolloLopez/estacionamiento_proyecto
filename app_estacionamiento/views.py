@@ -1,26 +1,33 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 
-from django.shortcuts import render, redirect, get_object_or_404, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.views import LoginView
-from django.contrib.auth import authenticate, login
 from django.utils import timezone
 from django.urls import reverse
-from django.http import HttpResponse
+
+from decimal import Decimal
+
 from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
-from .estrategias import EstrategiaExencion
 from .factories import EstacionamientoFactory
-from decimal import Decimal, ROUND_HALF_UP
 from .decorators import require_role, require_login
-from app_estacionamiento.decorators import require_role
-from app_estacionamiento.models import Vehiculo, Subcuadra, Estacionamiento, Infraccion, Usuario
-from app_estacionamiento.estrategias import EstrategiaExencion
+
+def get_subcuadra_default(municipio):
+    return Subcuadra.objects.get_or_create(
+        calle="Zona Única",
+        altura=0,
+        municipio=municipio
+    )[0]
+
+def get_usuario(request):
+    if not request.usuario:
+        raise Exception("Usuario no autenticado")
+    return request.usuario
 
 def inicio(request):
-    usuario_id = request.session.get("usuario_id")
-    if not usuario_id:
-        return redirect("login")
+    usuario = request.usuario
 
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    if not usuario:
+        return redirect("login")
 
     if usuario.es_admin:
         return redirect("panel_admin")
@@ -55,16 +62,18 @@ def login_view(request):
 
 @require_role("inspector", "admin", "conductor", "vendedor")
 def inicio_usuarios(request):
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
 
-    estacionamientos = usuario.estacionamiento_set.filter(activo=True)
-
-    return render(
-        request,
-        "usuarios/inicio_usuarios.html",
-        {"usuario": usuario, "estacionamientos": estacionamientos},
+    estacionamientos = Estacionamiento.objects.filter(
+        registrado_por=usuario,
+        activo=True,
+        subcuadra__municipio=usuario.municipio
     )
+
+    return render(request, "usuarios/inicio_usuarios.html", {
+        "usuario": usuario,
+        "estacionamientos": estacionamientos,
+    })
 
 
 # =========================================================
@@ -72,13 +81,17 @@ def inicio_usuarios(request):
 # =========================================================
 @require_role("admin")
 def panel_admin(request):
-    inspectores = Usuario.objects.filter(es_inspector=True)
-    vendedores = Usuario.objects.filter(es_vendedor=True)
-    usuarios = Usuario.objects.filter(es_conductor=True)
+    usuario = request.usuario
 
-    # Filtro dinámico por rol
+    inspectores = Usuario.objects.filter(es_inspector=True, municipio=usuario.municipio)
+    vendedores = Usuario.objects.filter(es_vendedor=True, municipio=usuario.municipio)
+    usuarios = Usuario.objects.filter(es_conductor=True, municipio=usuario.municipio)
+
     rol = request.GET.get("rol")
-    estacionamientos = Estacionamiento.objects.select_related("vehiculo", "subcuadra", "registrado_por")
+
+    estacionamientos = Estacionamiento.objects.select_related(
+        "vehiculo", "subcuadra", "registrado_por"
+    ).filter(subcuadra__municipio=usuario.municipio)
 
     if rol == "vendedor":
         estacionamientos = estacionamientos.filter(registrado_por__in=vendedores)
@@ -89,10 +102,16 @@ def panel_admin(request):
 
     estacionamientos = estacionamientos.order_by("-hora_inicio")
 
-    estacionamientos_activos = Estacionamiento.objects.filter(activo=True).count()
-    infracciones_recientes = Infraccion.objects.order_by('-fecha')[:5]
+    estacionamientos_activos = Estacionamiento.objects.filter(
+        activo=True,
+        subcuadra__municipio=usuario.municipio
+    ).count()
 
-    contexto = {
+    infracciones_recientes = Infraccion.objects.filter(
+        subcuadra__municipio=usuario.municipio
+    ).order_by('-fecha')[:5]
+
+    return render(request, "admin/panel_admin.html", {
         "inspectores": inspectores,
         "vendedores": vendedores,
         "usuarios": usuarios,
@@ -100,28 +119,52 @@ def panel_admin(request):
         "estacionamientos_activos": estacionamientos_activos,
         "infracciones_recientes": infracciones_recientes,
         "rol_seleccionado": rol,
-    }
-    return render(request, "admin/panel_admin.html", contexto)
+    })
 
 @require_role("admin")
-def cargar_saldo_usuario(request):
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+def cargar_saldo(request, usuario_id):
+    admin = get_usuario(request)  # quien ejecuta
+    usuario = get_object_or_404(Usuario, id=usuario_id)  # a quién le cargo saldo
 
     if request.method == "POST":
         monto = request.POST.get("monto")
         try:
-            monto = float(monto)
+            monto = Decimal(monto)
             usuario.saldo += monto
             usuario.save()
-            return redirect("inicio_usuarios")
+            return redirect("panel_admin")
         except ValueError:
-            return render(request, "usuarios/cargar_saldo.html", {
+            return render(request, "admin/cargar_saldo.html", {
                 "usuario": usuario,
                 "error": "Monto inválido"
             })
 
-    return render(request, "usuarios/cargar_saldo.html", {"usuario": usuario})
+    return render(request, "admin/cargar_saldo.html", {"usuario": usuario})
+
+@require_role("admin")
+def gestionar_exenciones(request):
+    usuario = request.usuario
+
+    vehiculos = Vehiculo.objects.all()
+    subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
+
+    if request.method == "POST":
+        patente = request.POST.get("patente")
+        exento_global = request.POST.get("exento_global") == "on"
+        subcuadras_ids = request.POST.getlist("subcuadras")
+
+        vehiculo = Vehiculo.objects.filter(patente=patente).first()
+
+        if vehiculo:
+            vehiculo.exento_global = exento_global
+            vehiculo.save()
+
+            vehiculo.subcuadras_exentas.set(subcuadras_ids)
+
+    return render(request, "admin/exenciones.html", {
+        "vehiculos": vehiculos,
+        "subcuadras": subcuadras
+    })
 
 # =========================================================
 # VIEWS USUARIOS
@@ -140,67 +183,43 @@ def home(request):
 
 @require_role("conductor")
 def estacionar_vehiculo(request):
-    """
-    Vista para registrar un estacionamiento.
-    - Conductores: pueden estacionar sus propios vehículos o cualquier patente válida.
-    - Inspectores/Admin: pueden estacionar cualquier patente sin restricción.
-    - Usa siempre 'Zona Única' como tarifa global.
-    """
-    # 🔒 Validar sesión
-    usuario_id = request.session.get("usuario_id")
-    if not usuario_id:
-        return render(request, "usuarios/login.html", {"error": "Debe iniciar sesión"})
-
-    usuario = get_object_or_404(Usuario, id=usuario_id)
-
-    # 🔒 Validar rol
-    if not (usuario.es_conductor or usuario.es_inspector or usuario.es_admin):
-        return redirect("inicio")
+    usuario = request.usuario
 
     if request.method == 'POST':
         patente = request.POST.get('patente')
         duracion = request.POST.get('duracion')
 
-        # Buscar o crear el vehículo
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
-        # 🚫 Validar exenciones: nunca debe estacionar
         if vehiculo.exento_global or vehiculo.subcuadras_exentas.exists():
             return render(request, 'usuarios/estacionar_vehiculo.html', {
-        'error': 'Este vehículo está marcado como exento. No puede estacionar.'
-        })
+                'error': 'Este vehículo está marcado como exento.'
+            })
 
-        # Si es conductor, asociar el vehículo a su cuenta
         if usuario.es_conductor and vehiculo not in usuario.vehiculos.all():
             usuario.vehiculos.add(vehiculo)
 
-        # Validar que no tenga estacionamiento activo
         if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
             return render(request, 'usuarios/estacionar_vehiculo.html', {
                 'error': 'El vehículo ya tiene un estacionamiento activo.'
             })
 
-        # Validar duración
         try:
             duracion = Decimal(duracion)
             if duracion <= 0 or duracion % 1 != 0:
-                raise ValueError("Duración inválida")
-        except Exception:
+                raise ValueError()
+        except:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'La duración debe ser en horas (ej: 1, 2).'
+                'error': 'Duración inválida'
             })
 
-        # Subcuadra única
-        subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
+        subcuadra = get_subcuadra_default(usuario.municipio)
 
-        # Crear estacionamiento
         EstacionamientoFactory.crear(vehiculo, subcuadra, duracion, registrado_por=usuario)
 
-        # Redirigir al inicio del conductor
         return redirect("inicio_usuarios")
 
     return render(request, 'usuarios/estacionar_vehiculo.html')
-
 @require_login
 def usuarios_historial(request):
     """
@@ -208,8 +227,7 @@ def usuarios_historial(request):
     - Si no hay sesión → redirige a login (decorador).
     - Si hay sesión → renderiza historial con estacionamientos.
     """
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
 
     estacionamientos = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
 
@@ -226,8 +244,7 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     - Si no alcanza saldo → redirige al historial sin cerrar.
     - Si alcanza saldo → cierra, descuenta y redirige al historial.
     """
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
     estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
 
     # Si ya está finalizado, volver al historial
@@ -254,23 +271,21 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     return redirect("usuarios_historial_estacionamientos")
 
 
-
 @require_role("conductor")
 def historial_estacionamientos(request):
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
-    estacionamientos = Estacionamiento.objects.filter(vehiculo__in=usuario.vehiculos.all()).order_by("-hora_inicio")
+    usuario = request.usuario
+    estacionamientos = Estacionamiento.objects.filter(
+    vehiculo__in=usuario.vehiculos.all(),
+    subcuadra__municipio=usuario.municipio
+    ).order_by("-hora_inicio")
     return render(request, "usuarios/historial.html", {"estacionamientos": estacionamientos})
-
-
 
 @require_role("inspector", "admin")
 def usuarios_infracciones(request):
     """
     Muestra historial de infracciones del usuario logueado.
     """
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
 
     infracciones = Infraccion.objects.filter(vehiculo__usuarios=usuario).order_by("-fecha")
 
@@ -279,29 +294,6 @@ def usuarios_infracciones(request):
         "infracciones": infracciones,
     })
 
-
-
-@require_role("admin")
-def cargar_saldo(request, usuario_id):
-    """
-    Permite al admin cargar saldo a un usuario.
-    """
-    usuario = get_object_or_404(Usuario, id=usuario_id)
-
-    if request.method == "POST":
-        monto = request.POST.get("monto")
-        try:
-            monto = float(monto)
-            usuario.saldo += monto
-            usuario.save()
-            return redirect("panel_admin")
-        except ValueError:
-            return render(request, "admin/cargar_saldo.html", {
-                "usuario": usuario,
-                "error": "Monto inválido"
-            })
-
-    return render(request, "admin/cargar_saldo.html", {"usuario": usuario})
 
 @require_login
 def consultar_deuda(request):
@@ -316,14 +308,11 @@ def consultar_deuda(request):
 # =========================================================
 @require_role("inspector", "admin")
 def panel_inspectores(request):
-    """
-    Panel principal de inspectores.
-    - Solo accesible si el usuario es inspector.
-    """
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
+
     if not usuario.es_inspector:
         return redirect("inicio")
+
     return render(request, 'inspectores/panel.html')
 
 
@@ -332,20 +321,20 @@ def panel_inspectores(request):
 
 @require_login
 def verificar_vehiculo(request):
-    """
-    Verifica el estado de un vehículo:
-    - Exento global → mensaje directo
-    - Exento parcial → listado de subcuadras exentas
-    - Pagado → estacionamiento activo con costo > 0
-    - Impago o no registrado → ofrece registrar infracción (no la crea automáticamente)
-    """
+    usuario = get_usuario(request)
     resultado = None
 
     if request.method == "POST":
         patente = (request.POST.get("patente") or "").strip().upper()
+
+        if not patente:
+            return render(request, "inspectores/verificar_vehiculo.html", {
+                "error": "Debe ingresar una patente"
+            })
+        
         vehiculo = Vehiculo.objects.filter(patente=patente).first()
 
-        # Caso: vehículo no registrado
+        # No registrado
         if not vehiculo:
             resultado = {
                 "patente": patente,
@@ -355,7 +344,7 @@ def verificar_vehiculo(request):
             }
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Caso: exento global
+        # Exento global
         if vehiculo.exento_global:
             resultado = {
                 "patente": patente,
@@ -364,10 +353,14 @@ def verificar_vehiculo(request):
             }
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Caso: exento parcial → mostrar solo si está estacionado en una subcuadra exenta
-        estacionamiento = Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).first()
-        subcuadras_exentas = vehiculo.subcuadras_exentas.all()
-        if estacionamiento and estacionamiento.subcuadra in subcuadras_exentas:
+        estacionamiento = Estacionamiento.objects.filter(
+            vehiculo=vehiculo,
+            activo=True,
+            subcuadra__municipio=usuario.municipio
+        ).first()
+
+        # Exento parcial
+        if estacionamiento and vehiculo.esta_exento_en(estacionamiento.subcuadra):
             resultado = {
                 "patente": patente,
                 "estado": "Exento parcial",
@@ -375,7 +368,7 @@ def verificar_vehiculo(request):
             }
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Caso: estacionamiento activo y pagado
+        # Pagado
         if estacionamiento and estacionamiento.costo > 0:
             resultado = {
                 "patente": patente,
@@ -384,7 +377,7 @@ def verificar_vehiculo(request):
             }
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Caso: impago → solo ofrece registrar infracción
+        # Impago
         resultado = {
             "patente": patente,
             "estado": "Impago",
@@ -393,45 +386,48 @@ def verificar_vehiculo(request):
         }
         return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-    # Si no se envió formulario, render vacío
     return render(request, "inspectores/verificar_vehiculo.html")
 
 @require_role("inspector")
 def registrar_infraccion(request):
-    """
-    Confirmar y registrar infracción:
-    - Inspector confirma patente y subcuadra
-    - Adjunta foto
-    - Se guarda infracción
-    """
-    usuario_id = request.session.get("usuario_id")
-    inspector = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
 
-    if not inspector.es_inspector and not inspector.es_admin:
+    if not usuario.es_inspector and not usuario.es_admin:
         return redirect("inicio")
 
     mensaje = None
-    subcuadras = Subcuadra.objects.all()
+    subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
     patente = request.GET.get("patente") or request.POST.get("patente")
 
     if request.method == "POST":
         subcuadra_id = request.POST.get("subcuadra_id")
         foto = request.FILES.get("foto")
-        subcuadra = Subcuadra.objects.filter(id=subcuadra_id).first()
+
+        subcuadra = Subcuadra.objects.filter(
+            id=subcuadra_id,
+            municipio=usuario.municipio
+        ).first()
 
         vehiculo = Vehiculo.objects.filter(patente=patente).first()
-        estacionamiento = Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).first() if vehiculo else None
+
+        estacionamiento = Estacionamiento.objects.filter(
+            vehiculo=vehiculo,
+            activo=True,
+            subcuadra__municipio=usuario.municipio
+        ).first() if vehiculo else None
 
         if not vehiculo:
             mensaje = f"⚠️ No se encontró vehículo con patente {patente}."
+
         elif vehiculo.exento_global or (
             estacionamiento and estacionamiento.subcuadra in vehiculo.subcuadras_exentas.all()
         ):
-            mensaje = f"Vehículo {patente} verificado como exento en esta condición. No se registra infracción."
+            mensaje = f"Vehículo {patente} exento. No se registra infracción."
+
         else:
             Infraccion.objects.create(
                 vehiculo=vehiculo,
-                inspector=inspector,
+                inspector=usuario,  # 🔥 FIX
                 subcuadra=subcuadra or (estacionamiento.subcuadra if estacionamiento else None),
                 estacionamiento=estacionamiento,
                 fecha=timezone.now(),
@@ -439,54 +435,37 @@ def registrar_infraccion(request):
             )
             mensaje = f"🚨 Infracción registrada para {patente}."
 
-    return render(
-        request,
-        "inspectores/registrar_infraccion.html",
-        {
-            "mensaje": mensaje,
-            "subcuadras": subcuadras,
-            "patente": patente,
-        },
-    )
-
+    return render(request, "inspectores/registrar_infraccion.html", {
+        "mensaje": mensaje,
+        "subcuadras": subcuadras,
+        "patente": patente,
+    })
 
 @require_role("inspector", "admin", "vendedor")
 def registrar_estacionamiento_manual(request):
-    """
-    Vista para que un inspector registre un estacionamiento manualmente.
-    - Puede registrar cualquier patente.
-    - Usa siempre 'Zona Única' como subcuadra global.
-    """
-    usuario_id = request.session.get("usuario_id")
-    inspector = get_object_or_404(Usuario, id=usuario_id)
+    inspector = get_usuario(request)
 
     if request.method == "POST":
         patente = request.POST.get("patente")
         duracion = request.POST.get("duracion")
 
-        # Buscar o crear vehículo
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
-        # Validar que no tenga estacionamiento activo
         if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
             return render(request, "inspectores/registrar_estacionamiento_manual.html", {
                 "error": "El vehículo ya tiene un estacionamiento activo."
             })
 
-        # Validar duración
         try:
             duracion = Decimal(duracion)
             if duracion <= 0 or duracion % 1 != 0:
-                raise ValueError("Duración inválida")
-        except Exception:
+                raise ValueError()
+        except:
             return render(request, "inspectores/registrar_estacionamiento_manual.html", {
-                "error": "La duración debe ser en pasos de horas (ej: 1, 2)."
+                "error": "La duración debe ser en horas (ej: 1, 2)."
             })
 
-        # Subcuadra única
-        subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
-
-        # Crear estacionamiento
+        subcuadra = get_subcuadra_default(inspector.municipio)
         EstacionamientoFactory.crear(vehiculo, subcuadra, duracion, registrado_por=inspector)
 
         return redirect("inspectores_verificar_vehiculo")
@@ -495,13 +474,7 @@ def registrar_estacionamiento_manual(request):
 
 @require_role("vendedor")
 def registrar_estacionamiento_vendedor(request):
-    """
-    Vista para que un vendedor registre un estacionamiento.
-    - Solo accesible a vendedores.
-    - Usa siempre 'Zona Única' como subcuadra global.
-    """
-    usuario_id = request.session.get("usuario_id")
-    vendedor = get_object_or_404(Usuario, id=usuario_id)
+    vendedor = get_usuario(request)
 
     if request.method == "POST":
         patente = request.POST.get("patente")
@@ -536,7 +509,7 @@ def registrar_estacionamiento_vendedor(request):
             })
 
         # Subcuadra única
-        subcuadra, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
+        subcuadra = get_subcuadra_default(vendedor.municipio)
 
         # Crear estacionamiento
         EstacionamientoFactory.crear(vehiculo, subcuadra, duracion, registrado_por=vendedor)
@@ -548,14 +521,11 @@ def registrar_estacionamiento_vendedor(request):
 
 @require_role("inspector", "vendedor", "admin")
 def resumen_cobros(request):
-    """
-    Vista de resumen de cobros realizados por inspectores.
-    - Solo accesible a inspectores.
-    """
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
+
     if not usuario.es_inspector:
         return redirect("inicio")
+
     return render(request, 'inspectores/resumen_cobros.html')
 
 @require_role("inspector", "admin")
@@ -564,8 +534,7 @@ def resumen_infracciones(request):
     Vista de resumen de infracciones registradas por inspectores.
     - Solo accesible a inspectores.
     """
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
     if not usuario.es_inspector:
         return redirect("inicio")
     return render(request, 'inspectores/resumen_infracciones.html')
@@ -580,8 +549,7 @@ def panel_vendedores(request):
     Panel principal de vendedores.
     - Solo accesible a vendedores.
     """
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
     if not usuario.es_vendedor:
         return redirect("inicio")
     return render(request, 'vendedores/panel.html', {"vendedor": usuario})
@@ -589,8 +557,7 @@ def panel_vendedores(request):
 
 @require_role("vendedor", "admin")
 def resumen_caja(request):
-    usuario_id = request.session.get("usuario_id")
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = request.usuario
 
     registros = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
 
@@ -599,9 +566,6 @@ def resumen_caja(request):
 # =========================================================
 # VIEWS LOGIN / LOGOUT
 
-class UsuarioLoginView(LoginView):
-    template_name = "usuarios/login.html"
-    redirect_authenticated_user = True
 
 def logout_view(request):
     """

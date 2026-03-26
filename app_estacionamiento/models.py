@@ -142,21 +142,21 @@ class Estacionamiento(models.Model):
     activo = models.BooleanField(default=True)
     registrado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, default=1)
 
-def calcular_costo(self):
-    if not self.activo:
-        return Decimal("0.00")
-    hora_fin = timezone.now()
-    duracion_horas = (hora_fin - self.hora_inicio).total_seconds() / 3600
-
-    # Siempre al menos 1 hora, redondeando hacia arriba
-    horas_redondeadas = max(1, math.ceil(duracion_horas))
-
-    tarifa = Tarifa.objects.first()
-    if not tarifa:
-        return Decimal(horas_redondeadas) * Decimal("100.00")
-
-    costo = Decimal(horas_redondeadas) * Decimal(str(tarifa.precio_por_hora))
-    return costo.quantize(Decimal("0.01"))
+    def calcular_costo(self):
+        if not self.activo:
+            return Decimal("0.00")
+        hora_fin = timezone.now()
+        duracion_horas = (hora_fin - self.hora_inicio).total_seconds() / 3600
+    
+        # Siempre al menos 1 hora, redondeando hacia arriba
+        horas_redondeadas = max(1, math.ceil(duracion_horas))
+    
+        tarifa = Tarifa.objects.first()
+        if not tarifa:
+            return Decimal(horas_redondeadas) * Decimal("100.00")
+    
+        costo = Decimal(horas_redondeadas) * Decimal(str(tarifa.precio_por_hora))
+        return costo.quantize(Decimal("0.01"))
 
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):

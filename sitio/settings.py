@@ -6,9 +6,8 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 🔐 Seguridad básica
-SECRET_KEY = 'django-insecure-reemplazame-por-una-clave-segura'
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+DEBUG = False
+ALLOWED_HOSTS = ["*"] # En producción, ALLOWED_HOSTS = ["tudominio.com"]
 
 # 🧩 Aplicaciones instaladas
 INSTALLED_APPS = [
@@ -31,9 +30,18 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'app_estacionamiento.middleware.UsuarioMiddleware',
 ]
 
 ROOT_URLCONF = 'sitio.urls'
+
+ENV = os.getenv("ENV", "dev")
+
+if ENV == "prod":
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # 🎨 Templates (HTML)
 TEMPLATES = [
@@ -82,12 +90,14 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # 🖼️ Fotos infracciones
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 # Para producción (cuando uses collectstatic)
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-key")
 
 # redirireccion correcta.
 LOGIN_REDIRECT_URL = "/usuarios/inicio/"

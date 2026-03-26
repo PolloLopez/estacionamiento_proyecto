@@ -1,3 +1,5 @@
+##app_estacionamiento/scripts/crear_usuarios.py
+
 import os
 import sys
 import django
@@ -9,76 +11,109 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sitio.settings')
 django.setup()
 
-from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra, Infraccion
+from app_estacionamiento.models import Municipio, Usuario, Vehiculo, Subcuadra
+
+
+def crear_subcuadras_municipio(municipio):
+    zonas = [
+        (["Calle 12","Calle 14","Calle 16","Calle 18","Calle 20","Calle 22","Calle 28","Calle 30"], [400,450,500,550,600,650,700]),
+        (["Calle 24","Calle 26"], [400,450,500,550,600,650,700,750,800,850]),
+        (["Calle 17","Calle 19","Calle 21","Calle 23","Calle 25","Calle 27","Calle 29","Calle 31","Calle 33"], [250,300,350,400,450,500,550,600,650,700]),
+        (["Calle 35","Calle 37"], [550]),
+    ]
+
+    for calles, alturas in zonas:
+        for calle in calles:
+            for altura in alturas:
+                Subcuadra.objects.get_or_create(
+                    calle=calle,
+                    altura=altura,
+                    municipio=municipio
+                )
+
 
 def run():
-    # Crear subcuadras de ejemplo
-    zona_unica, _ = Subcuadra.objects.get_or_create(calle="Zona Única", altura=0)
-    calle21_200, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=200)
-    calle21_250, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=250)
-    calle21_300, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=300)
-    calle21_350, _ = Subcuadra.objects.get_or_create(calle="Calle 21", altura=350)
+    municipio, _ = Municipio.objects.get_or_create(nombre="Mercedes")
 
-    # Conductor
-    juan, _ = Usuario.objects.get_or_create(correo="juanperez@ejemplo.com")
-    juan.nombre = "Juan Pérez"
-    juan.saldo = 1000
-    juan.es_admin = False
-    juan.es_inspector = False
-    juan.es_vendedor = False
-    juan.es_conductor = True
-    juan.set_password("1234")
-    juan.save()
+    # Zona única SIEMPRE
+    Subcuadra.objects.get_or_create(
+        calle="Zona Única",
+        altura=0,
+        municipio=municipio
+    )
 
-    # Asociar vehículos normales
+    crear_subcuadras_municipio(municipio)
+
+    # =========================================================
+    # ⚠️ DATOS DE PRUEBA (SOLO DESARROLLO)
+    # 👉 ELIMINAR O NO EJECUTAR EN PRODUCCIÓN
+    # =========================================================
+
+    # 👤 Conductor
+    conductor, _ = Usuario.objects.get_or_create(correo="juanperez@ejemplo.com")
+    conductor.municipio = municipio
+    conductor.nombre = "Juan Pérez"
+    conductor.saldo = 1000
+    conductor.es_admin = False
+    conductor.es_inspector = False
+    conductor.es_vendedor = False
+    conductor.es_conductor = True
+    conductor.set_password("1234")
+    conductor.save()
+
+    # 🚗 Vehículos normales
     auto1, _ = Vehiculo.objects.get_or_create(patente="ABC123")
-    juan.vehiculos.add(auto1)
     auto2, _ = Vehiculo.objects.get_or_create(patente="XYZ789")
-    juan.vehiculos.add(auto2)
+    conductor.vehiculos.add(auto1, auto2)
 
-    # Vehículo con exención global
+    # 🚗 Vehículo con EXENCIÓN GLOBAL
     vehiculo_exento_global, _ = Vehiculo.objects.get_or_create(patente="EXG123")
     vehiculo_exento_global.exento_global = True
     vehiculo_exento_global.save()
 
-    # Vehículo con exención en subcuadras específicas
-    vehiculo_exento_sub, _ = Vehiculo.objects.get_or_create(patente="EXP123")
-    vehiculo_exento_sub.subcuadras_exentas.add(calle21_300, calle21_350)
-    vehiculo_exento_sub.save()
+    # 🚗 Vehículo con EXENCIÓN PARCIAL (para testing UI)
+    vehiculo_exento_parcial, _ = Vehiculo.objects.get_or_create(patente="EXP123")
 
-    # Inspector
+    subcuadras_test = Subcuadra.objects.filter(
+        calle="Calle 21",
+        municipio=municipio
+    )[:2]
+
+    if subcuadras_test:
+        vehiculo_exento_parcial.subcuadras_exentas.set(subcuadras_test)
+
+    # 👮 Inspector
     inspector, _ = Usuario.objects.get_or_create(correo="garcia@ejemplo.com")
+    inspector.municipio = municipio
     inspector.nombre = "Inspector García"
-    inspector.es_admin = False
     inspector.es_inspector = True
-    inspector.es_vendedor = False
     inspector.es_conductor = False
     inspector.set_password("1234")
     inspector.save()
 
-    # Vendedor
+    # 💰 Vendedor
     vendedor, _ = Usuario.objects.get_or_create(correo="kiosco@ejemplo.com")
+    vendedor.municipio = municipio
     vendedor.nombre = "Kiosco San Martín"
-    vendedor.es_admin = False
-    vendedor.es_inspector = False
     vendedor.es_vendedor = True
     vendedor.es_conductor = False
     vendedor.set_password("1234")
     vendedor.save()
 
-    # Administrador
+    # 🛠️ Admin
     admin, _ = Usuario.objects.get_or_create(correo="admin@ejemplo.com")
+    admin.municipio = municipio
     admin.nombre = "Admin Municipal"
     admin.es_admin = True
-    admin.es_inspector = False
-    admin.es_vendedor = False
     admin.es_conductor = False
     admin.set_password("1234")
     admin.save()
 
-    # Mensajes de confirmación
-    print("Vehículos de Juan:", [v.patente for v in juan.vehiculos.all()])
-    print("Usuarios, vehículos y subcuadras de prueba creados correctamente ✅")
+    # =========================================================
+    # ✔ Logs
+    # =========================================================
+    print("Vehículos del conductor:", [v.patente for v in conductor.vehiculos.all()])
+    print("✔ Datos de prueba creados correctamente")
 
 
 if __name__ == "__main__":
