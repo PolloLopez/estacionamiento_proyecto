@@ -46,21 +46,32 @@ Permite administrar distintos roles de usuario (conductor, inspector, vendedor y
 ## 🧩 Uso de patrones de diseño
 
 ### 🏭 Factory
-El sistema utiliza el **patrón Factory** para la creación de objetos relacionados con los distintos roles de usuario (conductor, inspector, vendedor, administrador).  
-De esta forma, al registrar un nuevo usuario, el sistema instancia automáticamente el tipo de rol correspondiente sin necesidad de que el desarrollador cree manualmente cada objeto.
+
+El sistema utiliza el patrón Factory para la creación de estacionamientos.
+
+Esto permite centralizar la lógica de creación, validaciones y asignación de valores
+como duración, costo inicial y usuario que registra.
 
 Ejemplo conceptual:
+
 ```python
-class UsuarioFactory:
-    def crear_usuario(tipo, datos):
-        if tipo == "conductor":
-            return Conductor(**datos)
-        elif tipo == "inspector":
-            return Inspector(**datos)
-        elif tipo == "vendedor":
-            return Vendedor(**datos)
-        elif tipo == "admin":
-            return Administrador(**datos)
+class EstacionamientoFactory:
+    @staticmethod
+    def crear(vehiculo, subcuadra, duracion, registrado_por=None):
+        inicio = timezone.now()
+        fin = inicio + timedelta(hours=float(duracion))
+
+        estacionamiento = Estacionamiento.objects.create(
+            vehiculo=vehiculo,
+            subcuadra=subcuadra,
+            hora_inicio=inicio,
+            hora_fin=fin,
+            registrado_por=registrado_por,
+            activo=True
+        )
+
+        return estacionamiento
+
 🎯 Strategy
 En las funciones de verificación de vehículos por parte de los inspectores, se aplica el patrón Strategy. Cada vehículo puede tener una estrategia distinta para determinar si debe pagar o no:
 
@@ -70,29 +81,23 @@ Estrategia ExentoParcial: verifica si la subcuadra está dentro de las exentas.
 
 Estrategia Normal: calcula si el estacionamiento está pago o impago según saldo y tiempo.
 
-Ejemplo conceptual:
-
-python
-class EstrategiaPago:
-    def verificar(self, estacionamiento):
-        raise NotImplementedError
-
-class ExentoTotal(EstrategiaPago):
-    def verificar(self, estacionamiento):
-        return "Exento"
-
-class ExentoParcial(EstrategiaPago):
-    def verificar(self, estacionamiento):
-        if estacionamiento.subcuadra in estacionamiento.conductor.subcuadras_exentas:
-            return "Exento"
-        return "Debe pagar"
-
-class Normal(EstrategiaPago):
-    def verificar(self, estacionamiento):
-        return "Pago" if estacionamiento.pagado else "Impago"
+👉 Nota: actualmente la lógica se encuentra parcialmente implementada en vistas,
+pero se proyecta migrarla completamente a un sistema de estrategias desacopladas.
 
         
 Esto permite que el inspector simplemente invoque la estrategia correspondiente sin preocuparse por la lógica interna.
+
+## 🌎 Soporte multi-municipio
+
+El sistema permite operar múltiples municipios de forma independiente.
+
+Cada entidad clave está asociada a un municipio:
+- Usuarios
+- Subcuadras
+- Estacionamientos
+- Infracciones
+
+Esto permite escalar la solución como plataforma SaaS para distintas ciudades.
 
 🛠️ Tecnologías utilizadas
 Backend: Django 5.x
@@ -102,6 +107,14 @@ Frontend: HTML + CSS (estilos personalizados)
 Base de datos: SQLite (por defecto, fácilmente reemplazable por PostgreSQL/MySQL)
 
 Autenticación: Sistema de usuarios propio con roles
+## 🔐 Autenticación
+
+Actualmente el sistema utiliza un esquema de autenticación basado en sesión
+personalizada (`request.session["usuario_id"]`).
+
+Se encuentra planificada la migración al sistema estándar de Django (`request.user`)
+y posteriormente a JWT para API REST.
+
 
 Scripts de prueba: crear_usuarios.py para cargar datos iniciales
 
@@ -113,3 +126,18 @@ Clonar el repositorio:
 bash
 git clone https://github.com/PolloLopez/estacionamiento_proyecto
 cd 
+
+## 🚧 Estado del proyecto
+
+El sistema se encuentra en fase avanzada de desarrollo.
+
+✔ Funcionalidades principales implementadas  
+✔ Roles operativos  
+✔ Gestión de exenciones completa  
+✔ Paneles funcionales  
+
+🔜 Próximos pasos:
+- Interfaz administrativa avanzada (exenciones desde UI)
+- API REST
+- Integración con pagos (MercadoPago)
+- Frontend moderno (React / Next.js)
