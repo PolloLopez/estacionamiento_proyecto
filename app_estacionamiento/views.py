@@ -40,7 +40,6 @@ def inicio(request):
     else:
         return redirect("login")
 
-
 def login_view(request):
     if request.method == "POST":
         correo = request.POST.get("username")  # tu form usa "username"
@@ -128,16 +127,23 @@ def panel_exenciones(request):
     vehiculo = None
     subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
 
-    if request.method == "POST":
-        patente = request.POST.get("patente")
+    # 🔥 ESTA LÍNEA VA ACÁ
+    accion = request.POST.get("accion")
+
+    # 🔎 BUSCAR
+    if request.method == "POST" and accion == "buscar":
+        patente = (request.POST.get("patente") or "").strip().upper()
+        vehiculo = Vehiculo.objects.filter(patente=patente).first()
+
+    # 💾 GUARDAR
+    elif request.method == "POST" and accion == "guardar":
+        patente = (request.POST.get("patente") or "").strip().upper()
         vehiculo = Vehiculo.objects.filter(patente=patente).first()
 
         if vehiculo:
-            # Exención global
             vehiculo.exento_global = request.POST.get("exento_global") == "on"
             vehiculo.save()
 
-            # Subcuadras seleccionadas
             subcuadras_ids = request.POST.getlist("subcuadras")
             vehiculo.subcuadras_exentas.set(subcuadras_ids)
 
@@ -165,31 +171,6 @@ def cargar_saldo(request, usuario_id):
             })
 
     return render(request, "admin/cargar_saldo.html", {"usuario": usuario})
-
-@require_role("admin")
-def gestionar_exenciones(request):
-    usuario = request.usuario
-
-    vehiculos = Vehiculo.objects.all()
-    subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
-
-    if request.method == "POST":
-        patente = request.POST.get("patente")
-        exento_global = request.POST.get("exento_global") == "on"
-        subcuadras_ids = request.POST.getlist("subcuadras")
-
-        vehiculo = Vehiculo.objects.filter(patente=patente).first()
-
-        if vehiculo:
-            vehiculo.exento_global = exento_global
-            vehiculo.save()
-
-            vehiculo.subcuadras_exentas.set(subcuadras_ids)
-
-    return render(request, "admin/exenciones.html", {
-        "vehiculos": vehiculos,
-        "subcuadras": subcuadras
-    })
 
 # =========================================================
 # VIEWS USUARIOS
@@ -445,7 +426,7 @@ def registrar_infraccion(request):
             mensaje = f"⚠️ No se encontró vehículo con patente {patente}."
 
         elif vehiculo.exento_global or (
-            estacionamiento and estacionamiento.subcuadra in vehiculo.subcuadras_exentas.all()
+            estacionamiento and vehiculo.esta_exento_en(estacionamiento.subcuadra)
         ):
             mensaje = f"Vehículo {patente} exento. No se registra infracción."
 
@@ -471,7 +452,7 @@ def registrar_estacionamiento_manual(request):
     inspector = get_usuario(request)
 
     if request.method == "POST":
-        patente = request.POST.get("patente")
+        patente = patente = (request.POST.get("patente") or "").strip().upper()
         duracion = request.POST.get("duracion")
 
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
@@ -502,7 +483,7 @@ def registrar_estacionamiento_vendedor(request):
     vendedor = get_usuario(request)
 
     if request.method == "POST":
-        patente = request.POST.get("patente")
+        patente = patente = (request.POST.get("patente") or "").strip().upper()
         duracion = request.POST.get("duracion")
         cliente_email = request.POST.get("cliente_email", "").strip()
 

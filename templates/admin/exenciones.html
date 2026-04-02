@@ -2,6 +2,7 @@
 
 <form method="POST">
     {% csrf_token %}
+    <input type="hidden" name="accion" value="buscar">
 
     <label>Patente:</label>
     <input type="text" name="patente" required>
@@ -16,6 +17,7 @@
 
 <form method="POST">
     {% csrf_token %}
+    <input type="hidden" name="accion" value="guardar">
     <input type="hidden" name="patente" value="{{ vehiculo.patente }}">
 
     <label>

@@ -49,6 +49,7 @@
 
             {% if request.user.es_admin %}
                 <li><a href="/admin/">🔧 Panel Admin</a></li>
+                <li><a href="{% url 'panel_exenciones' %}">🚧 Exenciones</a></li>
             {% endif %}
 
             {% if request.user.is_authenticated %}
@@ -69,7 +70,7 @@
 </main>
 
 <footer class="footer">
-    <p>Sistema de Estacionamiento Medido — 2025</p>
+    <p>Sistema de Estacionamiento Medido — 2026</p>
 </footer>
 
 <script>

@@ -6,7 +6,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 🔐 Seguridad básica
-DEBUG = False
+DEBUG = True
 ALLOWED_HOSTS = ["*"] # En producción, ALLOWED_HOSTS = ["tudominio.com"]
 
 # 🧩 Aplicaciones instaladas
@@ -83,8 +83,7 @@ USE_TZ = True
 TIME_ZONE = 'America/Argentina/Buenos_Aires'
 
 # 🖼️ Archivos estáticos
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # 🖼️ Fotos infracciones
