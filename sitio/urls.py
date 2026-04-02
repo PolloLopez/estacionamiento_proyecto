@@ -19,7 +19,7 @@ urlpatterns = [
     path("usuarios/finalizar/<int:estacionamiento_id>/", views.finalizar_estacionamiento, name="usuarios_finalizar_estacionamiento"),
     path("usuarios/historial/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),
     path("usuarios/infracciones/", views.usuarios_infracciones, name="usuarios_historial_infracciones"),
-    path("usuarios/cargar_saldo/", views.cargar_saldo_usuario, name="usuarios_cargar_saldo"),
+    path("admin/cargar-saldo/<int:usuario_id>/", views.cargar_saldo, name="cargar_saldo"),
     path("usuarios/deuda/", views.consultar_deuda, name="usuarios_consultar_deuda"),
 
     # Inspectores

@@ -30,7 +30,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'app_estacionamiento.middleware.UsuarioMiddleware',
+    'sitio.middleware.UsuarioMiddleware',
 ]
 
 ROOT_URLCONF = 'sitio.urls'

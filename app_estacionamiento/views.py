@@ -122,6 +122,31 @@ def panel_admin(request):
     })
 
 @require_role("admin")
+def panel_exenciones(request):
+    usuario = request.usuario
+
+    vehiculo = None
+    subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
+
+    if request.method == "POST":
+        patente = request.POST.get("patente")
+        vehiculo = Vehiculo.objects.filter(patente=patente).first()
+
+        if vehiculo:
+            # Exención global
+            vehiculo.exento_global = request.POST.get("exento_global") == "on"
+            vehiculo.save()
+
+            # Subcuadras seleccionadas
+            subcuadras_ids = request.POST.getlist("subcuadras")
+            vehiculo.subcuadras_exentas.set(subcuadras_ids)
+
+    return render(request, "admin/exenciones.html", {
+        "vehiculo": vehiculo,
+        "subcuadras": subcuadras
+    })
+
+@require_role("admin")
 def cargar_saldo(request, usuario_id):
     admin = get_usuario(request)  # quien ejecuta
     usuario = get_object_or_404(Usuario, id=usuario_id)  # a quién le cargo saldo

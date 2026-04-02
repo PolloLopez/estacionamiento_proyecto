@@ -7,4 +7,5 @@ urlpatterns = [
     path("usuarios/login/", views.login_view, name="login"),
     path("usuarios/inicio/", views.inicio_usuarios, name="inicio_usuarios"),
     path("usuarios/logout/", views.logout_view, name="logout"),
+    path("admin/exenciones/", views.panel_exenciones, name="panel_exenciones"),
 ]
