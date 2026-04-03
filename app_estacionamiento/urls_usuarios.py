@@ -24,5 +24,5 @@ urlpatterns = [
     path("inicio/", views.inicio_usuarios, name="inicio_usuarios"),
 
     # Cargar saldo
-    path("cargar-saldo/", views.cargar_saldo_usuario, name="usuarios_cargar_saldo"),
+    path("cargar-saldo/", views.cargar_saldo_usuario, name="cargar_saldo"),
 ]

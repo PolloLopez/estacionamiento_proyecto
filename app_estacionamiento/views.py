@@ -42,22 +42,31 @@ def inicio(request):
 
 def login_view(request):
     if request.method == "POST":
-        correo = request.POST.get("username")  # tu form usa "username"
+        correo = request.POST.get("username")
         password = request.POST.get("password")
+
+        print("📩 LOGIN INTENTO")
+        print("Correo:", correo)
+        print("Password:", password)
 
         try:
             usuario = Usuario.objects.get(correo=correo)
+            print("✅ Usuario encontrado:", usuario)
         except Usuario.DoesNotExist:
+            print("❌ Usuario NO existe")
             return render(request, "usuarios/login.html", {"form": {"errors": True}})
 
         if usuario.check_password(password):
-            # Guardamos el usuario en la sesión 
+            print("🔓 Password CORRECTO")
+
             request.session["usuario_id"] = usuario.id
             return redirect("inicio")
         else:
+            print("🔒 Password INCORRECTO")
             return render(request, "usuarios/login.html", {"form": {"errors": True}})
 
     return render(request, "usuarios/login.html")
+
 
 @require_role("inspector", "admin", "conductor", "vendedor")
 def inicio_usuarios(request):
@@ -127,7 +136,6 @@ def panel_exenciones(request):
     vehiculo = None
     subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
 
-    # 🔥 ESTA LÍNEA VA ACÁ
     accion = request.POST.get("accion")
 
     # 🔎 BUSCAR
@@ -276,7 +284,6 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     # redirigir al historial correcto
     return redirect("usuarios_historial_estacionamientos")
 
-
 @require_role("conductor")
 def historial_estacionamientos(request):
     usuario = request.usuario
@@ -300,14 +307,12 @@ def usuarios_infracciones(request):
         "infracciones": infracciones,
     })
 
-
 @require_login
 def consultar_deuda(request):
     """
     Vista para consultar deuda del usuario.
     """
     return render(request, 'usuarios/consultar_deuda.html')
-
 
 # =========================================================
 # VIEWS INSPECTORES

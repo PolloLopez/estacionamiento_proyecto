@@ -9,6 +9,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DEBUG = True
 ALLOWED_HOSTS = ["*"] # En producción, ALLOWED_HOSTS = ["tudominio.com"]
 
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
 # 🧩 Aplicaciones instaladas
 INSTALLED_APPS = [
     "django_extensions",
@@ -103,4 +107,7 @@ LOGIN_REDIRECT_URL = "/usuarios/inicio/"
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
+]
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:8000",
 ]

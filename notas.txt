@@ -12,6 +12,9 @@ bash
 python manage.py runserver
 
 
-createsuperuser --email admin@test.com --password 1234
-
+superuserusuario --email: admin@test.com --password TODAS: 1234
+adminMun@test.com
+vendedor@test.com
+inspector@test.com
+conductor@test.com
 

@@ -6,7 +6,7 @@
   <h2>Cargar saldo</h2>
   <p>Seleccioná un monto y procesá el pago (integración MercadoPago luego).</p>
 
-  <form method="post" action="{% url 'usuarios_cargar_saldo' %}">
+  <form method="post" action="{% url 'cargar_saldo' %}">
     {% csrf_token %}
     <div class="form-row">
       <label for="monto">Monto</label>

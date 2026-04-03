@@ -15,10 +15,6 @@ def require_login(view_func):
 
 
 def require_role(*roles):
-    """
-    Decorador que exige que el usuario tenga al menos uno de los roles dados.
-    Además asigna el objeto Usuario al request.user para usarlo en templates.
-    """
     def decorator(view_func):
         def wrapper(request, *args, **kwargs):
             usuario = request.usuario

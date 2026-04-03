@@ -6,6 +6,8 @@ docs/roadmap.md
 El sistema ya cuenta con una base sólida funcional tanto a nivel backend como de interfaz básica.
 Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
 
+👉 Se completó la estabilización de navegación y sesiones.
+
 ---
 
 ## ✅ FUNCIONALIDADES IMPLEMENTADAS
@@ -21,6 +23,7 @@ Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
   * Administrador
 * Middleware propio (`UsuarioMiddleware`)
 * Decoradores de acceso (`require_login`, `require_role`)
+* 🔥 Corrección completa de uso de `request.usuario` en templates
 
 ---
 
@@ -32,6 +35,9 @@ Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
 
   * Exento global
   * Exento por subcuadras
+
+⚠️ Nota futura:
+La patente es única global → esto deberá ajustarse para multi-municipio.
 
 ---
 
@@ -80,6 +86,7 @@ Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
   * Estacionamientos
   * Infracciones recientes
 * Carga de saldo manual
+* 🔥 Navegación corregida (urls + templates)
 
 ---
 
@@ -91,7 +98,7 @@ Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
 * Guardado desde UI (sin código)
 * Filtro de subcuadras por texto (JS básico)
 
-👉 Esto elimina la necesidad de modificar código para asignar exenciones.
+👉 Funcional completamente desde interfaz.
 
 ---
 
@@ -101,6 +108,7 @@ Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
 * Navbar dinámica por rol
 * CSS global funcionando correctamente
 * Manejo correcto de archivos estáticos
+* 🔥 Corrección de visibilidad de navegación por sesión
 
 ---
 
@@ -112,10 +120,37 @@ Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
 * Corrección de imports y estructura Django
 * Configuración correcta de Pillow
 * Limpieza de archivos innecesarios
+* 🔥 Corrección de:
+  * CSRF issues
+  * Login manual
+  * Sesiones
+  * Uso incorrecto de `request.user`
+
+---
+
+## 🧪 ESTADO ACTUAL: LISTO PARA TESTEO REAL
+
+👉 El sistema ya puede ser probado en flujo completo:
+
+* Login por roles
+* Navegación por paneles
+* Registro de estacionamientos
+* Verificación por inspector
+* Registro de infracciones
+* Gestión de exenciones
 
 ---
 
 ## 🚀 PRÓXIMOS PASOS (CORTO PLAZO)
+
+### 🧪 TEST FUNCIONAL COMPLETO (PRIORIDAD 🔥)
+
+* [ ] Flujo completo inspector (calle)
+* [ ] Flujo conductor (saldo + estacionamiento)
+* [ ] Flujo vendedor
+* [ ] Validación de errores reales
+
+---
 
 ### 🔥 Panel de exenciones — Nivel PRO
 
@@ -155,7 +190,7 @@ Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
   * estacionamientos
   * pagos
   * multas
-* Multi-municipio (multi-tenant)
+* 🔥 Multi-municipio (multi-tenant) — PRIORIDAD ALTA
 
 ---
 
@@ -207,20 +242,19 @@ Construir una plataforma SaaS para municipios que permita:
 ## 🧠 NOTA DEL PROYECTO
 
 El sistema ya dejó de ser un prototipo.
-Actualmente se encuentra en una etapa donde:
 
-👉 El foco debe pasar de **funcionalidad técnica**
-👉 a **experiencia de usuario + escalabilidad**
+👉 Ahora entra en fase de:
+
+**VALIDACIÓN REAL + ENDURECIMIENTO DEL BACKEND**
 
 ---
 
 ## 📌 SIGUIENTE HITO
 
-👉 Panel de exenciones PRO (autocomplete + UX avanzada)
+👉 🧪 TEST REAL DEL SISTEMA (flujo completo)
 
-Este paso transforma el sistema de:
+ANTES de:
 
-* herramienta técnica
-  ➡️ a producto usable por personal municipal
+👉 Panel de exenciones PRO
 
 ---

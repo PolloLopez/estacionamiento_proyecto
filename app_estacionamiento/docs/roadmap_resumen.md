@@ -12,7 +12,7 @@
 
 ## 🟡 Evolución del sistema (SaaS)
 
-* Multi-municipio completo
+* Multi-municipio completo 🔥 (AGREGADO PRIORIDAD)
 * API REST (Django REST Framework)
 * Autenticación JWT
 * Frontend moderno (React / Next.js)
@@ -36,3 +36,15 @@ Convertir el sistema en una plataforma SaaS para gestión de estacionamiento med
 
 Este documento representa la **visión macro del producto**.
 Para el desarrollo técnico detallado ver: `roadmap.md`.
+
+---
+
+## 📌 Estado reciente (Abril 2026)
+
+* Sistema de navegación corregido (uso de `request.usuario`)
+* Middleware funcional y estable
+* Panel de exenciones operativo desde UI
+* Logout funcionando correctamente
+* Corrección de rutas y errores 500/404
+
+👉 El sistema entra en fase de **validación real (testing funcional)**.

@@ -52,6 +52,6 @@
 
 ## Observaciones
 
-- Pendiente migración a Django Auth (`request.user`)
+- Pendiente migración a Django Auth (`request.usuario`)
 - Pendiente API REST
 - Pendiente frontend separado
