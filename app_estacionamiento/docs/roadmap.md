@@ -191,6 +191,10 @@ La patente es única global → esto deberá ajustarse para multi-municipio.
   * pagos
   * multas
 * 🔥 Multi-municipio (multi-tenant) — PRIORIDAD ALTA
+* Validación de ubicación del vehículo (subcuadra) en inspecciones
+* Geolocalización de inspector (GPS)
+* Detección automática de subcuadra
+* Validación en tiempo real contra exenciones
 
 ---
 

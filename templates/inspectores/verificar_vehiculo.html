@@ -17,9 +17,10 @@
       <h3>Patente: {{ resultado.patente }}</h3>
       <p class="estado">{{ resultado.estado }}</p>
       {% if resultado.detalle %}<p>{{ resultado.detalle }}</p>{% endif %}
-      {% if resultado.subcuadras %}
+      {% if resultado.subcuadras_exentas %}
+        <h4>Subcuadras exentas:</h4>
         <ul>
-          {% for s in resultado.subcuadras %}
+          {% for s in resultado.subcuadras_exentas %}
             <li>{{ s.calle }} {{ s.altura }}</li>
           {% endfor %}
         </ul>

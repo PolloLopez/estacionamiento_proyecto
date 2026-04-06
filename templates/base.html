@@ -28,7 +28,7 @@
     <nav>
         <ul class="nav-items" id="navItems">
             <li><a href="{% url 'inicio' %}">🏠 Inicio</a></li>
-            <p>DEBUG USER: {{ request.usuario }}</p>
+            <p>USER: {{ request.usuario }}</p>
             {% if not request.usuario %}
               <p style="color:red;">⚠️ Usuario no cargado</p>
             {% endif %}

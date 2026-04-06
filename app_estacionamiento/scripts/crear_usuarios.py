@@ -17,7 +17,7 @@ from app_estacionamiento.models import Municipio, Usuario, Vehiculo, Subcuadra
 def crear_subcuadras_municipio(municipio):
     zonas = [
         (["Calle 12","Calle 14","Calle 16","Calle 18","Calle 20","Calle 22","Calle 28","Calle 30"], [400,450,500,550,600,650,700]),
-        (["Calle 24","Calle 26"], [400,450,500,550,600,650,700,750,800,850]),
+        (["Calle 24","Calle 26"], [400,450,500,550,600,650,700,750,800,850]), 
         (["Calle 17","Calle 19","Calle 21","Calle 23","Calle 25","Calle 27","Calle 29","Calle 31","Calle 33"], [250,300,350,400,450,500,550,600,650,700]),
         (["Calle 35","Calle 37"], [550]),
     ]

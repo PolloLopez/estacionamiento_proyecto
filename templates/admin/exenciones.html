@@ -1,53 +1,62 @@
-<h2>Panel de Exenciones</h2>
+{% extends "base.html" %}
 
-<form method="POST">
-    {% csrf_token %}
-    <input type="hidden" name="accion" value="buscar">
+{% block title %}Exenciones{% endblock %}
 
-    <label>Patente:</label>
-    <input type="text" name="patente" required>
+{% block content %}
+<section class="container">
+  <div class="card">
+    <h2>🚧 Panel de Exenciones</h2>
 
-    <button type="submit">Buscar</button>
-</form>
+    <form method="POST" class="grid">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="buscar">
 
-{% if vehiculo %}
-<hr>
+        <label>Patente:</label>
+        <input type="text" name="patente" class="input" required>
 
-<h3>Vehículo: {{ vehiculo.patente }}</h3>
+        <button type="submit" class="btn">Buscar</button>
+    </form> 
+  </div>
 
-<form method="POST">
-    {% csrf_token %}
-    <input type="hidden" name="accion" value="guardar">
-    <input type="hidden" name="patente" value="{{ vehiculo.patente }}">
+  {% if vehiculo %}
+  <div class="card" style="margin-top: 1rem;">
+    <h3>Vehículo: {{ vehiculo.patente }}</h3>
 
-    <label>
-        <input type="checkbox" name="exento_global"
-        {% if vehiculo.exento_global %}checked{% endif %}>
-        Exento global
-    </label>
+    <form method="POST" class="grid">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="guardar">
+        <input type="hidden" name="patente" value="{{ vehiculo.patente }}">
 
-    <h4>Subcuadras exentas</h4>
+        <label>
+            <input type="checkbox" name="exento_global"
+            {% if vehiculo.exento_global %}checked{% endif %}>
+            Exento global
+        </label>
 
-    <input type="text" id="buscador" placeholder="Buscar calle...">
+        <h4>Subcuadras exentas</h4>
 
-    <div id="lista-subcuadras">
-        {% for s in subcuadras %}
-            <div>
-                <label>
-                    <input type="checkbox" name="subcuadras" value="{{ s.id }}"
-                    {% if s in vehiculo.subcuadras_exentas.all %}checked{% endif %}>
-                    {{ s.calle }} {{ s.altura }}
-                </label>
-            </div>
-        {% endfor %}
-    </div>
+        <input type="text" id="buscador" class="input" placeholder="Buscar calle...">
 
-    <button type="submit">Guardar</button>
-</form>
-{% endif %}
+        <div id="lista-subcuadras" class="grid">
+            {% for s in subcuadras %}
+                <div class="card">
+                    <label>
+                        <input type="checkbox" name="subcuadras" value="{{ s.id }}"
+                        {% if s in vehiculo.subcuadras_exentas.all %}checked{% endif %}>
+                        {{ s.calle }} {{ s.altura }}
+                    </label>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="submit" class="btn">Guardar</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
 
 <script>
-document.getElementById("buscador").addEventListener("keyup", function() {
+document.getElementById("buscador")?.addEventListener("keyup", function() {
     let filtro = this.value.toLowerCase();
     let items = document.querySelectorAll("#lista-subcuadras div");
 
@@ -57,3 +66,4 @@ document.getElementById("buscador").addEventListener("keyup", function() {
     });
 });
 </script>
+{% endblock %}

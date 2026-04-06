@@ -4,7 +4,7 @@
 from django.utils import timezone
 from datetime import timedelta
 from .models import Estacionamiento
-
+  
 class EstacionamientoFactory:
     @staticmethod
     def crear(vehiculo, subcuadra, duracion, registrado_por=None):
@@ -17,7 +17,8 @@ class EstacionamientoFactory:
             hora_inicio=inicio,
             hora_fin=fin,
             registrado_por=registrado_por,
-            activo=True
+            activo=True,
+            municipio=registrado_por.municipio if registrado_por else None  # 🔥 FIX
         )
 
         return estacionamiento

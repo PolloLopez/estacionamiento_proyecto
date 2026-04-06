@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Historial de Infracciones{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>⚠️ Historial de infracciones</h2>
+
+  {% if infracciones %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Patente</th>
+          <th>Calle</th>
+          <th>Altura</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in infracciones %}
+          <tr>
+            <td>{{ i.fecha|date:"d/m/Y H:i" }}</td>
+            <td>{{ i.vehiculo.patente }}</td>
+            <td>{{ i.subcuadra.calle }}</td>
+            <td>{{ i.subcuadra.altura }}</td>
+            <td>
+              {% if i.cancelada %}
+                ✅ Pagada
+              {% else %}
+                🚫 Impaga
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No tenés infracciones registradas.</p>
+  {% endif %}
+</section>
+{% endblock %}
+

@@ -1,7 +1,7 @@
 #app_estacionamiento/admin.py
 
 from django.contrib import admin
-from .models import Usuario, Vehiculo, Subcuadra, Tarifa, Estacionamiento, Infraccion, Notificacion
+from .models import Municipio, Usuario, Vehiculo, Subcuadra, Tarifa, Estacionamiento, Infraccion, Notificacion
 
 @admin.register(Vehiculo)
 class VehiculoAdmin(admin.ModelAdmin):
@@ -20,3 +20,4 @@ admin.site.register(Tarifa)
 admin.site.register(Estacionamiento)
 admin.site.register(Infraccion)
 admin.site.register(Notificacion)
+admin.site.register(Municipio)

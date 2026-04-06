@@ -48,3 +48,5 @@ Para el desarrollo técnico detallado ver: `roadmap.md`.
 * Corrección de rutas y errores 500/404
 
 👉 El sistema entra en fase de **validación real (testing funcional)**.
+
+* Validación de ubicación del vehículo (subcuadra) en inspecciones

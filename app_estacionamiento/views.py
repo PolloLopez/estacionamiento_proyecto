@@ -300,7 +300,9 @@ def usuarios_infracciones(request):
     """
     usuario = request.usuario
 
-    infracciones = Infraccion.objects.filter(vehiculo__usuarios=usuario).order_by("-fecha")
+    infracciones = Infraccion.objects.filter(
+        municipio=usuario.municipio
+    ).select_related("vehiculo", "inspector").order_by("-fecha")
 
     return render(request, "usuarios/historial_infracciones.html", {
         "usuario": usuario,
@@ -332,7 +334,7 @@ def panel_inspectores(request):
 
 @require_login
 def verificar_vehiculo(request):
-    usuario = get_usuario(request)
+    usuario = request.usuario
     resultado = None
 
     if request.method == "POST":
@@ -342,10 +344,10 @@ def verificar_vehiculo(request):
             return render(request, "inspectores/verificar_vehiculo.html", {
                 "error": "Debe ingresar una patente"
             })
-        
+
         vehiculo = Vehiculo.objects.filter(patente=patente).first()
 
-        # No registrado
+        # ❌ Vehículo no registrado
         if not vehiculo:
             resultado = {
                 "patente": patente,
@@ -355,7 +357,7 @@ def verificar_vehiculo(request):
             }
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Exento global
+        # 🟢 Exento global
         if vehiculo.exento_global:
             resultado = {
                 "patente": patente,
@@ -364,23 +366,32 @@ def verificar_vehiculo(request):
             }
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
+        # 🔍 Estacionamiento activo en SU municipio
         estacionamiento = Estacionamiento.objects.filter(
             vehiculo=vehiculo,
             activo=True,
-            subcuadra__municipio=usuario.municipio
+            #municipio=usuario.municipio
         ).first()
 
-        # Exento parcial
-        if estacionamiento and vehiculo.esta_exento_en(estacionamiento.subcuadra):
+        # 🟡 Exento parcial → mostramos SIEMPRE las subcuadras
+        subcuadras_exentas = vehiculo.subcuadras_exentas.all()
+
+        if subcuadras_exentas.exists():
             resultado = {
                 "patente": patente,
                 "estado": "Exento parcial",
-                "detalle": "Exento en esta subcuadra",
+                "subcuadras_exentas": subcuadras_exentas,
+                "detalle": "Tiene exenciones en subcuadras específicas"
             }
+
+            # 👉 SI además está estacionado
+            if estacionamiento:
+                resultado["estacionamiento_activo"] = True
+
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Pagado
-        if estacionamiento and estacionamiento.costo > 0:
+        # 🟢 Pagado (activo)
+        if estacionamiento and estacionamiento.activo:
             resultado = {
                 "patente": patente,
                 "estado": "Pagado",
@@ -388,13 +399,14 @@ def verificar_vehiculo(request):
             }
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
-        # Impago
+        # 🔴 Impago
         resultado = {
             "patente": patente,
             "estado": "Impago",
             "detalle": "Estacionamiento sin pago",
             "registrar_infraccion_url": reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
         }
+
         return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
     return render(request, "inspectores/verificar_vehiculo.html")
@@ -407,6 +419,7 @@ def registrar_infraccion(request):
         return redirect("inicio")
 
     mensaje = None
+
     subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
     patente = request.GET.get("patente") or request.POST.get("patente")
 
@@ -424,26 +437,41 @@ def registrar_infraccion(request):
         estacionamiento = Estacionamiento.objects.filter(
             vehiculo=vehiculo,
             activo=True,
-            subcuadra__municipio=usuario.municipio
+            municipio=usuario.municipio
         ).first() if vehiculo else None
 
+        # ❌ NO existe vehículo
         if not vehiculo:
             mensaje = f"⚠️ No se encontró vehículo con patente {patente}."
 
-        elif vehiculo.exento_global or (
-            estacionamiento and vehiculo.esta_exento_en(estacionamiento.subcuadra)
-        ):
-            mensaje = f"Vehículo {patente} exento. No se registra infracción."
+        # ❌ subcuadra inválida
+        elif not subcuadra:
+            mensaje = "Debe seleccionar una subcuadra válida."
 
+        # ❌ EXENTO EN ESA CUADRA
+        elif vehiculo.esta_exento_en(subcuadra):
+            mensaje = f"Vehículo exento en esta subcuadra. No corresponde infracción."
+            
+
+        # ❌ EXENTO TOTAL
+        elif vehiculo.exento_global:
+            mensaje = "Vehículo con exención total."
+
+        # ❌ ESTÁ PAGANDO
+        elif estacionamiento:
+            mensaje = "Vehículo con estacionamiento activo."
+
+        # ✅ GENERAR
         else:
             Infraccion.objects.create(
                 vehiculo=vehiculo,
-                inspector=usuario,  # 🔥 FIX
-                subcuadra=subcuadra or (estacionamiento.subcuadra if estacionamiento else None),
+                inspector=usuario,
+                municipio=usuario.municipio,  # 🔥 CLAVE
+                subcuadra=subcuadra,
                 estacionamiento=estacionamiento,
-                fecha=timezone.now(),
                 foto=foto
             )
+
             mensaje = f"🚨 Infracción registrada para {patente}."
 
     return render(request, "inspectores/registrar_infraccion.html", {
@@ -529,7 +557,6 @@ def registrar_estacionamiento_vendedor(request):
 
     return render(request, "vendedores/registrar_estacionamiento.html")
 
-
 @require_role("inspector", "vendedor", "admin")
 def resumen_cobros(request):
     usuario = request.usuario
@@ -541,14 +568,15 @@ def resumen_cobros(request):
 
 @require_role("inspector", "admin")
 def resumen_infracciones(request):
-    """
-    Vista de resumen de infracciones registradas por inspectores.
-    - Solo accesible a inspectores.
-    """
     usuario = request.usuario
-    if not usuario.es_inspector:
-        return redirect("inicio")
-    return render(request, 'inspectores/resumen_infracciones.html')
+
+    infracciones = Infraccion.objects.filter(
+        municipio=usuario.municipio
+    ).select_related("vehiculo", "subcuadra").order_by("-fecha")
+
+    return render(request, "inspectores/resumen_infracciones.html", {
+        "infracciones": infracciones
+    })
 
 
 # =========================================================

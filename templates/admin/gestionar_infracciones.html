@@ -17,7 +17,7 @@
       <tr>
         <td>{{ inf.fecha }}</td>
         <td>{{ inf.vehiculo.patente }}</td>
-        <td>{{ inf.inspector.nombre }}</td>
+        <td>{{ inf.inspector.correo }}</td>
         <td>{{ inf.cancelada|yesno:"Cancelada,Activa" }}</td>
         <td>
           <a class="btn small" href="{% url 'admin_ver_infraccion' inf.id %}">Ver</a>

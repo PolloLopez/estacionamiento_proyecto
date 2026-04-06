@@ -142,6 +142,12 @@ class Estacionamiento(models.Model):
     activo = models.BooleanField(default=True)
     registrado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, default=1)
 
+    def save(self, *args, **kwargs):
+        if not self.municipio and self.registrado_por:
+            self.municipio = self.registrado_por.municipio
+
+        super().save(*args, **kwargs)
+
     def calcular_costo(self):
         if not self.activo:
             return Decimal("0.00")
@@ -157,6 +163,8 @@ class Estacionamiento(models.Model):
     
         costo = Decimal(horas_redondeadas) * Decimal(str(tarifa.precio_por_hora))
         return costo.quantize(Decimal("0.01"))
+    def __str__(self):
+        return f"{self.vehiculo.patente} - {self.subcuadra} - {self.hora_inicio}"
 
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
@@ -167,14 +175,32 @@ class Infraccion(models.Model):
         blank=True
     )
 
+    estado = models.CharField(
+        max_length=20,
+        choices=[
+            ("pendiente", "Pendiente"),
+            ("pagada", "Pagada"),
+            ("anulada", "Anulada"),
+        ],
+        default="pendiente"
+    )
+
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
-    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)  
+    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE, null=True, blank=True)
-    estacionamiento = models.ForeignKey(Estacionamiento, on_delete=models.SET_NULL, null=True, blank=True) 
+    estacionamiento = models.ForeignKey(Estacionamiento, on_delete=models.SET_NULL, null=True, blank=True)
     motivo = models.CharField(max_length=255, default="Impago")
     fecha = models.DateTimeField(auto_now_add=True)
     cancelada = models.BooleanField(default=False)
-    foto = models.ImageField(upload_to="infracciones/", null=True, blank=True) 
+    foto = models.ImageField(upload_to="infracciones/", null=True, blank=True)
+
+class VerificacionInspector(models.Model):
+    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
+    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)
+    fecha = models.DateTimeField(auto_now_add=True)
+    resultado = models.CharField(max_length=50)
+
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 
