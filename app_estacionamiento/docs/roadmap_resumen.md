@@ -1,52 +1,85 @@
-# 🚀 Roadmap — Visión del Producto
+🚀 Roadmap_resumen — Visión del Producto
 
-## 🔴 Pendientes críticos (producción)
+🔴 Pendientes críticos (producción)
 
-* Tolerancia de tiempo en inspecciones
-* Control de saldo negativo robusto
-* Estados de infracción (impaga / pagada)
-* Auditoría de acciones (logs)
-* Validaciones de seguridad adicionales
+Tolerancia de tiempo en inspecciones (gracia configurable ⏱️)
+Control de saldo negativo robusto 💳
+Estados de infracción completos:
+pendiente
+pagada
+anulada
+Auditoría de acciones (logs por usuario) 📋
+Validaciones de seguridad:
+evitar doble infracción
+validar municipio en todas las operaciones
+sanitización de inputs
 
----
+🟡 Evolución del sistema (SaaS)
 
-## 🟡 Evolución del sistema (SaaS)
+Multi-municipio completo 🔥 (YA INICIADO)
+aislamiento por municipio ✔
+datos independientes ✔
+API REST (Django REST Framework)
+Autenticación JWT
+Frontend moderno (React / Next.js)
 
-* Multi-municipio completo 🔥 (AGREGADO PRIORIDAD)
-* API REST (Django REST Framework)
-* Autenticación JWT
-* Frontend moderno (React / Next.js)
+💳 Integraciones
 
----
+MercadoPago (checkout + QR)
+Webhooks de pago (confirmación automática)
+Carga de saldo:
+tarjeta 💳
+puntos físicos 🏪
 
-## 💳 Integraciones
+📱 Experiencia de usuario (clave producto)
 
-* MercadoPago
-* Webhooks de pago
+Acceso por QR en vía pública 📍
+Login rápido:
+Google 🔥 (PRIORIDAD FASE 2)
+Flujo sin fricción:
+ingresar patente → estacionar → listo
 
----
+🧠 Lógica de negocio (ACTUALIZADA)
 
-## 🎯 Objetivo
+Vehículos dinámicos 🚗 ✔
+cualquier patente puede operar
+no requiere registro previo
+Asociación opcional usuario ↔ vehículo (fase 2)
+Inspector:
+valida estado
+genera infracción si corresponde
 
-Convertir el sistema en una plataforma SaaS para gestión de estacionamiento medido a nivel municipal.
+🎯 Objetivo
 
----
+Convertir el sistema en una plataforma SaaS municipal escalable para:
 
-## 🧠 Nota
+Estacionamiento medido
+Control de infracciones
+Recaudación digital
+📌 Estado reciente (7 - Abril 2026)
 
-Este documento representa la **visión macro del producto**.
-Para el desarrollo técnico detallado ver: `roadmap.md`.
+✅ Fase 1 — CORE OPERATIVO (COMPLETA)
+✔ Estacionar
+✔ Verificar estado
+✔ Infraccionar
+✔ Vehículo dinámico 🔥
+✔ Filtro por municipio funcionando
+✔ Inspector operativo real
 
----
+🚀 Fase 2 — IDENTIDAD Y USUARIOS (SIGUIENTE)
+Login con Google 🔥
+Asociación usuario ↔ patente
+Historial por usuario
+Base de usuarios real (ciudadanos + turistas)
 
-## 📌 Estado reciente (Abril 2026)
+💰 Fase 3 — PAGOS
+MercadoPago
+Saldo virtual
+Webhooks
+Validación automática de pago
 
-* Sistema de navegación corregido (uso de `request.usuario`)
-* Middleware funcional y estable
-* Panel de exenciones operativo desde UI
-* Logout funcionando correctamente
-* Corrección de rutas y errores 500/404
-
-👉 El sistema entra en fase de **validación real (testing funcional)**.
-
-* Validación de ubicación del vehículo (subcuadra) en inspecciones
+🛰️ Fase 4 — INTELIGENCIA EN CALLE
+GPS inspector
+Validación automática de subcuadra
+Eliminación de selección manual
+Auditoría geográfica

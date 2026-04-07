@@ -345,7 +345,7 @@ def verificar_vehiculo(request):
                 "error": "Debe ingresar una patente"
             })
 
-        vehiculo = Vehiculo.objects.filter(patente=patente).first()
+        vehiculo, creado = Vehiculo.objects.get_or_create(patente=patente)
 
         # ❌ Vehículo no registrado
         if not vehiculo:
@@ -427,52 +427,60 @@ def registrar_infraccion(request):
         subcuadra_id = request.POST.get("subcuadra_id")
         foto = request.FILES.get("foto")
 
+        print("------ DEBUG INFRACCION ------")
+        print("patente:", patente)
+        print("subcuadra_id:", subcuadra_id)
+
         subcuadra = Subcuadra.objects.filter(
             id=subcuadra_id,
             municipio=usuario.municipio
         ).first()
 
-        vehiculo = Vehiculo.objects.filter(patente=patente).first()
+        vehiculo, creado = Vehiculo.objects.get_or_create(patente=patente)
+
+        if creado:
+            print("🚗 Vehículo creado:", vehiculo)
 
         estacionamiento = Estacionamiento.objects.filter(
             vehiculo=vehiculo,
-            activo=True,
-            municipio=usuario.municipio
+            activo=True
         ).first() if vehiculo else None
 
-        # ❌ NO existe vehículo
+        print("vehiculo:", vehiculo)
+        print("subcuadra:", subcuadra)
+        print("estacionamiento:", estacionamiento)
+        print("municipio usuario:", usuario.municipio)
+
         if not vehiculo:
-            mensaje = f"⚠️ No se encontró vehículo con patente {patente}."
+            mensaje = "❌ Vehículo inexistente"
 
-        # ❌ subcuadra inválida
         elif not subcuadra:
-            mensaje = "Debe seleccionar una subcuadra válida."
+            mensaje = "❌ Subcuadra inválida"
 
-        # ❌ EXENTO EN ESA CUADRA
         elif vehiculo.esta_exento_en(subcuadra):
-            mensaje = f"Vehículo exento en esta subcuadra. No corresponde infracción."
-            
+            mensaje = "🚫 Exento en esta subcuadra"
 
-        # ❌ EXENTO TOTAL
         elif vehiculo.exento_global:
-            mensaje = "Vehículo con exención total."
+            mensaje = "🚫 Exento global"
 
-        # ❌ ESTÁ PAGANDO
-        elif estacionamiento:
-            mensaje = "Vehículo con estacionamiento activo."
+        elif estacionamiento and estacionamiento.activo:
+            mensaje = "🚫 Tiene estacionamiento activo"
 
-        # ✅ GENERAR
         else:
-            Infraccion.objects.create(
+            print("🔥 ENTRA A CREAR INFRACCION")
+
+            inf = Infraccion.objects.create(
                 vehiculo=vehiculo,
                 inspector=usuario,
-                municipio=usuario.municipio,  # 🔥 CLAVE
+                municipio=usuario.municipio,
                 subcuadra=subcuadra,
                 estacionamiento=estacionamiento,
                 foto=foto
             )
 
-            mensaje = f"🚨 Infracción registrada para {patente}."
+            print("✅ Infracción creada ID:", inf.id)
+
+            mensaje = f"🚨 Infracción registrada para {patente}"
 
     return render(request, "inspectores/registrar_infraccion.html", {
         "mensaje": mensaje,

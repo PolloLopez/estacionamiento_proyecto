@@ -194,6 +194,15 @@ class Infraccion(models.Model):
     cancelada = models.BooleanField(default=False)
     foto = models.ImageField(upload_to="infracciones/", null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if not self.municipio:
+            if self.inspector and self.inspector.municipio:
+                self.municipio = self.inspector.municipio
+            elif self.subcuadra and self.subcuadra.municipio:
+                self.municipio = self.subcuadra.municipio
+
+        super().save(*args, **kwargs)
+        
 class VerificacionInspector(models.Model):
     inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
