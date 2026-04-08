@@ -62,11 +62,14 @@ Recaudación digital
 ✔ Estacionar
 ✔ Verificar estado
 ✔ Infraccionar
-✔ Vehículo dinámico 🔥
+✔ Vehículo dinámico
 ✔ Filtro por municipio funcionando
 ✔ Inspector operativo real
+✔ Finalizar estacionamiento
 
-🚀 Fase 2 — IDENTIDAD Y USUARIOS (SIGUIENTE)
+
+🚀 Fase 2 — IDENTIDAD Y USUARIOS (8/4)
+
 Login con Google 🔥
 Asociación usuario ↔ patente
 Historial por usuario

@@ -252,36 +252,22 @@ def usuarios_historial(request):
 
 @require_role("conductor")
 def finalizar_estacionamiento(request, estacionamiento_id):
-    """
-    Finaliza un estacionamiento activo del usuario:
-    - Si ya está finalizado → redirige al historial.
-    - Si no alcanza saldo → redirige al historial sin cerrar.
-    - Si alcanza saldo → cierra, descuenta y redirige al historial.
-    """
     usuario = request.usuario
     estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
 
-    # Si ya está finalizado, volver al historial
+    # Ya finalizado
     if not estacionamiento.activo:
         return redirect("usuarios_historial_estacionamientos")
 
-    # calcular costo sin cerrar
+    # Calcular costo sin cerrar (preview)
+    costo_estimado = estacionamiento.calcular_costo()
+
+    # ✅ Finalizar correctamente
     costo_final = estacionamiento.finalizar()
-
-    if usuario.saldo < costo_final:
-        # ❌ No alcanza saldo → no se finaliza
-        return redirect("usuarios_historial_estacionamientos")
-
-    # ✅ Si alcanza saldo → cerrar y descontar
-    estacionamiento.hora_fin = timezone.now()
-    estacionamiento.costo = costo_final
-    estacionamiento.activo = False
-    estacionamiento.save()
 
     usuario.saldo -= costo_final
     usuario.save()
 
-    # redirigir al historial correcto
     return redirect("usuarios_historial_estacionamientos")
 
 @require_role("conductor")
@@ -334,7 +320,7 @@ def panel_inspectores(request):
 
 @require_login
 def verificar_vehiculo(request):
-    usuario = request.usuario
+    usuario = request.usuario 
     resultado = None
 
     if request.method == "POST":
@@ -347,6 +333,15 @@ def verificar_vehiculo(request):
 
         vehiculo, creado = Vehiculo.objects.get_or_create(patente=patente)
 
+        # 🟢 EXENTO GLOBAL (PRIORIDAD MÁXIMA)
+        if vehiculo.exento_global:
+            resultado = {
+                "patente": patente,
+                "estado": "Exento TOTAL",
+                "detalle": "Vehículo con exención total"
+            }
+            return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
+
         # ❌ Vehículo no registrado
         if not vehiculo:
             resultado = {
@@ -358,36 +353,32 @@ def verificar_vehiculo(request):
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
         # 🟢 Exento global
-        if vehiculo.exento_global:
-            resultado = {
-                "patente": patente,
-                "estado": "Exento",
-                "detalle": "Exento total"
-            }
-            return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
-
-        # 🔍 Estacionamiento activo en SU municipio
         estacionamiento = Estacionamiento.objects.filter(
             vehiculo=vehiculo,
             activo=True,
-            #municipio=usuario.municipio
+            municipio=usuario.municipio
         ).first()
 
         # 🟡 Exento parcial → mostramos SIEMPRE las subcuadras
         subcuadras_exentas = vehiculo.subcuadras_exentas.all()
-
+        
+        # 🟡 Exento parcial (NO bloquea)
         if subcuadras_exentas.exists():
             resultado = {
                 "patente": patente,
                 "estado": "Exento parcial",
                 "subcuadras_exentas": subcuadras_exentas,
-                "detalle": "Tiene exenciones en subcuadras específicas"
+                "detalle": "Puede estar exento según la subcuadra"
             }
-
-            # 👉 SI además está estacionado
-            if estacionamiento:
-                resultado["estacionamiento_activo"] = True
-
+        
+            # 👉 SI NO tiene estacionamiento → puede multar
+            if not estacionamiento:
+                resultado["registrar_infraccion_url"] = reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
+        
+            # 👉 SI tiene estacionamiento activo → no multa
+            else:
+                resultado["detalle"] = "Tiene estacionamiento activo"
+        
             return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
 
         # 🟢 Pagado (activo)
@@ -423,6 +414,7 @@ def registrar_infraccion(request):
     subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
     patente = request.GET.get("patente") or request.POST.get("patente")
 
+    print("Entro a generar infraccion")
     if request.method == "POST":
         subcuadra_id = request.POST.get("subcuadra_id")
         foto = request.FILES.get("foto")
@@ -457,14 +449,14 @@ def registrar_infraccion(request):
         elif not subcuadra:
             mensaje = "❌ Subcuadra inválida"
 
-        elif vehiculo.esta_exento_en(subcuadra):
-            mensaje = "🚫 Exento en esta subcuadra"
-
         elif vehiculo.exento_global:
-            mensaje = "🚫 Exento global"
+            mensaje = "🚫 Exento TOTAL"
+
+        elif vehiculo.esta_exento_en(subcuadra):
+            mensaje = "🚫 Exento en esta subcuadra - No multa"
 
         elif estacionamiento and estacionamiento.activo:
-            mensaje = "🚫 Tiene estacionamiento activo"
+            mensaje = "🚫 Tiene estacionamiento activo (no se multa)"
 
         else:
             print("🔥 ENTRA A CREAR INFRACCION")

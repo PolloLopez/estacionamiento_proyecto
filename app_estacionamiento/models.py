@@ -77,7 +77,6 @@ class Vehiculo(models.Model):
     usuarios = models.ManyToManyField(Usuario, related_name="vehiculos", blank=True)  # vincula usuario / vehiculo
     exento_global = models.BooleanField(default=False)  # exento total
     subcuadras_exentas = models.ManyToManyField("Subcuadra", blank=True)  # Exenciones específicas
-    exento_parcial = subcuadras_exentas  # alias para que los tests no fallen
 
     def __str__(self):
         return self.patente
@@ -85,13 +84,7 @@ class Vehiculo(models.Model):
     def esta_exento_en(self, subcuadra):
         if self.exento_global:
             return True
-        return self.subcuadras_exentas.filter(id=subcuadra.id).exists()
-
-    @property
-    def exento_parcial(self):
-        # alias para compatibilidad con tests
-        return self.subcuadras_exentas
-    
+        return self.subcuadras_exentas.filter(id=subcuadra.id).exists()   
 
 # 🏙️ Subcuadra representa una altura específica de una calle
 class Subcuadra(models.Model):
@@ -148,6 +141,27 @@ class Estacionamiento(models.Model):
 
         super().save(*args, **kwargs)
 
+    def finalizar(self):
+        print("🔥 FINALIZAR EJECUTADO")
+    
+        if not self.activo:
+            print("⚠️ YA ESTABA FINALIZADO")
+            return self.costo
+    
+        self.hora_fin = timezone.now()
+    
+        costo = self.calcular_costo()
+    
+        self.costo = costo
+        self.activo = False
+    
+        print("💾 GUARDANDO FINALIZACION...")
+        self.save()
+    
+        print("✅ FINALIZADO OK")
+    
+        return costo
+
     def calcular_costo(self):
         if not self.activo:
             return Decimal("0.00")
@@ -202,7 +216,7 @@ class Infraccion(models.Model):
                 self.municipio = self.subcuadra.municipio
 
         super().save(*args, **kwargs)
-        
+
 class VerificacionInspector(models.Model):
     inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)

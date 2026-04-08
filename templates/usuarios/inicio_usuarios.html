@@ -24,9 +24,12 @@
         — Fin: (activo)
       {% endif %}
       <br>
-      <a class="btn" href="{% url 'usuarios_finalizar_estacionamiento'   estacionamiento_id=e.id %}">
+      {% if e.activo %}
+      <a class="btn" href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_id=e.id %}">
         Finalizar
       </a>
+      {% endif %}
+
     </li>
   {% empty %}
     <li>No tenés estacionamientos activos.</li>

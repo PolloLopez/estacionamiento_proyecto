@@ -18,8 +18,11 @@
       <p class="estado">{{ resultado.estado }}</p>
       {% if resultado.detalle %}<p>{{ resultado.detalle }}</p>{% endif %}
       {% if resultado.subcuadras_exentas %}
-        <h4>Subcuadras exentas:</h4>
+        <h4>Exento en:</h4>
         <ul>
+          {% if resultado.estado == "Exento TOTAL" %}
+            <p class="estado exento-total">🚫 EXENTO TOTAL</p>
+          {% endif %}
           {% for s in resultado.subcuadras_exentas %}
             <li>{{ s.calle }} {{ s.altura }}</li>
           {% endfor %}
@@ -34,3 +37,5 @@
   {% endif %}
 </section>
 {% endblock %}
+
+
