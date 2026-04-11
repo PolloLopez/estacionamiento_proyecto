@@ -1,40 +1,31 @@
-{% extends "base.html" %}
+<!-- templates/usuarios/inicio_usuarios.html -->
+{% extends "base.html" %} 
 {% block title %}Inicio — Usuario{% endblock %}
 
 {% block content %}
 <section class="panel">
-  <!-- Muestra el nombre del usuario -->
   <h1>Bienvenido, {{ usuario.nombre }}</h1>
   <h4>Saldo actual: ${{ usuario.saldo }} </h4>
-  <p>Desde aquí podés gestionar tus estacionamientos y saldo.</p>
 
-  <ul class="list">
-    <!-- Botón para ir al formulario de estacionar vehículo -->
-    <li><a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar vehículo</a></li>
+  {% if estacionamiento_activo %}
+    <div class="card">
+      <h3>Estacionamiento activo</h3>
 
-    <!-- Itera sobre estacionamientos activos y genera un botón "Finalizar" para cada uno -->
-    {% for e in estacionamientos %}
-    <li>
-      🚗 {{ e.vehiculo.patente }} — {{ e.subcuadra.calle }} {{ e.subcuadra.altura }}
-      <br>
-      ⏰ Inicio: {{ e.hora_inicio|date:"d/m/Y H:i" }}
-      {% if e.hora_fin %}
-        — Fin: {{ e.hora_fin|date:"d/m/Y H:i" }}
-      {% else %}
-        — Fin: (activo)
-      {% endif %}
-      <br>
-      {% if e.activo %}
-      <a class="btn" href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_id=e.id %}">
+      <p>Patente: {{ estacionamiento_activo.vehiculo.patente }}</p>
+      <p>Zona: {{ estacionamiento_activo.subcuadra }}</p>
+      <p>Inicio: {{ estacionamiento_activo.hora_inicio }}</p>
+
+      <a class="btn" href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}">
         Finalizar
       </a>
-      {% endif %}
+    </div>
+  {% else %}
+    <p>No tenés estacionamientos activos.</p>
+  {% endif %}
 
-    </li>
-  {% empty %}
-    <li>No tenés estacionamientos activos.</li>
-  {% endfor %}
+  <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">
+    Estacionar vehículo
+  </a>
 
-  </ul>
 </section>
 {% endblock %}

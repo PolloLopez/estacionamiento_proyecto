@@ -66,23 +66,37 @@ def login_view(request):
             return render(request, "usuarios/login.html", {"form": {"errors": True}})
 
     return render(request, "usuarios/login.html")
-
-
-@require_role("inspector", "admin", "conductor", "vendedor")
+ 
+@require_role("inspector", "admin", "conductor", "vendedor") 
 def inicio_usuarios(request):
     usuario = request.usuario
 
-    estacionamientos = Estacionamiento.objects.filter(
-        registrado_por=usuario,
+    print("---- DEBUG INICIO ----")
+    print("Usuario:", usuario)
+
+    todos = Estacionamiento.objects.all()
+    print("TOTAL estacionamientos:", todos.count())
+
+    for e in todos:
+        print(
+            "ID:", e.id,
+            "| vehiculo:", e.vehiculo,
+            "| activo:", e.activo,
+            "| municipio:", e.municipio,
+            "| registrado_por:", e.registrado_por
+        )
+
+    estacionamiento_activo = Estacionamiento.objects.filter(
         activo=True,
-        subcuadra__municipio=usuario.municipio
-    )
+        registrado_por=usuario
+    ).order_by("-hora_inicio").first()
+
+    print("ACTIVO ENCONTRADO:", estacionamiento_activo)
 
     return render(request, "usuarios/inicio_usuarios.html", {
         "usuario": usuario,
-        "estacionamientos": estacionamientos,
+        "estacionamiento_activo": estacionamiento_activo,
     })
-
 
 # =========================================================
 # VIEWS ADMIN
@@ -140,12 +154,14 @@ def panel_exenciones(request):
 
     # 🔎 BUSCAR
     if request.method == "POST" and accion == "buscar":
-        patente = (request.POST.get("patente") or "").strip().upper()
+        #patente = (input).strip().upper()
+        patente = (request.POST.get('patente') or "").strip().upper()
         vehiculo = Vehiculo.objects.filter(patente=patente).first()
 
     # 💾 GUARDAR
     elif request.method == "POST" and accion == "guardar":
-        patente = (request.POST.get("patente") or "").strip().upper()
+        #patente = (input).strip().upper()
+        patente = (request.POST.get('patente') or "").strip().upper()
         vehiculo = Vehiculo.objects.filter(patente=patente).first()
 
         if vehiculo:
@@ -198,26 +214,31 @@ def home(request):
 @require_role("conductor")
 def estacionar_vehiculo(request):
     usuario = request.usuario
-
+    print("🔥 CREANDO ESTACIONAMIENTO")
+    
     if request.method == 'POST':
-        patente = request.POST.get('patente')
+        patente = (request.POST.get('patente') or "").strip().upper()
         duracion = request.POST.get('duracion')
 
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
-
-        if vehiculo.exento_global or vehiculo.subcuadras_exentas.exists():
+        
+        # ❌ Exento TOTAL bloquea
+        if vehiculo.exento_global:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'Este vehículo está marcado como exento.'
+                'error': 'Este vehículo es exento total.'
             })
 
+        # asociar vehículo al usuario
         if usuario.es_conductor and vehiculo not in usuario.vehiculos.all():
             usuario.vehiculos.add(vehiculo)
 
+        # 🚫 evitar doble estacionamiento
         if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
             return render(request, 'usuarios/estacionar_vehiculo.html', {
                 'error': 'El vehículo ya tiene un estacionamiento activo.'
             })
 
+        # validar duración
         try:
             duracion = Decimal(duracion)
             if duracion <= 0 or duracion % 1 != 0:
@@ -229,11 +250,19 @@ def estacionar_vehiculo(request):
 
         subcuadra = get_subcuadra_default(usuario.municipio)
 
-        EstacionamientoFactory.crear(vehiculo, subcuadra, duracion, registrado_por=usuario)
+        estacionamiento = EstacionamientoFactory.crear(
+            vehiculo,
+            subcuadra,
+            duracion,
+            registrado_por=usuario
+        )
+
+        print("✅ Estacionamiento creado:", estacionamiento.id)
 
         return redirect("inicio_usuarios")
 
     return render(request, 'usuarios/estacionar_vehiculo.html')
+
 @require_login
 def usuarios_historial(request):
     """
@@ -243,7 +272,9 @@ def usuarios_historial(request):
     """
     usuario = request.usuario
 
-    estacionamientos = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
+    estacionamientos = Estacionamiento.objects.filter(
+        registrado_por=usuario
+        ).order_by("-hora_inicio")
 
     return render(request, "usuarios/historial_estacionamientos.html", {
         "usuario": usuario,
@@ -324,7 +355,8 @@ def verificar_vehiculo(request):
     resultado = None
 
     if request.method == "POST":
-        patente = (request.POST.get("patente") or "").strip().upper()
+        #patente = (input).strip().upper()
+        patente = (request.POST.get('patente') or "").strip().upper()
 
         if not patente:
             return render(request, "inspectores/verificar_vehiculo.html", {
@@ -412,9 +444,10 @@ def registrar_infraccion(request):
     mensaje = None
 
     subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
-    patente = request.GET.get("patente") or request.POST.get("patente")
+    #patente = (input).strip().upper()
+    patente = (request.GET.get("patente") or request.POST.get("patente") or "").strip().upper()
 
-    print("Entro a generar infraccion")
+    print("🔥 ENTRA A CREAR INFRACCION")
     if request.method == "POST":
         subcuadra_id = request.POST.get("subcuadra_id")
         foto = request.FILES.get("foto")
@@ -435,8 +468,9 @@ def registrar_infraccion(request):
 
         estacionamiento = Estacionamiento.objects.filter(
             vehiculo=vehiculo,
-            activo=True
-        ).first() if vehiculo else None
+            activo=True,
+            municipio=usuario.municipio
+        ).order_by("-hora_inicio").first()
 
         print("vehiculo:", vehiculo)
         print("subcuadra:", subcuadra)
@@ -485,7 +519,8 @@ def registrar_estacionamiento_manual(request):
     inspector = get_usuario(request)
 
     if request.method == "POST":
-        patente = patente = (request.POST.get("patente") or "").strip().upper()
+        #patente = (input).strip().upper()
+        patente = (request.POST.get('patente') or "").strip().upper()
         duracion = request.POST.get("duracion")
 
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
@@ -516,7 +551,8 @@ def registrar_estacionamiento_vendedor(request):
     vendedor = get_usuario(request)
 
     if request.method == "POST":
-        patente = patente = (request.POST.get("patente") or "").strip().upper()
+        #patente = (input).strip().upper()
+        patente = (request.POST.get('patente') or "").strip().upper()
         duracion = request.POST.get("duracion")
         cliente_email = request.POST.get("cliente_email", "").strip()
 
@@ -578,7 +614,6 @@ def resumen_infracciones(request):
         "infracciones": infracciones
     })
 
-
 # =========================================================
 # VIEWS VENDEDORES
 # =========================================================
@@ -593,7 +628,6 @@ def panel_vendedores(request):
         return redirect("inicio")
     return render(request, 'vendedores/panel.html', {"vendedor": usuario})
 
-
 @require_role("vendedor", "admin")
 def resumen_caja(request):
     usuario = request.usuario
@@ -604,7 +638,6 @@ def resumen_caja(request):
 
 # =========================================================
 # VIEWS LOGIN / LOGOUT
-
 
 def logout_view(request):
     """

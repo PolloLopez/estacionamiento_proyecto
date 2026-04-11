@@ -86,3 +86,54 @@ GPS inspector
 Validación automática de subcuadra
 Eliminación de selección manual
 Auditoría geográfica
+
+
+
+📌 Estado del sistema (10 Abril 2026)
+✅ CORE OPERATIVO FUNCIONAL
+
+El sistema ya permite operar de punta a punta:
+
+🚗 Estacionamiento
+Crear estacionamiento desde usuario
+Asociación automática vehículo ↔ usuario
+Validación de patente (normalizada a mayúsculas)
+Control de un solo estacionamiento activo por usuario
+Prevención de duplicados
+⏱️ Gestión de estado
+Visualización de estacionamiento activo
+Cálculo automático de duración
+Estimación y cálculo real de costo
+💰 Finalización
+Finalización manual desde panel
+Cálculo de costo por tiempo
+Descuento automático de saldo
+Persistencia correcta del estado (activo=False)
+🚨 Inspección
+Verificación de vehículos
+Registro de infracciones
+Validación de estacionamiento activo
+🔧 Fixes importantes realizados
+Corrección crítica: estacionamientos se desactivaban al crearse
+Eliminación de duplicados por patentes (unique constraint)
+Estandarización de patentes (uppercase)
+Corrección de templates duplicados (panel.html vs inicio_usuarios.html)
+Manejo seguro de inputs (None.strip() fix)
+Consistencia entre backend y frontend
+🧠 Decisiones de arquitectura
+1 estacionamiento activo por usuario
+Vehículos dinámicos (no requieren registro previo)
+Factory para creación centralizada de estacionamientos
+Separación clara de roles (conductor / inspector / vendedor / admin)
+🚀 Estado del roadmap
+✅ Fase 1 — CORE (COMPLETA)
+Estacionar ✔
+Verificar ✔
+Infraccionar ✔
+Finalizar ✔
+Multi-municipio ✔
+🔜 Fase 2 — IDENTIDAD (SIGUIENTE)
+Login con Google
+Asociación usuario ↔ vehículos
+Historial por usuario
+Base de ciudadanos

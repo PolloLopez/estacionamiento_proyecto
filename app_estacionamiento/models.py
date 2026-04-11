@@ -133,50 +133,60 @@ class Estacionamiento(models.Model):
     hora_fin = models.DateTimeField(null=True, blank=True)
     costo = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     activo = models.BooleanField(default=True)
-    registrado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, default=1)
+    registrado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
+        import traceback
+
+        print("💾 SAVE EJECUTADO")
+        print("ID:", self.id)
+        print("ACTIVO:", self.activo)
+        print("STACK TRACE 👇")
+        traceback.print_stack(limit=5) 
+
         if not self.municipio and self.registrado_por:
-            self.municipio = self.registrado_por.municipio
+            self.municipio = self.registrado_por.municipio 
 
         super().save(*args, **kwargs)
 
     def finalizar(self):
         print("🔥 FINALIZAR EJECUTADO")
-    
+
         if not self.activo:
             print("⚠️ YA ESTABA FINALIZADO")
             return self.costo
-    
+
         self.hora_fin = timezone.now()
-    
+
         costo = self.calcular_costo()
-    
+
         self.costo = costo
         self.activo = False
-    
+
         print("💾 GUARDANDO FINALIZACION...")
         self.save()
-    
+
         print("✅ FINALIZADO OK")
-    
+
         return costo
 
     def calcular_costo(self):
         if not self.activo:
             return Decimal("0.00")
+
         hora_fin = timezone.now()
         duracion_horas = (hora_fin - self.hora_inicio).total_seconds() / 3600
-    
-        # Siempre al menos 1 hora, redondeando hacia arriba
+
+        # Redondeo hacia arriba mínimo 1 hora
         horas_redondeadas = max(1, math.ceil(duracion_horas))
-    
+
         tarifa = Tarifa.objects.first()
         if not tarifa:
             return Decimal(horas_redondeadas) * Decimal("100.00")
-    
+
         costo = Decimal(horas_redondeadas) * Decimal(str(tarifa.precio_por_hora))
         return costo.quantize(Decimal("0.01"))
+
     def __str__(self):
         return f"{self.vehiculo.patente} - {self.subcuadra} - {self.hora_inicio}"
 
