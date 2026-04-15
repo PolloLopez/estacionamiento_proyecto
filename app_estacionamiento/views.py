@@ -1,10 +1,9 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.views import LoginView
 from django.utils import timezone
 from django.urls import reverse
-
+from app_estacionamiento.utils import get_usuario
 from decimal import Decimal
 
 from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
@@ -18,13 +17,8 @@ def get_subcuadra_default(municipio):
         municipio=municipio
     )[0]
 
-def get_usuario(request):
-    if not request.usuario:
-        raise Exception("Usuario no autenticado")
-    return request.usuario
-
 def inicio(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     if not usuario:
         return redirect("login")
@@ -37,21 +31,21 @@ def inicio(request):
         return redirect("panel_vendedores")
     elif usuario.es_conductor:
         return redirect("inicio_usuarios")
-    else:
-        return redirect("login")
+
+    return redirect("login")
 
 def login_view(request):
     if request.method == "POST":
-        correo = request.POST.get("username")
+        correo = request.POST.get("username")  # ✅ ESTE ES EL FIX
         password = request.POST.get("password")
 
         print("📩 LOGIN INTENTO")
         print("Correo:", correo)
-        print("Password:", password)
 
         try:
-            usuario = Usuario.objects.get(correo=correo)
+            usuario = Usuario.objects.get(email=correo)  # ✅ si tu campo es email
             print("✅ Usuario encontrado:", usuario)
+            print("👤 USUARIO EN SESSION:", request.session.get("usuario_id"))
         except Usuario.DoesNotExist:
             print("❌ Usuario NO existe")
             return render(request, "usuarios/login.html", {"form": {"errors": True}})
@@ -59,17 +53,24 @@ def login_view(request):
         if usuario.check_password(password):
             print("🔓 Password CORRECTO")
 
+            request.session.flush()
             request.session["usuario_id"] = usuario.id
+            request.session.modified = True
+
+            print("🧠 SESSION GUARDADA:", request.session.get("usuario_id"))
+
             return redirect("inicio")
+
         else:
             print("🔒 Password INCORRECTO")
             return render(request, "usuarios/login.html", {"form": {"errors": True}})
 
     return render(request, "usuarios/login.html")
- 
+
 @require_role("inspector", "admin", "conductor", "vendedor") 
+
 def inicio_usuarios(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     print("---- DEBUG INICIO ----")
     print("Usuario:", usuario)
@@ -103,7 +104,7 @@ def inicio_usuarios(request):
 # =========================================================
 @require_role("admin")
 def panel_admin(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     inspectores = Usuario.objects.filter(es_inspector=True, municipio=usuario.municipio)
     vendedores = Usuario.objects.filter(es_vendedor=True, municipio=usuario.municipio)
@@ -145,7 +146,7 @@ def panel_admin(request):
 
 @require_role("admin")
 def panel_exenciones(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     vehiculo = None
     subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
@@ -201,19 +202,14 @@ def cargar_saldo(request, usuario_id):
 # =========================================================
 
 def home(request):
-    """
-    Vista principal del sistema.
-    - Si hay usuario logueado, redirige al inicio de usuarios.
-    - Si no hay sesión, muestra login.
-    """
-    if not request.session.get("usuario_id"):
-        # antes: return redirect("login")
-        return render(request, "usuarios/login.html")
-    return redirect("inicio_usuarios")
+    if not get_usuario(request):
+        return redirect("login")
+
+    return redirect("inicio")
 
 @require_role("conductor")
 def estacionar_vehiculo(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
     print("🔥 CREANDO ESTACIONAMIENTO")
     
     if request.method == 'POST':
@@ -265,12 +261,7 @@ def estacionar_vehiculo(request):
 
 @require_login
 def usuarios_historial(request):
-    """
-    Muestra el historial de estacionamientos del usuario logueado.
-    - Si no hay sesión → redirige a login (decorador).
-    - Si hay sesión → renderiza historial con estacionamientos.
-    """
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     estacionamientos = Estacionamiento.objects.filter(
         registrado_por=usuario
@@ -283,7 +274,7 @@ def usuarios_historial(request):
 
 @require_role("conductor")
 def finalizar_estacionamiento(request, estacionamiento_id):
-    usuario = request.usuario
+    usuario = get_usuario(request)
     estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
 
     # Ya finalizado
@@ -303,7 +294,7 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 
 @require_role("conductor")
 def historial_estacionamientos(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
     estacionamientos = Estacionamiento.objects.filter(
     vehiculo__in=usuario.vehiculos.all(),
     subcuadra__municipio=usuario.municipio
@@ -312,10 +303,8 @@ def historial_estacionamientos(request):
 
 @require_role("inspector", "admin")
 def usuarios_infracciones(request):
-    """
-    Muestra historial de infracciones del usuario logueado.
-    """
-    usuario = request.usuario
+
+    usuario = get_usuario(request)
 
     infracciones = Infraccion.objects.filter(
         municipio=usuario.municipio
@@ -328,9 +317,7 @@ def usuarios_infracciones(request):
 
 @require_login
 def consultar_deuda(request):
-    """
-    Vista para consultar deuda del usuario.
-    """
+
     return render(request, 'usuarios/consultar_deuda.html')
 
 # =========================================================
@@ -338,7 +325,7 @@ def consultar_deuda(request):
 # =========================================================
 @require_role("inspector", "admin")
 def panel_inspectores(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     if not usuario.es_inspector:
         return redirect("inicio")
@@ -351,7 +338,7 @@ def panel_inspectores(request):
 
 @require_login
 def verificar_vehiculo(request):
-    usuario = request.usuario 
+    usuario = get_usuario(request)
     resultado = None
 
     if request.method == "POST":
@@ -436,7 +423,7 @@ def verificar_vehiculo(request):
 
 @require_role("inspector")
 def registrar_infraccion(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     if not usuario.es_inspector and not usuario.es_admin:
         return redirect("inicio")
@@ -595,7 +582,7 @@ def registrar_estacionamiento_vendedor(request):
 
 @require_role("inspector", "vendedor", "admin")
 def resumen_cobros(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     if not usuario.es_inspector:
         return redirect("inicio")
@@ -604,7 +591,7 @@ def resumen_cobros(request):
 
 @require_role("inspector", "admin")
 def resumen_infracciones(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     infracciones = Infraccion.objects.filter(
         municipio=usuario.municipio
@@ -623,14 +610,14 @@ def panel_vendedores(request):
     Panel principal de vendedores.
     - Solo accesible a vendedores.
     """
-    usuario = request.usuario
+    usuario = get_usuario(request)
     if not usuario.es_vendedor:
         return redirect("inicio")
     return render(request, 'vendedores/panel.html', {"vendedor": usuario})
 
 @require_role("vendedor", "admin")
 def resumen_caja(request):
-    usuario = request.usuario
+    usuario = get_usuario(request)
 
     registros = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
 
@@ -640,9 +627,6 @@ def resumen_caja(request):
 # VIEWS LOGIN / LOGOUT
 
 def logout_view(request):
-    """
-    - Cierra sesión del usuario.
-    - Redirige al login.
-    """
+
     request.session.flush()
     return render(request, "usuarios/login.html", {"error": "Debe iniciar sesión"})

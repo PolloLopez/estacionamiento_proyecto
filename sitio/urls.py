@@ -20,6 +20,9 @@ urlpatterns = [
     path("usuarios/infracciones/", views.usuarios_infracciones, name="usuarios_historial_infracciones"),
     path("usuarios/deuda/", views.consultar_deuda, name="usuarios_consultar_deuda"),
 
+    # Cuentas sociales (allauth)
+    #path('accounts/', include('allauth.urls')),
+
     # Inspectores
     path("inspectores/panel/", views.panel_inspectores, name="panel_inspectores"),
     path("inspectores/verificar/", views.verificar_vehiculo, name="inspectores_verificar_vehiculo"),

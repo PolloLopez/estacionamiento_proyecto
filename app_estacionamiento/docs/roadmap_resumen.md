@@ -1,139 +1,122 @@
-🚀 Roadmap_resumen — Visión del Producto
+🧭 ROADMAP ACTUALIZADO (ABRIL 2026)
+🔴 FASE 1.1 — HARDENING PRODUCTIVO (CRÍTICO)
 
-🔴 Pendientes críticos (producción)
+👉 Esto es lo que te falta para decir: “esto ya se puede usar en producción posta”
 
-Tolerancia de tiempo en inspecciones (gracia configurable ⏱️)
-Control de saldo negativo robusto 💳
-Estados de infracción completos:
+Incluye
+⏱️ Tolerancia configurable de tiempo (gracia inspecciones)
+💳 Control de saldo negativo robusto (bloqueos + edge cases)
+🚫 Evitar doble infracción (constraint + lógica)
+🏛️ Validación de municipio en TODAS las operaciones (clave SaaS)
+🧼 Sanitización de inputs (backend + API)
+📋 Auditoría completa (logs por usuario + acciones críticas)
+📄 Estados de infracción:
 pendiente
 pagada
 anulada
-Auditoría de acciones (logs por usuario) 📋
-Validaciones de seguridad:
-evitar doble infracción
-validar municipio en todas las operaciones
-sanitización de inputs
+💡 Nota importante
 
-🟡 Evolución del sistema (SaaS)
+Esto no es “feature”, es blindaje del sistema.
+Si lo salteás → en producción se rompe.
 
-Multi-municipio completo 🔥 (YA INICIADO)
-aislamiento por municipio ✔
-datos independientes ✔
-API REST (Django REST Framework)
-Autenticación JWT
-Frontend moderno (React / Next.js)
+⏱️ Estimación
 
-💳 Integraciones
+18 a 28 horas
 
-MercadoPago (checkout + QR)
-Webhooks de pago (confirmación automática)
-Carga de saldo:
-tarjeta 💳
-puntos físicos 🏪
+🟡 FASE 2 — IDENTIDAD Y USUARIOS
 
-📱 Experiencia de usuario (clave producto)
+👉 Acá convertís el sistema en producto usable por personas reales
 
-Acceso por QR en vía pública 📍
-Login rápido:
-Google 🔥 (PRIORIDAD FASE 2)
-Flujo sin fricción:
-ingresar patente → estacionar → listo
+Incluye
+🔐 Login con Google (OAuth)
+👤 Modelo de usuario extendido
+🚗 Asociación usuario ↔ vehículo (opcional)
+📜 Historial por usuario
+🧾 Relación usuario ↔ transacciones
+⚠️ Complejidad real
 
-🧠 Lógica de negocio (ACTUALIZADA)
+No es difícil, pero:
 
-Vehículos dinámicos 🚗 ✔
-cualquier patente puede operar
-no requiere registro previo
-Asociación opcional usuario ↔ vehículo (fase 2)
-Inspector:
-valida estado
-genera infracción si corresponde
+cambia modelo mental (de “vehículo suelto” → “usuario”)
+impacta en TODO
+⏱️ Estimación
 
-🎯 Objetivo
+16 a 24 horas
 
-Convertir el sistema en una plataforma SaaS municipal escalable para:
+💰 FASE 3 — PAGOS (CORE DE NEGOCIO)
 
-Estacionamiento medido
-Control de infracciones
-Recaudación digital
-📌 Estado reciente (7 - Abril 2026)
+👉 Acá aparece la plata real
 
-✅ Fase 1 — CORE OPERATIVO (COMPLETA)
-✔ Estacionar
-✔ Verificar estado
-✔ Infraccionar
-✔ Vehículo dinámico
-✔ Filtro por municipio funcionando
-✔ Inspector operativo real
-✔ Finalizar estacionamiento
+Incluye
+💳 Integración con MercadoPago:
+Checkout
+QR
+🔔 Webhooks (confirmación automática)
+💰 Sistema de saldo virtual
+🏪 Carga manual (puntos físicos)
+⚠️ Donde se complica
+Webhooks bien hechos (idempotencia)
+conciliación de pagos
+estados intermedios
+⏱️ Estimación
 
+24 a 36 horas
 
-🚀 Fase 2 — IDENTIDAD Y USUARIOS (8/4)
+🔥 FASE 4 — MULTI-MUNICIPIO COMPLETO (SaaS REAL)
 
-Login con Google 🔥
-Asociación usuario ↔ patente
-Historial por usuario
-Base de usuarios real (ciudadanos + turistas)
+👉 Ya lo empezaste, pero falta cerrarlo bien
 
-💰 Fase 3 — PAGOS
-MercadoPago
-Saldo virtual
-Webhooks
-Validación automática de pago
+Incluye
+🏛️ Aislamiento total por municipio (DB lógico)
+🔑 permisos por municipio
+⚙️ configuración independiente (tarifas, reglas, tolerancias)
+📊 métricas por municipio
+💡 Esto te convierte en SaaS vendible
+⏱️ Estimación
 
-🛰️ Fase 4 — INTELIGENCIA EN CALLE
-GPS inspector
-Validación automática de subcuadra
-Eliminación de selección manual
-Auditoría geográfica
+12 a 18 horas
+(porque ya tenés base hecha)
 
+📱 FASE 5 — EXPERIENCIA DE USUARIO (PRODUCTO)
 
+👉 Esto define si la gente lo usa o lo abandona
 
-📌 Estado del sistema (10 Abril 2026)
-✅ CORE OPERATIVO FUNCIONAL
+Incluye
+📍 Acceso por QR en calle
+⚡ Flujo ultra rápido:
+patente → estacionar → listo
+🔐 Login rápido (Google ya integrado)
+UI usable desde celular (clave inspectores)
+⏱️ Estimación
 
-El sistema ya permite operar de punta a punta:
+16 a 24 horas
 
-🚗 Estacionamiento
-Crear estacionamiento desde usuario
-Asociación automática vehículo ↔ usuario
-Validación de patente (normalizada a mayúsculas)
-Control de un solo estacionamiento activo por usuario
-Prevención de duplicados
-⏱️ Gestión de estado
-Visualización de estacionamiento activo
-Cálculo automático de duración
-Estimación y cálculo real de costo
-💰 Finalización
-Finalización manual desde panel
-Cálculo de costo por tiempo
-Descuento automático de saldo
-Persistencia correcta del estado (activo=False)
-🚨 Inspección
-Verificación de vehículos
-Registro de infracciones
-Validación de estacionamiento activo
-🔧 Fixes importantes realizados
-Corrección crítica: estacionamientos se desactivaban al crearse
-Eliminación de duplicados por patentes (unique constraint)
-Estandarización de patentes (uppercase)
-Corrección de templates duplicados (panel.html vs inicio_usuarios.html)
-Manejo seguro de inputs (None.strip() fix)
-Consistencia entre backend y frontend
-🧠 Decisiones de arquitectura
-1 estacionamiento activo por usuario
-Vehículos dinámicos (no requieren registro previo)
-Factory para creación centralizada de estacionamientos
-Separación clara de roles (conductor / inspector / vendedor / admin)
-🚀 Estado del roadmap
-✅ Fase 1 — CORE (COMPLETA)
-Estacionar ✔
-Verificar ✔
-Infraccionar ✔
-Finalizar ✔
-Multi-municipio ✔
-🔜 Fase 2 — IDENTIDAD (SIGUIENTE)
-Login con Google
-Asociación usuario ↔ vehículos
-Historial por usuario
-Base de ciudadanos
+🛰️ FASE 6 — INTELIGENCIA EN CALLE (DIFERENCIAL)
+
+👉 Esto te separa de cualquier sistema municipal básico
+
+Incluye
+📡 GPS inspector
+📍 detección automática de subcuadra
+🚫 eliminar selección manual
+🗺️ validación geográfica de infracciones
+📋 auditoría con ubicación
+⚠️ Complejidad
+
+Acá ya hay lógica + frontend + precisión GPS
+
+⏱️ Estimación
+
+20 a 30 horas
+
+📊 RESUMEN TOTAL
+Fase	Horas
+🔴 Hardening	18 – 28 h
+🟡 Usuarios	16 – 24 h
+💰 Pagos	24 – 36 h
+🔥 Multi-municipio	12 – 18 h
+📱 UX	16 – 24 h
+🛰️ Inteligencia	20 – 30 h
+🧮 TOTAL ESTIMADO
+
+👉 106 a 160 horas

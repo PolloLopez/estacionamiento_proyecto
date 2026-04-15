@@ -16,28 +16,50 @@ STATICFILES_DIRS = [
 # 🧩 Aplicaciones instaladas
 INSTALLED_APPS = [
     "django_extensions",
-    'django.contrib.staticfiles',
-    'app_estacionamiento',
+    'django.contrib.sites',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'django.contrib.staticfiles',
+
+    'app_estacionamiento',
+
+    #'allauth',
+    #'allauth.account',
+    #'allauth.socialaccount',
+    # 'allauth.socialaccount.providers.google', # Login con Google
 ]
 
 # ⚙️ Middleware (control de peticiones)
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+
     'django.contrib.sessions.middleware.SessionMiddleware',
+
+    # 🔥 TIENE QUE ESTAR ACÁ
+    'app_estacionamiento.middleware.UsuarioMiddleware',
+
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'sitio.middleware.UsuarioMiddleware',
 ]
 
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
 ROOT_URLCONF = 'sitio.urls'
+
+# 🌐 Configuración de sitios (para allauth)
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 ENV = os.getenv("ENV", "dev")
 
@@ -105,9 +127,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-key")
 # redirireccion correcta.
 LOGIN_REDIRECT_URL = "/usuarios/inicio/"
 
-AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
-]
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
 ]
+
+
