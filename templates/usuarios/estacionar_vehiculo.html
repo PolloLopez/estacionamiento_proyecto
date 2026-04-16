@@ -9,6 +9,12 @@
     <p class="error">{{ error }}</p>
   {% endif %}
 
+  {% if warning %}
+    <div style="color: orange; font-weight: bold;">
+      {{ warning }}
+    </div>
+  {% endif %}
+
   <form method="post" action="{% url 'usuarios_estacionar_vehiculo' %}">
     {% csrf_token %}
 

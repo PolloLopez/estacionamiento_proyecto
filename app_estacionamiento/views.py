@@ -5,8 +5,7 @@ from django.utils import timezone
 from django.urls import reverse
 from app_estacionamiento.utils import get_usuario
 from decimal import Decimal
-
-from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion
+from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion, VehiculoUsuario
 from .factories import EstacionamientoFactory
 from .decorators import require_role, require_login
 
@@ -68,31 +67,18 @@ def login_view(request):
     return render(request, "usuarios/login.html")
 
 @require_role("inspector", "admin", "conductor", "vendedor") 
-
 def inicio_usuarios(request):
     usuario = get_usuario(request)
 
-    print("---- DEBUG INICIO ----")
-    print("Usuario:", usuario)
-
-    todos = Estacionamiento.objects.all()
-    print("TOTAL estacionamientos:", todos.count())
-
-    for e in todos:
-        print(
-            "ID:", e.id,
-            "| vehiculo:", e.vehiculo,
-            "| activo:", e.activo,
-            "| municipio:", e.municipio,
-            "| registrado_por:", e.registrado_por
-        )
-
+    print(f"👤 Usuario: {usuario}")
+    print(f"🚗 Vehículos: {usuario.vehiculos.count()}")
+         
     estacionamiento_activo = Estacionamiento.objects.filter(
-        activo=True,
-        registrado_por=usuario
+    activo=True,
+    registrado_por=usuario
     ).order_by("-hora_inicio").first()
-
     print("ACTIVO ENCONTRADO:", estacionamiento_activo)
+    print("MIS VEHICULOS:", usuario.vehiculos.all())
 
     return render(request, "usuarios/inicio_usuarios.html", {
         "usuario": usuario,
@@ -216,22 +202,43 @@ def estacionar_vehiculo(request):
         patente = (request.POST.get('patente') or "").strip().upper()
         duracion = request.POST.get('duracion')
 
-        vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
-        
+        vehiculo, creado = Vehiculo.objects.get_or_create(patente=patente)
+
+        # 🏛️ asegurar municipio
+        if not vehiculo.municipio:
+            vehiculo.municipio = usuario.municipio
+            vehiculo.save()
+
+        # 🚨 WARNING INTELIGENTE
+        otros_usuarios = vehiculo.usuarios.exclude(id=usuario.id)
+
+        warning = None
+        if otros_usuarios.exists():
+            warning = "⚠️ Este vehículo ya está asociado a otro usuario"
+
+        # 🚗 Asociación vehiculo al usuario automática
+        if usuario.es_conductor:
+            VehiculoUsuario.objects.get_or_create(
+                usuario=usuario,
+                vehiculo=vehiculo,
+                defaults={
+                    "es_propietario": True,
+                    "verificado": False
+                }
+            )
+     
         # ❌ Exento TOTAL bloquea
         if vehiculo.exento_global:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'Este vehículo es exento total.'
+                'error': 'Este vehículo es exento total.',
+                'warning': warning
             })
-
-        # asociar vehículo al usuario
-        if usuario.es_conductor and vehiculo not in usuario.vehiculos.all():
-            usuario.vehiculos.add(vehiculo)
 
         # 🚫 evitar doble estacionamiento
         if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
             return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'El vehículo ya tiene un estacionamiento activo.'
+                'error': 'El vehículo ya tiene un estacionamiento activo.',
+                'warning': warning
             })
 
         # validar duración
@@ -241,7 +248,8 @@ def estacionar_vehiculo(request):
                 raise ValueError()
         except:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'Duración inválida'
+                'error': 'Duración inválida',
+                'warning': warning
             })
 
         subcuadra = get_subcuadra_default(usuario.municipio)
@@ -257,7 +265,9 @@ def estacionar_vehiculo(request):
 
         return redirect("inicio_usuarios")
 
-    return render(request, 'usuarios/estacionar_vehiculo.html')
+    return render(request, 'usuarios/estacionar_vehiculo.html', {
+        'warning': warning
+    })
 
 @require_login
 def usuarios_historial(request):
@@ -276,6 +286,10 @@ def usuarios_historial(request):
 def finalizar_estacionamiento(request, estacionamiento_id):
     usuario = get_usuario(request)
     estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
+
+    # 🔐 SOLO EL QUE LO CREÓ
+    if estacionamiento.registrado_por != usuario:
+        return redirect("inicio")
 
     # Ya finalizado
     if not estacionamiento.activo:

@@ -1,122 +1,145 @@
-🧭 ROADMAP ACTUALIZADO (ABRIL 2026)
+🧭 ROADMAP ACTUALIZADO (15 ABRIL 2026) 
+Te lo rearmo con lo que definiste hoy (modelo A + ownership de vehículo controlado)
+
 🔴 FASE 1.1 — HARDENING PRODUCTIVO (CRÍTICO)
 
-👉 Esto es lo que te falta para decir: “esto ya se puede usar en producción posta”
+👉 Se mantiene, pero le agrego lo que descubriste hoy
 
 Incluye
-⏱️ Tolerancia configurable de tiempo (gracia inspecciones)
-💳 Control de saldo negativo robusto (bloqueos + edge cases)
-🚫 Evitar doble infracción (constraint + lógica)
-🏛️ Validación de municipio en TODAS las operaciones (clave SaaS)
-🧼 Sanitización de inputs (backend + API)
-📋 Auditoría completa (logs por usuario + acciones críticas)
-📄 Estados de infracción:
-pendiente
-pagada
-anulada
-💡 Nota importante
+⏱️ Tolerancia configurable de tiempo
+💳 Control de saldo negativo robusto
+🚫 Evitar doble infracción
+🏛️ Validación de municipio en TODAS las operaciones
+🧼 Sanitización de inputs
+📋 Auditoría completa
+📄 Estados de infracción (pendiente / pagada / anulada)
+🔥 NUEVO (clave por lo que vimos hoy)
+🔐 Validación de ownership en acciones críticas:
+finalizar estacionamiento
+ver historial
+🚗 Normalización de acceso a vehículo:
+evitar acceso cruzado entre usuarios
+🧱 Protección contra manipulación por ID (IDOR)
 
-Esto no es “feature”, es blindaje del sistema.
-Si lo salteás → en producción se rompe.
+⏱️ Nueva estimación:
+👉 22 – 32 horas
 
-⏱️ Estimación
+🟡 FASE 2 — IDENTIDAD Y VEHÍCULOS (REDEFINIDA)
 
-18 a 28 horas
+👉 Esta fase cambia FUERTE respecto a tu versión anterior
 
-🟡 FASE 2 — IDENTIDAD Y USUARIOS
+🎯 OBJETIVO
 
-👉 Acá convertís el sistema en producto usable por personas reales
+Pasar de:
+
+“vehículo suelto”
+
+a:
+
+“vehículo con ownership controlado dentro del sistema”
 
 Incluye
-🔐 Login con Google (OAuth)
-👤 Modelo de usuario extendido
-🚗 Asociación usuario ↔ vehículo (opcional)
-📜 Historial por usuario
-🧾 Relación usuario ↔ transacciones
-⚠️ Complejidad real
+🔐 Identidad
+Login (ya ✔)
+Preparar OAuth (opcional)
+🚗 Ownership de vehículos (NUEVO CORE)
+Relación:
+Usuario ↔ Vehiculo (ManyToMany)
+🔒 Reglas de ownership
+✔ El usuario puede operar SOLO sus vehículos
+✔ El creador del estacionamiento mantiene control (modelo A)
+✔ Se registra SIEMPRE quién hizo la acción
+⚠️ Conflictos de patente
+Detección:
+“este vehículo ya está asociado a otro usuario”
 
-No es difícil, pero:
+Opciones:
 
-cambia modelo mental (de “vehículo suelto” → “usuario”)
-impacta en TODO
-⏱️ Estimación
+warning
+permitir con log
+futura validación OTP
+📜 Historial correcto
+por usuario
+por vehículo
+por acción
+📊 Auditoría extendida
 
-16 a 24 horas
+Ejemplo:
+
+Vehículo: ABC123
+Creado por: vendedor@test.com
+Finalizado por: conductor@test.com
+
+⏱️ Estimación realista:
+👉 20 – 30 horas
 
 💰 FASE 3 — PAGOS (CORE DE NEGOCIO)
 
-👉 Acá aparece la plata real
+👉 Se mantiene igual (bien definida)
+
+Pero ahora:
+
+🔥 Impacta con vehículos
+saldo ligado a usuario
+consumo ligado a estacionamiento
+consistencia entre:
+usuario
+vehículo
+transacción
+
+⏱️ 24 – 36 horas
+
+🔥 FASE 4 — MULTI-MUNICIPIO (SaaS REAL)
+
+👉 Acá entra algo importante nuevo
+
+🔐 Aislamiento + ownership
+Un vehículo NO puede cruzar municipios
+Usuario pertenece a municipio
+Todas las validaciones usan:
+vehiculo__municipio = usuario.municipio
+🔥 Nuevo riesgo que evitás
+fuga de datos entre municipios
+multas mal asignadas
+
+⏱️ 14 – 20 horas
+
+📱 FASE 5 — EXPERIENCIA DE USUARIO
+
+👉 Ahora con impacto directo del ownership
 
 Incluye
-💳 Integración con MercadoPago:
-Checkout
-QR
-🔔 Webhooks (confirmación automática)
-💰 Sistema de saldo virtual
-🏪 Carga manual (puntos físicos)
-⚠️ Donde se complica
-Webhooks bien hechos (idempotencia)
-conciliación de pagos
-estados intermedios
-⏱️ Estimación
+Flujo simple:
+seleccionar vehículo (auto-guardado)
+“Mis vehículos”
+advertencias de conflicto
+UX inspector rápida
 
-24 a 36 horas
+⏱️ 18 – 26 horas
 
-🔥 FASE 4 — MULTI-MUNICIPIO COMPLETO (SaaS REAL)
+🛰️ FASE 6 — INTELIGENCIA EN CALLE
 
-👉 Ya lo empezaste, pero falta cerrarlo bien
+👉 Se mantiene igual
 
-Incluye
-🏛️ Aislamiento total por municipio (DB lógico)
-🔑 permisos por municipio
-⚙️ configuración independiente (tarifas, reglas, tolerancias)
-📊 métricas por municipio
-💡 Esto te convierte en SaaS vendible
-⏱️ Estimación
+Pero mejora:
 
-12 a 18 horas
-(porque ya tenés base hecha)
+validación cruzada:
+vehículo
+ubicación
+inspector
 
-📱 FASE 5 — EXPERIENCIA DE USUARIO (PRODUCTO)
+⏱️ 20 – 30 horas
 
-👉 Esto define si la gente lo usa o lo abandona
-
-Incluye
-📍 Acceso por QR en calle
-⚡ Flujo ultra rápido:
-patente → estacionar → listo
-🔐 Login rápido (Google ya integrado)
-UI usable desde celular (clave inspectores)
-⏱️ Estimación
-
-16 a 24 horas
-
-🛰️ FASE 6 — INTELIGENCIA EN CALLE (DIFERENCIAL)
-
-👉 Esto te separa de cualquier sistema municipal básico
-
-Incluye
-📡 GPS inspector
-📍 detección automática de subcuadra
-🚫 eliminar selección manual
-🗺️ validación geográfica de infracciones
-📋 auditoría con ubicación
-⚠️ Complejidad
-
-Acá ya hay lógica + frontend + precisión GPS
-
-⏱️ Estimación
-
-20 a 30 horas
-
-📊 RESUMEN TOTAL
+🧮 RESUMEN ACTUALIZADO
 Fase	Horas
-🔴 Hardening	18 – 28 h
-🟡 Usuarios	16 – 24 h
+🔴 Hardening	22 – 32 h
+🟡 Identidad + Vehículos	20 – 30 h
 💰 Pagos	24 – 36 h
-🔥 Multi-municipio	12 – 18 h
-📱 UX	16 – 24 h
+🔥 Multi-municipio	14 – 20 h
+📱 UX	18 – 26 h
 🛰️ Inteligencia	20 – 30 h
-🧮 TOTAL ESTIMADO
+🧠 TOTAL NUEVO
 
-👉 106 a 160 horas
+👉 118 a 174 horas
+
+(Sí, subió un poco — pero ahora es sistema serio)

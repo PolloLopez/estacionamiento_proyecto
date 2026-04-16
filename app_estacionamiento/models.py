@@ -1,6 +1,5 @@
 # app_estacionamiento/models.py
 
-
 import math
 from decimal import Decimal
 from django.contrib.auth.models import AbstractUser
@@ -8,22 +7,30 @@ from django.contrib.auth.base_user import BaseUserManager
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from django.conf import settings
 
-# 👤 Usuario del sistema (con roles y saldo)
+# 👤 Usuario del sistema 
 class UsuarioManager(BaseUserManager):
+
     def create_user(self, correo=None, email=None, password=None, **extra_fields):
-        # aceptar ambos nombres
         correo = correo or email
+
         if not correo:
             raise ValueError("El correo es obligatorio")
+
         correo = self.normalize_email(correo)
+
+        extra_fields.setdefault("is_active", True)
+
         user = self.model(correo=correo, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
+
         return user
 
     def create_superuser(self, correo=None, email=None, password=None, **extra_fields):
         correo = correo or email
+
         if not correo:
             raise ValueError("El correo es obligatorio")
 
@@ -31,7 +38,52 @@ class UsuarioManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("es_admin", True)
 
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("El superuser debe tener is_staff=True")
+
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("El superuser debe tener is_superuser=True")
+
         return self.create_user(correo=correo, password=password, **extra_fields)
+
+class Usuario(AbstractUser):
+    username = None
+
+    correo = models.EmailField(unique=True)
+
+    municipio = models.ForeignKey(
+        "Municipio",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
+    vehiculos = models.ManyToManyField(
+        "Vehiculo",
+        through="VehiculoUsuario",
+        related_name="usuarios"
+    )
+
+    saldo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    # 🎭 Roles
+    es_conductor = models.BooleanField(default=True)
+    es_inspector = models.BooleanField(default=False)
+    es_vendedor = models.BooleanField(default=False)
+    es_admin = models.BooleanField(default=False)
+
+    # 🔐 Django admin / permisos
+    #is_staff → acceso admin Django
+    #es_admin → lógica de negocio
+    is_staff = models.BooleanField(default=False)
+
+    USERNAME_FIELD = "correo"
+    REQUIRED_FIELDS = []
+
+    objects = UsuarioManager()
+
+    def __str__(self):
+        return self.correo or f"Usuario #{self.id}"
 
 class Municipio(models.Model):
     nombre = models.CharField(max_length=100)
@@ -39,44 +91,13 @@ class Municipio(models.Model):
 
     def __str__(self):
         return self.nombre
-
-
-class Usuario(AbstractUser):
-    objects = UsuarioManager()  # 👈 ESTO ES CLAVE
-
-    username = None
-    correo = models.EmailField(unique=True, null=True, blank=True)
-
-    municipio = models.ForeignKey(
-    Municipio,
-    on_delete=models.CASCADE,
-    null=True,
-    blank=True
-    )
-
-    saldo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-
-    es_conductor = models.BooleanField(default=True)
-    es_inspector = models.BooleanField(default=False)
-    es_vendedor = models.BooleanField(default=False)
-    es_admin = models.BooleanField(default=False)
-
-    USERNAME_FIELD = "correo"
-
-    REQUIRED_FIELDS = []
-
-    objects = UsuarioManager()
-
-    def __str__(self):
-        return self.correo
-
-
+    
 # 🚗 Vehículo asociado a uno o varios usuarios
 class Vehiculo(models.Model):
     patente = models.CharField(max_length=10, unique=True) 
-    usuarios = models.ManyToManyField(Usuario, related_name="vehiculos", blank=True)  # vincula usuario / vehiculo
     exento_global = models.BooleanField(default=False)  # exento total
     subcuadras_exentas = models.ManyToManyField("Subcuadra", blank=True)  # Exenciones específicas
+    municipio = models.ForeignKey(Municipio,on_delete=models.CASCADE,null=True,blank=True)  
 
     def __str__(self):
         return self.patente
@@ -86,6 +107,13 @@ class Vehiculo(models.Model):
             return True
         return self.subcuadras_exentas.filter(id=subcuadra.id).exists()   
 
+class VehiculoUsuario(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
+
+    es_propietario = models.BooleanField(default=False)
+    verificado = models.BooleanField(default=False)
+    
 # 🏙️ Subcuadra representa una altura específica de una calle
 class Subcuadra(models.Model):
     municipio = models.ForeignKey(
@@ -142,7 +170,8 @@ class Estacionamiento(models.Model):
         print("ID:", self.id)
         print("ACTIVO:", self.activo)
         print("STACK TRACE 👇")
-        traceback.print_stack(limit=5) 
+        if settings.DEBUG:
+            traceback.print_stack(limit=5) 
 
         if not self.municipio and self.registrado_por:
             self.municipio = self.registrado_por.municipio 
