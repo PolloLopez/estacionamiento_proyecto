@@ -50,21 +50,16 @@ def run():
     # =========================================================
 
     # 👤 Conductor
-    conductor, _ = Usuario.objects.get_or_create(correo="juanperez@ejemplo.com")
+    conductor, _ = Usuario.objects.get_or_create(correo="conductor@ejemplo.com")
     conductor.municipio = municipio
-    conductor.nombre = "Juan Pérez"
-    conductor.saldo = 1000
+    conductor.nombre = "Conductor"
+    conductor.saldo = 10000
     conductor.es_admin = False
     conductor.es_inspector = False
     conductor.es_vendedor = False
     conductor.es_conductor = True
-    conductor.set_password("1234")
+    conductor.set_password("12345")
     conductor.save()
-
-    # 🚗 Vehículos normales
-    auto1, _ = Vehiculo.objects.get_or_create(patente="ABC123")
-    auto2, _ = Vehiculo.objects.get_or_create(patente="XYZ789")
-    conductor.vehiculos.add(auto1, auto2)
 
     # 🚗 Vehículo con EXENCIÓN GLOBAL
     vehiculo_exento_global, _ = Vehiculo.objects.get_or_create(patente="EXG123")
@@ -83,30 +78,35 @@ def run():
         vehiculo_exento_parcial.subcuadras_exentas.set(subcuadras_test)
 
     # 👮 Inspector
-    inspector, _ = Usuario.objects.get_or_create(correo="garcia@ejemplo.com")
+    inspector, _ = Usuario.objects.get_or_create(correo="inspector@ejemplo.com")
     inspector.municipio = municipio
-    inspector.nombre = "Inspector García"
+    inspector.nombre = "Inspector"
     inspector.es_inspector = True
     inspector.es_conductor = False
-    inspector.set_password("1234")
+    inspector.set_password("12345")
     inspector.save()
 
     # 💰 Vendedor
     vendedor, _ = Usuario.objects.get_or_create(correo="kiosco@ejemplo.com")
     vendedor.municipio = municipio
-    vendedor.nombre = "Kiosco San Martín"
+    vendedor.nombre = "Kiosco"
     vendedor.es_vendedor = True
     vendedor.es_conductor = False
-    vendedor.set_password("1234")
+    vendedor.set_password("12345")
     vendedor.save()
 
     # 🛠️ Admin
-    admin, _ = Usuario.objects.get_or_create(correo="admin@ejemplo.com")
+    admin, created = Usuario.objects.get_or_create(correo="admin@ejemplo.com")
+
     admin.municipio = municipio
-    admin.nombre = "Admin Municipal"
     admin.es_admin = True
     admin.es_conductor = False
-    admin.set_password("1234")
+
+    # 🔥 CLAVE PARA DJANGO ADMIN
+    admin.is_staff = True
+    admin.is_superuser = True
+
+    admin.set_password("12345")
     admin.save()
 
     # =========================================================

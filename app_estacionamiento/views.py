@@ -42,7 +42,7 @@ def login_view(request):
         print("Correo:", correo)
 
         try:
-            usuario = Usuario.objects.get(email=correo)  # ✅ si tu campo es email
+            usuario = Usuario.objects.get(correo=correo)  # ✅ si tu campo es email
             print("✅ Usuario encontrado:", usuario)
             print("👤 USUARIO EN SESSION:", request.session.get("usuario_id"))
         except Usuario.DoesNotExist:
