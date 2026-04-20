@@ -14,6 +14,8 @@ urlpatterns = [
     path("usuarios/logout/", views.logout_view, name="logout"),
     path("usuarios/inicio/", views.inicio_usuarios, name="inicio_usuarios"),
 
+    path("usuarios/", include("app_estacionamiento.urls")),
+
     path("usuarios/estacionar/", views.estacionar_vehiculo, name="usuarios_estacionar_vehiculo"),
     path("usuarios/finalizar/<int:estacionamiento_id>/", views.finalizar_estacionamiento, name="usuarios_finalizar_estacionamiento"),
     path("usuarios/historial/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),

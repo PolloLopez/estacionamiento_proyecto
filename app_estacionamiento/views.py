@@ -2,12 +2,14 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
+from django.contrib.auth import authenticate, login, logout
 from django.urls import reverse
 from app_estacionamiento.utils import get_usuario
 from decimal import Decimal
-from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion, VehiculoUsuario
+from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion, VehiculoUsuario, Municipio
 from .factories import EstacionamientoFactory
 from .decorators import require_role, require_login
+from .forms import RegistroUsuarioForm
 
 def get_subcuadra_default(municipio):
     return Subcuadra.objects.get_or_create(
@@ -35,34 +37,32 @@ def inicio(request):
 
 def login_view(request):
     if request.method == "POST":
-        correo = request.POST.get("username")  # ✅ ESTE ES EL FIX
+        correo = request.POST.get("username")
         password = request.POST.get("password")
 
-        print("📩 LOGIN INTENTO")
-        print("Correo:", correo)
+        print("📩 LOGIN INTENTO:", correo)
 
-        try:
-            usuario = Usuario.objects.get(correo=correo)  # ✅ si tu campo es email
-            print("✅ Usuario encontrado:", usuario)
-            print("👤 USUARIO EN SESSION:", request.session.get("usuario_id"))
-        except Usuario.DoesNotExist:
-            print("❌ Usuario NO existe")
-            return render(request, "usuarios/login.html", {"form": {"errors": True}})
+        from django.contrib.auth import authenticate
 
-        if usuario.check_password(password):
-            print("🔓 Password CORRECTO")
+        usuario = authenticate(request, username=correo, password=password)
 
-            request.session.flush()
-            request.session["usuario_id"] = usuario.id
-            request.session.modified = True
+        print("🧪 AUTH RESULT:", usuario)
 
-            print("🧠 SESSION GUARDADA:", request.session.get("usuario_id"))
+        if usuario is not None:
+            print("✅ LOGIN OK")
+
+            from django.contrib.auth import login
+            login(request, usuario)
+
+            print("🧪 request.user:", request.user)
 
             return redirect("inicio")
-
         else:
-            print("🔒 Password INCORRECTO")
-            return render(request, "usuarios/login.html", {"form": {"errors": True}})
+            print("❌ LOGIN FAIL")
+
+            return render(request, "usuarios/login.html", {
+                "form": {"errors": True}
+            })
 
     return render(request, "usuarios/login.html")
 
@@ -192,6 +192,28 @@ def home(request):
         return redirect("login")
 
     return redirect("inicio")
+
+def registro_view(request):
+    if request.method == "POST":
+        form = RegistroUsuarioForm(request.POST)
+
+        if form.is_valid():
+            usuario = form.save(commit=False)
+
+            # 🏛️ asignar municipio
+            usuario.municipio = Municipio.objects.first()
+
+            usuario.save()
+
+            # 🔐 LOGIN REAL DJANGO
+            login(request, usuario)
+
+            return redirect("inicio")
+
+    else:
+        form = RegistroUsuarioForm()
+
+    return render(request, "usuarios/registro.html", {"form": form})
 
 @require_role("conductor")
 def estacionar_vehiculo(request):
@@ -641,6 +663,5 @@ def resumen_caja(request):
 # VIEWS LOGIN / LOGOUT
 
 def logout_view(request):
-
-    request.session.flush()
-    return render(request, "usuarios/login.html", {"error": "Debe iniciar sesión"})
+    logout(request)
+    return redirect("login")

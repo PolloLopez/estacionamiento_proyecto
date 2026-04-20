@@ -110,7 +110,7 @@ Autenticación: Sistema de usuarios propio con roles
 ## 🔐 Autenticación
 
 Actualmente el sistema utiliza un esquema de autenticación basado en sesión
-personalizada (`request.session["usuario_id"]`).
+
 
 Se encuentra planificada la migración al sistema estándar de Django (`request.usuario`)
 y posteriormente a JWT para API REST.

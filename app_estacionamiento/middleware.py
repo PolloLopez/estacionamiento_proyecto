@@ -9,14 +9,7 @@ class UsuarioMiddleware:
     def __call__(self, request):
         print("🧪 SESSION:", request.session.items())
 
-        usuario_id = request.session.get("usuario_id")
-
-        print("🧪 usuario_id:", usuario_id)
-
-        request.usuario = None
-
-        if usuario_id:
-            request.usuario = Usuario.objects.filter(id=usuario_id).first()
+        request.usuario = request.user if request.user.is_authenticated else None
 
         print("🧪 request.usuario:", request.usuario)
 

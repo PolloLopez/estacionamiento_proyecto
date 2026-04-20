@@ -44,7 +44,7 @@
 ## Autenticación actual
 
 - Basada en session:
-  - request.session["usuario_id"]
+
 - Middleware:
   - request.usuario
 
