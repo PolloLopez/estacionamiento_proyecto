@@ -58,7 +58,7 @@
 ./templates/inspectores
 ./templates/inspectores/panel.html
 ./templates/inspectores/registrar_estacionamiento_manual.html
-./templates/inspectores/registrar_infraccion.html
+./templates/inspectores/inspectores_registrar_infraccion.html
 ./templates/inspectores/resumen_cobros.html
 ./templates/inspectores/resumen_infracciones.html
 ./templates/inspectores/verificar_vehiculo.html

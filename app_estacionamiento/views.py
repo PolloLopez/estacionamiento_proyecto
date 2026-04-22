@@ -6,10 +6,12 @@ from django.contrib.auth import authenticate, login, logout
 from django.urls import reverse
 from app_estacionamiento.utils import get_usuario
 from decimal import Decimal
-from .models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion, VehiculoUsuario, Municipio
-from .factories import EstacionamientoFactory
 from .decorators import require_role, require_login
 from .forms import RegistroUsuarioForm
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion, VehiculoUsuario, Municipio
+from app_estacionamiento.factories import EstacionamientoFactory
 
 def get_subcuadra_default(municipio):
     return Subcuadra.objects.get_or_create(
@@ -18,19 +20,22 @@ def get_subcuadra_default(municipio):
         municipio=municipio
     )[0]
 
+@login_required
 def inicio(request):
-    usuario = get_usuario(request)
+    user = request.user
 
-    if not usuario:
-        return redirect("login")
+    print("🧭 INICIO USER:", user)
 
-    if usuario.es_admin:
+    if user.is_superuser or user.is_staff:
         return redirect("panel_admin")
-    elif usuario.es_inspector:
+
+    if hasattr(user, "es_inspector") and user.es_inspector:
         return redirect("panel_inspectores")
-    elif usuario.es_vendedor:
+
+    if hasattr(user, "es_vendedor") and user.es_vendedor:
         return redirect("panel_vendedores")
-    elif usuario.es_conductor:
+
+    if hasattr(user, "es_conductor") and user.es_conductor:
         return redirect("inicio_usuarios")
 
     return redirect("login")
@@ -42,8 +47,6 @@ def login_view(request):
 
         print("📩 LOGIN INTENTO:", correo)
 
-        from django.contrib.auth import authenticate
-
         usuario = authenticate(request, username=correo, password=password)
 
         print("🧪 AUTH RESULT:", usuario)
@@ -51,7 +54,6 @@ def login_view(request):
         if usuario is not None:
             print("✅ LOGIN OK")
 
-            from django.contrib.auth import login
             login(request, usuario)
 
             print("🧪 request.user:", request.user)
@@ -217,56 +219,73 @@ def registro_view(request):
 
 @require_role("conductor")
 def estacionar_vehiculo(request):
-    usuario = get_usuario(request)
-    print("🔥 CREANDO ESTACIONAMIENTO")
-    
+    usuario = request.user
+
     if request.method == 'POST':
         patente = (request.POST.get('patente') or "").strip().upper()
         duracion = request.POST.get('duracion')
 
-        vehiculo, creado = Vehiculo.objects.get_or_create(patente=patente)
+        vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
-        # 🏛️ asegurar municipio
+        # municipio
         if not vehiculo.municipio:
             vehiculo.municipio = usuario.municipio
             vehiculo.save()
 
+        # 🔗 relación usuario-vehiculo
+        relacion, created = VehiculoUsuario.objects.get_or_create(
+            usuario=usuario,
+            vehiculo=vehiculo,
+            defaults={
+                "es_propietario": True,
+                "verificado": False
+            }
+        )
+
         # 🚨 WARNING INTELIGENTE
-        otros_usuarios = vehiculo.usuarios.exclude(id=usuario.id)
-
         warning = None
-        if otros_usuarios.exists():
-            warning = "⚠️ Este vehículo ya está asociado a otro usuario"
 
-        # 🚗 Asociación vehiculo al usuario automática
-        if usuario.es_conductor:
-            VehiculoUsuario.objects.get_or_create(
-                usuario=usuario,
-                vehiculo=vehiculo,
-                defaults={
-                    "es_propietario": True,
-                    "verificado": False
-                }
-            )
-     
-        # ❌ Exento TOTAL bloquea
+        relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
+
+        propietarios = relaciones.filter(es_propietario=True)
+        otros = relaciones.exclude(usuario=usuario)
+
+        if propietarios.exists() and not propietarios.filter(usuario=usuario).exists():
+            warning = "🚨 Este vehículo tiene otro propietario"
+
+        elif otros.exists():
+            warning = "⚠️ Vehículo asociado a múltiples usuarios"
+
+        if not relacion.verificado:
+            warning = (warning or "") + " | ⛔ Usuario no verificado"
+
+        # 🔒 VALIDACIÓN PREMIUM (apagada)
+        if settings.VALIDACION_ACTIVA:
+            if vehiculo.exento_global or vehiculo.subcuadras_exentas.exists():
+                if not relacion.verificado:
+                    return render(request, 'usuarios/estacionar_vehiculo.html', {
+                        'error': 'Vehículo exento requiere verificación',
+                        'warning': warning
+                    })
+
+        # ❌ exento global (regla de negocio actual)
         if vehiculo.exento_global:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
                 'error': 'Este vehículo es exento total.',
                 'warning': warning
             })
 
-        # 🚫 evitar doble estacionamiento
+        # 🚫 doble estacionamiento
         if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
             return render(request, 'usuarios/estacionar_vehiculo.html', {
                 'error': 'El vehículo ya tiene un estacionamiento activo.',
                 'warning': warning
             })
 
-        # validar duración
+        # duración
         try:
             duracion = Decimal(duracion)
-            if duracion <= 0 or duracion % 1 != 0:
+            if duracion <= 0:
                 raise ValueError()
         except:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
@@ -276,20 +295,16 @@ def estacionar_vehiculo(request):
 
         subcuadra = get_subcuadra_default(usuario.municipio)
 
-        estacionamiento = EstacionamientoFactory.crear(
+        EstacionamientoFactory.crear(
             vehiculo,
             subcuadra,
             duracion,
             registrado_por=usuario
         )
 
-        print("✅ Estacionamiento creado:", estacionamiento.id)
-
         return redirect("inicio_usuarios")
 
-    return render(request, 'usuarios/estacionar_vehiculo.html', {
-        'warning': warning
-    })
+    return render(request, 'usuarios/estacionar_vehiculo.html')
 
 @require_login
 def usuarios_historial(request):
@@ -374,11 +389,14 @@ def panel_inspectores(request):
 
 @require_login
 def verificar_vehiculo(request):
-    usuario = get_usuario(request)
+    usuario = request.user
     resultado = None
-
+    if not settings.VALIDACION_ACTIVA:
+        return render(request, "inspectores/verificar_vehiculo.html", {
+            "error": "Sistema en modo restringido"
+        })
+    
     if request.method == "POST":
-        #patente = (input).strip().upper()
         patente = (request.POST.get('patente') or "").strip().upper()
 
         if not patente:
@@ -460,10 +478,6 @@ def verificar_vehiculo(request):
 @require_role("inspector")
 def registrar_infraccion(request):
     usuario = get_usuario(request)
-
-    if not usuario.es_inspector and not usuario.es_admin:
-        return redirect("inicio")
-
     mensaje = None
 
     subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)

@@ -114,6 +114,15 @@ class VehiculoUsuario(models.Model):
     es_propietario = models.BooleanField(default=False)
     verificado = models.BooleanField(default=False)
     
+    def save(self, *args, **kwargs):
+        if self.es_propietario:
+            VehiculoUsuario.objects.filter(
+                vehiculo=self.vehiculo,
+                es_propietario=True
+            ).exclude(id=self.id).update(es_propietario=False)
+
+        super().save(*args, **kwargs)
+
 # 🏙️ Subcuadra representa una altura específica de una calle
 class Subcuadra(models.Model):
     municipio = models.ForeignKey(

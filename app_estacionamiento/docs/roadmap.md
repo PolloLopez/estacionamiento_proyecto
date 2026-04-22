@@ -51,7 +51,7 @@ La patente es única global → esto deberá ajustarse para multi-municipio.
 * Integración con:
 
   * Verificación de inspectores
-  * Registro de infracciones
+  * Registro de 
 
 ---
 
@@ -64,7 +64,7 @@ La patente es única global → esto deberá ajustarse para multi-municipio.
 
 ---
 
-### ⚠️ Infracciones
+### ⚠️ 
 
 * Registro manual por inspector
 * Asociación con:
@@ -84,7 +84,7 @@ La patente es única global → esto deberá ajustarse para multi-municipio.
 * Visualización de:
 
   * Estacionamientos
-  * Infracciones recientes
+  *  recientes
 * Carga de saldo manual
 * 🔥 Navegación corregida (urls + templates)
 
@@ -136,7 +136,7 @@ La patente es única global → esto deberá ajustarse para multi-municipio.
 * Navegación por paneles
 * Registro de estacionamientos
 * Verificación por inspector
-* Registro de infracciones
+* Registro de 
 * Gestión de exenciones
 
 ---
@@ -207,7 +207,7 @@ La patente es única global → esto deberá ajustarse para multi-municipio.
   * Login
   * Estacionamientos
   * Vehículos
-  * Infracciones
+  * 
   * Pagos
 
 ---

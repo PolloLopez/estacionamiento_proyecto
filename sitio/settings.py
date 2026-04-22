@@ -36,16 +36,11 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-
     'django.contrib.sessions.middleware.SessionMiddleware',
-
-    # 🔥 TIENE QUE ESTAR ACÁ
-    'app_estacionamiento.middleware.UsuarioMiddleware',
-
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-
+    'app_estacionamiento.middleware.UsuarioMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -120,12 +115,17 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Para producción (cuando uses collectstatic)
 STATIC_ROOT = BASE_DIR / "staticfiles"
+VALIDACION_ACTIVA = False
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-key")
 
 # redirireccion correcta.
-LOGIN_REDIRECT_URL = "/usuarios/inicio/"
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "inicio"
+LOGOUT_REDIRECT_URL = "login"
+
 
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",

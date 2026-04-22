@@ -28,8 +28,9 @@
     <nav>
         <ul class="nav-items" id="navItems">
             <li><a href="{% url 'inicio' %}">🏠 Inicio</a></li>
-            <p>USER: {{ request.usuario }}</p>
-            {% if not request.usuario %}
+
+            <p>USER: {{ request.user }}</p>
+            {% if not request.user.is_authenticated %}
               <p style="color:red;">⚠️ Usuario no cargado</p>
             {% endif %}
 

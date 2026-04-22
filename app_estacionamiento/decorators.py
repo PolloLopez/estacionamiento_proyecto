@@ -12,24 +12,29 @@ def require_login(view_func):
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 
-
 def require_role(*roles):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
-            usuario = get_usuario(request)
 
-            if not usuario:
+            # 🔐 usar Django Auth
+            if not request.user.is_authenticated:
                 return redirect("login")
 
-            if not any([
+            usuario = request.user  # 👈 reemplazo clave
+
+            # 🎭 validación de roles
+            tiene_permiso = any([
                 ("admin" in roles and usuario.es_admin),
                 ("inspector" in roles and usuario.es_inspector),
                 ("vendedor" in roles and usuario.es_vendedor),
                 ("conductor" in roles and usuario.es_conductor),
-            ]):
+            ])
+
+            if not tiene_permiso:
                 return redirect("inicio")
 
             return view_func(request, *args, **kwargs)
+
         return wrapper
     return decorator

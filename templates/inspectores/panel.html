@@ -18,6 +18,9 @@
     <li>Estacionamientos no pagados: <strong>{{ resumen.no_pagados }}</strong></li>
     <li>Infracciones recientes: <strong>{{ resumen.infracciones_recientes }}</strong></li>
   </ul>
+  <p>DEBUG URL:
+    {% url 'inspectores_registrar_infraccion' %}
+  </p>
 </section>
 {% endblock %}
 
