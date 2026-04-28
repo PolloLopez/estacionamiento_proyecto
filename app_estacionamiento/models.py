@@ -8,6 +8,7 @@ from django.db import models
 from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
+from django.db.models import Q, UniqueConstraint
 
 # 👤 Usuario del sistema 
 class UsuarioManager(BaseUserManager):
@@ -175,10 +176,6 @@ class Estacionamiento(models.Model):
     def save(self, *args, **kwargs):
         import traceback
 
-        print("💾 SAVE EJECUTADO")
-        print("ID:", self.id)
-        print("ACTIVO:", self.activo)
-        print("STACK TRACE 👇")
         if settings.DEBUG:
             traceback.print_stack(limit=5) 
 
@@ -188,10 +185,8 @@ class Estacionamiento(models.Model):
         super().save(*args, **kwargs)
 
     def finalizar(self):
-        print("🔥 FINALIZAR EJECUTADO")
 
         if not self.activo:
-            print("⚠️ YA ESTABA FINALIZADO")
             return self.costo
 
         self.hora_fin = timezone.now()
@@ -201,10 +196,7 @@ class Estacionamiento(models.Model):
         self.costo = costo
         self.activo = False
 
-        print("💾 GUARDANDO FINALIZACION...")
         self.save()
-
-        print("✅ FINALIZADO OK")
 
         return costo
 
@@ -227,6 +219,15 @@ class Estacionamiento(models.Model):
 
     def __str__(self):
         return f"{self.vehiculo.patente} - {self.subcuadra} - {self.hora_inicio}"
+
+class Meta:
+    constraints = [
+        UniqueConstraint(
+            fields=["vehiculo"],
+            condition=Q(activo=True),
+            name="unique_estacionamiento_activo_por_vehiculo"
+        )
+    ]
 
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):

@@ -6,14 +6,9 @@ from .models import Municipio, Usuario, Vehiculo, Subcuadra, Tarifa, Estacionami
 
 @admin.register(Vehiculo)
 class VehiculoAdmin(admin.ModelAdmin):
-    list_display = ("patente", "exento_global", "municipio")
+    list_display = ("patente", "exento_global")
+    list_filter = ("exento_global",)
     search_fields = ("patente",)
-    filter_horizontal = ("subcuadras_exentas",)
-
-    def get_readonly_fields(self, request, obj=None):
-        if not request.user.is_superuser:
-            return ("exento_global", "subcuadras_exentas")
-        return ()
     
 
 class VehiculoUsuarioInline(admin.TabularInline):

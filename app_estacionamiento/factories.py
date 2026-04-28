@@ -27,8 +27,4 @@ class EstacionamientoFactory:
             activo=True,
             registrado_por=registrado_por
         )
-
-        print("🏭 FACTORY CREA ID:", estacionamiento.id)
-        print("🏭 ACTIVO:", estacionamiento.activo)
-
         return estacionamiento

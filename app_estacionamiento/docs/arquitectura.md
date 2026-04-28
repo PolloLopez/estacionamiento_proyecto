@@ -46,12 +46,12 @@
 - Basada en session:
 
 - Middleware:
-  - request.usuario
+  - request.user
 
 ---
 
 ## Observaciones
 
-- Pendiente migración a Django Auth (`request.usuario`)
+- Pendiente migración a Django Auth (`request.user`)
 - Pendiente API REST
 - Pendiente frontend separado

@@ -34,32 +34,32 @@
               <p style="color:red;">⚠️ Usuario no cargado</p>
             {% endif %}
 
-            {% if request.usuario and request.usuario.es_conductor %}
+            {% if request.user and request.user.es_conductor %}
                 <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">🚗 Estacionar</a></li>
                 <li><a href="{% url 'usuarios_historial_estacionamientos' %}">📜 Estacionamientos</a></li>
                 <li><a href="{% url 'usuarios_historial_infracciones' %}">⚠️ Infracciones</a></li>
             {% endif %}
 
-            {% if request.usuario and request.usuario.es_inspector %}
+            {% if request.user and request.user.es_inspector %}
                 <li><a href="{% url 'inspectores_verificar_vehiculo' %}">🔍 Verificar vehículo</a></li>
                 <li><a href="{% url 'inspectores_registrar_infraccion' %}">⚠️ Registrar infracción</a></li>
                 <li><a href="{% url 'inspectores_registrar_estacionamiento_manual' %}">📝 Registrar estacionamiento manual</a></li>
                 <li><a href="{% url 'inspectores_resumen_cobros' %}">💰 Resumen cobros</a></li>
             {% endif %}
 
-            {% if request.usuario and request.usuario.es_vendedor %}
+            {% if request.user and request.user.es_vendedor %}
                 <li><a href="{% url 'vendedores_registrar_estacionamiento' %}">🅿️ Registrar estacionamiento</a></li>
                 <li><a href="{% url 'vendedores_resumen_caja' %}">📊 Resumen caja</a></li>
-                <li><a href="{% url 'cargar_saldo' request.usuario.id %}">💳 Cargar</a></li>
+                <li><a href="{% url 'cargar_saldo' request.user.id %}">💳 Cargar</a></li>
             {% endif %}
 
-            {% if request.usuario and request.usuario.es_admin %}
+            {% if request.user and request.user.es_admin %}
                 <li><a href="/admin/">🔧 Panel Admin</a></li>
                 <li><a href="{% url 'exenciones' %}">🚧 Exenciones</a></li>
             {% endif %}
 
-            {% if request.usuario %}
-                <li class="user-info">👤 {{ request.usuario.nombre }}</li>
+            {% if request.user %}
+                <li class="user-info">👤 {{ request.user.nombre }}</li>
                 <li><a href="{% url 'logout' %}">❌ Salir</a></li>
             {% else %}
                 <li><a href="{% url 'login' %}">🔑 Iniciar sesión</a></li>

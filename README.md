@@ -112,7 +112,7 @@ Autenticación: Sistema de usuarios propio con roles
 Actualmente el sistema utiliza un esquema de autenticación basado en sesión
 
 
-Se encuentra planificada la migración al sistema estándar de Django (`request.usuario`)
+Se encuentra planificada la migración al sistema estándar de Django (`request.user`)
 y posteriormente a JWT para API REST.
 
 

@@ -109,12 +109,5 @@ def run():
     admin.set_password("12345")
     admin.save()
 
-    # =========================================================
-    # ✔ Logs
-    # =========================================================
-    print("Vehículos del conductor:", [v.patente for v in conductor.vehiculos.all()])
-    print("✔ Datos de prueba creados correctamente")
-
-
 if __name__ == "__main__":
     run()

@@ -40,7 +40,6 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'app_estacionamiento.middleware.UsuarioMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -115,7 +114,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Para producción (cuando uses collectstatic)
 STATIC_ROOT = BASE_DIR / "staticfiles"
-VALIDACION_ACTIVA = False
+VALIDACION_ACTIVA = False # True El sistema FUNCIONA (permite verificar) - False El sistema NO FUNCIONA (no permite verificar) - Modo desarrollo
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-key")

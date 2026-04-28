@@ -21,9 +21,11 @@ Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
   * Inspector
   * Vendedor
   * Administrador
-* Middleware propio (`UsuarioMiddleware`)
+* Uso estándar de Django Auth (`request.user`)
+* Eliminación de middleware custom legacy
 * Decoradores de acceso (`require_login`, `require_role`)
-* 🔥 Corrección completa de uso de `request.usuario` en templates
+🔥 Migración completa a `request.user` (backend + templates)
+🔥 Eliminación de sistema legacy basado en session manual
 
 ---
 
