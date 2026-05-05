@@ -114,7 +114,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Para producción (cuando uses collectstatic)
 STATIC_ROOT = BASE_DIR / "staticfiles"
-VALIDACION_ACTIVA = False # True El sistema FUNCIONA (permite verificar) - False El sistema NO FUNCIONA (no permite verificar) - Modo desarrollo
+VALIDACION_ACTIVA = False # True El sistema FUNCIONA (permite verificar) valida (modo estricto / producción) True = versión segura (la que vas a vender - False El sistema NO FUNCIONA (no permite verificar) - Modo desarrollo NO valida (modo barato / MVP)  False = versión rápida, flexible
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-key")

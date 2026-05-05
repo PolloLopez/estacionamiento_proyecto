@@ -5,22 +5,27 @@
 <section class="panel auth-panel">
   <h2>Iniciar sesión</h2>
   <form method="post" action="{% url 'login' %}">
-    {% csrf_token %}
-    <a href="/accounts/google/login/" class="btn">
-      Ingresar con Google
-    </a>
-    <label for="id_username">Correo</label>
+  {% csrf_token %}
 
-    <input type="email" name="username" required>
-    <label for="id_password">Contraseña</label>
-    
-    
-    <input type="password" name="password" required>
-    <button type="submit">Entrar</button>
+  <!--
+  
+  <a href="/accounts/google/login/" class="btn">
+    Ingresar con Google
+  </a>
 
-    {% if form.errors %}
-      <p class="error">Correo o contraseña incorrectos</p>
-    {% endif %}
-  </form>
+  -->
+
+  <label>Correo</label>
+  <input type="email" name="correo" required>
+
+  <label>Contraseña</label>
+  <input type="password" name="password" required>
+
+  <button type="submit">Entrar</button>
+
+  {% if form.errors %}
+    <p class="error">Correo o contraseña incorrectos</p>
+  {% endif %}
+</form>
 </section>
 {% endblock %}

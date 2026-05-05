@@ -32,25 +32,22 @@ def inicio(request):
     if getattr(user, "es_vendedor", False):
         return redirect("panel_vendedores")
 
-    return redirect("inicio_usuarios")
+    return redirect("inicio")
 
 def login_view(request):
     if request.method == "POST":
-        correo = request.POST.get("username")
+        correo = request.POST.get("correo")
         password = request.POST.get("password")
 
         usuario = authenticate(request, username=correo, password=password)
 
         if usuario is not None:
-
             login(request, usuario)
-
             return redirect("inicio")
-        else:
 
-            return render(request, "usuarios/login.html", {
-                "form": {"errors": True}
-            })
+        return render(request, "usuarios/login.html", {
+            "form": {"errors": True}
+        })
 
     return render(request, "usuarios/login.html")
 
@@ -283,7 +280,7 @@ def estacionar_vehiculo(request):
             registrado_por=usuario
         )
 
-        return redirect("inicio_usuarios")
+        return redirect("inicio")
 
     return render(request, 'usuarios/estacionar_vehiculo.html')
 
