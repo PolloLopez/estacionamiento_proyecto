@@ -1,29 +1,34 @@
-🔥 8. Te propongo un TEST REAL (flujo completo)
+🧪 Cómo hacer un TEST antes del commit (bien hecho, rápido)
 
-Hacé esto en orden:
+No hace falta que te metas en testing complejo todavía.
+Hacé test funcional mínimo + sanity check.
 
-🧍 1. Crear usuario conductor
-loguearte como admin
-crear usuario conductor
-🚗 2. Registrar vehículo
-estacionar vehículo
-👮 3. Inspector
-verificar vehículo
-ver estado
-💣 4. Caso sin pago
-registrar infracción
-🚧 5. Probar exenciones
-ir a panel exenciones
-marcar exento
-volver a verificar
-💰 6. Flujo vendedor
-cargar estacionamiento manual
-🧠 9. Qué tenés que observar
+✅ 1. TEST MANUAL (el más importante ahora)
 
-Anotá si falla:
+Hacé este flujo:
 
-❌ estados incorrectos
-❌ duplicados
-❌ exenciones mal aplicadas
-❌ errores de permisos
-❌ UI rota
+🔐 Login
+entrar con admin ✔
+🚗 Estacionar
+ir a:
+/usuarios/estacionar/
+
+Probar:
+
+✅ patente nueva → debería crear
+✅ patente existente → debería permitir
+⚠️ patente con otro usuario → warning
+❌ patente con estacionamiento activo → bloquear
+✅ 2. TEST DE URLS (evita errores como el que tuviste)
+
+Corré:
+
+python manage.py check
+
+✔ debe decir:
+
+System check identified no issues
+✅ 3. TEST DE MIGRACIONES
+python manage.py showmigrations
+
+✔ todas con [X]
