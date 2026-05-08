@@ -1,4 +1,4 @@
-docs/roadmap.md
+app_estacionamiento/docs/roadmap.md
 # 🚗 Sistema de Estacionamiento Medido — Roadmap del Proyecto
 
 ## 📌 Estado actual del sistema (Abril 2026)

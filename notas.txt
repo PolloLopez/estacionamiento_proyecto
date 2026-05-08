@@ -12,9 +12,9 @@ bash
 python manage.py runserver
 
 
-superuserusuario --email: admin@test.com --password TODAS: 1234
-adminMun@test.com
+admin@test.com --- superuserusuario -
 vendedor@test.com
 inspector@test.com
 conductor@test.com
 
+--password TODAS: 123456

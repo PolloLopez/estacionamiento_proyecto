@@ -29,12 +29,6 @@ media/
 staticfiles/
 
 # ============================
-# 📌 MIGRACIONES (solo contenido)
-# ============================
-**/migrations/*
-!**/migrations/__init__.py
-
-# ============================
 # 📌 ARCHIVOS DEL SISTEMA
 # ============================
 *.log

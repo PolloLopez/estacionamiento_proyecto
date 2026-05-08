@@ -9,30 +9,54 @@ from .decorators import require_role, require_login
 from .forms import RegistroUsuarioForm
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from app_estacionamiento.models import Usuario, Vehiculo, Subcuadra, Estacionamiento, Infraccion, VehiculoUsuario, Municipio
-from app_estacionamiento.factories import EstacionamientoFactory
-
-def get_subcuadra_default(municipio):
-    return Subcuadra.objects.get_or_create(
-        calle="Zona Única",
-        altura=0,
-        municipio=municipio
-    )[0]
+from .models import (
+    Usuario,
+    Vehiculo,
+    VehiculoUsuario,
+    Subcuadra,
+    Estacionamiento,
+    Infraccion,
+    Municipio,
+)
+from .factories import EstacionamientoFactory
+from .utils import get_subcuadra_default
 
 @login_required
 def inicio(request):
+
     user = request.user
 
-    if user.is_superuser or user.is_staff or getattr(user, "es_admin", False):
+    # 👑 ADMIN
+    if getattr(user, "es_admin", False):
         return redirect("panel_admin")
 
+    # 👮 INSPECTOR
     if getattr(user, "es_inspector", False):
         return redirect("panel_inspectores")
 
+    # 💰 VENDEDOR
     if getattr(user, "es_vendedor", False):
         return redirect("panel_vendedores")
 
-    return redirect("inicio")
+    # 🚗 CONDUCTOR
+    if getattr(user, "es_conductor", False):
+        return redirect("inicio_usuarios")
+
+    return redirect("login")
+
+@require_role("inspector", "admin", "conductor", "vendedor") 
+def inicio_usuarios(request):
+    usuario = request.user
+
+    estacionamiento_activo = Estacionamiento.objects.filter(
+    activo=True,
+    registrado_por=usuario
+    ).order_by("-hora_inicio").first()
+
+    return render(request, "usuarios/inicio_usuarios.html", {
+        "usuario": usuario,
+        "estacionamiento_activo": estacionamiento_activo,
+    })
 
 def login_view(request):
     if request.method == "POST":
@@ -51,19 +75,6 @@ def login_view(request):
 
     return render(request, "usuarios/login.html")
 
-@require_role("inspector", "admin", "conductor", "vendedor") 
-def inicio_usuarios(request):
-    usuario = request.user
-         
-    estacionamiento_activo = Estacionamiento.objects.filter(
-    activo=True,
-    registrado_por=usuario
-    ).order_by("-hora_inicio").first()
-
-    return render(request, "usuarios/inicio_usuarios.html", {
-        "usuario": usuario,
-        "estacionamiento_activo": estacionamiento_activo,
-    })
 
 # =========================================================
 # VIEWS ADMIN
@@ -197,20 +208,29 @@ def registro_view(request):
 
 @require_role("conductor")
 def estacionar_vehiculo(request):
-    usuario = request.user
+    usuario = request.user  # 👤 usuario logueado
 
-    if request.method == 'POST':
+    if request.method == "POST":
+
+        # ==============================
+        # 1. INPUTS
+        # ==============================
         patente = (request.POST.get('patente') or "").strip().upper()
         duracion = request.POST.get('duracion')
 
+        # ==============================
+        # 2. VEHÍCULO (crear o buscar)
+        # ==============================
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
-        # municipio
+        # asignar municipio si no tiene
         if not vehiculo.municipio:
             vehiculo.municipio = usuario.municipio
             vehiculo.save()
 
-        # 🔗 relación usuario-vehiculo
+        # ==============================
+        # 3. RELACIÓN USUARIO-VEHÍCULO
+        # ==============================
         relacion, created = VehiculoUsuario.objects.get_or_create(
             usuario=usuario,
             vehiculo=vehiculo,
@@ -220,33 +240,28 @@ def estacionar_vehiculo(request):
             }
         )
 
-        # 🚨 WARNING INTELIGENTE
+        # ==============================
+        # 4. WARNINGS (NO bloquean)
+        # ==============================
         warning = None
 
         relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
-
         propietarios = relaciones.filter(es_propietario=True)
         otros = relaciones.exclude(usuario=usuario)
 
         if propietarios.exists() and not propietarios.filter(usuario=usuario).exists():
             warning = "🚨 Este vehículo tiene otro propietario"
-
         elif otros.exists():
             warning = "⚠️ Vehículo asociado a múltiples usuarios"
 
         if not relacion.verificado:
             warning = (warning or "") + " | ⛔ Usuario no verificado"
 
-        # 🔒 VALIDACIÓN PREMIUM (apagada)
-        if settings.VALIDACION_ACTIVA:
-            if vehiculo.exento_global or vehiculo.subcuadras_exentas.exists():
-                if not relacion.verificado:
-                    return render(request, 'usuarios/estacionar_vehiculo.html', {
-                        'error': 'Vehículo exento requiere verificación',
-                        'warning': warning
-                    })
+        # ==============================
+        # 5. VALIDACIONES DURAS (bloquean)
+        # ==============================
 
-        # ❌ exento global (regla de negocio actual)
+        # 🚫 vehículo exento
         if vehiculo.exento_global:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
                 'error': 'Este vehículo es exento total.',
@@ -260,17 +275,35 @@ def estacionar_vehiculo(request):
                 'warning': warning
             })
 
-        # duración
+        # ==============================
+        # 6. VALIDAR DURACIÓN
+        # ==============================
         try:
             duracion = Decimal(duracion)
             if duracion <= 0:
                 raise ValueError()
-        except:
+        except Exception:
             return render(request, 'usuarios/estacionar_vehiculo.html', {
                 'error': 'Duración inválida',
                 'warning': warning
             })
 
+        # ==============================
+        # 7. COSTO (💰 CORE DEL NEGOCIO)
+        # ==============================
+        TARIFA_BASE = Decimal("100")  # 🔧 configurable después
+        costo_estimado = duracion * TARIFA_BASE
+
+        # 🚫 saldo insuficiente
+        if usuario.saldo < costo_estimado:
+            return render(request, 'usuarios/estacionar_vehiculo.html', {
+                'error': f'Saldo insuficiente. Necesitás ${costo_estimado}',
+                'warning': warning
+            })
+
+        # ==============================
+        # 8. CREAR ESTACIONAMIENTO
+        # ==============================
         subcuadra = get_subcuadra_default(usuario.municipio)
 
         EstacionamientoFactory.crear(
@@ -280,8 +313,18 @@ def estacionar_vehiculo(request):
             registrado_por=usuario
         )
 
+        # 💸 DESCONTAR SALDO (simple por ahora)
+        usuario.saldo -= costo_estimado
+        usuario.save()
+
+        # ==============================
+        # 9. REDIRECCIÓN FINAL
+        # ==============================
         return redirect("inicio")
 
+    # ==============================
+    # GET → mostrar formulario
+    # ==============================
     return render(request, 'usuarios/estacionar_vehiculo.html')
 
 @require_login
@@ -533,7 +576,7 @@ def registrar_estacionamiento_manual(request):
             duracion = Decimal(duracion)
             if duracion <= 0 or duracion % 1 != 0:
                 raise ValueError()
-        except:
+        except Exception:
             return render(request, "inspectores/registrar_estacionamiento_manual.html", {
                 "error": "La duración debe ser en horas (ej: 1, 2)."
             })
