@@ -1,10 +1,13 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 
+from logging import warning
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.contrib.auth import authenticate, login, logout
 from django.urls import reverse
 from decimal import Decimal
+from django.db import IntegrityError, transaction
 from .decorators import require_role, require_login
 from .forms import RegistroUsuarioForm
 from django.conf import settings
@@ -18,8 +21,9 @@ from .models import (
     Infraccion,
     Municipio,
 )
-from .factories import EstacionamientoFactory
 from .utils import get_subcuadra_default
+from .factories import EstacionamientoFactory
+
 
 @login_required
 def inicio(request):
@@ -206,31 +210,68 @@ def registro_view(request):
 
     return render(request, "usuarios/registro.html", {"form": form})
 
+# =====================================================
+# 🚗 ESTACIONAR VEHÍCULO
+# =====================================================
+# Flujo principal del conductor.
+#
+# ¿Qué hace?
+# - valida patente
+# - busca/crea vehículo
+# - valida relaciones
+# - valida saldo
+# - evita estacionamientos duplicados
+# - crea estacionamiento
+# - descuenta saldo
+#
+# 🔥 HARDENING:
+# Se agregó try/except IntegrityError para cubrir:
+# - race conditions
+# - doble request simultáneo
+# - duplicación de estacionamientos
+#
+# La protección REAL ocurre en la DB mediante:
+# UniqueConstraint(activo=True)
+# =====================================================
+
 @require_role("conductor")
 def estacionar_vehiculo(request):
-    usuario = request.user  # 👤 usuario logueado
 
+    # 👤 usuario autenticado
+    usuario = request.user
+
+    # =================================================
+    # POST → crear estacionamiento
+    # =================================================
     if request.method == "POST":
 
-        # ==============================
-        # 1. INPUTS
-        # ==============================
-        patente = (request.POST.get('patente') or "").strip().upper()
-        duracion = request.POST.get('duracion')
+        # =============================================
+        # 1. INPUTS DEL FORMULARIO
+        # =============================================
 
-        # ==============================
-        # 2. VEHÍCULO (crear o buscar)
-        # ==============================
-        vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+        patente = (request.POST.get("patente") or "").strip().upper()
+        duracion = request.POST.get("duracion")
 
-        # asignar municipio si no tiene
+        # =============================================
+        # 2. BUSCAR O CREAR VEHÍCULO
+        # =============================================
+
+        vehiculo, _ = Vehiculo.objects.get_or_create(
+            patente=patente
+        )
+
+        # asignar municipio automáticamente
         if not vehiculo.municipio:
             vehiculo.municipio = usuario.municipio
             vehiculo.save()
 
-        # ==============================
-        # 3. RELACIÓN USUARIO-VEHÍCULO
-        # ==============================
+        # =============================================
+        # 3. RELACIÓN USUARIO ↔ VEHÍCULO
+        # =============================================
+        # NO bloquea.
+        # Solo genera trazabilidad / ownership soft.
+        # =============================================
+
         relacion, created = VehiculoUsuario.objects.get_or_create(
             usuario=usuario,
             vehiculo=vehiculo,
@@ -240,92 +281,189 @@ def estacionar_vehiculo(request):
             }
         )
 
-        # ==============================
-        # 4. WARNINGS (NO bloquean)
-        # ==============================
+        # =============================================
+        # 4. WARNINGS (NO bloqueantes)
+        # =============================================
+
         warning = None
 
-        relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
-        propietarios = relaciones.filter(es_propietario=True)
-        otros = relaciones.exclude(usuario=usuario)
+        relaciones = VehiculoUsuario.objects.filter(
+            vehiculo=vehiculo
+        )
 
+        propietarios = relaciones.filter(
+            es_propietario=True
+        )
+
+        otros = relaciones.exclude(
+            usuario=usuario
+        )
+
+        # 🚨 otro propietario
         if propietarios.exists() and not propietarios.filter(usuario=usuario).exists():
+
             warning = "🚨 Este vehículo tiene otro propietario"
+
+        # ⚠ múltiples usuarios
         elif otros.exists():
+
             warning = "⚠️ Vehículo asociado a múltiples usuarios"
 
+        # ⛔ usuario no validado
         if not relacion.verificado:
+
             warning = (warning or "") + " | ⛔ Usuario no verificado"
 
-        # ==============================
-        # 5. VALIDACIONES DURAS (bloquean)
-        # ==============================
+        # =============================================
+        # 5. VALIDACIONES DURAS
+        # =============================================
 
-        # 🚫 vehículo exento
+        # 🚫 vehículo exento total
         if vehiculo.exento_global:
-            return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'Este vehículo es exento total.',
-                'warning': warning
-            })
 
-        # 🚫 doble estacionamiento
-        if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
-            return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'El vehículo ya tiene un estacionamiento activo.',
-                'warning': warning
-            })
+            return render(
+                request,
+                "usuarios/estacionar_vehiculo.html",
+                {
+                    "error": "Este vehículo es exento total.",
+                    "warning": warning
+                }
+            )
 
-        # ==============================
+        # 🚫 validación rápida backend
+        # (la validación REAL está en la DB)
+        if Estacionamiento.objects.filter(
+            vehiculo=vehiculo,
+            activo=True
+        ).exists():
+
+            return render(
+                request,
+                "usuarios/estacionar_vehiculo.html",
+                {
+                    "error": "El vehículo ya tiene un estacionamiento activo.",
+                    "warning": warning
+                }
+            )
+
+        # =============================================
         # 6. VALIDAR DURACIÓN
-        # ==============================
+        # =============================================
+
         try:
+
             duracion = Decimal(duracion)
+
             if duracion <= 0:
                 raise ValueError()
-        except Exception:
-            return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': 'Duración inválida',
-                'warning': warning
-            })
 
-        # ==============================
-        # 7. COSTO (💰 CORE DEL NEGOCIO)
-        # ==============================
-        TARIFA_BASE = Decimal("100")  # 🔧 configurable después
+        except Exception:
+
+            return render(
+                request,
+                "usuarios/estacionar_vehiculo.html",
+                {
+                    "error": "Duración inválida",
+                    "warning": warning
+                }
+            )
+
+        # =============================================
+        # 7. CALCULAR COSTO
+        # =============================================
+
+        TARIFA_BASE = Decimal("100")
+
         costo_estimado = duracion * TARIFA_BASE
 
         # 🚫 saldo insuficiente
         if usuario.saldo < costo_estimado:
-            return render(request, 'usuarios/estacionar_vehiculo.html', {
-                'error': f'Saldo insuficiente. Necesitás ${costo_estimado}',
-                'warning': warning
-            })
 
-        # ==============================
-        # 8. CREAR ESTACIONAMIENTO
-        # ==============================
-        subcuadra = get_subcuadra_default(usuario.municipio)
+            return render(
+                request,
+                "usuarios/estacionar_vehiculo.html",
+                {
+                    "error": f"Saldo insuficiente. Necesitás ${costo_estimado}",
+                    "warning": warning
+                }
+            )
 
-        EstacionamientoFactory.crear(
-            vehiculo,
-            subcuadra,
-            duracion,
-            registrado_por=usuario
+    # =============================================
+    # 8. TRANSACCIÓN SEGURA
+    # =============================================
+    # 🔥 HARDENING FINANCIERO
+    #
+    # Garantiza consistencia:
+    #
+    # ✅ crea estacionamiento
+    # ✅ descuenta saldo
+    #
+    # o NO hace nada.
+    #
+    # Evita:
+    # - estacionamientos gratis
+    # - corrupción de saldo
+    # - inconsistencias
+    # - fallos parciales
+    # =============================================
+    
+    subcuadra = get_subcuadra_default(
+        usuario.municipio
+    )
+    
+    try:
+    
+        with transaction.atomic():
+        
+            # 🚗 crear estacionamiento
+            EstacionamientoFactory.crear(
+                vehiculo,
+                subcuadra,
+                duracion,
+                registrado_por=usuario
+            )
+    
+            # 💸 descontar saldo
+            usuario.saldo -= costo_estimado
+    
+            usuario.save()
+    
+    except IntegrityError:
+    
+        return render(
+            request,
+            "usuarios/estacionar_vehiculo.html",
+            {
+                "error": "El vehículo ya posee un estacionamiento activo.",
+                "warning": warning
+            }
+        )
+    
+    except Exception:
+    
+        return render(
+            request,
+            "usuarios/estacionar_vehiculo.html",
+            {
+                "error": "Ocurrió un error al registrar el estacionamiento.",
+                "warning": warning
+            }
         )
 
-        # 💸 DESCONTAR SALDO (simple por ahora)
-        usuario.saldo -= costo_estimado
-        usuario.save()
+        # =============================================
+        # 10. REDIRECCIÓN FINAL
+        # =============================================
 
-        # ==============================
-        # 9. REDIRECCIÓN FINAL
-        # ==============================
         return redirect("inicio")
 
-    # ==============================
+    # =================================================
     # GET → mostrar formulario
-    # ==============================
-    return render(request, 'usuarios/estacionar_vehiculo.html')
+    # =================================================
+
+    return render(
+        request,
+        "usuarios/estacionar_vehiculo.html"
+    )
 
 @require_login
 def usuarios_historial(request):
