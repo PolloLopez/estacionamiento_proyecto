@@ -1,102 +1,33 @@
-<!-- templates/base.html -->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+
     {% load static %}
-    <title>{% block title %}Estacionamiento Medido{% endblock %}</title>
 
-    <link rel="stylesheet" href="{% static 'app_estacionamiento/css/global.css' %}">
+    <title>{% block title %} Estacionamiento Medido {% endblock %}</title>
 
-    {% block extra_css %}{% endblock %}
-</head>
+    <link
+      rel="stylesheet"
+      href="{% static 'app_estacionamiento/css/global.css' %}"
+    />
+  </head>
 
-<body>
+  <body>
+    <header>
+      <a href="{% url 'inicio' %}"> Inicio </a>
 
-<header class="navbar">
-    <div class="logo-container">
-        <img src="{% static 'app_estacionamiento/multimedia/logo.svg' %}" alt="Logo" class="logo-img">
-    </div>
+      {% if request.user.is_authenticated %}
 
-    <!-- Botón Hamburguesa -->
-    <div class="menu-toggle" id="menuToggle">
-        <span></span>
-        <span></span>
-        <span></span>
-    </div>
+      <a href="{% url 'logout' %}"> Salir </a>
 
-    <nav>
-        <ul class="nav-items" id="navItems">
-            <li><a href="{% url 'inicio' %}">🏠 Inicio</a></li>
+      {% else %}
 
-            <p>USER: {{ request.user }}</p>
-            {% if not request.user.is_authenticated %}
-              <p style="color:red;">⚠️ Usuario no cargado</p>
-            {% endif %}
+      <a href="{% url 'login' %}"> Login </a>
 
-            {% if request.user and request.user.es_conductor %}
-                <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">🚗 Estacionar</a></li>
-                <li><a href="{% url 'usuarios_historial_estacionamientos' %}">📜 Estacionamientos</a></li>
-                <li><a href="{% url 'usuarios_historial_infracciones' %}">⚠️ Infracciones</a></li>
-            {% endif %}
+      {% endif %}
+    </header>
 
-            {% if request.user and request.user.es_inspector %}
-                <li><a href="{% url 'inspectores_verificar_vehiculo' %}">🔍 Verificar vehículo</a></li>
-                <li><a href="{% url 'inspectores_registrar_infraccion' %}">⚠️ Registrar infracción</a></li>
-                <li><a href="{% url 'inspectores_registrar_estacionamiento_manual' %}">📝 Registrar estacionamiento manual</a></li>
-                <li><a href="{% url 'inspectores_resumen_cobros' %}">💰 Resumen cobros</a></li>
-            {% endif %}
-
-            {% if request.user and request.user.es_vendedor %}
-                <li><a href="{% url 'vendedores_registrar_estacionamiento' %}">🅿️ Registrar estacionamiento</a></li>
-                <li><a href="{% url 'vendedores_resumen_caja' %}">📊 Resumen caja</a></li>
-                <li><a href="{% url 'cargar_saldo' request.user.id %}">💳 Cargar</a></li>
-            {% endif %}
-
-            {% if request.user and request.user.es_admin %}
-                <li><a href="/admin/">🔧 Panel Admin</a></li>
-                <li><a href="{% url 'exenciones' %}">🚧 Exenciones</a></li>
-            {% endif %}
-
-            {% if request.user.is_authenticated %}
-                <li class="user-info">👤 {{ request.user.nombre }}</li>
-                <li><a href="{% url 'logout' %}">❌ Salir</a></li>
-            {% else %}
-                <li><a href="{% url 'login' %}">🔑 Iniciar sesión</a></li>
-            {% endif %}
-        </ul>
-    </nav>
-
-    <!-- Fondo semitransparente -->
-    <div class="nav-overlay" id="navOverlay"></div>
-</header>
-
-<main class="container">
-    {% block content %}{% endblock %}
-</main>
-
-<footer class="footer">
-    <p>Sistema de Estacionamiento Medido — 2026</p>
-</footer>
-
-<script>
-    const menuToggle = document.getElementById("menuToggle");
-    const navItems = document.getElementById("navItems");
-    const navOverlay = document.getElementById("navOverlay");
-
-    function toggleMenu() {
-        navItems.classList.toggle("active");
-        menuToggle.classList.toggle("open");
-        navOverlay.classList.toggle("active");
-    }
-
-    menuToggle.addEventListener("click", toggleMenu);
-    navOverlay.addEventListener("click", toggleMenu);
-</script>
-
-{% block extra_js %}{% endblock %}
-
-</body>
+    <main>{% block content %} {% endblock %}</main>
+  </body>
 </html>
-

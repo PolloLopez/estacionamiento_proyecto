@@ -132,6 +132,12 @@ urlpatterns = [
         name="vendedores_resumen_caja"
     ),
 
+    path(
+        "cargar-saldo/",
+        views.cargar_saldo,
+        name="cargar_saldo"
+    ),
+
     # =====================================================
     # 🛠 ADMIN
     # =====================================================

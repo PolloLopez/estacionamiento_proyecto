@@ -1,41 +1,74 @@
-{% extends "base.html" %}
-{% block title %}Verificar Vehículo{% endblock %}
+{% extends 'base.html' %}
 
-{% block content %}
-<section class="panel">
-  <h2>🔍 Verificar vehículo</h2>
-
-  <form method="post" action="{% url 'inspectores_verificar_vehiculo' %}">
-    {% csrf_token %}
-    <label for="patente">Patente</label>
-    <input id="patente" name="patente" placeholder="ABC123" required />
-    <button class="btn-general">Verificar</button>
-  </form>
-
-  {% if resultado %}
-    <div class="resultado">
-      <h3>Patente: {{ resultado.patente }}</h3>
-      <p class="estado">{{ resultado.estado }}</p>
-      {% if resultado.detalle %}<p>{{ resultado.detalle }}</p>{% endif %}
-      {% if resultado.subcuadras_exentas %}
-        <h4>Exento en:</h4>
-        <ul>
-          {% if resultado.estado == "Exento TOTAL" %}
-            <p class="estado exento-total">🚫 EXENTO TOTAL</p>
-          {% endif %}
-          {% for s in resultado.subcuadras_exentas %}
-            <li>{{ s.calle }} {{ s.altura }}</li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-      {% if resultado.registrar_infraccion_url %}
-        <a href="{{ resultado.registrar_infraccion_url }}" class="btn alert">
-          Registrar infracción
-        </a>
-      {% endif %}
-    </div>
-  {% endif %}
-</section>
+{% block title %}
+Verificar Vehículo
 {% endblock %}
 
+{% block content %}
 
+<section class="card">
+    <h1>🔍 Verificar vehículo</h1>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="patente">Patente</label>
+
+            <input
+                type="text"
+                id="patente"
+                name="patente"
+                required
+            >
+        </div>
+
+        <button type="submit" class="btn">
+            Verificar
+        </button>
+    </form>
+
+    {% if resultado %}
+
+        <div class="resultado-box">
+
+            <h2>Resultado</h2>
+
+            <p>
+                <strong>Patente:</strong>
+                {{ resultado.patente }}
+            </p>
+
+            <p>
+                <strong>Estado:</strong>
+                {{ resultado.estado }}
+            </p>
+
+            {% if resultado.estacionamiento_activo %}
+
+                <p class="success">
+                    ✅ Vehículo con estacionamiento activo
+                </p>
+
+            {% else %}
+
+                <p class="danger">
+                    ❌ Vehículo sin estacionamiento
+                </p>
+
+                <a
+                    href="{{ resultado.registrar_infraccion_url }}"
+                    class="btn alert"
+                >
+                    Registrar infracción
+                </a>
+
+            {% endif %}
+
+        </div>
+
+    {% endif %}
+
+</section>
+
+{% endblock %}

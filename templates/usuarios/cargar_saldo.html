@@ -1,24 +1,41 @@
-{% extends "base.html" %}
-{% block title %}Cargar Saldo{% endblock %}
+{% extends 'base.html' %}
+
+{% block title %}
+Cargar saldo
+{% endblock %}
 
 {% block content %}
-<section class="panel">
-  <h2>Cargar saldo</h2>
-  <p>Seleccioná un monto y procesá el pago (integración MercadoPago luego).</p>
 
-  <form method="post" action="{% url 'cargar_saldo' %}">
-    {% csrf_token %}
-    <div class="form-row">
-      <label for="monto">Monto</label>
-      <input id="monto" name="monto" type="number" min="1" step="0.01" required />
-    </div>
-    <div class="form-row actions">
-      <button class="btn-general">Cargar</button>
-    </div>
-  </form>
+<section class="card">
 
-  {% if error %}
-    <p class="error">{{ error }}</p>
-  {% endif %}
+    <h1>💳 Cargar saldo</h1>
+
+    <form method="post">
+
+        {% csrf_token %}
+
+        <div class="form-group">
+
+            <label for="monto">
+                Monto
+            </label>
+
+            <input
+                type="number"
+                id="monto"
+                name="monto"
+                min="1"
+                required
+            >
+
+        </div>
+
+        <button type="submit" class="btn">
+            Cargar saldo
+        </button>
+
+    </form>
+
 </section>
+
 {% endblock %}
