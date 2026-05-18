@@ -9,7 +9,7 @@ Verificar Vehículo
 <section class="card">
     <h1>🔍 Verificar vehículo</h1>
 
-    <form method="post">
+    <form method="post" action="{% url 'inspectores_verificar_vehiculo' %}">
         {% csrf_token %}
 
         <div class="form-group">
@@ -27,6 +27,8 @@ Verificar Vehículo
             Verificar
         </button>
     </form>
+
+    <p>DEBUG RESULTADO: {{ resultado }}</p>
 
     {% if resultado %}
 

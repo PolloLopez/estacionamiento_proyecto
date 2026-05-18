@@ -1,6 +1,7 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 
 from logging import warning
+from urllib import request
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -538,6 +539,7 @@ def consultar_deuda(request):
 # =========================================================
 @require_role("inspector", "admin")
 def panel_inspectores(request):
+    print("VIEW: panel_inspectores")
     usuario = request.user
 
     if not usuario.es_inspector:
@@ -552,29 +554,17 @@ def panel_inspectores(request):
 @require_role("inspector", "admin")
 def verificar_vehiculo(request):
 
+    print("VIEW: verificar_vehiculo")
     print("METHOD:", request.method)
+    print("VALIDACION_ACTIVA:", settings.VALIDACION_ACTIVA)
 
-    # ==============================
-    # VALIDACIÓN GLOBAL
-    # ==============================
-    if not settings.VALIDACION_ACTIVA:
-
-        return render(
-            request,
-            "inspectores/verificar_vehiculo.html",
-            {
-                "error": "Sistema en modo restringido"
-            }
-        )
-
-    usuario = request.user
     resultado = None
+    error = None
 
     # ==============================
-    # POST → verificar patente
+    # POST
     # ==============================
     if request.method == "POST":
-        print("🔥 POST OK")
 
         patente = (
             request.POST.get("patente") or ""
@@ -586,156 +576,76 @@ def verificar_vehiculo(request):
         # VALIDAR INPUT
         # ==============================
         if not patente:
+            error = "Debe ingresar una patente"
 
-            return render(
-                request,
-                "inspectores/verificar_vehiculo.html",
-                {
-                    "error": "Debe ingresar una patente"
+        else:
+            # ==============================
+            # BUSCAR VEHICULO
+            # ==============================
+            try:
+                vehiculo = Vehiculo.objects.get(patente=patente)
+                print("VEHICULO:", vehiculo)
+
+            except Vehiculo.DoesNotExist:
+
+                resultado = {
+                    "patente": patente,
+                    "estado": "No registrado",
+                    "estacionamiento_activo": False
                 }
-            )
 
-        # ==============================
-        # BUSCAR VEHÍCULO
-        # ==============================
-        try:
+                return render(
+                    request,
+                    "inspectores/verificar_vehiculo.html",
+                    {"resultado": resultado}
+                )
 
-            vehiculo = Vehiculo.objects.get(
-                patente=patente
-            )
+            # ==============================
+            # MODO RESTRINGIDO
+            # ==============================
+            modo_restringido = not settings.VALIDACION_ACTIVA
 
-        except Vehiculo.DoesNotExist:
+            # ==============================
+            # ESTACIONAMIENTO
+            # ==============================
+            estacionamiento = Estacionamiento.objects.filter(
+                vehiculo=vehiculo,
+                activo=True
+            ).first()
 
+            print("ESTACIONAMIENTO:", estacionamiento)
+
+        if estacionamiento:
             resultado = {
                 "patente": patente,
-                "estado": "No registrado",
-                "detalle": "Vehículo no registrado",
+                "estado": "Pagado",
+                "estacionamiento_activo": True
+            }
+        else:
+            resultado = {
+                "patente": patente,
+                "estado": "Impago",
+                "estacionamiento_activo": False,
                 "registrar_infraccion_url":
                     reverse("inspectores_registrar_infraccion")
                     + f"?patente={patente}"
             }
-
+        
+        # 🔥 agregar esto:
+        if modo_restringido:
+            resultado["estado"] = "Modo restringido"
+        
+            # ==============================
+            # RENDER FINAL (GET o POST)
+            # ==============================
             return render(
                 request,
                 "inspectores/verificar_vehiculo.html",
                 {
-                    "resultado": resultado
+                    "resultado": resultado,
+                    "error": error
                 }
             )
-
-        # ==============================
-        # EXENTO TOTAL
-        # ==============================
-        if vehiculo.exento_global:
-
-            resultado = {
-                "patente": patente,
-                "estado": "Exento TOTAL",
-                "detalle": "Vehículo con exención total"
-            }
-
-            return render(
-                request,
-                "inspectores/verificar_vehiculo.html",
-                {
-                    "resultado": resultado
-                }
-            )
-
-        # ==============================
-        # ESTACIONAMIENTO ACTIVO
-        # ==============================
-        estacionamiento = Estacionamiento.objects.filter(
-            vehiculo=vehiculo,
-            activo=True,
-            municipio=usuario.municipio
-        ).first()
-
-        # ==============================
-        # EXENCIONES PARCIALES
-        # ==============================
-        subcuadras_exentas = (
-            vehiculo.subcuadras_exentas.all()
-        )
-
-        if subcuadras_exentas.exists():
-
-            resultado = {
-                "patente": patente,
-                "estado": "Exento parcial",
-                "subcuadras_exentas": subcuadras_exentas,
-                "detalle": "Puede estar exento según la subcuadra"
-            }
-
-            # 🚨 NO tiene estacionamiento
-            if not estacionamiento:
-
-                resultado["registrar_infraccion_url"] = (
-                    reverse("inspectores_registrar_infraccion")
-                    + f"?patente={patente}"
-                )
-
-            # ✅ tiene estacionamiento
-            else:
-
-                resultado["detalle"] = (
-                    "Tiene estacionamiento activo"
-                )
-
-            return render(
-                request,
-                "inspectores/verificar_vehiculo.html",
-                {
-                    "resultado": resultado
-                }
-            )
-
-        # ==============================
-        # ESTACIONAMIENTO ACTIVO
-        # ==============================
-        if estacionamiento and estacionamiento.activo:
-
-            resultado = {
-                "patente": patente,
-                "estado": "Pagado",
-                "detalle": "Estacionamiento activo"
-            }
-
-            return render(
-                request,
-                "inspectores/verificar_vehiculo.html",
-                {
-                    "resultado": resultado
-                }
-            )
-
-        # ==============================
-        # IMPAGO
-        # ==============================
-        resultado = {
-            "patente": patente,
-            "estado": "Impago",
-            "detalle": "Estacionamiento sin pago",
-            "registrar_infraccion_url":
-                reverse("inspectores_registrar_infraccion")
-                + f"?patente={patente}"
-        }
-
-        return render(
-            request,
-            "inspectores/verificar_vehiculo.html",
-            {
-                "resultado": resultado
-            }
-        )
-
-    # ==============================
-    # GET → mostrar formulario
-    # ==============================
-    return render(
-        request,
-        "inspectores/verificar_vehiculo.html"
-    )
 
 @require_role("inspector")
 def registrar_infraccion(request):
