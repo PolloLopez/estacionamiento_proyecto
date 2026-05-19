@@ -10,25 +10,39 @@
     </div>
   {% endif %}
 
-  <form id="infraccionForm" method="post" enctype="multipart/form-data">
+  <form id="infraccionForm"
+        method="post"
+        action="{% url 'inspectores_registrar_infraccion' %}"
+        enctype="multipart/form-data">
+  
     {% csrf_token %}
+  
     <label for="patente">Patente:</label>
-    <input id="patente" name="patente" value="{{ patente }}" readonly />
-
+  
+    <!-- visible -->
+    <input id="patente" value="{{ patente }}" readonly />
+  
+    <!-- real (POST) -->
+    <input type="hidden" name="patente" value="{{ patente }}">
+  
     <label for="subcuadra_id">Subcuadra:</label>
     <select id="subcuadra_id" name="subcuadra_id" required>
       {% for s in subcuadras %}
         <option value="{{ s.id }}">{{ s.calle }} {{ s.altura }}</option>
       {% endfor %}
     </select>
-
+  
     <label for="foto">Foto de la infracción:</label>
     <input type="file" id="foto" name="foto" accept="image/*" required />
-
+  
     <button type="submit" class="btn alert">
       Grabar acta de infracción
     </button>
-    <a href="{% url 'panel_inspectores' %}" class="btn link">🏠 Volver al inicio</a>
+  
+    <a href="{% url 'panel_inspectores' %}" class="btn link">
+      🏠 Volver al inicio
+    </a>
+  
   </form>
 </section>
 

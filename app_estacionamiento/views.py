@@ -628,10 +628,12 @@ def verificar_vehiculo(request):
                 "patente": patente,
                 "estado": "Exento parcial",
                 "estacionamiento_activo": False,
-                "subcuadras_exentas": subcuadras
+                "subcuadras_exentas": subcuadras,
+                "registrar_infraccion_url": reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
             }
             print("EXENTO PARCIAL")
-            return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
+            return render(request,  "inspectores/verificar_vehiculo.html", {"resultado": resultado})
+            
 
 
         # ==============================
@@ -645,7 +647,6 @@ def verificar_vehiculo(request):
 
         print("ESTACIONAMIENTO:", estacionamiento)
 
-
         if estacionamiento:
             resultado = {
                 "patente": patente,
@@ -656,7 +657,8 @@ def verificar_vehiculo(request):
             resultado = {
                 "patente": patente,
                 "estado": "Impago",
-                "estacionamiento_activo": False
+                "estacionamiento_activo": False,
+                "registrar_infraccion_url": reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
             }
 
         print("RESULTADO:", resultado)
@@ -671,57 +673,91 @@ def verificar_vehiculo(request):
 
 @require_role("inspector")
 def registrar_infraccion(request):
+    
     usuario = request.user
     mensaje = None
 
-    subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
-    #patente = (input).strip().upper()
-    patente = (request.GET.get("patente") or request.POST.get("patente") or "").strip().upper()
+    subcuadras = Subcuadra.objects.filter(
+        municipio=usuario.municipio
+    )
+
+    patente = (
+        request.GET.get("patente")
+        or request.POST.get("patente")
+        or ""
+    ).strip().upper()
 
     if request.method == "POST":
+
         subcuadra_id = request.POST.get("subcuadra_id")
         foto = request.FILES.get("foto")
 
+        # ==============================
+        # VALIDAR SUBCUADRA
+        # ==============================
         subcuadra = Subcuadra.objects.filter(
             id=subcuadra_id,
             municipio=usuario.municipio
         ).first()
 
-        vehiculo, creado = Vehiculo.objects.get_or_create(patente=patente)
-
-        estacionamiento = Estacionamiento.objects.filter(
-            vehiculo=vehiculo,
-            activo=True,
-            municipio=usuario.municipio
-        ).order_by("-hora_inicio").first()
-
-        if not vehiculo:
-            mensaje = "❌ Vehículo inexistente"
-
-        elif not subcuadra:
+        if not subcuadra:
             mensaje = "❌ Subcuadra inválida"
 
-        elif vehiculo.exento_global:
-            mensaje = "🚫 Exento TOTAL"
-
-        elif vehiculo.esta_exento_en(subcuadra):
-            mensaje = "🚫 Exento en esta subcuadra - No multa"
-
-        elif estacionamiento and estacionamiento.activo:
-            mensaje = "🚫 Tiene estacionamiento activo (no se multa)"
-
         else:
+            # ==============================
+            # VALIDAR VEHICULO
+            # ==============================
+            try:
+                vehiculo = Vehiculo.objects.get(patente=patente)
+            except Vehiculo.DoesNotExist:
+                mensaje = "❌ Vehículo no registrado"
 
-            inf = Infraccion.objects.create(
-                vehiculo=vehiculo,
-                inspector=usuario,
-                municipio=usuario.municipio,
-                subcuadra=subcuadra,
-                estacionamiento=estacionamiento,
-                foto=foto
-            )
+                return render(request, "inspectores/registrar_infraccion.html", {
+                    "mensaje": mensaje,
+                    "subcuadras": subcuadras,
+                    "patente": patente,
+                })
 
-            mensaje = f"🚨 Infracción registrada para {patente}"
+            # ==============================
+            # 🚫 EXENTO TOTAL
+            # ==============================
+            if vehiculo.exento_global:
+                mensaje = "🚫 Exento TOTAL"
+
+            # ==============================
+            # 🚫 EXENTO EN ESTA SUBCUADRA
+            # ==============================
+            elif vehiculo.esta_exento_en(subcuadra):
+                mensaje = "🚫 Exento en esta subcuadra"
+
+            else:
+                # ==============================
+                # 🚗 ESTACIONAMIENTO
+                # ==============================
+                estacionamiento = Estacionamiento.objects.filter(
+                    vehiculo=vehiculo,
+                    activo=True,
+                    municipio=usuario.municipio
+                ).order_by("-hora_inicio").first()
+
+                if estacionamiento:
+                    mensaje = "🚫 Tiene estacionamiento activo"
+
+                else:
+                    # ==============================
+                    # ✅ CREAR INFRACCION
+                    # ==============================
+                    Infraccion.objects.create(
+                        vehiculo=vehiculo,
+                        inspector=usuario,
+                        municipio=usuario.municipio,
+                        subcuadra=subcuadra,
+                        estacionamiento=estacionamiento,
+                        foto=foto
+                    )
+
+                    mensaje = f"🚨 Infracción registrada para {patente}"
+    print("POST DATA:", request.POST)
 
     return render(request, "inspectores/registrar_infraccion.html", {
         "mensaje": mensaje,

@@ -31,85 +31,87 @@ Verificar Vehículo
     <p>DEBUG RESULTADO: {{ resultado }}</p>
 
     {% if resultado %}
-    
+
     <div class="resultado-box">
-    
+
         <h2>Resultado</h2>
-    
+
         <p>
             <strong>Patente:</strong>
             {{ resultado.patente }}
         </p>
-    
+
         <p>
             <strong>Estado:</strong>
             {{ resultado.estado }}
         </p>
-    
+
         {# ============================== #}
         {# 🚫 EXENTO TOTAL #}
         {# ============================== #}
         {% if resultado.estado == "Exento TOTAL" %}
-    
+
             <p class="info">
                 🟢 Vehículo exento total — NO corresponde infracción
             </p>
-    
+
         {# ============================== #}
         {# ⚠️ EXENTO PARCIAL #}
         {# ============================== #}
         {% elif resultado.estado == "Exento parcial" %}
-    
+
             <p class="warning">
                 ⚠️ Exento solo en algunas subcuadras
             </p>
-    
+
             <ul>
                 {% for sub in resultado.subcuadras_exentas %}
                     <li>📍 {{ sub }}</li>
                 {% endfor %}
             </ul>
-    
+
             <p class="danger">
                 ❗ Verificar ubicación antes de infraccionar
             </p>
-    
+
             <a
                 href="{{ resultado.registrar_infraccion_url }}"
                 class="btn alert"
             >
                 Registrar infracción
+                
             </a>
-    
+            <p>URL DEBUG: {{ resultado.registrar_infraccion_url }}</p>
+
         {# ============================== #}
         {# ✅ PAGADO #}
         {# ============================== #}
         {% elif resultado.estacionamiento_activo %}
-    
+
             <p class="success">
                 ✅ Estacionamiento activo — NO corresponde infracción
             </p>
-    
+
         {# ============================== #}
         {# ❌ IMPAGO #}
         {# ============================== #}
         {% else %}
-    
+
             <p class="danger">
                 ❌ Vehículo sin estacionamiento
             </p>
-    
+
             <a
                 href="{{ resultado.registrar_infraccion_url }}"
                 class="btn alert"
             >
                 Registrar infracción
             </a>
-    
+
         {% endif %}
-    
+
     </div>
-    
+
     {% endif %}
 
 </section>
