@@ -82,6 +82,19 @@ Verificar Vehículo
                 
             </a>
             <p>URL DEBUG: {{ resultado.registrar_infraccion_url }}</p>
+            {% if infracciones_recientes %}
+              <div class="historial-box">
+                <h3>📜 Últimas infracciones</h3>
+            
+                <ul>
+                  {% for inf in infracciones_recientes %}
+                    <li>
+                      {{ inf.subcuadra }} — {{ inf.created_at|default:inf.id }}
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
 
         {# ============================== #}
         {# ✅ PAGADO #}

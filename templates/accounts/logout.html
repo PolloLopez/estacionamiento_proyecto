@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+  <h2>¿Cerrar sesión?</h2>
+
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn alert">Cerrar sesión</button>
+  </form>
+</section>
+{% endblock %}

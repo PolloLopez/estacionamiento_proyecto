@@ -28,7 +28,11 @@
     <label for="subcuadra_id">Subcuadra:</label>
     <select id="subcuadra_id" name="subcuadra_id" required>
       {% for s in subcuadras %}
-        <option value="{{ s.id }}">{{ s.calle }} {{ s.altura }}</option>
+        <option value="{{ s.id }}"
+          {% if s.id == subcuadra_default %}selected{% endif %}
+        >
+          {{ s.calle }} {{ s.altura }}
+        </option>
       {% endfor %}
     </select>
   
@@ -47,6 +51,6 @@
 </section>
 
 <script>
-
+  alert("{{ mensaje }}");
 </script>
 {% endblock %}

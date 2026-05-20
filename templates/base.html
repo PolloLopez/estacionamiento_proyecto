@@ -5,29 +5,50 @@
 
     {% load static %}
 
-    <title>{% block title %} Estacionamiento Medido {% endblock %}</title>
+    <title>{% block title %}Estacionamiento Medido{% endblock %}</title>
 
-    <link
-      rel="stylesheet"
-      href="{% static 'app_estacionamiento/css/global.css' %}"
-    />
+    <link rel="stylesheet" href="{% static 'app_estacionamiento/css/global.css' %}" />
   </head>
 
   <body>
-    <header>
-      <a href="{% url 'inicio' %}"> Inicio </a>
+
+    <!-- 🔥 NAVBAR -->
+    <header style="padding:10px; background:#222; color:white;">
+      
+      <a href="{% url 'inicio' %}" style="color:white; margin-right:15px;">
+        🏠 Inicio
+      </a>
 
       {% if request.user.is_authenticated %}
+        <span style="margin-right:15px;">
+          👤 {{ request.user.email }}
+        </span>
 
-      <a href="{% url 'logout' %}"> Salir </a>
-
+        <a href="{% url 'logout' %}" style="color:#ff6b6b;">
+          Salir
+        </a>
       {% else %}
-
-      <a href="{% url 'login' %}"> Login </a>
-
+        <a href="{% url 'login' %}" style="color:#4dabf7;">
+          Login
+        </a>
       {% endif %}
+
     </header>
 
-    <main>{% block content %} {% endblock %}</main>
+    <!-- 🔥 MENSAJES GLOBALES -->
+    {% if messages %}
+      <div style="padding:10px;">
+        {% for message in messages %}
+          <div style="background:#333; color:white; padding:8px; margin-bottom:5px;">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <main style="padding:15px;">
+      {% block content %}{% endblock %}
+    </main>
+
   </body>
 </html>

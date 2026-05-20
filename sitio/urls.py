@@ -12,4 +12,6 @@ urlpatterns = [
 
     # app completa
     path("usuarios/", include("app_estacionamiento.urls")),
+
+    path("accounts/", include("allauth.urls")),
 ]

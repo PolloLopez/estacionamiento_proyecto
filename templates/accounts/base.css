@@ -1,0 +1,18 @@
+.panel {
+  max-width: 400px;
+  margin: 50px auto;
+  padding: 20px;
+  background: #1e1e1e;
+  border-radius: 10px;
+  color: white;
+  text-align: center;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 20px;
+  background: #4285F4;
+  color: white;
+  text-decoration: none;
+  border-radius: 5px;
+}

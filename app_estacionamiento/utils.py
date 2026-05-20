@@ -2,10 +2,18 @@
 
 from app_estacionamiento.models import Subcuadra
 
-
 def get_subcuadra_default(municipio):
-    return Subcuadra.objects.get_or_create(
-        calle="Zona Única",
+    subcuadra = Subcuadra.objects.filter(
+        calle="SIN DEFINIR",
         altura=0,
         municipio=municipio
-    )[0]
+    ).first()
+
+    if subcuadra:
+        return subcuadra
+
+    return Subcuadra.objects.create(
+        calle="SIN DEFINIR",
+        altura=0,
+        municipio=municipio
+    )

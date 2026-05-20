@@ -256,6 +256,7 @@ class Infraccion(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
     cancelada = models.BooleanField(default=False)
     foto = models.ImageField(upload_to="infracciones/", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         if not self.municipio:

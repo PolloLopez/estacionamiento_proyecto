@@ -26,11 +26,13 @@ INSTALLED_APPS = [
 
     'app_estacionamiento',
 
-    #'allauth',
-    #'allauth.account',
-    #'allauth.socialaccount',
-    # 'allauth.socialaccount.providers.google', # Login con Google
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
 ]
+
+SITE_ID = 1
 
 # ⚙️ Middleware (control de peticiones)
 
@@ -42,6 +44,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
@@ -53,6 +56,7 @@ SITE_ID = 1
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 ENV = os.getenv("ENV", "dev")
@@ -119,15 +123,23 @@ VALIDACION_ACTIVA = False # True El sistema FUNCIONA (permite verificar) valida 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-key")
 
-# redirireccion correcta.
+# LOGIN / LOGOUT
+LOGIN_REDIRECT_URL = "/usuarios/inicio/"
+LOGOUT_REDIRECT_URL = "/"
 
-LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "inicio"
-LOGOUT_REDIRECT_URL = "login"
+# ALLAUTH (modo email-only)
+ACCOUNT_LOGIN_METHODS = {"email"}
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 
+ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USERNAME_REQUIRED = False
+
+ACCOUNT_ADAPTER = "app_estacionamiento.adapters.NoUsernameAccountAdapter"
+
+SOCIALACCOUNT_AUTO_SIGNUP = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
 ]
-
 

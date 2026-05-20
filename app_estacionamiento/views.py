@@ -24,6 +24,7 @@ from .models import (
 )
 from .utils import get_subcuadra_default
 from .factories import EstacionamientoFactory
+from datetime import timedelta
 
 
 @login_required
@@ -597,14 +598,35 @@ def verificar_vehiculo(request):
             resultado = {
                 "patente": patente,
                 "estado": "No registrado",
-                "estacionamiento_activo": False
+                "estacionamiento_activo": False,
+                "infracciones_recientes": infracciones_recientes
             }
 
             return render(
                 request,
-                "inspectores/verificar_vehiculo.html",
-                {"resultado": resultado}
+                "inspectores/verificar_vehiculo.html",{
+                    "resultado": resultado,
+                    "subcuadra_default": subcuadra_default,
+                    "infracciones_recientes": infracciones_recientes
+                }
             )
+        
+        # ==============================
+        # 📜 Últimas infracciones
+        # ==============================
+        infracciones_recientes = Infraccion.objects.filter(
+            vehiculo=vehiculo
+        ).order_by("-id")[:3]
+
+        # ==============================
+        # 🧠 Última subcuadra usada
+        # ==============================
+        ultima_infraccion = Infraccion.objects.filter(
+            inspector=request.user
+        ).order_by("-id").first()
+
+        subcuadra_default = ultima_infraccion.subcuadra if ultima_infraccion else None
+
         # ==============================
         # 🚫 EXENTO TOTAL (PRIMERO)
         # ==============================
@@ -615,9 +637,12 @@ def verificar_vehiculo(request):
                 "estacionamiento_activo": True
             }
             print("EXENTO TOTAL")
-            return render(request, "inspectores/verificar_vehiculo.html", {"resultado": resultado})
-        
-        
+            return render(request, "inspectores/verificar_vehiculo.html", {
+                "resultado": resultado,
+                "infracciones_recientes": infracciones_recientes
+            })
+
+
         # ==============================
         # ⚠️ EXENTO PARCIAL
         # ==============================
@@ -629,11 +654,16 @@ def verificar_vehiculo(request):
                 "estado": "Exento parcial",
                 "estacionamiento_activo": False,
                 "subcuadras_exentas": subcuadras,
+                "infracciones_recientes": infracciones_recientes,
                 "registrar_infraccion_url": reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
             }
             print("EXENTO PARCIAL")
-            return render(request,  "inspectores/verificar_vehiculo.html", {"resultado": resultado})
-            
+            return render(request,  "inspectores/verificar_vehiculo.html", {
+                "resultado": resultado,
+                "infracciones_recientes": infracciones_recientes,
+                "subcuadra_default": subcuadra_default
+            })
+
 
 
         # ==============================
@@ -651,13 +681,15 @@ def verificar_vehiculo(request):
             resultado = {
                 "patente": patente,
                 "estado": "Pagado",
-                "estacionamiento_activo": True
+                "estacionamiento_activo": True,
+                "infracciones_recientes": infracciones_recientes
             }
         else:
             resultado = {
                 "patente": patente,
                 "estado": "Impago",
                 "estacionamiento_activo": False,
+                "infracciones_recientes": infracciones_recientes,
                 "registrar_infraccion_url": reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
             }
 
@@ -667,103 +699,119 @@ def verificar_vehiculo(request):
         # ==============================
         return render(
             request,
-            "inspectores/verificar_vehiculo.html",
-            {"resultado": resultado}
+            "inspectores/verificar_vehiculo.html",{
+                "resultado": resultado,
+                "infracciones_recientes": infracciones_recientes,
+                "subcuadra_default": subcuadra_default
+                }
         )
+    
+    print("RESULTADO FINAL:", resultado)
 
 @require_role("inspector")
 def registrar_infraccion(request):
-    
     usuario = request.user
     mensaje = None
 
-    subcuadras = Subcuadra.objects.filter(
-        municipio=usuario.municipio
-    )
+    subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
 
-    patente = (
-        request.GET.get("patente")
-        or request.POST.get("patente")
-        or ""
-    ).strip().upper()
+    # ==============================
+    # 🧠 Última subcuadra usada
+    # ==============================
+    ultima_infraccion = Infraccion.objects.filter(
+        inspector=usuario
+    ).order_by("-id").first()
+    
+    subcuadra_default = None
+    
+    if ultima_infraccion:
+        subcuadra_default = ultima_infraccion.subcuadra_id
+
+        infracciones_recientes = Infraccion.objects.filter(
+            municipio=usuario.municipio
+        ).order_by("-fecha")[:5]
 
     if request.method == "POST":
 
         subcuadra_id = request.POST.get("subcuadra_id")
         foto = request.FILES.get("foto")
 
-        # ==============================
-        # VALIDAR SUBCUADRA
-        # ==============================
         subcuadra = Subcuadra.objects.filter(
             id=subcuadra_id,
             municipio=usuario.municipio
         ).first()
 
+        # obtener patente desde el POST
+        patente = (request.POST.get('patente') or "").strip().upper()
+
+        vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+
+        estacionamiento = Estacionamiento.objects.filter(
+            vehiculo=vehiculo,
+            activo=True,
+            municipio=usuario.municipio
+        ).order_by("-hora_inicio").first()
+
+        # ==============================
+        # 🚫 VALIDACIONES
+        # ==============================
         if not subcuadra:
             mensaje = "❌ Subcuadra inválida"
 
+            return render(request, "inspectores/registrar_infraccion.html", {
+                "mensaje": mensaje,
+                "subcuadras": subcuadras,
+                "patente": patente,
+                "infracciones_recientes": infracciones_recientes,
+                "subcuadra_default": subcuadra_default
+            })
+
+        elif vehiculo.exento_global:
+            mensaje = "🚫 Exento TOTAL"
+
+        elif vehiculo.esta_exento_en(subcuadra):
+            mensaje = "🚫 Exento en esta subcuadra"
+
+        elif estacionamiento:
+            mensaje = "🚫 Tiene estacionamiento activo"
+
         else:
-            # ==============================
-            # VALIDAR VEHICULO
-            # ==============================
-            try:
-                vehiculo = Vehiculo.objects.get(patente=patente)
-            except Vehiculo.DoesNotExist:
-                mensaje = "❌ Vehículo no registrado"
-
-                return render(request, "inspectores/registrar_infraccion.html", {
-                    "mensaje": mensaje,
-                    "subcuadras": subcuadras,
-                    "patente": patente,
-                })
 
             # ==============================
-            # 🚫 EXENTO TOTAL
+            # 🚫 BLOQUEO DUPLICADOS (SIN created_at)
             # ==============================
-            if vehiculo.exento_global:
-                mensaje = "🚫 Exento TOTAL"
+            hace_15_min = timezone.now() - timedelta(minutes=15)
 
-            # ==============================
-            # 🚫 EXENTO EN ESTA SUBCUADRA
-            # ==============================
-            elif vehiculo.esta_exento_en(subcuadra):
-                mensaje = "🚫 Exento en esta subcuadra"
+            ultima = Infraccion.objects.filter(
+                vehiculo=vehiculo,
+                municipio=usuario.municipio
+            ).order_by("-id").first()
+
+            if ultima and ultima.fecha >= hace_15_min:
+                mensaje = "⚠️ Ya existe una infracción reciente"
 
             else:
-                # ==============================
-                # 🚗 ESTACIONAMIENTO
-                # ==============================
-                estacionamiento = Estacionamiento.objects.filter(
+                Infraccion.objects.create(
                     vehiculo=vehiculo,
-                    activo=True,
-                    municipio=usuario.municipio
-                ).order_by("-hora_inicio").first()
+                    inspector=usuario,
+                    municipio=usuario.municipio,
+                    subcuadra=subcuadra,
+                    estacionamiento=estacionamiento,
+                    foto=foto
+                )
 
-                if estacionamiento:
-                    mensaje = "🚫 Tiene estacionamiento activo"
-
-                else:
-                    # ==============================
-                    # ✅ CREAR INFRACCION
-                    # ==============================
-                    Infraccion.objects.create(
-                        vehiculo=vehiculo,
-                        inspector=usuario,
-                        municipio=usuario.municipio,
-                        subcuadra=subcuadra,
-                        estacionamiento=estacionamiento,
-                        foto=foto
-                    )
-
-                    mensaje = f"🚨 Infracción registrada para {patente}"
-    print("POST DATA:", request.POST)
-
+                mensaje = f"🚨 Infracción registrada para {patente}"
+                
+    
+    # 👇 SIEMPRE retorna
     return render(request, "inspectores/registrar_infraccion.html", {
         "mensaje": mensaje,
         "subcuadras": subcuadras,
         "patente": patente,
+        "infracciones_recientes": infracciones_recientes,
+        "subcuadra_default": subcuadra_default
     })
+    
 
 @require_role("inspector", "admin", "vendedor")
 def registrar_estacionamiento_manual(request):
