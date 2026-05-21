@@ -1,17 +1,37 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block title %}Panel Municipal{% endblock %} {%
+block content %}
+<section class="container">
+  <div class="panel">
+    <h2>Panel Municipal</h2>
+    <div class="panel-body">
+      <p>
+        Bienvenido al panel de administración. Aquí puedes gestionar usuarios,
+        revisar cobros
+      </p>
 
-{% block title %}Panel Municipal{% endblock %}
-
-{% block content %}
-<section class="panel">
-  <h2>Panel Municipal</h2>
-
-  <div class="filters">
-    <a href="?rol=" class="btn {% if not rol_seleccionado %}active{% endif %}">Todos</a>
-    <a href="?rol=vendedor" class="btn {% if rol_seleccionado == 'vendedor' %}active{% endif %}">Vendedores</a>
-    <a href="?rol=inspector" class="btn {% if rol_seleccionado == 'inspector' %}active{% endif %}">Inspectores</a>
-    <a href="?rol=conductor" class="btn {% if rol_seleccionado == 'conductor' %}active{% endif %}">Conductores</a>
+      <div class="filters">
+        <a
+          href="?rol="
+          class="btn {% if not rol_seleccionado %}active{% endif %}"
+          >Todos</a
+        >
+        <a
+          href="?rol=vendedor"
+          class="btn {% if rol_seleccionado == 'vendedor' %}active{% endif %}"
+          >Vendedores</a
+        >
+        <a
+          href="?rol=inspector"
+          class="btn {% if rol_seleccionado == 'inspector' %}active{% endif %}"
+          >Inspectores</a
+        >
+        <a
+          href="?rol=conductor"
+          class="btn {% if rol_seleccionado == 'conductor' %}active{% endif %}"
+          >Conductores</a
+        >
+      </div>
+    </div>
   </div>
-
 </section>
 {% endblock %}

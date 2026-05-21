@@ -2,8 +2,10 @@
 {% block title %}Gestionar Inspectores{% endblock %}
 
 {% block content %}
-<section class="panel">
+<section class="container">
+<div class="panel">
   <h2>Inspectores</h2>
+  <div class="panel-body">
 
   <!-- Nuevo inspector -->
   <form method="post" action="{% url 'admin_crear_inspector' %}" class="form">
@@ -29,5 +31,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  </div>
 </section>
 {% endblock %}

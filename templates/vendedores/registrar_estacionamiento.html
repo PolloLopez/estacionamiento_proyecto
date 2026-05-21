@@ -1,42 +1,52 @@
-{% extends "base.html" %}
-{% block title %}Registrar Estacionamiento — Vendedor{% endblock %}
+{% extends "base.html" %} {% block title %}Registrar Estacionamiento —
+Vendedor{% endblock %} {% block content %}
+<section class="container">
+  <div class="panel">
+    <h2>Registrar estacionamiento (a nombre de cliente)</h2>
+    <div class="panel-body">
+      <form
+        method="post"
+        action="{% url 'vendedores_registrar_estacionamiento' %}"
+      >
+        {% csrf_token %}
+        <div class="form-row">
+          <label>Patente</label>
+          <input name="patente" required />
+        </div>
+        <div class="form-row">
+          <label>Cliente (opcional)</label>
+          <input name="cliente_email" />
+        </div>
+        <div class="form-row">
+          <label>Duración (horas)</label>
+          <input name="duracion" type="number" min="1" value="1" />
+        </div>
+        <div class="form-row actions">
+          <button class="btn-general">Registrar y cobrar</button>
+        </div>
+      </form>
 
-{% block content %}
-<section class="panel">
-  <h2>Registrar estacionamiento (a nombre de cliente)</h2>
-  <form method="post" action="{% url 'vendedores_registrar_estacionamiento' %}">
-    {% csrf_token %}
-    <div class="form-row">
-      <label>Patente</label>
-      <input name="patente" required />
+      {% if error %}
+      <p class="error">{{ error }}</p>
+      {% endif %}
+      <div class="actions">
+        {% if request.user.es_inspector %}
+        <a href="{% url 'panel_inspectores' %}" class="btn link"
+          >🏠 Volver al inicio</a
+        >
+        {% elif request.user.es_vendedor %}
+        <a href="{% url 'panel_vendedores' %}" class="btn link"
+          >🏠 Volver al inicio</a
+        >
+        {% elif request.user.es_admin %}
+        <a href="{% url 'panel_admin' %}" class="btn link"
+          >🏠 Volver al inicio</a
+        >
+        {% else %}
+        <a href="{% url 'inicio' %}" class="btn link">🏠 Volver al inicio</a>
+        {% endif %}
+      </div>
     </div>
-    <div class="form-row">
-      <label>Cliente (opcional)</label>
-      <input name="cliente_email" />
-    </div>
-    <div class="form-row">
-      <label>Duración (horas)</label>
-      <input name="duracion" type="number" min="1" value="1" />
-    </div>
-    <div class="form-row actions">
-      <button class="btn-general">Registrar y cobrar</button>
-    </div>
-  </form>
-
-  {% if error %}
-    <p class="error">{{ error }}</p>
-  {% endif %}
-  <div class="actions">
-  {% if request.user.es_inspector %}
-    <a href="{% url 'panel_inspectores' %}" class="btn link">🏠 Volver al inicio</a>
-  {% elif request.user.es_vendedor %}
-    <a href="{% url 'panel_vendedores' %}" class="btn link">🏠 Volver al inicio</a>
-  {% elif request.user.es_admin %}
-    <a href="{% url 'panel_admin' %}" class="btn link">🏠 Volver al inicio</a>
-  {% else %}
-    <a href="{% url 'inicio' %}" class="btn link">🏠 Volver al inicio</a>
-  {% endif %}
-</div>
-
+  </div>
 </section>
 {% endblock %}

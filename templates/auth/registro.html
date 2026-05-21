@@ -1,32 +1,37 @@
-{% extends "base.html" %}
+{% extends "base.html" %} {% block content %}
+<section class="container">
+  <div class="panel">
+    <h2>Crear cuenta</h2>
+    <div class="panel-body">
+      <form method="post">
+        {% csrf_token %}
 
-{% block content %}
-<section class="panel">
-  <h2>Crear cuenta</h2>
+        <div>
+          <label>Correo</label>
+          {{ form.correo }}
+        </div>
 
-  <form method="post">
-    {% csrf_token %}
+        <div>
+          <label>Contraseña</label>
+          {{ form.password1 }}
+        </div>
 
-    <div>
-      <label>Correo</label>
-      {{ form.correo }}
+        <div>
+          <label>Repetir contraseña</label>
+          {{ form.password2 }}
+        </div>
+
+        <button type="submit">Registrarme</button>
+      </form>
+
+      {% if form.errors %}
+      <p style="color: red">{{ form.errors }}</p>
+      {% endif %}
+      <p>
+        ¿Ya tienes cuenta?
+        <a href="{% url 'usuarios_login' %}">Inicia sesión</a>
+      </p>
     </div>
-
-    <div>
-      <label>Contraseña</label>
-      {{ form.password1 }}
-    </div>
-
-    <div>
-      <label>Repetir contraseña</label>
-      {{ form.password2 }}
-    </div>
-
-    <button type="submit">Registrarme</button>
-  </form>
-
-  {% if form.errors %}
-    <p style="color:red">{{ form.errors }}</p>
-  {% endif %}
+  </div>
 </section>
 {% endblock %}

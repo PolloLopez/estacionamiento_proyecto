@@ -1,43 +1,43 @@
-{% extends "base.html" %}
-{% block title %}Historial de Estacionamientos{% endblock %}
+{% extends "base.html" %} {% block title %}Historial de Estacionamientos{%
+endblock %} {% block content %}
+<section class="container">
+  <div class="panel">
+    <h2>Bienvenido, {{ usuario.nombre }}</h2>
+    <div class="panel-body">
+      <h2>🚗 Historial de estacionamientos</h2>
 
-{% block content %}
-<section class="panel">
-  <h1>Bienvenido, {{ usuario.nombre }}</h1>
-
-  {% if estacionamientos %}
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Fecha inicio</th>
-          <th>Fecha fin</th>
-          <th>Calle</th>
-          <th>Altura</th>
-          <th>Patente</th>
-          <th>Costo</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for e in estacionamientos %}
+      {% if estacionamientos %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha inicio</th>
+            <th>Fecha fin</th>
+            <th>Calle</th>
+            <th>Altura</th>
+            <th>Patente</th>
+            <th>Costo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in estacionamientos %}
           <tr>
             <td>{{ e.hora_inicio|date:"d/m/Y H:i" }}</td>
             <td>
-              {% if e.hora_fin %}
-                {{ e.hora_fin|date:"d/m/Y H:i" }}
-              {% else %}
-                Activo
-              {% endif %}
+              {% if e.hora_fin %} {{ e.hora_fin|date:"d/m/Y H:i" }} {% else %}
+              Activo {% endif %}
             </td>
             <td>{{ e.subcuadra.calle }}</td>
             <td>{{ e.subcuadra.altura }}</td>
             <td>{{ e.vehiculo.patente }}</td>
             <td>${{ e.costo }}</td>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No tenés estacionamientos registrados.</p>
-  {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No tenés estacionamientos registrados.</p>
+      {% endif %}
+    </div>
+  </div>
 </section>
 {% endblock %}

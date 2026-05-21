@@ -1,0 +1,13 @@
+<div class="panel">
+  {% if title %}
+    <h2>{{ title }}</h2>
+  {% endif %}
+
+  {% if subtitle %}
+    <p class="text-muted">{{ subtitle }}</p>
+  {% endif %}
+
+  <div class="panel-body">
+    {% block panel_content %}{% endblock %}
+  </div>
+</div>

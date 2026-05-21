@@ -2,22 +2,24 @@
 {% block title %}Historial de Infracciones{% endblock %}
 
 {% block content %}
-<section class="panel">
-  <h2>⚠️ Historial de infracciones</h2>
+<section class="container">
+  <div class="panel">
+    <h2>⚠️ Historial de infracciones</h2>
+    <div class="panel-body">
 
-  {% if infracciones %}
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Patente</th>
-          <th>Calle</th>
-          <th>Altura</th>
-          <th>Estado</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for i in infracciones %}
+      {% if infracciones %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Patente</th>
+            <th>Calle</th>
+            <th>Altura</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in infracciones %}
           <tr>
             <td>{{ i.fecha|date:"d/m/Y H:i" }}</td>
             <td>{{ i.vehiculo.patente }}</td>
@@ -25,18 +27,19 @@
             <td>{{ i.subcuadra.altura }}</td>
             <td>
               {% if i.cancelada %}
-                ✅ Pagada
+              ✅ Pagada
               {% else %}
-                🚫 Impaga
+              🚫 Impaga
               {% endif %}
             </td>
           </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No tenés infracciones registradas.</p>
-  {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No tenés infracciones registradas.</p>
+      {% endif %}
+    </div>
+  </div>
 </section>
 {% endblock %}
-

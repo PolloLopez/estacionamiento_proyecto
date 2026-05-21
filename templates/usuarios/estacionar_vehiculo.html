@@ -1,70 +1,94 @@
-<!-- templates/usuarios/estacionar_vehiculo.html -->
- {% extends "base.html" %} 
+{% extends "base.html" %}
 {% block title %}Estacionar vehículo{% endblock %}
 
 {% block content %}
-<section class="panel">
-  <h2>Registrar estacionamiento</h2>
 
-  {% if error %}
-    <p class="error">{{ error }}</p>
-  {% endif %}
+<div class="container">
 
-  {% if warning %}
-    <div style="color: orange; font-weight: bold;">
-      {{ warning }}
-    </div>
-  {% endif %}
+  <!-- 💰 SALDO -->
+  <div class="card">
+    <h3>💰 Tu saldo</h3>
+    <h2>${{ usuario.saldo }}</h2>
 
-  <form method="post" action="{% url 'usuarios_estacionar_vehiculo' %}">
-    {% csrf_token %}
+    {% if usuario.saldo < 100 %}
+      <p class="danger">Saldo insuficiente</p>
+    {% else %}
+      <p class="success">Saldo disponible</p>
+    {% endif %}
+  </div>
 
-    <!-- Tipo de vehículo -->
-    <div class="form-row">
-      <label for="tipo">Tipo</label>
-      <select id="tipo" name="tipo">
-        <option value="auto">Auto</option>
-        <option value="moto">Moto</option>
+  <!-- 🚗 FORM -->
+  <div class="card">
+    <h3>🚗 Estacionar vehículo</h3>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <!-- PATENTE -->
+      <label>Patente</label>
+      <select name="vehiculo_id" class="input" required>
+        {% for v in vehiculos %}
+          <option value="{{ v.id }}">
+            {{ v.patente }}
+          </option>
+        {% endfor %}
       </select>
-    </div>
 
-    <!-- Patente -->
-    <div class="form-row">
-      <label for="patente">Patente</label>
-      <input id="patente" name="patente" required />
-    </div>
+      <!-- DURACIÓN -->
+      <label>Duración</label>
 
-    <!-- Duración -->
-    <div class="form-row">
-      <label for="duracion">Duración estimada</label>
-      <select id="duracion" name="duracion">
-        <option value="1">1 hs</option>
-        <option value="1.5">1.5 hs</option>
-        <option value="2">2 hs</option>
-        <option value="2.5">2.5 hs</option>
-        <option value="3">3 hs</option>
-        <option value="3.5">3.5 hs</option>
-        <option value="4">4 hs</option>
-      </select>
-    </div>
+      <div class="duraciones">
+        <button type="button" class="btn-outline duracion-btn" data-horas="1">1h</button>
+        <button type="button" class="btn-outline duracion-btn" data-horas="2">2h</button>
+        <button type="button" class="btn-outline duracion-btn" data-horas="4">4h</button>
+      </div>
 
-    <!-- Botón de acción -->
-    <div class="form-row actions">
-      <button class="btn link">Estacionar</button>
-    </div>
-  </form>
-  {% if error %}<p style="color:red">{{ error }}</p>{% endif %}
-  <div class="actions">
-  {% if request.user.es_inspector %}
-    <a href="{% url 'panel_inspectores' %}" class="btn link">🏠 Volver al inicio</a>
-  {% elif request.user.es_vendedor %}
-    <a href="{% url 'panel_vendedores' %}" class="btn link">🏠 Volver al inicio</a>
-  {% elif request.user.es_admin %}
-    <a href="{% url 'panel_admin' %}" class="btn link">🏠 Volver al inicio</a>
-  {% else %}
-    <a href="{% url 'inicio' %}" class="btn link">🏠 Volver al inicio</a>
-  {% endif %}
+      <input type="hidden" name="horas" id="horas" value="1">
+
+      <!-- RESUMEN -->
+      <div class="resumen">
+        <p>Duración: <strong id="duracionTexto">1 hora</strong></p>
+        <p>Costo: <strong id="costoTexto">$100</strong></p>
+      </div>
+
+      <!-- ERROR -->
+      {% if error %}
+        <div class="alert alert-danger">
+          {{ error }}
+        </div>
+      {% endif %}
+
+      <!-- BOTÓN -->
+      <button class="btn" type="submit">
+        Confirmar estacionamiento
+      </button>
+
+    </form>
+  </div>
+
 </div>
 
-</section>
+<script>
+  const botones = document.querySelectorAll(".duracion-btn");
+  const horasInput = document.getElementById("horas");
+  const duracionTexto = document.getElementById("duracionTexto");
+  const costoTexto = document.getElementById("costoTexto");
+
+  const PRECIO_HORA = 100;
+
+  botones.forEach(btn => {
+    btn.addEventListener("click", () => {
+
+      botones.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      const horas = btn.dataset.horas;
+      horasInput.value = horas;
+
+      duracionTexto.innerText = horas + " hora(s)";
+      costoTexto.innerText = "$" + (horas * PRECIO_HORA);
+    });
+  });
+</script>
+
 {% endblock %}

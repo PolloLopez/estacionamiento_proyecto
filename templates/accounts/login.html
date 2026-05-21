@@ -1,12 +1,12 @@
-{% extends "base.html" %}
-
-{% block content %}
-<section class="panel">
-  <h2>🔐 Iniciar sesión</h2>
-
-  <a href="{% url 'google_login' %}" class="btn">
-    🔵 Iniciar sesión con Google
-  </a>
-
+{% extends "base.html" %} {% block content %}
+<section class="container">
+  <div class="panel">
+    <h2>🔐 Iniciar sesión</h2>
+    <div class="panel-body">
+      <a href="{% url 'google_login' %}" class="btn">
+        🔵 Iniciar sesión con Google
+      </a>
+    </div>
+  </div>
 </section>
 {% endblock %}

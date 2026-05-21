@@ -1,31 +1,150 @@
-<!-- templates/usuarios/inicio_usuarios.html -->
-{% extends "base.html" %} 
-{% block title %}Inicio — Usuario{% endblock %}
+{% extends "base.html" %}
+{% block title %}Inicio{% endblock %}
 
 {% block content %}
-<section class="panel">
-  <h1>Bienvenido, {{ usuario.nombre }}</h1>
-  <h4>Saldo actual: ${{ usuario.saldo }} </h4>
 
-  {% if estacionamiento_activo %}
-    <div class="card">
-      <h3>Estacionamiento activo</h3>
+<div class="grid grid-2">
 
-      <p>Patente: {{ estacionamiento_activo.vehiculo.patente }}</p>
-      <p>Zona: {{ estacionamiento_activo.subcuadra }}</p>
-      <p>Inicio: {{ estacionamiento_activo.hora_inicio }}</p>
+  <!-- 👤 PERFIL -->
+  <div class="card">
+    <h2>👤 {{ usuario.nombre }}</h2>
+    <p class="info">Saldo: ${{ usuario.saldo }}</p>
 
-      <a class="btn" href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}">
+    {% if usuario.saldo < 100 %}
+      <p class="danger">⚠️ Saldo bajo</p>
+    {% endif %}
+  </div>
+
+  <!-- 🚗 ESTADO -->
+  <div class="card">
+    <h3>Estado del vehículo</h3>
+
+    {% if estacionamiento_activo %}
+
+      <p class="success">🟢 Estacionado</p>
+      <p><b>Patente:</b> {{ estacionamiento_activo.vehiculo.patente }}</p>
+      <p><b>Zona:</b> {{ estacionamiento_activo.subcuadra }}</p>
+
+      <!-- ⏱ TIMER -->
+      <div class="timer-box">
+        <span id="timer">--:--</span>
+      </div>
+
+      <!-- 📊 PROGRESS -->
+      <div class="progress-bar">
+        <div id="progress"></div>
+      </div>
+
+      <!-- DATOS PARA JS -->
+      <script>
+        const horaInicio = "{{ estacionamiento_activo.hora_inicio|date:'c' }}";
+        const duracionHoras = {{ estacionamiento_activo.duracion }};
+      </script>
+
+      <a class="btn danger"
+         href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}">
         Finalizar
       </a>
-    </div>
-  {% else %}
-    <p>No tenés estacionamientos activos.</p>
-  {% endif %}
 
-  <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">
-    Estacionar vehículo
-  </a>
+    {% else %}
 
-</section>
+      <p class="warning">🟡 No estacionado</p>
+
+      <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">
+        Estacionar vehículo
+      </a>
+
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- 📊 ACCIONES -->
+<div class="grid grid-3" style="margin-top:1rem;">
+
+  <div class="card">
+    <h4>📜 Historial</h4>
+    <a class="btn btn-outline" href="{% url 'usuarios_historial_estacionamientos' %}">
+      Ver historial
+    </a>
+  </div>
+
+  <div class="card">
+    <h4>💰 Cargar saldo</h4>
+    <a class="btn btn-outline" href="{% url 'cargar_saldo' %}">
+      Cargar
+    </a>
+  </div>
+
+  <div class="card">
+    <h4>⚠️ Infracciones</h4>
+    <a class="btn btn-outline" href="{% url 'usuarios_historial_infracciones' %}">
+      Ver
+    </a>
+  </div>
+
+</div>
+
+<!-- =========================
+     ⏱ TIMER SCRIPT
+========================= -->
+<script>
+(function() {
+
+  if (typeof horaInicio === "undefined") return;
+
+  const inicio = new Date(horaInicio);
+  const duracionMs = duracionHoras * 60 * 60 * 1000;
+  const fin = new Date(inicio.getTime() + duracionMs);
+
+  const timerEl = document.getElementById("timer");
+  const progressEl = document.getElementById("progress");
+
+  function actualizarTimer() {
+
+    const ahora = new Date();
+    const restante = fin - ahora;
+
+    if (restante <= 0) {
+      timerEl.innerText = "VENCIDO";
+      progressEl.style.width = "100%";
+      progressEl.style.background = "#c62828";
+      return;
+    }
+
+    const minutos = Math.floor(restante / 60000);
+    const segundos = Math.floor((restante % 60000) / 1000);
+    
+      // ✅ SOLO UNA VEZ
+    if (minutos === 5 && segundos === 0 && !avisoMostrado) {
+      alert("⚠️ Te quedan 5 minutos");
+      avisoMostrado = true;
+    }
+
+    timerEl.innerText =
+      `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
+
+    // progreso
+    const total = duracionMs;
+    const usado = ahora - inicio;
+    const porcentaje = Math.min((usado / total) * 100, 100);
+
+    progressEl.style.width = porcentaje + "%";
+
+    // colores dinámicos
+    if (porcentaje > 80) {
+      progressEl.style.background = "#c62828";
+    } else if (porcentaje > 50) {
+      progressEl.style.background = "#f9a825";
+    } else {
+      progressEl.style.background = "#2e7d32";
+    }
+  }
+
+  setInterval(actualizarTimer, 1000);
+  actualizarTimer();
+
+})();
+</script>
+
 {% endblock %}

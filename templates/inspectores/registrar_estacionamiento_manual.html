@@ -1,26 +1,31 @@
-{% extends "base.html" %}
-{% block title %}Registrar Estacionamiento Manual{% endblock %}
+{% extends "base.html" %} {% block title %}Registrar Estacionamiento Manual{%
+endblock %} {% block content %}
+<section classs="container">
+  <div class="card">
+    <h2>Registrar estacionamiento manual</h2>
+    <div class="card-body">
+      <form
+        method="post"
+        action="{% url 'inspectores_registrar_estacionamiento_manual' %}"
+      >
+        {% csrf_token %}
+        <div class="form-row">
+          <label>Patente</label>
+          <input name="patente" required />
+        </div>
+        <div class="form-row">
+          <label>Duración (horas)</label>
+          <input name="duracion" type="number" min="1" value="1" />
+        </div>
+        <div class="form-row actions">
+          <button type="submit" class="btn">Registrar</button>
+        </div>
+      </form>
 
-{% block content %}
-<section class="panel">
-  <h2>Registrar estacionamiento manual</h2>
-  <form method="post" action="{% url 'inspectores_registrar_estacionamiento_manual' %}">
-    {% csrf_token %}
-    <div class="form-row">
-      <label>Patente</label>
-      <input name="patente" required />
+      {% if error %}
+      <p class="error">{{ error }}</p>
+      {% endif %}
     </div>
-    <div class="form-row">
-      <label>Duración (horas)</label>
-      <input name="duracion" type="number" min="1" value="1" />
-    </div>
-    <div class="form-row actions">
-      <button class="btn link">Registrar</button>
-    </div>
-  </form>
-
-  {% if error %}
-    <p class="error">{{ error }}</p>
-  {% endif %}
+  </div>
 </section>
 {% endblock %}

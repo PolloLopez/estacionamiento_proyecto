@@ -1,54 +1,65 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
+<head>
+  <meta charset="UTF-8" />
+  {% load static %}
 
-    {% load static %}
+  <title>{% block title %}Estacionamiento{% endblock %}</title>
 
-    <title>{% block title %}Estacionamiento Medido{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'app_estacionamiento/css/global.css' %}">
+</head>
 
-    <link rel="stylesheet" href="{% static 'app_estacionamiento/css/global.css' %}" />
-  </head>
+<body>
 
-  <body>
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <div class="logo">
+      🚗 Estacionamiento
+    </div>
 
-    <!-- 🔥 NAVBAR -->
-    <header style="padding:10px; background:#222; color:white;">
-      
-      <a href="{% url 'inicio' %}" style="color:white; margin-right:15px;">
-        🏠 Inicio
-      </a>
+    <div class="menu-toggle" onclick="toggleMenu()">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+
+    <ul class="nav-items" id="navMenu">
 
       {% if request.user.is_authenticated %}
-        <span style="margin-right:15px;">
-          👤 {{ request.user.email }}
-        </span>
 
-        <a href="{% url 'logout' %}" style="color:#ff6b6b;">
-          Salir
-        </a>
+        <li><a href="{% url 'inicio' %}">Inicio</a></li>
+
+        {% if request.user.rol == "conductor" %}
+          <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar</a></li>
+          <li><a href="{% url 'usuarios_historial_estacionamientos' %}">Historial</a></li>
+        {% endif %}
+
+        {% if request.user.rol == "inspector" %}
+          <li><a href="{% url 'panel_inspectores' %}">Inspector</a></li>
+        {% endif %}
+
+        <li><a href="{% url 'logout' %}">Salir</a></li>
+
       {% else %}
-        <a href="{% url 'login' %}" style="color:#4dabf7;">
-          Login
-        </a>
+        <li><a href="{% url 'login' %}">Login</a></li>
       {% endif %}
 
-    </header>
+    </ul>
+  </nav>
 
-    <!-- 🔥 MENSAJES GLOBALES -->
-    {% if messages %}
-      <div style="padding:10px;">
-        {% for message in messages %}
-          <div style="background:#333; color:white; padding:8px; margin-bottom:5px;">
-            {{ message }}
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
 
-    <main style="padding:15px;">
-      {% block content %}{% endblock %}
-    </main>
+  <footer class="footer">
+    Sistema de estacionamiento medido
+  </footer>
 
-  </body>
+  <script>
+    function toggleMenu() {
+      document.getElementById("navMenu").classList.toggle("active");
+    }
+  </script>
+
+</body>
 </html>

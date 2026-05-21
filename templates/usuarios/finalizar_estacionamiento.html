@@ -1,50 +1,59 @@
-{% extends "base.html" %}
-{% block title %}Finalizar Estacionamiento{% endblock %}
+{% extends "base.html" %} {% block title %}Finalizar Estacionamiento{% endblock
+%} {% block content %}
+<section class="container">
+  <div class="panel">
+    <h2>Finalizar estacionamiento</h2>
+    <div class="panel-body">
+      <!-- Si hay error, se muestra en rojo -->
+      {% if error %}
+      <p style="color: red">{{ error }}</p>
+      {% endif %}
 
-{% block content %}
-<section class="panel">
-  <h2>Finalizar estacionamiento</h2>
+      <!-- Si hay mensaje de éxito, se muestra -->
+      {% if mensaje %}
+      <p style="color: green">{{ mensaje }}</p>
+      <p>Saldo restante: ${{ usuario.saldo }}</p>
+      {% endif %}
 
-  <!-- Si hay error, se muestra en rojo -->
-  {% if error %}
-    <p style="color:red">{{ error }}</p>
-  {% endif %}
+      <!-- Tarjeta con detalles del estacionamiento -->
+      <div class="card">
+        <h3>Detalles</h3>
+        <p>Patente: <strong>{{ estacionamiento.vehiculo.patente }}</strong></p>
+        <p>Inicio: {{ estacionamiento.hora_inicio }}</p>
+        <p>Duración real: {{ estacionamiento.duracion_real }}</p>
+        <p>Costo calculado: <strong>${{ estacionamiento.costo }}</strong></p>
+      </div>
 
-  <!-- Si hay mensaje de éxito, se muestra -->
-  {% if mensaje %}
-    <p style="color:green">{{ mensaje }}</p>
-    <p>Saldo restante: ${{ usuario.saldo }}</p>
-  {% endif %}
-
-  <!-- Tarjeta con detalles del estacionamiento -->
-  <div class="card">
-    <h3>Detalles</h3>
-    <p>Patente: <strong>{{ estacionamiento.vehiculo.patente }}</strong></p>
-    <p>Inicio: {{ estacionamiento.hora_inicio }}</p>
-    <p>Duración real: {{ estacionamiento.duracion_real }}</p>
-    <p>Costo calculado: <strong>${{ estacionamiento.costo }}</strong></p>
-  </div>
-
-  <!-- Formulario para confirmar finalización -->
-  <form method="post" action="{% url 'usuarios_finalizar_estacionamiento' estacionamiento.id %}">
-    {% csrf_token %}
-    <div class="form-row actions">
-      <button class="actions">Pagar y finalizar</button>
-      <!-- Botón de cancelar vuelve al inicio de usuarios -->
-      <a class="btn link" href="{% url 'inicio' %}">Cancelar</a>
+      <!-- Formulario para confirmar finalización -->
+      <form
+        method="post"
+        action="{% url 'usuarios_finalizar_estacionamiento' estacionamiento.id %}"
+      >
+        {% csrf_token %}
+        <div class="form-row actions">
+          <button class="actions">Pagar y finalizar</button>
+          <!-- Botón de cancelar vuelve al inicio de usuarios -->
+          <a class="btn link" href="{% url 'inicio' %}">Cancelar</a>
+        </div>
+      </form>
+      <div class="actions">
+        {% if request.user.es_inspector %}
+        <a href="{% url 'panel_inspectores' %}" class="btn link"
+          >🏠 Volver al inicio</a
+        >
+        {% elif request.user.es_vendedor %}
+        <a href="{% url 'panel_vendedores' %}" class="btn link"
+          >🏠 Volver al inicio</a
+        >
+        {% elif request.user.es_admin %}
+        <a href="{% url 'panel_admin' %}" class="btn link"
+          >🏠 Volver al inicio</a
+        >
+        {% else %}
+        <a href="{% url 'inicio' %}" class="btn link">🏠 Volver al inicio</a>
+        {% endif %}
+      </div>
     </div>
-  </form>
-  <div class="actions">
-  {% if request.user.es_inspector %}
-    <a href="{% url 'panel_inspectores' %}" class="btn link">🏠 Volver al inicio</a>
-  {% elif request.user.es_vendedor %}
-    <a href="{% url 'panel_vendedores' %}" class="btn link">🏠 Volver al inicio</a>
-  {% elif request.user.es_admin %}
-    <a href="{% url 'panel_admin' %}" class="btn link">🏠 Volver al inicio</a>
-  {% else %}
-    <a href="{% url 'inicio' %}" class="btn link">🏠 Volver al inicio</a>
-  {% endif %}
-</div>
-
+  </div>
 </section>
 {% endblock %}

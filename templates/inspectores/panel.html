@@ -2,25 +2,40 @@
 {% block title %}Panel Inspectores{% endblock %}
 
 {% block content %}
-<section class="panel">
-  <h2>Inspector — Panel</h2>
+<section class="container">
+  <div class="card">
 
-  <nav class="inline">
-    <a class="btn" href="{% url 'inspectores_verificar_vehiculo' %}">🔍 Verificar vehículo</a>
-    <a class="btn" href="{% url 'inspectores_registrar_infraccion' %}">⚠️ Registrar infracción</a>
-    <a class="btn" href="{% url 'inspectores_registrar_estacionamiento_manual' %}">📝 Registrar cobro manual</a>
-    <a class="btn" href="{% url 'inspectores_resumen_cobros' %}">💰 Resumen cobros</a>
-    <a class="btn" href="{% url 'inspectores_resumen_infracciones' %}">📑 Resumen infracciones</a>
-  </nav>
+    <h2>👮 Panel Inspector</h2>
 
-  <h3>Resumen rápido</h3>
-  <ul>
-    <li>Estacionamientos no pagados: <strong>{{ resumen.no_pagados }}</strong></li>
-    <li>Infracciones recientes: <strong>{{ resumen.infracciones_recientes }}</strong></li>
-  </ul>
-  <p>DEBUG URL:
-    {% url 'inspectores_registrar_infraccion' %}
-  </p>
+    <div class="grid grid-2" style="margin-top:1rem;">
+      <a class="btn" href="{% url 'inspectores_verificar_vehiculo' %}">
+        🔍 Verificar vehículo
+      </a>
+
+      <a class="btn" href="{% url 'inspectores_registrar_infraccion' %}">
+        ⚠️ Registrar infracción
+      </a>
+
+      <a class="btn" href="{% url 'inspectores_registrar_estacionamiento_manual' %}">
+        📝 Cobro manual
+      </a>
+
+      <a class="btn btn-outline" href="{% url 'inspectores_resumen_cobros' %}">
+        💰 Cobros
+      </a>
+
+      <a class="btn btn-outline" href="{% url 'inspectores_resumen_infracciones' %}">
+        📑 Infracciones
+      </a>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <h3>Resumen</h3>
+      <p>No pagados: <b>{{ resumen.no_pagados }}</b></p>
+      <p>Infracciones: <b>{{ resumen.infracciones_recientes }}</b></p>
+    </div>
+
+  </div>
 </section>
 {% endblock %}
 

@@ -4,9 +4,9 @@
 
 {% block content %}
 <section class="container">
-  <div class="card">
+  <div class="panel">
     <h2>🚧 Panel de Exenciones</h2>
-
+    <div class="panel-body">
     <form method="POST" class="grid">
         {% csrf_token %}
         <input type="hidden" name="accion" value="buscar">
@@ -53,6 +53,8 @@
     </form>
   </div>
   {% endif %}
+  </div>
+  </div>
 </section>
 
 <script>

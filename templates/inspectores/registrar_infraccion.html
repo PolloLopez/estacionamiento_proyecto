@@ -1,56 +1,61 @@
-{% extends "base.html" %}
-{% block title %}Registrar Infracción{% endblock %}
-{% block content %}
-<section class="panel">
-  <h2>Registrar infracción</h2>
+{% extends "base.html" %} {% block title %}Registrar Infracción{% endblock %} {%
+block content %}
 
-  {% if mensaje %}
-    <div class="alert success">
-      {{ mensaje }}
-    </div>
-  {% endif %}
+<section class="container">
+  <div class="card">
+    <h2>Registrar infracción</h2>
+    <div class="panel-body">
+      {% if mensaje %}
+      <div class="alert success">{{ mensaje }}</div>
+      {% endif %}
 
-  <form id="infraccionForm"
+      <form
+        id="infraccionForm"
         method="post"
         action="{% url 'inspectores_registrar_infraccion' %}"
-        enctype="multipart/form-data">
-  
-    {% csrf_token %}
-  
-    <label for="patente">Patente:</label>
-  
-    <!-- visible -->
-    <input id="patente" value="{{ patente }}" readonly />
-  
-    <!-- real (POST) -->
-    <input type="hidden" name="patente" value="{{ patente }}">
-  
-    <label for="subcuadra_id">Subcuadra:</label>
-    <select id="subcuadra_id" name="subcuadra_id" required>
-      {% for s in subcuadras %}
-        <option value="{{ s.id }}"
-          {% if s.id == subcuadra_default %}selected{% endif %}
-        >
-          {{ s.calle }} {{ s.altura }}
-        </option>
-      {% endfor %}
-    </select>
-  
-    <label for="foto">Foto de la infracción:</label>
-    <input type="file" id="foto" name="foto" accept="image/*" required />
-  
-    <button type="submit" class="btn alert">
-      Grabar acta de infracción
-    </button>
-  
-    <a href="{% url 'panel_inspectores' %}" class="btn link">
-      🏠 Volver al inicio
-    </a>
-  
-  </form>
+        enctype="multipart/form-data"
+      >
+        {% csrf_token %}
+
+        <label for="patente">Patente:</label>
+
+        <!-- visible -->
+        <input value="{{ patente }}" readonly class="input" />
+
+        <!-- real -->
+        <input type="hidden" name="patente" value="{{ patente }}" />
+
+        <label for="subcuadra_id">Subcuadra:</label>
+        <select id="subcuadra_id" name="subcuadra_id" required>
+          {% for s in subcuadras %}
+          <option
+            value="{{ s.id }}"
+            {%
+            if
+            s.id=""
+            ="subcuadra_default"
+            %}selected{%
+            endif
+            %}
+          >
+            {{ s.calle }} {{ s.altura }}
+          </option>
+          {% endfor %}
+        </select>
+
+        <label for="foto">Foto de la infracción:</label>
+        <input type="file" id="foto" name="foto" accept="image/*" required />
+
+        <button type="submit" class="btn btn-danger">
+          Grabar acta de infracción
+        </button>
+
+        <a href="{% url 'panel_inspectores' %}" class="btn link">
+          🏠 Volver al inicio
+        </a>
+      </form>
+    </div>
+  </div>
 </section>
 
-<script>
-  alert("{{ mensaje }}");
-</script>
-{% endblock %}
+{% if mensaje %} {% endif %} {% endblock %}

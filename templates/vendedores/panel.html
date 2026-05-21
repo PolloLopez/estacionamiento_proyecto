@@ -1,16 +1,25 @@
-{% extends "base.html" %}
-{% block title %}Panel Vendedor{% endblock %}
+{% extends "base.html" %} {% block title %}Panel Vendedor{% endblock %} {% block
+content %}
+<section class="container">
+  <div class="panel">
+    <h2>Vendedor — Panel</h2>
+    <div class="panel-body">
+      <nav class="inline">
+        <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}"
+          >🅿️ Registrar estacionamiento</a
+        >
+        <a class="btn" href="{% url 'vendedores_resumen_caja' %}"
+          >📊 Resumen de caja</a
+        >
+      </nav>
 
-{% block content %}
-<section class="panel">
-  <h2>Vendedor — Panel</h2>
-  <nav class="inline">
-    <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}">🅿️ Registrar estacionamiento</a>
-    <a class="btn" href="{% url 'vendedores_resumen_caja' %}">📊 Resumen de caja</a>
-  </nav>
-
-  <h3>Saldo y rendiciones</h3>
-  <p>Balance: <strong>${{ usuario.balance }}</strong></p>
-  <p>Deuda a municipalidad: <strong>${{ usuario.deuda }}</strong></p>
+      <h3>Saldo y rendiciones</h3>
+      <p>Balance: <strong>${{ usuario.balance }}</strong></p>
+      <p>Deuda a municipalidad: <strong>${{ usuario.deuda }}</strong></p>
+      <p>
+        Rendiciones pendientes: <strong>{{ rendiciones_pendientes }}</strong>
+      </p>
+    </div>
+  </div>
 </section>
 {% endblock %}

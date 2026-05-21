@@ -20,7 +20,8 @@ Verificar Vehículo
                 id="patente"
                 name="patente"
                 required
-            >
+                class="input"
+            />
         </div>
 
         <button type="submit" class="btn">
@@ -28,12 +29,16 @@ Verificar Vehículo
         </button>
     </form>
 
-    <p>DEBUG RESULTADO: {{ resultado }}</p>
-
     {% if resultado %}
 
-    <div class="resultado-box">
-
+    <div class="card" style="margin-top:1rem;">
+        <h2>
+          {% if resultado.estado == "Impago" %}
+            🚨 Acción requerida
+          {% else %}
+            ℹ️ Información
+          {% endif %}
+        </h2>
         <h2>Resultado</h2>
 
         <p>
@@ -76,12 +81,12 @@ Verificar Vehículo
 
             <a
                 href="{{ resultado.registrar_infraccion_url }}"
-                class="btn alert"
+                class="btn"
             >
                 Registrar infracción
                 
             </a>
-            <p>URL DEBUG: {{ resultado.registrar_infraccion_url }}</p>
+
             {% if infracciones_recientes %}
               <div class="historial-box">
                 <h3>📜 Últimas infracciones</h3>
@@ -110,13 +115,13 @@ Verificar Vehículo
         {# ============================== #}
         {% else %}
 
-            <p class="danger">
+            <p class="btn btn-danger">
                 ❌ Vehículo sin estacionamiento
             </p>
 
             <a
                 href="{{ resultado.registrar_infraccion_url }}"
-                class="btn alert"
+                class="btn"
             >
                 Registrar infracción
             </a>

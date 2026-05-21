@@ -1,34 +1,35 @@
-{% extends "base.html" %}
-{% block title %}Resumen Infracciones{% endblock %}
+{% extends "base.html" %} {% block title %}Resumen Infracciones{% endblock %} {%
+block content %}
+<section class="container">
+  <div class="panel">
+    <h2>Resumen de infracciones</h2>
+    <div class="panel-body">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Patente</th>
+            <th>Inspector</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
 
-{% block content %}
-<section class="panel">
-  <h1>Resumen de infracciones</h1>
-
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Fecha</th>
-        <th>Patente</th>
-        <th>Inspector</th>
-        <th>Estado</th>
-      </tr>
-    </thead>
-
-    <tbody>
-      {% for inf in infracciones %}
-      <tr>
-        <td>{{ inf.fecha|date:"d/m/Y H:i" }}</td>
-        <td>{{ inf.vehiculo.patente }}</td>
-        <td>{{ inf.inspector.correo }}</td>
-        <td>{{ inf.estado }}</td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="4">No hay infracciones</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        <tbody>
+          {% for inf in infracciones %}
+          <tr>
+            <td>{{ inf.fecha|date:"d/m/Y H:i" }}</td>
+            <td>{{ inf.vehiculo.patente }}</td>
+            <td>{{ inf.inspector.correo }}</td>
+            <td>{{ inf.estado }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="4">No hay infracciones</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </section>
 {% endblock %}

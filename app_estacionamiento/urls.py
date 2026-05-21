@@ -17,14 +17,7 @@ urlpatterns = [
     # 🧭 INICIO
     # =====================================================
 
-    path("inicio/", views.inicio, name="inicio"),
-
-    # ✅ ESTA RUTA FALTABA
-    path(
-        "inicio-usuarios/",
-        views.inicio_usuarios,
-        name="inicio_usuarios"
-    ),
+    path("inicio/", views.inicio_usuarios, name="inicio"),
 
     # =====================================================
     # 🚗 CONDUCTORES
