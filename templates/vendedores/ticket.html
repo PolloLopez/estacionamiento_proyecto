@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ticket</title>
+
+  <style>
+    body {
+      font-family: monospace;
+      text-align: center;
+    }
+
+    .ticket {
+      width: 250px;
+      margin: auto;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px dashed black;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+
+<body onload="window.print()">
+
+  <div class="ticket">
+
+    <h3>ESTACIONAMIENTO</h3>
+    <p>Municipio</p>
+
+    <hr>
+
+    <p><b>Patente:</b> {{ patente }}</p>
+    <p><b>Duración:</b> {{ duracion }} hs</p>
+    <p><b>Inicio:</b> {{ hora }}</p>
+    <p><b>Monto:</b> ${{ monto }}</p>
+
+    <hr>
+
+    <p>Gracias por su pago</p>
+
+    <button type="button" class="btn" onclick="imprimirTicket()">
+          🧾 Imprimir
+    </button>
+
+  </div>
+
+</body>
+<script>
+function imprimirTicket() {
+  const contenido = `
+    <h3>Estacionamiento</h3>
+    <p>Patente: {{ patente }}</p>
+    <p>Duración: {{ duracion }} hs</p>
+    <p>Fecha: ${new Date().toLocaleString()}</p>
+  `;
+
+  const w = window.open("", "", "width=300,height=400");
+  w.document.write(contenido);
+  w.document.close();
+  w.print();
+
+    window.onload = () => {
+    window.print();
+  };
+}
+</script>
+</html>

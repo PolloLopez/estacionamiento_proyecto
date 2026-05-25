@@ -2,7 +2,7 @@
 content %}
 <section class="container">
   <div class="panel">
-    <h1>Cargar saldo a {{ usuario.nombre }}</h1>
+    <h1>Cargar saldo a {{ request.user.correo }}</h1>
     <div class="panel-body">
       {% if error %}
       <p style="color: red">{{ error }}</p>

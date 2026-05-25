@@ -7,7 +7,7 @@
 
   <!-- 👤 PERFIL -->
   <div class="card">
-    <h2>👤 {{ usuario.nombre }}</h2>
+    <h2>👤 {{ request.user.correo }}</h2>
     <p class="info">Saldo: ${{ usuario.saldo }}</p>
 
     {% if usuario.saldo < 100 %}
@@ -35,7 +35,6 @@
         <div id="progress"></div>
       </div>
 
-      <!-- DATOS PARA JS -->
       <script>
         const horaInicio = "{{ estacionamiento_activo.hora_inicio|date:'c' }}";
         const duracionHoras = {{ estacionamiento_activo.duracion }};
@@ -52,6 +51,10 @@
 
       <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">
         Estacionar vehículo
+      </a>
+
+      <a href="{% url 'agregar_vehiculo' %}" class="btn">
+        ➕ Agregar patente
       </a>
 
     {% endif %}
@@ -85,13 +88,12 @@
 
 </div>
 
-<!-- =========================
-     ⏱ TIMER SCRIPT
-========================= -->
 <script>
 (function() {
 
   if (typeof horaInicio === "undefined") return;
+
+  let avisoMostrado = false;
 
   const inicio = new Date(horaInicio);
   const duracionMs = duracionHoras * 60 * 60 * 1000;
@@ -114,8 +116,7 @@
 
     const minutos = Math.floor(restante / 60000);
     const segundos = Math.floor((restante % 60000) / 1000);
-    
-      // ✅ SOLO UNA VEZ
+
     if (minutos === 5 && segundos === 0 && !avisoMostrado) {
       alert("⚠️ Te quedan 5 minutos");
       avisoMostrado = true;
@@ -124,14 +125,12 @@
     timerEl.innerText =
       `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
 
-    // progreso
     const total = duracionMs;
     const usado = ahora - inicio;
     const porcentaje = Math.min((usado / total) * 100, 100);
 
     progressEl.style.width = porcentaje + "%";
 
-    // colores dinámicos
     if (porcentaje > 80) {
       progressEl.style.background = "#c62828";
     } else if (porcentaje > 50) {

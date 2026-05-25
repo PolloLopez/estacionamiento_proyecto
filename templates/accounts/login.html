@@ -1,11 +1,34 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %}
+
+{% block title %}Iniciar sesión{% endblock %}
+
+{% block content %}
 <section class="container">
   <div class="panel">
     <h2>🔐 Iniciar sesión</h2>
+
     <div class="panel-body">
-      <a href="{% url 'google_login' %}" class="btn">
-        🔵 Iniciar sesión con Google
+
+      <form method="post">
+        {% csrf_token %}
+
+        <label>Email</label>
+        <input type="email" name="login" class="input" required />
+
+        <label>Contraseña</label>
+        <input type="password" name="password" class="input" required />
+
+        <button type="submit" class="btn">
+          Ingresar
+        </button>
+      </form>
+
+      <hr style="margin:1rem 0;">
+
+      <a class="btn btn-outline" href="{% provider_login_url 'google' %}">
+        🔵 Ingresar con Google
       </a>
+
     </div>
   </div>
 </section>

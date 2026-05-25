@@ -1,5 +1,6 @@
-{% extends "base.html" %} {% block title %}Registrar Infracción{% endblock %} {%
-block content %}
+{% extends "base.html" %}
+{% block title %}Registrar Infracción{% endblock %}
+{%block content %}
 
 <section class="container">
   <div class="card">
@@ -12,9 +13,9 @@ block content %}
       <form
         id="infraccionForm"
         method="post"
-        action="{% url 'inspectores_registrar_infraccion' %}"
-        enctype="multipart/form-data"
-      >
+        action="{% url 'inspectores_registrar_infraccion' %}?patente={{ patente }}"
+        enctype="multipart/form-data">
+        
         {% csrf_token %}
 
         <label for="patente">Patente:</label>
@@ -25,21 +26,14 @@ block content %}
         <!-- real -->
         <input type="hidden" name="patente" value="{{ patente }}" />
 
-        <label for="subcuadra_id">Subcuadra:</label>
-        <select id="subcuadra_id" name="subcuadra_id" required>
+        <label>Subcuadra</label>
+
+        <select name="subcuadra_id" class="input" required>
           {% for s in subcuadras %}
-          <option
-            value="{{ s.id }}"
-            {%
-            if
-            s.id=""
-            ="subcuadra_default"
-            %}selected{%
-            endif
-            %}
-          >
-            {{ s.calle }} {{ s.altura }}
-          </option>
+            <option value="{{ s.id }}"
+              {% if s.id == subcuadra_default %}selected{% endif %}>
+              {{ s }}
+            </option>
           {% endfor %}
         </select>
 

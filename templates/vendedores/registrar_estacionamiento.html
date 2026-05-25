@@ -1,52 +1,95 @@
-{% extends "base.html" %} {% block title %}Registrar Estacionamiento —
-Vendedor{% endblock %} {% block content %}
-<section class="container">
+{% extends "base.html" %}
+{% block title %}Registrar Estacionamiento{% endblock %}
+
+{% block content %}
+
+<div class="container">
+
   <div class="panel">
-    <h2>Registrar estacionamiento (a nombre de cliente)</h2>
     <div class="panel-body">
-      <form
-        method="post"
-        action="{% url 'vendedores_registrar_estacionamiento' %}"
-      >
-        {% csrf_token %}
-        <div class="form-row">
-          <label>Patente</label>
-          <input name="patente" required />
-        </div>
-        <div class="form-row">
-          <label>Cliente (opcional)</label>
-          <input name="cliente_email" />
-        </div>
-        <div class="form-row">
-          <label>Duración (horas)</label>
-          <input name="duracion" type="number" min="1" value="1" />
-        </div>
-        <div class="form-row actions">
-          <button class="btn-general">Registrar y cobrar</button>
-        </div>
-      </form>
+
+      <h2>💰 Registrar estacionamiento</h2>
 
       {% if error %}
-      <p class="error">{{ error }}</p>
+        <div class="alert alert-danger">
+          {{ error }}
+        </div>
       {% endif %}
-      <div class="actions">
-        {% if request.user.es_inspector %}
-        <a href="{% url 'panel_inspectores' %}" class="btn link"
-          >🏠 Volver al inicio</a
-        >
-        {% elif request.user.es_vendedor %}
-        <a href="{% url 'panel_vendedores' %}" class="btn link"
-          >🏠 Volver al inicio</a
-        >
-        {% elif request.user.es_admin %}
-        <a href="{% url 'panel_admin' %}" class="btn link"
-          >🏠 Volver al inicio</a
-        >
-        {% else %}
-        <a href="{% url 'inicio' %}" class="btn link">🏠 Volver al inicio</a>
-        {% endif %}
-      </div>
+
+      {% if mensaje %}
+        <div class="alert success">
+          {{ mensaje }}
+        </div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+
+        <!-- 🚗 PATENTE -->
+        <label>Patente</label>
+        <input 
+          name="patente" 
+          class="input" 
+          placeholder="ABC123" 
+          required 
+          autofocus
+          style="text-transform:uppercase;"
+        />
+
+        <!-- ⏱ DURACIÓN -->
+        <label style="margin-top:1rem;">Duración</label>
+
+        <div class="grid grid-3">
+
+          <button type="button" class="btn btn-outline duracion-btn" data-horas="1">1h</button>
+          <button type="button" class="btn btn-outline duracion-btn" data-horas="2">2h</button>
+          <button type="button" class="btn btn-outline duracion-btn" data-horas="3">3h</button>
+
+        </div>
+
+        <input type="hidden" name="duracion" id="duracion" value="1">
+
+        <!-- 💸 COSTO -->
+        <div class="card" style="margin-top:1rem;">
+          <h3>Total: $<span id="costo">100</span></h3>
+        </div>
+
+        <!-- 💳 ACCIÓN -->
+        <button class="btn" style="width:100%; margin-top:1rem;">
+          💰 Cobrar y registrar
+        </button>
+
+      </form>
+
     </div>
   </div>
-</section>
+
+</div>
+
+<script>
+  const tarifa = 100;
+  const botones = document.querySelectorAll(".duracion-btn");
+  const inputDuracion = document.getElementById("duracion");
+  const costo = document.getElementById("costo");
+
+  botones.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const horas = btn.dataset.horas;
+
+      inputDuracion.value = horas;
+      costo.textContent = horas * tarifa;
+
+      botones.forEach(b => b.classList.remove("btn-success"));
+      btn.classList.add("btn-success");
+    });
+  });
+  function imprimir() {
+    window.print();
+  
+    setTimeout(() => {
+      window.location.href = "/usuarios/vendedores/";
+    }, 1000);
+  }
+</script>
+
 {% endblock %}

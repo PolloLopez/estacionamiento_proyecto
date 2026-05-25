@@ -1,9 +1,19 @@
-{% extends "base.html" %} {% block title %}Historial de Infracciones{% endblock
-%} {% block content %}
+{% extends "base.html" %}
+
+{% block title %}
+Historial de Infracciones
+{% endblock %}
+
+{% block content %}
+
 <section class="container">
+
   <div class="panel">
-    <h2>Bienvenido, {{ usuario.nombre }}</h2>
+
+    <h2>Bienvenido, {{ request.user.correo }}</h2>
+
     <div class="panel-body">
+
       <h2>⚠️ Historial de infracciones</h2>
 
       {% if infracciones %}
@@ -25,16 +35,24 @@
             <td>{{ i.subcuadra.calle }}</td>
             <td>{{ i.subcuadra.altura }}</td>
             <td>
-              {% if i.cancelada %} ✅ Pagada {% else %} 🚫 Impaga {% endif %}
+              {% if i.cancelada %}
+                ✅ Pagada
+              {% else %}
+                🚫 Impaga
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       {% else %}
-      <p>No tenés infracciones registradas.</p>
+        <p>No tenés infracciones registradas.</p>
       {% endif %}
+
     </div>
+
   </div>
+
 </section>
+
 {% endblock %}

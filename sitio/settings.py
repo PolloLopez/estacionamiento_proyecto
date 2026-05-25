@@ -124,8 +124,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-key")
 
 # LOGIN / LOGOUT
-LOGIN_REDIRECT_URL = "/usuarios/inicio/"
-LOGOUT_REDIRECT_URL = "/"
+
+LOGIN_URL = '/usuarios/login/'
+LOGIN_REDIRECT_URL = '/'
 
 # ALLAUTH (modo email-only)
 ACCOUNT_LOGIN_METHODS = {"email"}
@@ -133,7 +134,7 @@ ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
 
 ACCOUNT_ADAPTER = "app_estacionamiento.adapters.NoUsernameAccountAdapter"
 

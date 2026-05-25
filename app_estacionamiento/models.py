@@ -59,6 +59,12 @@ class Usuario(AbstractUser):
         blank=True
     )
 
+    saldo_operativo = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0
+    )
+
     vehiculos = models.ManyToManyField(
         "Vehiculo",
         through="VehiculoUsuario",
@@ -87,7 +93,8 @@ class Usuario(AbstractUser):
         return self.correo or f"Usuario #{self.id}"
 
 class Municipio(models.Model):
-    nombre = models.CharField(max_length=100)
+    nombre = models.CharField(max_length=100, blank=True)
+    apellido = models.CharField(max_length=100, blank=True)
     activo = models.BooleanField(default=True)
 
     def __str__(self):
@@ -98,7 +105,8 @@ class Vehiculo(models.Model):
     patente = models.CharField(max_length=10, unique=True) 
     exento_global = models.BooleanField(default=False)  # exento total
     subcuadras_exentas = models.ManyToManyField("Subcuadra", blank=True)  # Exenciones específicas
-    municipio = models.ForeignKey(Municipio,on_delete=models.CASCADE,null=True,blank=True)  
+    municipio = models.ForeignKey(Municipio,on_delete=models.CASCADE,null=True,blank=True) 
+    fecha_creacion = models.DateTimeField(auto_now_add=True, null=True)
 
     def __str__(self):
         return self.patente
@@ -229,6 +237,13 @@ class Meta:
         )
     ]
 
+class MovimientoCaja(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    tipo = models.CharField(max_length=20)  # egreso / ingreso
+    descripcion = models.TextField()
+    fecha = models.DateTimeField(auto_now_add=True)
+    
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
     municipio = models.ForeignKey(
@@ -237,6 +252,7 @@ class Infraccion(models.Model):
         null=True,
         blank=True
     )
+    fecha_creacion = models.DateTimeField(auto_now_add=True, null=True)
 
     estado = models.CharField(
         max_length=20,

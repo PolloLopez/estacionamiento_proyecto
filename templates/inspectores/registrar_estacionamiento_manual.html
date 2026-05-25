@@ -1,31 +1,40 @@
-{% extends "base.html" %} {% block title %}Registrar Estacionamiento Manual{%
-endblock %} {% block content %}
-<section classs="container">
-  <div class="card">
-    <h2>Registrar estacionamiento manual</h2>
-    <div class="card-body">
-      <form
-        method="post"
-        action="{% url 'inspectores_registrar_estacionamiento_manual' %}"
-      >
-        {% csrf_token %}
-        <div class="form-row">
-          <label>Patente</label>
-          <input name="patente" required />
-        </div>
-        <div class="form-row">
-          <label>Duración (horas)</label>
-          <input name="duracion" type="number" min="1" value="1" />
-        </div>
-        <div class="form-row actions">
-          <button type="submit" class="btn">Registrar</button>
-        </div>
-      </form>
+{% extends "base.html" %}
+
+{% block title %}Registrar estacionamiento{% endblock %}
+
+{% block content %}
+
+<section class="container">
+  <div class="panel">
+    <div class="panel-body">
+
+      <h2>Registrar estacionamiento manual</h2>
 
       {% if error %}
-      <p class="error">{{ error }}</p>
+        <p class="error">{{ error }}</p>
       {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="form-row">
+          <label>Patente</label>
+          <input name="patente" class="input" required />
+        </div>
+
+        <div class="form-row">
+          <label>Duración (horas)</label>
+          <input name="duracion" type="number" min="1" value="1" class="input" />
+        </div>
+
+        <div class="form-row">
+          <button class="btn">Registrar</button>
+        </div>
+
+      </form>
+
     </div>
   </div>
 </section>
+
 {% endblock %}

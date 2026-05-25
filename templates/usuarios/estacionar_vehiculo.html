@@ -17,15 +17,29 @@
     {% endif %}
   </div>
 
-  <!-- 🚗 FORM -->
+  <!-- 🚗 AGREGAR VEHÍCULO -->
+  <div class="card">
+    <h3>➕ Agregar patente</h3>
+
+    <form method="post" action="{% url 'agregar_vehiculo' %}">
+      {% csrf_token %}
+
+      <input name="patente" placeholder="ABC123" required style="text-transform:uppercase;">
+      <button type="submit" class="btn">
+        Agregar vehículo
+      </button>
+    </form>
+  </div>
+
+  <!-- 🚗 ESTACIONAR -->
   <div class="card">
     <h3>🚗 Estacionar vehículo</h3>
 
     <form method="post">
       {% csrf_token %}
 
-      <!-- PATENTE -->
-      <label>Patente</label>
+      <!-- SELECT VEHICULO -->
+      <label>Seleccionar vehículo</label>
       <select name="vehiculo_id" class="input" required>
         {% for v in vehiculos %}
           <option value="{{ v.id }}">
@@ -51,14 +65,12 @@
         <p>Costo: <strong id="costoTexto">$100</strong></p>
       </div>
 
-      <!-- ERROR -->
       {% if error %}
         <div class="alert alert-danger">
           {{ error }}
         </div>
       {% endif %}
 
-      <!-- BOTÓN -->
       <button class="btn" type="submit">
         Confirmar estacionamiento
       </button>

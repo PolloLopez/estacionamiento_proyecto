@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body { font-family: monospace; text-align:center; }
+.ticket { width: 250px; margin:auto; }
+</style>
+</head>
+
+<body onload="window.print()">
+
+<div class="ticket">
+
+<h3>🚨 INFRACCIÓN</h3>
+
+<p><b>Patente:</b> {{ patente }}</p>
+<p><b>Subcuadra:</b> {{ subcuadra }}</p>
+<p><b>Fecha:</b> {{ fecha }}</p>
+<p><b>Inspector:</b> {{ inspector }}</p>
+
+<hr>
+
+<p>Municipalidad</p>
+
+<a href="{% url 'inspectores_verificar_vehiculo' %}" class="btn">
+  🔍 Volver a verificar 
+</a>
+
+</div>
+
+</body>
+</html>

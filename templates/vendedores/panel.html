@@ -1,25 +1,42 @@
-{% extends "base.html" %} {% block title %}Panel Vendedor{% endblock %} {% block
-content %}
-<section class="container">
-  <div class="panel">
-    <h2>Vendedor — Panel</h2>
-    <div class="panel-body">
-      <nav class="inline">
-        <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}"
-          >🅿️ Registrar estacionamiento</a
-        >
-        <a class="btn" href="{% url 'vendedores_resumen_caja' %}"
-          >📊 Resumen de caja</a
-        >
-      </nav>
+{% extends "base.html" %}
+{% block title %}Panel Vendedor{% endblock %}
 
-      <h3>Saldo y rendiciones</h3>
-      <p>Balance: <strong>${{ usuario.balance }}</strong></p>
-      <p>Deuda a municipalidad: <strong>${{ usuario.deuda }}</strong></p>
-      <p>
-        Rendiciones pendientes: <strong>{{ rendiciones_pendientes }}</strong>
-      </p>
+{% block content %}
+
+<div class="container">
+
+  <div class="panel">
+    <div class="panel-body">
+
+      <h1>💼 Panel vendedor</h1>
+
+      <div class="grid grid-2">
+
+        <div class="card">
+          <h3>💰 Caja del día</h3>
+          <p class="success">$ {{ total_hoy }}</p>
+        </div>
+
+        <div class="card">
+          <h3>🚗 Operaciones</h3>
+          <p>{{ cantidad_operaciones }} registros</p>
+        </div>
+
+      </div>
+
+      <div style="margin-top:1rem;">
+        <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}">
+          ➕ Registrar estacionamiento
+        </a>
+
+        <a class="btn btn-outline" href="{% url 'vendedores_resumen_caja' %}">
+          📊 Ver resumen
+        </a>
+      </div>
+
     </div>
   </div>
-</section>
+
+</div>
+
 {% endblock %}

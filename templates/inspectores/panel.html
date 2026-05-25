@@ -12,10 +12,6 @@
         🔍 Verificar vehículo
       </a>
 
-      <a class="btn" href="{% url 'inspectores_registrar_infraccion' %}">
-        ⚠️ Registrar infracción
-      </a>
-
       <a class="btn" href="{% url 'inspectores_registrar_estacionamiento_manual' %}">
         📝 Cobro manual
       </a>
@@ -30,13 +26,17 @@
     </div>
 
     <div class="card" style="margin-top:1rem;">
-      <h3>Resumen</h3>
-      <p>No pagados: <b>{{ resumen.no_pagados }}</b></p>
-      <p>Infracciones: <b>{{ resumen.infracciones_recientes }}</b></p>
+      <h3>💰 Caja Inspector</h3>
+
+      <p>Saldo operativo: <b>${{ resumen.saldo_operativo }}</b></p>
+      <p>Total cobrado: <b>${{ resumen.a_rendir }}</b></p>
+
+      <hr>
+
+      <p>🚨 Infracciones: <b>{{ resumen.infracciones }}</b></p>
+      <p>🚗 No pagados: <b>{{ resumen.no_pagados }}</b></p>
     </div>
 
   </div>
 </section>
 {% endblock %}
-
-
