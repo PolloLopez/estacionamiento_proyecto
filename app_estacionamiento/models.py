@@ -240,8 +240,8 @@ class Meta:
 class MovimientoCaja(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
-    tipo = models.CharField(max_length=20)  # egreso / ingreso
-    descripcion = models.TextField()
+    tipo = models.CharField(max_length=10)  # egreso / ingreso
+    descripcion = models.TextField(blank=True, null=True)
     fecha = models.DateTimeField(auto_now_add=True)
     
 # 🚨 Infracción generada por un inspector
@@ -290,6 +290,20 @@ class VerificacionInspector(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
     resultado = models.CharField(max_length=50)
 
+class CierreCaja(models.Model):
+
+    usuario = models.ForeignKey("Usuario", on_delete=models.CASCADE)
+
+    fecha_inicio = models.DateTimeField()
+    fecha_cierre = models.DateTimeField(auto_now_add=True)
+
+    total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)
+
+    observaciones = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Cierre {self.usuario.correo} - {self.fecha_cierre}"
+    
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 

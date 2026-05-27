@@ -7,7 +7,9 @@
     <h2>Registrar infracción</h2>
     <div class="panel-body">
       {% if mensaje %}
-      <div class="alert success">{{ mensaje }}</div>
+      <div class="alert {{ tipo_mensaje|default:'error' }}">
+        {{ mensaje }}
+      </div>
       {% endif %}
 
       <form

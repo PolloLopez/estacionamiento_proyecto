@@ -26,29 +26,24 @@
     <ul class="nav-items" id="navMenu">
 
       {% if request.user.is_authenticated %}
-      
-        <li><a href="{% url 'inicio' %}">Inicio</a></li>
-      
-        {% if request.user.es_conductor %}
-          <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar</a></li>
-          <li><a href="{% url 'usuarios_historial_estacionamientos' %}">Historial</a></li>
-        {% endif %}
-      
-        {% if request.user.es_inspector %}
-          <li><a href="{% url 'panel_inspectores' %}">Panel Inspector</a></li>
-          <li><a href="{% url 'inspectores_verificar_vehiculo' %}">Verificar</a></li>
-        {% endif %}
-      
-        {% if request.user.es_vendedor %}
-          <li><a href="{% url 'panel_vendedores' %}">Panel Vendedor</a></li>
-        {% endif %}
-      
+
         {% if request.user.es_admin %}
-          <li><a href="{% url 'panel_admin' %}">Admin</a></li>
+          <li><a href="{% url 'panel_admin' %}">Inicio</a></li>
+
+        {% elif request.user.es_inspector %}
+          <li><a href="{% url 'panel_inspectores' %}">Inicio</a></li>
+          <li><a href="{% url 'inspectores_verificar_vehiculo' %}">Verificar</a></li>
+
+        {% elif request.user.es_vendedor %}
+          <li><a href="{% url 'panel_vendedores' %}">Inicio</a></li>
+
+        {% elif request.user.es_conductor %}
+          <li><a href="{% url 'inicio' %}">Inicio</a></li>
+          <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar</a></li>
         {% endif %}
-      
+
         <li><a href="{% url 'logout' %}">Salir</a></li>
-      
+
       {% else %}
         <li><a href="{% url 'login' %}">Login</a></li>
       {% endif %}

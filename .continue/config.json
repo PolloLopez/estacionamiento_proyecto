@@ -1,14 +1,14 @@
 {
   "models": [
     {
-      "title": "Llama3 (Explicaciones)",
-      "provider": "ollama",
-      "model": "llama3"
-    },
-    {
       "title": "DeepSeek Coder (Código)",
       "provider": "ollama",
       "model": "deepseek-coder"
+    },
+    {
+      "title": "Llama3 (Explicaciones)",
+      "provider": "ollama",
+      "model": "llama3"
     }
   ],
   "tabAutocompleteModel": {
@@ -19,5 +19,6 @@
   "embeddingsProvider": {
     "provider": "ollama",
     "model": "nomic-embed-text"
-  }
+  },
+  "customInstructions": "Responde siempre en español simple. Explica como si estuvieras enseñando a un desarrollador junior. Prioriza arquitectura clara en Django, separación de lógica de negocio en services, evitar duplicación y código desordenado. No des solo código: explica decisiones."
 }

@@ -26,4 +26,10 @@ urlpatterns = [
     name="inspectores_ticket_cobro"
     ),
     path("vehiculo/agregar/", views.agregar_vehiculo, name="agregar_vehiculo"),
+    path("inspectores/caja/", views.caja_inspector, name="inspectores_caja"),
+    path(
+    "inspectores/cerrar-caja/",
+    views.cerrar_caja,
+    name="inspectores_cerrar_caja"
+    ),
 ]

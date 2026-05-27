@@ -22,6 +22,7 @@ from .models import (
     Infraccion,
     Municipio,
     MovimientoCaja,
+    CierreCaja
 )
 
 from .utils import get_subcuadra_default
@@ -29,7 +30,8 @@ from .factories import EstacionamientoFactory
 from datetime import timedelta
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate
-
+from app_estacionamiento.services_verificacion import verificar_estado_vehiculo
+from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
 
 @require_role("inspector", "admin", "conductor", "vendedor") 
 def inicio_usuarios(request):
@@ -537,13 +539,14 @@ def consultar_deuda(request):
 # VIEWS INSPECTORES
 # =========================================================
 @require_role("inspector")
+
 def panel_inspectores(request):
     usuario = request.user
 
-    # 🚗 NO PAGADOS (vehículos sin estacionamiento activo)
+    # 🚗 NO PAGADOS (simplificado por ahora)
     no_pagados = Estacionamiento.objects.filter(
         activo=False,
-        municipio=usuario.municipio
+        subcuadra__municipio=usuario.municipio
     ).count()
 
     # 🚨 INFRACCIONES DEL INSPECTOR
@@ -551,172 +554,49 @@ def panel_inspectores(request):
         inspector=usuario
     ).count()
 
-    # 💰 TOTAL COBRADO (egresos = lo que cobró en calle)
+    # 💰 COBRADO (lo que generó en calle)
     total_cobrado = MovimientoCaja.objects.filter(
         usuario=usuario,
         tipo="egreso"
+    ).aggregate(total=Sum("monto"))["total"] or 0
+
+    # 💸 GASTADO (opcional si después cargás costos)
+    total_gastado = MovimientoCaja.objects.filter(
+        usuario=usuario,
+        tipo="ingreso"
     ).aggregate(total=Sum("monto"))["total"] or 0
 
     resumen = {
         "no_pagados": no_pagados,
         "infracciones": infracciones,
         "a_rendir": total_cobrado,
-        "saldo_operativo": usuario.saldo_operativo
+        "saldo_operativo": usuario.saldo_operativo,
+        "total_gastado": total_gastado
     }
 
     return render(request, "inspectores/panel.html", {
         "resumen": resumen
     })
 
-#    ============  en test solo @require_login   ============
-#              para produccion: @require_role("inspector")
 
 @require_role("inspector", "admin")
 def verificar_vehiculo(request):
 
-    print("VIEW: verificar_vehiculo")
-    print("METHOD:", request.method)
-    print("VALIDACION_ACTIVA:", settings.VALIDACION_ACTIVA)
-
-    # ==============================
-    # GET → mostrar formulario
-    # ==============================
     if request.method == "GET":
-        return render(
-            request,
-            "inspectores/verificar_vehiculo.html",
-            {
-                "infracciones_recientes": []
-            }
-        )
+        return render(request, "inspectores/verificar_vehiculo.html", {})
 
-    # ==============================
-    # POST
-    # ==============================
     patente = (request.POST.get("patente") or "").strip().upper()
-    print("PATENTE:", patente)
 
     if not patente:
-        return render(
-            request,
-            "inspectores/verificar_vehiculo.html",
-            {
-                "error": "Debe ingresar una patente",
-                "infracciones_recientes": []
-            }
-        )
-
-    # ==============================
-    # 🔍 VEHICULO
-    # ==============================
-    vehiculo = Vehiculo.objects.filter(patente=patente).first()
-
-    # 👇 SI NO EXISTE → LO TRATAMOS COMO IMPAGO
-    if not vehiculo:
-        resultado = {
-            "patente": patente,
-            "estado": "No registrado (Impago)",
-            "estacionamiento_activo": False,
-            "registrar_infraccion_url": reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
-        }
-
         return render(request, "inspectores/verificar_vehiculo.html", {
-            "resultado": resultado,
-            "infracciones_recientes": []
+            "error": "Debe ingresar una patente"
         })
 
-    print("VEHICULO:", vehiculo)
+    resultado_service = verificar_estado_vehiculo(patente, request.user)
 
-    # ==============================
-    # 📜 Últimas infracciones
-    # ==============================
-    infracciones_recientes = Infraccion.objects.filter(
-        vehiculo=vehiculo
-    ).order_by("-id")[:3]
-
-    # ==============================
-    # 🧠 Última subcuadra usada
-    # ==============================
-    ultima_infraccion = Infraccion.objects.filter(
-        inspector=request.user
-    ).order_by("-id").first()
-
-    subcuadra_default = ultima_infraccion.subcuadra_id if ultima_infraccion else None
-
-    # ==============================
-    # 🚫 EXENTO TOTAL
-    # ==============================
-    if vehiculo.exento_global:
-        resultado = {
-            "patente": patente,
-            "estado": "Exento TOTAL",
-            "estacionamiento_activo": True
-        }
-
-        return render(request, "inspectores/verificar_vehiculo.html", {
-            "resultado": resultado,
-            "infracciones_recientes": infracciones_recientes
-        })
-
-    # ==============================
-    # ⚠️ EXENTO PARCIAL
-    # ==============================
-    subcuadras = vehiculo.subcuadras_exentas.all()
-
-    if subcuadras.exists():
-        resultado = {
-            "patente": patente,
-            "estado": "Exento parcial",
-            "estacionamiento_activo": False,
-            "subcuadras_exentas": subcuadras,
-            "registrar_infraccion_url": reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
-        }
-
-        return render(request, "inspectores/verificar_vehiculo.html", {
-            "resultado": resultado,
-            "infracciones_recientes": infracciones_recientes,
-            "subcuadra_default": subcuadra_default
-        })
-
-    # ==============================
-    # 🚗 ESTACIONAMIENTO
-    # ==============================
-    estacionamiento = Estacionamiento.objects.filter(
-        vehiculo=vehiculo,
-        activo=True,
-        municipio=request.user.municipio
-    ).first()
-
-    print("ESTACIONAMIENTO:", estacionamiento)
-
-    if estacionamiento:
-        resultado = {
-            "patente": patente,
-            "estado": "Pagado",
-            "estacionamiento_activo": True
-        }
-    else:
-        resultado = {
-            "patente": patente,
-            "estado": "Impago",
-            "estacionamiento_activo": False,
-            "registrar_infraccion_url": reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
-        }
-
-    print("RESULTADO:", resultado)
-
-    # ==============================
-    # FINAL
-    # ==============================
-    return render(
-        request,
-        "inspectores/verificar_vehiculo.html",
-        {
-            "resultado": resultado,
-            "infracciones_recientes": infracciones_recientes,
-            "subcuadra_default": subcuadra_default
-        }
-    )
+    return render(request, "inspectores/verificar_vehiculo.html", {
+        "resultado": resultado_service
+    })
 
 @require_role("inspector")
 def registrar_infraccion(request):
@@ -728,103 +608,46 @@ def registrar_infraccion(request):
     if not patente:
         return redirect("inspectores_verificar_vehiculo")
 
-    vehiculo = Vehiculo.objects.filter(patente=patente).first()
+    vehiculo, creado = Vehiculo.objects.get_or_create(
+        patente=patente,
+        defaults={
+            "municipio": usuario.municipio
+        }
+    )
 
-    if not vehiculo:
-        return redirect("inspectores_verificar_vehiculo")
-
-    # ==============================
-    # 📍 Subcuadras disponibles
-    # ==============================
     subcuadras = Subcuadra.objects.filter(
         municipio=usuario.municipio
     )
 
-    # ==============================
-    # 🧠 Última subcuadra usada
-    # ==============================
     ultima_infraccion = Infraccion.objects.filter(
         inspector=usuario
     ).order_by("-id").first()
 
     subcuadra_default = ultima_infraccion.subcuadra_id if ultima_infraccion else None
 
-    # ==============================
-    # 📜 Infracciones recientes
-    # ==============================
     infracciones_recientes = Infraccion.objects.filter(
         vehiculo=vehiculo
     ).order_by("-id")[:3]
 
     # ==============================
-    # POST → CREAR INFRACCIÓN
+    # POST → usar service
     # ==============================
     if request.method == "POST":
-        print("ENTRO AL POST")
-        print(request.POST)
+        try:
+            infraccion = crear_infraccion(
+                patente=patente,
+                subcuadra_id=request.POST.get("subcuadra_id"),
+                inspector=usuario,
+                foto=request.FILES.get("foto")
+            )
 
-        subcuadra_id = request.POST.get("subcuadra_id")
-        foto = request.FILES.get("foto")
+            return redirect("inspectores_ticket", infraccion.id)
 
-        subcuadra = Subcuadra.objects.filter(
-            id=subcuadra_id,
-            municipio=usuario.municipio
-        ).first()
-
-        estacionamiento = Estacionamiento.objects.filter(
-            vehiculo=vehiculo,
-            activo=True,
-            municipio=usuario.municipio
-        ).order_by("-hora_inicio").first()
-
-        # ==============================
-        # VALIDACIONES
-        # ==============================
-        if not subcuadra:
-            mensaje = "❌ Subcuadra inválida"
-
-        elif vehiculo.exento_global:
-            mensaje = "🚫 Exento TOTAL"
-
-        elif vehiculo.esta_exento_en(subcuadra):
-            mensaje = "🚫 Exento en esta subcuadra"
-
-        elif estacionamiento:
-            mensaje = "🚫 Tiene estacionamiento activo"
-
-        else:
-            hace_15_min = timezone.now() - timedelta(minutes=15)
-
-            ultima = Infraccion.objects.filter(
-                vehiculo=vehiculo,
-                municipio=usuario.municipio
-            ).order_by("-id").first()
-
-            if ultima and ultima.fecha >= hace_15_min:
-                mensaje = "⚠️ Ya existe una infracción reciente"
-
-            else:
-                infraccion = Infraccion.objects.create(
-                    vehiculo=vehiculo,
-                    inspector=usuario,
-                    municipio=usuario.municipio,
-                    subcuadra=subcuadra,
-                    estacionamiento=estacionamiento,
-                    foto=foto
-                )
-
-                print("INFRACCION CREADA")
-                # 👉 ACA VAMOS A TICKET (IMPORTANTE)
-                return redirect("inspectores_ticket", infraccion.id)
-                #return render(request, "ticket_infraccion.html", {
-                #    "patente": patente,
-                #    "subcuadra": subcuadra,
-                #    "fecha": infraccion.fecha,
-                #    "inspector": usuario.correo
-                #}, status=200)
+        except ErrorInfraccion as e:
+            mensaje = str(e)
 
     # ==============================
-    # GET o error
+    # 👇 ESTO ES LO QUE TE FALTABA
     # ==============================
     return render(request, "inspectores/registrar_infraccion.html", {
         "mensaje": mensaje,
@@ -834,7 +657,6 @@ def registrar_infraccion(request):
         "infracciones_recientes": infracciones_recientes,
         "subcuadra_default": subcuadra_default
     })
-
 
 @require_role("inspector", "admin", "vendedor")
 def registrar_estacionamiento_manual(request):
@@ -992,6 +814,32 @@ def ticket_infraccion(request, infraccion_id):
         "inspector": infraccion.inspector.correo
     })
 
+@require_role("inspector")
+def caja_inspector(request):
+
+    inspector = request.user
+
+    movimientos = MovimientoCaja.objects.filter(
+        usuario=inspector
+    ).order_by("-fecha")
+
+    total_ingresos = movimientos.filter(tipo="ingreso").aggregate(
+        total=Sum("monto")
+    )["total"] or 0
+
+    total_egresos = movimientos.filter(tipo="egreso").aggregate(
+        total=Sum("monto")
+    )["total"] or 0
+
+    saldo = total_ingresos - total_egresos
+
+    return render(request, "inspectores/caja.html", {
+        "movimientos": movimientos,
+        "ingresos": total_ingresos,
+        "egresos": total_egresos,
+        "saldo": saldo
+    })
+
 # =========================================================
 # VIEWS VENDEDORES
 # =========================================================
@@ -1009,6 +857,53 @@ def resumen_caja(request):
     registros = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
 
     return render(request, 'vendedores/resumen_caja.html', {"registros": registros})
+
+@require_role("inspector")
+def cerrar_caja(request):
+
+    usuario = request.user
+
+    # 🧠 último cierre
+    ultimo_cierre = CierreCaja.objects.filter(
+        usuario=usuario
+    ).order_by("-fecha_cierre").first()
+
+    fecha_inicio = ultimo_cierre.fecha_cierre if ultimo_cierre else usuario.date_joined
+
+    # 💰 calcular total
+    movimientos = MovimientoCaja.objects.filter(
+        usuario=usuario,
+        tipo="egreso",
+        fecha__gte=fecha_inicio
+    )
+
+    total = movimientos.aggregate(total=Sum("monto"))["total"] or 0
+
+    if request.method == "POST":
+
+        cierre = CierreCaja.objects.create(
+            usuario=usuario,
+            fecha_inicio=fecha_inicio,
+            total_cobrado=total
+        )
+
+        # 🔥 REGISTRO EN HISTORIAL (MEJORA PRO)
+        MovimientoCaja.objects.create(
+            usuario=usuario,
+            monto=total,
+            tipo="cierre",
+            descripcion="Cierre de caja inspector"
+        )
+
+        return render(request, "inspectores/cierre_exitoso.html", {
+            "total": total,
+            "cierre": cierre
+        })
+
+    return render(request, "inspectores/cerrar_caja.html", {
+        "total": total,
+        "desde": fecha_inicio
+    })
 
 # =========================================================
 # VIEWS LOGIN / LOGOUT

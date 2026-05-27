@@ -23,13 +23,16 @@
       <a class="btn btn-outline" href="{% url 'inspectores_resumen_infracciones' %}">
         📑 Infracciones
       </a>
+      <a class="btn btn-outline" href="{% url 'inspectores_caja' %}">
+      🧾 Caja
+      </a>
     </div>
 
     <div class="card" style="margin-top:1rem;">
       <h3>💰 Caja Inspector</h3>
 
       <p>Saldo operativo: <b>${{ resumen.saldo_operativo }}</b></p>
-      <p>Total cobrado: <b>${{ resumen.a_rendir }}</b></p>
+      <p>Debe rendir: <b>${{ resumen.a_rendir }}</b></p>
 
       <hr>
 

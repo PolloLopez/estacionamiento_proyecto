@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Caja Inspector{% endblock %}
+
+{% block content %}
+<h2>💰 Caja Inspector</h2>
+
+<p><b>Saldo:</b> {{ saldo }}</p>
+<p><b>Ingresos:</b> {{ ingresos }}</p>
+<p><b>Egresos:</b> {{ egresos }}</p>
+
+<hr>
+
+<h3>Movimientos</h3>
+
+<table>
+<tr>
+  <th>Fecha</th>
+  <th>Tipo</th>
+  <th>Monto</th>
+  <th>Descripción</th>
+</tr>
+
+{% for m in movimientos %}
+<tr>
+  <td>{{ m.fecha }}</td>
+  <td>{{ m.tipo }}</td>
+  <td>{{ m.monto }}</td>
+  <td>{{ m.descripcion }}</td>
+</tr>
+{% endfor %}
+</table>
+
+{% endblock %}
