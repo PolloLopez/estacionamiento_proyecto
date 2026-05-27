@@ -1,5 +1,3 @@
-# app_estacionamiento/tests.py
-
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -8,18 +6,67 @@ from decimal import Decimal
 from django.utils import timezone
 from datetime import timedelta
 
-from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
-from app_estacionamiento.models import Vehiculo, Subcuadra, Infraccion, Usuario, Estacionamiento, MovimientoCaja, Municipio
+from app_estacionamiento.models import (
+    Vehiculo, Subcuadra, Infraccion,
+    Usuario, Estacionamiento,
+    MovimientoCaja, Municipio
+)
 
-from app_estacionamiento.services_verificacion import verificar_estado_vehiculo
+from app_estacionamiento.services_infracciones import (
+    crear_infraccion, ErrorInfraccion
+)
+
+from app_estacionamiento.services_verificacion import (
+    verificar_estado_vehiculo
+)
 
 User = get_user_model()
 
 
+# =====================================================
+# 🧱 BASE + MIXINS (PRIMERO SIEMPRE)
+# =====================================================
+
+class BaseTestCase(TestCase):
+
+    def setUp(self):
+        self.municipio = Municipio.objects.create(nombre="TestCity")
+
+        self.usuario = Usuario.objects.create(
+            email="inspector@test.com",
+            municipio=self.municipio
+        )
+
+        self.subcuadra = Subcuadra.objects.create(
+            calle="Calle Falsa",
+            altura=123,
+            municipio=self.municipio
+        )
+
+
+class ResultadoAssertionsMixin:
+
+    def assertEsMultable(self, resultado):
+        self.assertFalse(resultado.estacionamiento_activo)
+        self.assertIsNotNone(resultado.registrar_infraccion_url)
+        self.assertTrue(resultado.necesita_infraccion())
+
+    def assertNoEsMultable(self, resultado):
+        self.assertTrue(resultado.estacionamiento_activo)
+        self.assertIsNone(resultado.registrar_infraccion_url)
+        self.assertFalse(resultado.necesita_infraccion())
+
+    def assertEstado(self, resultado, esperado):
+        self.assertIn(esperado.lower(), resultado.estado.lower())
+
+
+# =====================================================
+# 🚗 ESTACIONAMIENTO
+# =====================================================
+
 class EstacionamientoTest(TestCase):
 
     def setUp(self):
-
         self.user = User.objects.create_user(
             correo="conductor@test.com",
             password="123456",
@@ -28,52 +75,34 @@ class EstacionamientoTest(TestCase):
         )
 
     def test_estacionar_view(self):
-
-        login_ok = self.client.login(
-            correo="conductor@test.com",
-            password="123456"
-        )
-
-        self.assertTrue(login_ok)
+        self.client.login(correo="conductor@test.com", password="123456")
 
         response = self.client.post(
             reverse("usuarios_estacionar_vehiculo"),
-            {
-                "patente": "AAA111",
-                "duracion": "1"
-            }
+            {"patente": "AAA111", "duracion": "1"}
         )
 
-        # debería redirigir
         self.assertEqual(response.status_code, 302)
-
-        # se crea vehículo
         self.assertTrue(Vehiculo.objects.filter(patente="AAA111").exists())
-
-        # se crea estacionamiento
         self.assertTrue(Estacionamiento.objects.exists())
 
     def test_no_estaciona_sin_saldo(self):
-
         self.user.saldo = 0
         self.user.save()
 
-        login_ok = self.client.login(
-            correo="conductor@test.com",
-            password="123456"
-        )
-
-        self.assertTrue(login_ok)
+        self.client.login(correo="conductor@test.com", password="123456")
 
         response = self.client.post(
             reverse("usuarios_estacionar_vehiculo"),
-            {
-                "patente": "ZZZ999",
-                "duracion": "2"
-            }
+            {"patente": "ZZZ999", "duracion": "2"}
         )
 
         self.assertEqual(response.status_code, 200)
+
+
+# =====================================================
+# 💰 CAJA INSPECTOR
+# =====================================================
 
 class CajaInspectorTest(TestCase):
 
@@ -105,104 +134,109 @@ class CajaInspectorTest(TestCase):
 
         self.client.post(
             reverse("inspectores_registrar_estacionamiento_manual"),
-            {
-                "patente": "TEST123",
-                "duracion": "2"
-            }
+            {"patente": "TEST123", "duracion": "2"}
         )
 
         self.inspector.refresh_from_db()
-
         self.assertEqual(self.inspector.saldo_operativo, 800)
 
-class VerificacionTest(TestCase):
 
-    def setUp(self):
-        # ==============================
-        # 🏙 Municipio base
-        # ==============================
-        self.municipio = Municipio.objects.create(
-            nombre="Municipio Test"
-        )
+# =====================================================
+# 🔍 VERIFICACIÓN (DATACLASS READY)
+# =====================================================
 
-        # ==============================
-        # 👤 Usuario inspector
-        # ==============================
-        self.usuario = Usuario.objects.create(
-            email="inspector@test.com",
-            municipio=self.municipio
-        )
+class VerificacionTest(BaseTestCase, ResultadoAssertionsMixin):
 
-    # ==============================
-    # 🚫 NO REGISTRADO
-    # ==============================
     def test_no_registrado(self):
         resultado = verificar_estado_vehiculo("AAA111", self.usuario)
 
-        self.assertEqual(resultado["estado"], "No registrado (Impago)")
-        self.assertFalse(resultado["estacionamiento_activo"])
-        self.assertIn("registrar_infraccion_url", resultado)
+        self.assertEqual(resultado.patente, "AAA111")
+        self.assertEstado(resultado, "no registrado")
+        self.assertEsMultable(resultado)
 
-    # ==============================
-    # 🚫 EXENTO TOTAL
-    # ==============================
     def test_exento_total(self):
         vehiculo = Vehiculo.objects.create(
             patente="BBB222",
-            exento_global=True,
-            municipio=self.municipio
+            municipio=self.municipio,
+            exento_global=True
         )
 
         resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
 
-        self.assertEqual(resultado["estado"], "Exento TOTAL")
-        self.assertTrue(resultado["estacionamiento_activo"])
-        self.assertNotIn("registrar_infraccion_url", resultado)
+        self.assertEstado(resultado, "exento total")
+        self.assertNoEsMultable(resultado)
 
-    # ==============================
-    # ❌ IMPAGO
-    # ==============================
-    def test_impago(self):
+    def test_exento_parcial(self):
         vehiculo = Vehiculo.objects.create(
             patente="CCC333",
             municipio=self.municipio
         )
 
+        vehiculo.subcuadras_exentas.add(self.subcuadra)
+
         resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
 
-        self.assertEqual(resultado["estado"], "Impago")
-        self.assertFalse(resultado["estacionamiento_activo"])
-        self.assertIn("registrar_infraccion_url", resultado)
+        self.assertEstado(resultado, "exento parcial")
+        self.assertEsMultable(resultado)
 
-    # ==============================
-    # ✅ PAGADO
-    # ==============================
+        self.assertIsNotNone(resultado.subcuadras_exentas)
+        self.assertTrue(resultado.subcuadras_exentas.exists())
+
     def test_pagado(self):
         vehiculo = Vehiculo.objects.create(
-        patente="DDD444",
-        municipio=self.municipio
-    )
-
-        subcuadra = Subcuadra.objects.create(
-            calle="Test",
-            altura=123,
+            patente="DDD444",
             municipio=self.municipio
         )
 
         Estacionamiento.objects.create(
             vehiculo=vehiculo,
-            activo=True,
             municipio=self.municipio,
-            registrado_por=self.usuario,
-            subcuadra=subcuadra
+            activo=True,
+            subcuadra=self.subcuadra,
+            registrado_por=self.usuario
         )
 
         resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
 
-        self.assertEqual(resultado["estado"], "Pagado")
-        self.assertTrue(resultado["estacionamiento_activo"])
-        self.assertNotIn("registrar_infraccion_url", resultado)
-        
+        self.assertEstado(resultado, "pagado")
+        self.assertNoEsMultable(resultado)
+
+    def test_impago(self):
+        vehiculo = Vehiculo.objects.create(
+            patente="EEE555",
+            municipio=self.municipio
+        )
+
+        resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
+
+        self.assertEstado(resultado, "impago")
+        self.assertEsMultable(resultado)
+
+    def test_resultado_tiene_estructura_correcta(self):
+        resultado = verificar_estado_vehiculo("ZZZ999", self.usuario)
+
+        self.assertTrue(hasattr(resultado, "patente"))
+        self.assertTrue(hasattr(resultado, "estado"))
+        self.assertTrue(hasattr(resultado, "estacionamiento_activo"))
+        self.assertTrue(hasattr(resultado, "registrar_infraccion_url"))
+        self.assertTrue(hasattr(resultado, "necesita_infraccion"))
+
+    def test_flujo_real_impago(self):
+        vehiculo = Vehiculo.objects.create(
+            patente="FFF666",
+            municipio=self.municipio
+        )
+
+        resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
+
+        self.assertEsMultable(resultado)
+        self.assertIn("FFF666", resultado.registrar_infraccion_url)
+
+
+# =====================================================
+# 🚨 INFRACCIONES
+# =====================================================
+
 class CrearInfraccionTest(TestCase):
 
     def setUp(self):
@@ -214,9 +248,7 @@ class CrearInfraccionTest(TestCase):
             municipio=self.municipio
         )
 
-        self.vehiculo = Vehiculo.objects.create(
-            patente="ABC123"
-        )
+        self.vehiculo = Vehiculo.objects.create(patente="ABC123")
 
         self.subcuadra = Subcuadra.objects.create(
             calle="12",
@@ -260,7 +292,11 @@ class CrearInfraccionTest(TestCase):
                 inspector=self.usuario
             )
 
-# 🚨 TEST DE LOGIN POR ROL
+
+# =====================================================
+# 🔐 LOGIN
+# =====================================================
+
 class LoginRedirectTest(TestCase):
 
     def setUp(self):
@@ -271,17 +307,17 @@ class LoginRedirectTest(TestCase):
         )
 
     def test_redirect_inspector(self):
-
         response = self.client.post(
             reverse("login"),
-            {
-                "correo": "inspector@test.com",
-                "password": "123456"
-            }
+            {"correo": "inspector@test.com", "password": "123456"}
         )
 
-        # debería redirigir al panel inspector
         self.assertRedirects(response, reverse("panel_inspectores"))
+
+
+# =====================================================
+# 🧾 CIERRE DE CAJA
+# =====================================================
 
 class CierreCajaTest(TestCase):
 
@@ -294,13 +330,11 @@ class CierreCajaTest(TestCase):
         )
 
     def test_cierre_caja(self):
-
         self.client.login(
             correo="inspector@test.com",
             password="123456"
         )
 
-        # simular cobro en calle
         MovimientoCaja.objects.create(
             usuario=self.inspector,
             monto=Decimal("300"),
@@ -308,9 +342,7 @@ class CierreCajaTest(TestCase):
             descripcion="Cobro prueba"
         )
 
-        response = self.client.post(
-            reverse("inspectores_cerrar_caja")
-        )
+        response = self.client.post(reverse("inspectores_cerrar_caja"))
 
         self.assertEqual(response.status_code, 200)
 

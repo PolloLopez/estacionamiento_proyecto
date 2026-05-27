@@ -33,7 +33,7 @@ Verificar Vehículo
 
     <div class="card" style="margin-top:1rem;">
         <h2>
-          {% if resultado.estado == "Impago" %}
+          {% if resultado.necesita_infraccion %}
             🚨 Acción requerida
           {% else %}
             ℹ️ Información
