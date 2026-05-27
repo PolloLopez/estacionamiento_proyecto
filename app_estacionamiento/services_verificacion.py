@@ -49,7 +49,7 @@ def verificar_estado_vehiculo(patente, usuario):
     if not vehiculo:
         return ResultadoVerificacion(
             patente=patente,
-            estado="No registrado (Impago)",
+            estado="No registrado (Impago)", 
             estacionamiento_activo=False,
             registrar_infraccion_url=_url_infraccion(patente),
         )
