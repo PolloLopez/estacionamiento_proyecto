@@ -592,10 +592,10 @@ def verificar_vehiculo(request):
             "error": "Debe ingresar una patente"
         })
 
-    resultado_service = verificar_estado_vehiculo(patente, request.user)
-
+    resultado = verificar_estado_vehiculo(patente, request.user)
+    
     return render(request, "inspectores/verificar_vehiculo.html", {
-        "resultado": resultado_service
+        "resultado": resultado.to_dict()
     })
 
 @require_role("inspector")

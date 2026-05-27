@@ -21,6 +21,7 @@ Verificar Vehículo
                 name="patente"
                 required
                 class="input"
+                autofocus
             />
         </div>
 
@@ -32,6 +33,7 @@ Verificar Vehículo
     {% if resultado %}
 
     <div class="card" style="margin-top:1rem;">
+
         <h2>
           {% if resultado.necesita_infraccion %}
             🚨 Acción requerida
@@ -39,92 +41,62 @@ Verificar Vehículo
             ℹ️ Información
           {% endif %}
         </h2>
-        <h2>Resultado</h2>
 
-        <p>
-            <strong>Patente:</strong>
-            {{ resultado.patente }}
-        </p>
-
-        <p>
-            <strong>Estado:</strong>
-            {{ resultado.estado }}
-        </p>
-
-        {# ============================== #}
-        {# 🚫 EXENTO TOTAL #}
-        {# ============================== #}
-        {% if resultado.estado == "Exento TOTAL" %}
-
-            <p class="info">
-                🟢 Vehículo exento total — NO corresponde infracción
-            </p>
-
-        {# ============================== #}
-        {# ⚠️ EXENTO PARCIAL #}
-        {# ============================== #}
-        {% elif resultado.estado == "Exento parcial" %}
-
-            <p class="warning">
-                ⚠️ Exento solo en algunas subcuadras
-            </p>
-
-            <ul>
-                {% for sub in resultado.subcuadras_exentas %}
-                    <li>📍 {{ sub }}</li>
-                {% endfor %}
-            </ul>
-
-            <p class="danger">
-                ❗ Solo podés infraccionar si el vehículo está FUERA de estas subcuadras
-            </p>
-
-            <a
-                href="{{ resultado.registrar_infraccion_url }}"
-                class="btn"
-            >
-                Registrar infracción
-                
-            </a>
-
-            {% if infracciones_recientes %}
-              <div class="historial-box">
-                <h3>📜 Últimas infracciones</h3>
+        <div class="alert alert-{{ resultado.css_class }}">
             
-                <ul>
-                  {% for inf in infracciones_recientes %}
-                    <li>
-                      {{ inf.subcuadra }} — {{ inf.created_at|default:inf.id }}
-                    </li>
-                  {% endfor %}
-                </ul>
-              </div>
+            <h4>Resultado</h4>
+        
+            <p><strong>Patente:</strong> {{ resultado.patente }}</p>
+        
+            <p>
+                <strong>Estado:</strong> 
+                {{ resultado.estado.label }}
+            </p>
+
+            {% if resultado.estado.name == "EXENTO_TOTAL" %}
+                <p>🟢 Vehículo exento total — NO corresponde infracción</p>
+
+            {% elif resultado.estado.name == "EXENTO_PARCIAL" %}
+                <p>⚠️ Exento solo en algunas subcuadras</p>
+
+                {% if resultado.subcuadras_exentas %}
+                    <ul>
+                        {% for sub in resultado.subcuadras_exentas %}
+                            <li>📍 {{ sub }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                <p>❗ Solo corresponde infracción fuera de estas subcuadras</p>
+
+            {% elif resultado.estado.name == "PAGADO" %}
+                <p>✅ Estacionamiento activo — NO corresponde infracción</p>
+
+            {% else %}
+                <p>❌ Sin estacionamiento activo — corresponde infracción</p>
             {% endif %}
 
-        {# ============================== #}
-        {# ✅ PAGADO #}
-        {# ============================== #}
-        {% elif resultado.estacionamiento_activo %}
+            {% if resultado.necesita_infraccion %}
+                <a href="{{ resultado.registrar_infraccion_url }}" 
+                   class="btn btn-danger">
+                    Generar infracción
+                </a>
+            {% endif %}
 
-            <p class="success">
-                ✅ Estacionamiento activo — NO corresponde infracción
-            </p>
+        </div>
 
-        {# ============================== #}
-        {# ❌ IMPAGO #}
-        {# ============================== #}
-        {% else %}
-            <p class="danger">
-                ❌ Sin estacionamiento activo — corresponde infracción
-            </p>
-
-            <a
-                href="{{ resultado.registrar_infraccion_url }}"
-                class="btn"
-            >
-                Registrar infracción
-            </a>
-
+        {% if infracciones_recientes %}
+          <div class="historial-box">
+            <h3>📜 Últimas infracciones</h3>
+        
+            <ul>
+              {% for inf in infracciones_recientes %}
+                <li>
+                  {{ inf.subcuadra }} — {{ inf.created_at|default:inf.id }}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
         {% endif %}
 
     </div>

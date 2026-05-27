@@ -5,7 +5,8 @@ from django.db.models import Sum
 from decimal import Decimal
 from django.utils import timezone
 from datetime import timedelta
-
+from app_estacionamiento.domain.verificacion import ResultadoVerificacion
+from app_estacionamiento.domain.enums import EstadoVehiculo
 from app_estacionamiento.models import (
     Vehiculo, Subcuadra, Infraccion,
     Usuario, Estacionamiento,
@@ -56,9 +57,8 @@ class ResultadoAssertionsMixin:
         self.assertIsNone(resultado.registrar_infraccion_url)
         self.assertFalse(resultado.necesita_infraccion())
 
-    def assertEstado(self, resultado, esperado):
-        self.assertIn(esperado.lower(), resultado.estado.lower())
-
+    def assertEstado(self, resultado, esperado: EstadoVehiculo):
+        self.assertEqual(resultado.estado, esperado)
 
 # =====================================================
 # 🚗 ESTACIONAMIENTO
@@ -151,20 +151,22 @@ class VerificacionTest(BaseTestCase, ResultadoAssertionsMixin):
         resultado = verificar_estado_vehiculo("AAA111", self.usuario)
 
         self.assertEqual(resultado.patente, "AAA111")
-        self.assertEstado(resultado, "no registrado")
+        self.assertEstado(resultado, EstadoVehiculo.NO_REGISTRADO)
         self.assertEsMultable(resultado)
+
 
     def test_exento_total(self):
         vehiculo = Vehiculo.objects.create(
-            patente="BBB222",
-            municipio=self.municipio,
-            exento_global=True
-        )
+        patente="BBB222",
+        municipio=self.municipio,
+        exento_global=True
+    )
 
         resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
 
-        self.assertEstado(resultado, "exento total")
+        self.assertEstado(resultado, EstadoVehiculo.EXENTO_TOTAL)
         self.assertNoEsMultable(resultado)
+
 
     def test_exento_parcial(self):
         vehiculo = Vehiculo.objects.create(
@@ -176,12 +178,12 @@ class VerificacionTest(BaseTestCase, ResultadoAssertionsMixin):
 
         resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
 
-        self.assertEstado(resultado, "exento parcial")
+        self.assertEstado(resultado, EstadoVehiculo.EXENTO_PARCIAL)
         self.assertEsMultable(resultado)
 
         self.assertIsNotNone(resultado.subcuadras_exentas)
         self.assertTrue(resultado.subcuadras_exentas.exists())
-
+        
     def test_pagado(self):
         vehiculo = Vehiculo.objects.create(
             patente="DDD444",
@@ -198,7 +200,7 @@ class VerificacionTest(BaseTestCase, ResultadoAssertionsMixin):
 
         resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
 
-        self.assertEstado(resultado, "pagado")
+        self.assertEstado(resultado, EstadoVehiculo.PAGADO)
         self.assertNoEsMultable(resultado)
 
     def test_impago(self):
@@ -209,7 +211,7 @@ class VerificacionTest(BaseTestCase, ResultadoAssertionsMixin):
 
         resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
 
-        self.assertEstado(resultado, "impago")
+        self.assertEstado(resultado, EstadoVehiculo.IMPAGO)
         self.assertEsMultable(resultado)
 
     def test_resultado_tiene_estructura_correcta(self):

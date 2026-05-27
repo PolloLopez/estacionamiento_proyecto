@@ -1,45 +1,15 @@
 # app_estacionamiento/services_verificacion.py
 
 from django.urls import reverse
-from .models import Estacionamiento
-from app_estacionamiento.models import Vehiculo
+from app_estacionamiento.models import Vehiculo, Estacionamiento
 from dataclasses import dataclass
+
+from app_estacionamiento.domain.verificacion import ResultadoVerificacion
+from app_estacionamiento.domain.enums import EstadoVehiculo
 from typing import Optional
-
-@dataclass
-class ResultadoVerificacion:
-    patente: str
-    estado: str
-    estacionamiento_activo: bool = False
-    registrar_infraccion_url: Optional[str] = None
-    subcuadras_exentas: Optional[object] = None
-
-    def to_dict(self):
-        """
-        🔁 Compatibilidad con templates actuales
-        Permite seguir usando resultado["estado"]
-        """
-        data = {
-            "patente": self.patente,
-            "estado": self.estado,
-            "estacionamiento_activo": self.estacionamiento_activo,
-        }
-
-        if self.registrar_infraccion_url:
-            data["registrar_infraccion_url"] = self.registrar_infraccion_url
-
-        if self.subcuadras_exentas:
-            data["subcuadras_exentas"] = self.subcuadras_exentas
-
-        return data
-    
-        # 🔥 ESTO ES LO QUE TE FALTA
-    def necesita_infraccion(self) -> bool:
-        return self.registrar_infraccion_url is not None
-    
+   
 def _url_infraccion(patente):
     return reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
-
 
 def verificar_estado_vehiculo(patente, usuario):
 
@@ -49,17 +19,17 @@ def verificar_estado_vehiculo(patente, usuario):
     if not vehiculo:
         return ResultadoVerificacion(
             patente=patente,
-            estado="No registrado (Impago)", 
+            estado=EstadoVehiculo.NO_REGISTRADO,
             estacionamiento_activo=False,
-            registrar_infraccion_url=_url_infraccion(patente),
+            registrar_infraccion_url=reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
         )
 
     # 🚫 EXENTO TOTAL
     if vehiculo.exento_global:
         return ResultadoVerificacion(
             patente=vehiculo.patente,
-            estado="Exento TOTAL",
-            estacionamiento_activo=True,
+            estado=EstadoVehiculo.EXENTO_TOTAL,
+            estacionamiento_activo=True
         )
 
     # ⚠️ EXENTO PARCIAL
@@ -67,30 +37,30 @@ def verificar_estado_vehiculo(patente, usuario):
     if subcuadras.exists():
         return ResultadoVerificacion(
             patente=vehiculo.patente,
-            estado="Exento parcial",
+            estado=EstadoVehiculo.EXENTO_PARCIAL,
             estacionamiento_activo=False,
             subcuadras_exentas=subcuadras,
-            registrar_infraccion_url=_url_infraccion(vehiculo.patente),
+            registrar_infraccion_url=reverse("inspectores_registrar_infraccion") + f"?patente={vehiculo.patente}"
         )
 
     # 🚗 ESTACIONAMIENTO
-    tiene_estacionamiento = Estacionamiento.objects.filter(
+    estacionamiento = Estacionamiento.objects.filter(
         vehiculo=vehiculo,
         activo=True,
         municipio=usuario.municipio
-    ).exists()
+    ).first()
 
-    if tiene_estacionamiento:
+    if estacionamiento:
         return ResultadoVerificacion(
             patente=vehiculo.patente,
-            estado="Pagado",
-            estacionamiento_activo=True,
+            estado=EstadoVehiculo.PAGADO,
+            estacionamiento_activo=True
         )
 
     # ❌ IMPAGO
     return ResultadoVerificacion(
         patente=vehiculo.patente,
-        estado="Impago",
+        estado=EstadoVehiculo.IMPAGO,
         estacionamiento_activo=False,
-        registrar_infraccion_url=_url_infraccion(vehiculo.patente),
+        registrar_infraccion_url=reverse("inspectores_registrar_infraccion") + f"?patente={vehiculo.patente}"
     )
