@@ -12,7 +12,7 @@ from decimal import Decimal
 from django.db import IntegrityError, transaction
 
 from app_estacionamiento.services_caja import generar_cierre_caja
-
+from app_estacionamiento.use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
 from app_estacionamiento.use_cases.estacionar_vehiculo import ejecutar as estacionar_uc
 from .decorators import require_role, require_login
 from .forms import RegistroUsuarioForm
@@ -657,42 +657,20 @@ def registrar_estacionamiento_manual(request):
         TARIFA = Decimal("100")
         monto = duracion * TARIFA 
 
-        # 🔴 CONTROL DE CAJA
-        if inspector.saldo_operativo < monto:
+        # 🧾 REGISTRAR MOVIMIENTO DE CAJA
+        try:
+            cobrar_estacionamiento(
+                inspector=inspector,
+                monto=monto,
+                descripcion=f"Cobro estacionamiento {vehiculo.patente}"
+            )
+        except Exception:
             return render(request, "inspectores/registrar_estacionamiento_manual.html", {
                 "error": "No tenés saldo operativo suficiente."
             })
 
-        subcuadra = get_subcuadra_default(inspector.municipio)
-
-        est = EstacionamientoFactory.crear(
-            vehiculo,
-            subcuadra,
-            duracion,
-            registrado_por=inspector
-        )
-
-        # 💰 descontar saldo operativo
-        monto = duracion * TARIFA
-        inspector.saldo_operativo -= monto
-        inspector.save()
-
-        # 🧾 REGISTRAR MOVIMIENTO DE CAJA
-        MovimientoCaja.objects.create(
-            usuario=inspector,
-            monto=monto,
-            tipo="ingreso",
-            descripcion=f"Cobro estacionamiento {vehiculo.patente}"
-        )
-
-        # 👉 mostrar ticket en vez de redirigir
-        return redirect("inspectores_ticket_cobro", est.id)
-        #return render(request, "ticket.html", {
-        #    "patente": vehiculo.patente,
-        #    "duracion": duracion,
-        #    "hora": est.hora_inicio,
-        #    "monto": monto,
-        #}, status=200)
+        # 👉 redirigir simple (sin est porque no lo estás creando acá)
+        return redirect("panel_inspectores")
     return render(request, "inspectores/registrar_estacionamiento_manual.html")
 
 @require_role("vendedor", "inspector", "admin")

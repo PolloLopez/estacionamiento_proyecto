@@ -243,6 +243,7 @@ class MovimientoCaja(models.Model):
     tipo = models.CharField(max_length=10)  # egreso / ingreso
     descripcion = models.TextField(blank=True, null=True)
     fecha = models.DateTimeField(auto_now_add=True)
+    cerrado = models.BooleanField(default=False)
     
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
@@ -295,7 +296,7 @@ class VerificacionInspector(models.Model):
 class CierreCaja(models.Model):
 
     usuario = models.ForeignKey("Usuario", on_delete=models.CASCADE)
-
+    fecha = models.DateTimeField(auto_now_add=True, null=True)
     fecha_inicio = models.DateTimeField(default=timezone.now)
     fecha_cierre = models.DateTimeField(auto_now_add=True)
 

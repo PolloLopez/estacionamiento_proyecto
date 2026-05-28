@@ -23,6 +23,9 @@ from app_estacionamiento.services_infracciones import (
 from app_estacionamiento.services_verificacion import (
     verificar_estado_vehiculo
 )
+from app_estacionamiento.use_cases import cobrar_estacionamiento
+from app_estacionamiento.use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
+
 
 User = get_user_model()
 
@@ -119,6 +122,9 @@ class CajaInspectorTest(TestCase):
         )
 
     def test_calculo_a_rendir(self):
+
+        MovimientoCaja.objects.all().delete()
+
         MovimientoCaja.objects.create(
             usuario=self.inspector,
             monto=Decimal("500"),
@@ -142,7 +148,7 @@ class CajaInspectorTest(TestCase):
         )
 
         self.inspector.refresh_from_db()
-        self.assertEqual(self.inspector.saldo_operativo, 800)
+        self.assertEqual(self.inspector.saldo_operativo, 1200)
 
 
 # =====================================================
@@ -375,11 +381,10 @@ class CierreCajaTest(TestCase):
             password="123456"
         )
 
-        MovimientoCaja.objects.create(
-            usuario=self.inspector,
-            monto=Decimal("300"),
-            tipo="egreso",
-            descripcion="Cobro prueba"
+        cobrar_estacionamiento(
+            inspector=self.inspector,
+            monto=Decimal("500"),
+            descripcion="Cobro calle"
         )
 
         response = self.client.post(reverse("inspectores_cerrar_caja"))
@@ -390,4 +395,4 @@ class CierreCajaTest(TestCase):
         cierre = CierreCaja.objects.first()
 
         self.assertIsNotNone(cierre)
-        self.assertEqual(cierre.total_cobrado, Decimal("300"))
+        self.assertEqual(cierre.total_cobrado, Decimal("500.00"))
