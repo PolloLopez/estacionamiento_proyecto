@@ -273,6 +273,8 @@ class Infraccion(models.Model):
     cancelada = models.BooleanField(default=False)
     foto = models.ImageField(upload_to="infracciones/", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    qr_code = models.CharField(max_length=255, null=True, blank=True)
+    monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def save(self, *args, **kwargs):
         if not self.municipio:
@@ -294,7 +296,7 @@ class CierreCaja(models.Model):
 
     usuario = models.ForeignKey("Usuario", on_delete=models.CASCADE)
 
-    fecha_inicio = models.DateTimeField()
+    fecha_inicio = models.DateTimeField(default=timezone.now)
     fecha_cierre = models.DateTimeField(auto_now_add=True)
 
     total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)

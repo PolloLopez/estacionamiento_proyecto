@@ -1,6 +1,7 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 
 from logging import warning
+from unittest import result
 from urllib import request
 
 from django.shortcuts import render, redirect, get_object_or_404
@@ -9,6 +10,9 @@ from django.contrib.auth import authenticate, login, logout
 from django.urls import reverse
 from decimal import Decimal
 from django.db import IntegrityError, transaction
+
+from app_estacionamiento.services_caja import generar_cierre_caja
+from app_estacionamiento.services_estacionamiento import estacionar
 from .decorators import require_role, require_login
 from .forms import RegistroUsuarioForm
 from django.conf import settings
@@ -32,6 +36,7 @@ from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate
 from app_estacionamiento.services_verificacion import verificar_estado_vehiculo
 from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
+from app_estacionamiento.services_estacionamiento import estacionar as estacionar_service
 
 @require_role("inspector", "admin", "conductor", "vendedor") 
 def inicio_usuarios(request):
@@ -335,20 +340,7 @@ def estacionar_vehiculo(request):
         # 4. WARNINGS (mejorados)
         # =============================================
 
-        warnings_list = []
-
-        relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
-
-        if relaciones.filter(es_propietario=True).exists() and not relaciones.filter(usuario=usuario, es_propietario=True).exists():
-            warnings_list.append("🚨 Este vehículo tiene otro propietario")
-
-        if relaciones.exclude(usuario=usuario).exists():
-            warnings_list.append("⚠️ Vehículo asociado a múltiples usuarios")
-
-        if not relacion.verificado:
-            warnings_list.append("⛔ Usuario no verificado")
-
-        warning = " | ".join(warnings_list) if warnings_list else None
+        warning = None
 
         # =============================================
         # 5. VALIDACIONES
@@ -393,65 +385,21 @@ def estacionar_vehiculo(request):
         # =============================================
         # 7. COSTO
         # =============================================
-
-        TARIFA_BASE = Decimal("100")
-        costo_estimado = duracion * TARIFA_BASE
-
-        if usuario.saldo < costo_estimado:
-            return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error": f"Saldo insuficiente. Necesitás ${costo_estimado}",
-                "warning": warning,
-                "vehiculos": vehiculos,
-                "usuario": usuario
-            })
-
-        # =============================================
-        # 8. TRANSACCIÓN
-        # =============================================
-
         subcuadra = get_subcuadra_default(usuario.municipio)
 
-        try:
-            with transaction.atomic():
+        result = estacionar_service(
+            usuario,
+            vehiculo,
+            subcuadra,
+            duracion
+        )
 
-                usuario = Usuario.objects.select_for_update().get(id=usuario.id)
+        warning = " | ".join(result.get("warnings", [])) if result.get("warnings") else None
+        
+        if not result["ok"]:
+            return redirect(reverse(result["redirect"]))
 
-                if usuario.saldo < costo_estimado:
-                    return render(request, "usuarios/estacionar_vehiculo.html", {
-                        "error": f"Saldo insuficiente. Necesitás ${costo_estimado}",
-                        "warning": warning,
-                        "vehiculos": vehiculos,
-                        "usuario": usuario
-                    })
-
-                EstacionamientoFactory.crear(
-                    vehiculo,
-                    subcuadra,
-                    duracion,
-                    registrado_por=usuario
-                )
-
-                usuario.saldo -= costo_estimado
-                usuario.save()
-
-        except IntegrityError:
-            return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error": "El vehículo ya posee un estacionamiento activo.",
-                "warning": warning,
-                "vehiculos": vehiculos,
-                "usuario": usuario
-            })
-
-        except Exception:
-            return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error": "Ocurrió un error al registrar el estacionamiento.",
-                "warning": warning,
-                "vehiculos": vehiculos,
-                "usuario": usuario
-            })
-
-        # ✅ CORRECTO
-        return redirect("inicio")
+        return redirect(reverse(result["redirect"]))
 
     # =================================================
     # GET
@@ -530,6 +478,15 @@ def usuarios_infracciones(request):
         "infracciones": infracciones,
     })
 
+def mis_estacionamientos(request):
+    estacionamientos = Estacionamiento.objects.filter(
+        vehiculo__vehiculousuario__usuario=request.user
+    ).select_related("subcuadra", "vehiculo").order_by("-hora_inicio").distinct()
+
+    return render(request, "usuarios/historial_estacionamientos.html", {
+        "estacionamientos": estacionamientos
+    })
+
 @require_login
 def consultar_deuda(request):
 
@@ -598,6 +555,24 @@ def verificar_vehiculo(request):
         "resultado": resultado.to_dict()
     })
 
+def verificar_vehiculo_calle(request):
+    resultado = None
+    historial = request.session.get("historial", [])
+
+    if request.method == "POST":
+        patente = request.POST.get("patente", "").upper().strip()
+
+        resultado = verificar_estado_vehiculo(patente, request.user)
+
+        # 🔥 guardar historial
+        historial.insert(0, patente)
+        request.session["historial"] = historial[:5]
+
+    return render(request, "inspectores/verificar_calle.html", {
+        "resultado": resultado,
+        "historial": historial
+    })
+
 @require_role("inspector")
 def registrar_infraccion(request):
     usuario = request.user
@@ -608,11 +583,9 @@ def registrar_infraccion(request):
     if not patente:
         return redirect("inspectores_verificar_vehiculo")
 
-    vehiculo, creado = Vehiculo.objects.get_or_create(
+    vehiculo, _ = Vehiculo.objects.get_or_create(
         patente=patente,
-        defaults={
-            "municipio": usuario.municipio
-        }
+        defaults={"municipio": usuario.municipio}
     )
 
     subcuadras = Subcuadra.objects.filter(
@@ -623,11 +596,16 @@ def registrar_infraccion(request):
         inspector=usuario
     ).order_by("-id").first()
 
-    subcuadra_default = ultima_infraccion.subcuadra_id if ultima_infraccion else None
+    subcuadra_default = (
+        ultima_infraccion.subcuadra_id if ultima_infraccion else None
+    )
 
     infracciones_recientes = Infraccion.objects.filter(
         vehiculo=vehiculo
     ).order_by("-id")[:3]
+
+    # 🚀 NUEVO: validación previa (clave para UX real)
+    resultado = verificar_estado_vehiculo(patente, usuario)
 
     # ==============================
     # POST → usar service
@@ -646,16 +624,14 @@ def registrar_infraccion(request):
         except ErrorInfraccion as e:
             mensaje = str(e)
 
-    # ==============================
-    # 👇 ESTO ES LO QUE TE FALTABA
-    # ==============================
     return render(request, "inspectores/registrar_infraccion.html", {
         "mensaje": mensaje,
         "vehiculo": vehiculo,
         "patente": patente,
         "subcuadras": subcuadras,
         "infracciones_recientes": infracciones_recientes,
-        "subcuadra_default": subcuadra_default
+        "subcuadra_default": subcuadra_default,
+        "resultado": resultado,  # 🔥 clave UX
     })
 
 @require_role("inspector", "admin", "vendedor")
@@ -710,7 +686,7 @@ def registrar_estacionamiento_manual(request):
         MovimientoCaja.objects.create(
             usuario=inspector,
             monto=monto,
-            tipo="egreso",
+            tipo="ingreso",
             descripcion=f"Cobro estacionamiento {vehiculo.patente}"
         )
 
@@ -858,53 +834,21 @@ def resumen_caja(request):
 
     return render(request, 'vendedores/resumen_caja.html', {"registros": registros})
 
-@require_role("inspector")
 def cerrar_caja(request):
-
     usuario = request.user
 
-    # 🧠 último cierre
-    ultimo_cierre = CierreCaja.objects.filter(
-        usuario=usuario
-    ).order_by("-fecha_cierre").first()
+    cierre = generar_cierre_caja(usuario)
 
-    fecha_inicio = ultimo_cierre.fecha_cierre if ultimo_cierre else usuario.date_joined
+    return redirect("panel_inspectores")
 
-    # 💰 calcular total
-    movimientos = MovimientoCaja.objects.filter(
-        usuario=usuario,
-        tipo="egreso",
-        fecha__gte=fecha_inicio
-    )
+def simular_pago(request, infraccion_id):
 
-    total = movimientos.aggregate(total=Sum("monto"))["total"] or 0
+    infraccion = Infraccion.objects.get(id=infraccion_id)
 
-    if request.method == "POST":
+    infraccion.estado = "pagado"
+    infraccion.save()
 
-        cierre = CierreCaja.objects.create(
-            usuario=usuario,
-            fecha_inicio=fecha_inicio,
-            total_cobrado=total
-        )
-
-        # 🔥 REGISTRO EN HISTORIAL (MEJORA PRO)
-        MovimientoCaja.objects.create(
-            usuario=usuario,
-            monto=total,
-            tipo="cierre",
-            descripcion="Cierre de caja inspector"
-        )
-
-        return render(request, "inspectores/cierre_exitoso.html", {
-            "total": total,
-            "cierre": cierre
-        })
-
-    return render(request, "inspectores/cerrar_caja.html", {
-        "total": total,
-        "desde": fecha_inicio
-    })
-
+    return redirect("inspectores_ticket", infraccion.id)
 # =========================================================
 # VIEWS LOGIN / LOGOUT
 

@@ -8,10 +8,10 @@ class ResultadoVerificacion:
     estado: EstadoVehiculo
     estacionamiento_activo: bool
     registrar_infraccion_url: Optional[str] = None
-    subcuadras_exentas: Optional[object] = None
+    subcuadras_exentas: list | None = None
 
     def necesita_infraccion(self) -> bool:
-        return not self.estacionamiento_activo and self.registrar_infraccion_url is not None
+        return not self.estacionamiento_activo
     
     def css_class(self) -> str:
         return {

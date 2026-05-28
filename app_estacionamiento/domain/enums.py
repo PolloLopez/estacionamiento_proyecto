@@ -9,16 +9,16 @@ class EstadoVehiculo(Enum):
     PAGADO = "pagado"
     EXENTO_TOTAL = "exento_total"
     EXENTO_PARCIAL = "exento_parcial"
+    PENDIENTE_PAGO = "pendiente_pago"
 
+    @property
     def label(self):
-        if self == EstadoVehiculo.NO_REGISTRADO:
-            return "No registrado (Impago)"
-        if self == EstadoVehiculo.IMPAGO:
-            return "Impago"
-        if self == EstadoVehiculo.PAGADO:
-            return "Pagado"
-        if self == EstadoVehiculo.EXENTO_TOTAL:
-            return "Exento TOTAL"
-        if self == EstadoVehiculo.EXENTO_PARCIAL:
-            return "Exento parcial"
-        
+        mapping = {
+            self.NO_REGISTRADO: "No registrado (Impago)",
+            self.IMPAGO: "Impago",
+            self.PAGADO: "Pagado",
+            self.EXENTO_TOTAL: "Exento TOTAL",
+            self.EXENTO_PARCIAL: "Exento parcial",
+            self.PENDIENTE_PAGO: "Pendiente de pago",
+        }
+        return mapping[self]

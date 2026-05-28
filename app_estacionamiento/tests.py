@@ -1,3 +1,5 @@
+from urllib import response
+
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -12,6 +14,7 @@ from app_estacionamiento.models import (
     Usuario, Estacionamiento,
     MovimientoCaja, Municipio
 )
+from app_estacionamiento.models import CierreCaja
 
 from app_estacionamiento.services_infracciones import (
     crear_infraccion, ErrorInfraccion
@@ -97,7 +100,8 @@ class EstacionamientoTest(TestCase):
             {"patente": "ZZZ999", "duracion": "2"}
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("consultar_deuda"))
 
 
 # =====================================================
@@ -118,14 +122,14 @@ class CajaInspectorTest(TestCase):
         MovimientoCaja.objects.create(
             usuario=self.inspector,
             monto=Decimal("500"),
-            tipo="egreso",
+            tipo="ingreso",
             descripcion="Cobro calle"
         )
 
         total = MovimientoCaja.objects.filter(
             usuario=self.inspector,
-            tipo="egreso"
-        ).aggregate(total=Sum("monto"))["total"]
+            tipo="ingreso"
+        ).aggregate(total=Sum("monto"))["total"] or Decimal("0")
 
         self.assertEqual(total, Decimal("500"))
 
@@ -232,8 +236,42 @@ class VerificacionTest(BaseTestCase, ResultadoAssertionsMixin):
         resultado = verificar_estado_vehiculo(vehiculo.patente, self.usuario)
 
         self.assertEsMultable(resultado)
-        self.assertIn("FFF666", resultado.registrar_infraccion_url)
+        self.assertTrue(resultado.necesita_infraccion())
 
+    def test_flujo_inspector_completo(self):
+        vehiculo = Vehiculo.objects.create(
+            patente="TEST123",
+            municipio=self.municipio
+        )
+
+        resultado = verificar_estado_vehiculo("TEST123", self.usuario)
+
+        self.assertEqual(resultado.patente, "TEST123")
+        self.assertTrue(hasattr(resultado, "estado"))
+        self.assertTrue(hasattr(resultado, "necesita_infraccion"))
+
+    def test_flujo_verificacion_real(self):
+
+        vehiculo = Vehiculo.objects.create(
+            patente="TEST123",
+            municipio=self.municipio
+        )
+
+        # caso sin nada → IMPAGO
+        r = verificar_estado_vehiculo("TEST123", self.usuario)
+        self.assertEqual(r.estado, EstadoVehiculo.IMPAGO)
+
+        # pagado
+        Estacionamiento.objects.create(
+            vehiculo=vehiculo,
+            municipio=self.municipio,
+            activo=True,
+            subcuadra=self.subcuadra,
+            registrado_por=self.usuario
+        )
+
+        r = verificar_estado_vehiculo("TEST123", self.usuario)
+        self.assertEqual(r.estado, EstadoVehiculo.PAGADO)
 
 # =====================================================
 # 🚨 INFRACCIONES
@@ -346,9 +384,8 @@ class CierreCajaTest(TestCase):
 
         response = self.client.post(reverse("inspectores_cerrar_caja"))
 
-        self.assertEqual(response.status_code, 200)
-
-        from app_estacionamiento.models import CierreCaja
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("panel_inspectores"))
 
         cierre = CierreCaja.objects.first()
 

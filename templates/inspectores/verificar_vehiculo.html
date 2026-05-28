@@ -1,108 +1,116 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}
-Verificar Vehículo
-{% endblock %}
+{% block title %}Inspector PRO{% endblock %}
 
 {% block content %}
 
-<section class="card">
-    <h1>🔍 Verificar vehículo</h1>
+<style>
+.pantalla {
+    max-width: 520px;
+    margin: auto;
+    text-align: center;
+    padding-top: 30px;
+}
 
-    <form method="post" action="{% url 'inspectores_verificar_vehiculo' %}">
+.input-patente {
+    font-size: 3rem;
+    text-align: center;
+    letter-spacing: 6px;
+    width: 100%;
+    padding: 1rem;
+    border-radius: 12px;
+}
+
+.box {
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 12px;
+    font-size: 1.2rem;
+}
+
+.danger { background: #ffe5e5; }
+.success { background: #e5ffe5; }
+.warning { background: #fff6e5; }
+.info { background: #e5f0ff; }
+
+.btn-big {
+    width: 100%;
+    font-size: 1.5rem;
+    padding: 1rem;
+    margin-top: 15px;
+}
+</style>
+
+<div class="pantalla">
+
+    <h2>🚓 INSPECTOR PRO</h2>
+
+    <form method="post" id="form">
         {% csrf_token %}
-
-        <div class="form-group">
-            <label for="patente">Patente</label>
-
-            <input
-                type="text"
-                id="patente"
-                name="patente"
-                required
-                class="input"
-                autofocus
-            />
-        </div>
-
-        <button type="submit" class="btn">
-            Verificar
-        </button>
+        <input
+            id="patente"
+            name="patente"
+            class="input-patente"
+            autocomplete="off"
+            autofocus
+        />
     </form>
 
     {% if resultado %}
 
-    <div class="card" style="margin-top:1rem;">
+        <div class="box {{ resultado.css_class }}">
 
-        <h2>
-          {% if resultado.necesita_infraccion %}
-            🚨 Acción requerida
-          {% else %}
-            ℹ️ Información
-          {% endif %}
-        </h2>
+            <h2>{{ resultado.patente }}</h2>
 
-        <div class="alert alert-{{ resultado.css_class }}">
-            
-            <h4>Resultado</h4>
-        
-            <p><strong>Patente:</strong> {{ resultado.patente }}</p>
-        
-            <p>
-                <strong>Estado:</strong> 
-                {{ resultado.estado.label }}
-            </p>
+            <h3>{{ resultado.estado.label }}</h3>
 
             {% if resultado.estado.name == "EXENTO_TOTAL" %}
-                <p>🟢 Vehículo exento total — NO corresponde infracción</p>
+                <p>🟢 Exento total</p>
 
             {% elif resultado.estado.name == "EXENTO_PARCIAL" %}
-                <p>⚠️ Exento solo en algunas subcuadras</p>
-
-                {% if resultado.subcuadras_exentas %}
-                    <ul>
-                        {% for sub in resultado.subcuadras_exentas %}
-                            <li>📍 {{ sub }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-
-                <p>❗ Solo corresponde infracción fuera de estas subcuadras</p>
+                <p>🟡 Exento parcial</p>
 
             {% elif resultado.estado.name == "PAGADO" %}
-                <p>✅ Estacionamiento activo — NO corresponde infracción</p>
+                <p>🟢 Pago activo</p>
 
             {% else %}
-                <p>❌ Sin estacionamiento activo — corresponde infracción</p>
+                <p>🔴 Sin pago</p>
             {% endif %}
 
             {% if resultado.necesita_infraccion %}
-                <a href="{{ resultado.registrar_infraccion_url }}" 
-                   class="btn btn-danger">
-                    Generar infracción
+                <a class="btn btn-danger btn-big"
+                   href="{{ resultado.registrar_infraccion_url }}">
+                    🚨 INFRACCIONAR (1 CLICK)
                 </a>
+            {% else %}
+                <p>OK</p>
             {% endif %}
 
         </div>
 
-        {% if infracciones_recientes %}
-          <div class="historial-box">
-            <h3>📜 Últimas infracciones</h3>
-        
-            <ul>
-              {% for inf in infracciones_recientes %}
-                <li>
-                  {{ inf.subcuadra }} — {{ inf.created_at|default:inf.id }}
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
-
-    </div>
-
     {% endif %}
 
-</section>
+</div>
+
+<script>
+const input = document.getElementById("patente");
+const form = document.getElementById("form");
+
+// limpieza fuerte
+input.addEventListener("input", () => {
+    input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+});
+
+// ENTER inmediato
+input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        form.submit();
+    }
+});
+
+window.onload = () => input.focus();
+</script>
 
 {% endblock %}

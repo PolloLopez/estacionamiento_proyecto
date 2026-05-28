@@ -15,7 +15,7 @@ def verificar_estado_vehiculo(patente, usuario):
 
     vehiculo = Vehiculo.objects.filter(patente=patente).first()
 
-    # 🚫 NO REGISTRADO
+    # 1️⃣ NO REGISTRADO
     if not vehiculo:
         return ResultadoVerificacion(
             patente=patente,
@@ -24,7 +24,7 @@ def verificar_estado_vehiculo(patente, usuario):
             registrar_infraccion_url=reverse("inspectores_registrar_infraccion") + f"?patente={patente}"
         )
 
-    # 🚫 EXENTO TOTAL
+    # 2️⃣ EXENTO TOTAL (PRIORIDAD ABSOLUTA)
     if vehiculo.exento_global:
         return ResultadoVerificacion(
             patente=vehiculo.patente,
@@ -32,23 +32,22 @@ def verificar_estado_vehiculo(patente, usuario):
             estacionamiento_activo=True
         )
 
-    # ⚠️ EXENTO PARCIAL
-    subcuadras = vehiculo.subcuadras_exentas.all()
-    if subcuadras.exists():
+    # 3️⃣ EXENTO PARCIAL
+    if vehiculo.subcuadras_exentas.exists():
         return ResultadoVerificacion(
             patente=vehiculo.patente,
             estado=EstadoVehiculo.EXENTO_PARCIAL,
             estacionamiento_activo=False,
-            subcuadras_exentas=subcuadras,
+            subcuadras_exentas=vehiculo.subcuadras_exentas.all(),
             registrar_infraccion_url=reverse("inspectores_registrar_infraccion") + f"?patente={vehiculo.patente}"
         )
 
-    # 🚗 ESTACIONAMIENTO
+    # 4️⃣ PAGADO (activo real)
     estacionamiento = Estacionamiento.objects.filter(
         vehiculo=vehiculo,
         activo=True,
         municipio=usuario.municipio
-    ).first()
+    ).exists()
 
     if estacionamiento:
         return ResultadoVerificacion(
@@ -57,7 +56,7 @@ def verificar_estado_vehiculo(patente, usuario):
             estacionamiento_activo=True
         )
 
-    # ❌ IMPAGO
+    # 5️⃣ IMPAGO
     return ResultadoVerificacion(
         patente=vehiculo.patente,
         estado=EstadoVehiculo.IMPAGO,

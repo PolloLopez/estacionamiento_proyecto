@@ -74,6 +74,24 @@ urlpatterns = [
     ),
 
     path(
+        "inspectores/verificar_calle/",
+        views.verificar_vehiculo_calle,
+        name="inspectores_verificar_vehiculo_calle"
+    ),
+
+    path(
+        "simular-pago/",
+         views.simular_pago,
+          name="simular_pago"
+    ),
+
+    path(
+        "mis-estacionamientos/",
+        views.mis_estacionamientos,
+        name="usuarios_mis_estacionamientos"
+    ),
+
+    path(
         "inspectores/infraccion/",
         views.registrar_infraccion,
         name="inspectores_registrar_infraccion"

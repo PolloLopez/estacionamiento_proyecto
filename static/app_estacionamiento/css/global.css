@@ -278,6 +278,31 @@ body {
   border: 1px solid var(--color-border);
 }
 
+.input-patente {
+    width: 100%;
+    font-size: 3rem;
+    text-align: center;
+    padding: 1rem;
+    border-radius: 10px;
+    border: 2px solid #ccc;
+    letter-spacing: 5px;
+}
+
+.alert-success {
+    background-color: #e6ffed;
+    border-left: 6px solid #2ecc71;
+}
+
+.alert-danger {
+    background-color: #ffe6e6;
+    border-left: 6px solid #e74c3c;
+}
+
+.alert-warning {
+    background-color: #fff6e0;
+    border-left: 6px solid #f39c12;
+}
+
 /* =========================
    INPUTS
 ========================= */
