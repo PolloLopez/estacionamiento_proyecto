@@ -807,10 +807,15 @@ def resumen_caja(request):
 
     return render(request, 'vendedores/resumen_caja.html', {"registros": registros})
 
+@require_role("inspector")
 def cerrar_caja(request):
     usuario = request.user
 
     cierre = generar_cierre_caja(usuario)
+
+    # 🛑 si no hay movimientos, no rompe
+    if cierre is None:
+        return redirect("panel_inspectores")
 
     return redirect("panel_inspectores")
 

@@ -295,17 +295,18 @@ class VerificacionInspector(models.Model):
 
 class CierreCaja(models.Model):
 
-    usuario = models.ForeignKey("Usuario", on_delete=models.CASCADE)
-    fecha = models.DateTimeField(auto_now_add=True, null=True)
-    fecha_inicio = models.DateTimeField(default=timezone.now)
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+
+    fecha_apertura = models.DateTimeField()
     fecha_cierre = models.DateTimeField(auto_now_add=True)
 
     total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)
 
-    observaciones = models.TextField(blank=True, null=True)
+    # 🔒 auditoría
+    cantidad_movimientos = models.IntegerField(default=0)
 
     def __str__(self):
-        return f"Cierre {self.usuario.correo} - {self.fecha_cierre}"
+        return f"Cierre {self.usuario} - {self.fecha_cierre}"
     
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):

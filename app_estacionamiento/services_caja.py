@@ -10,43 +10,38 @@ def cobrar_estacionamiento(inspector, monto, descripcion=""):
 
     monto = Decimal(monto)
 
-    with transaction.atomic():
-
-        inspector = Usuario.objects.select_for_update().get(id=inspector.id)
-
-        if inspector.saldo_operativo < monto:
-            raise Exception("Saldo insuficiente")
-
-        # ✅ DESCUENTA saldo operativo (correcto para inspector)
-        inspector.saldo_operativo -= monto
-        inspector.save()
-
-        MovimientoCaja.objects.create(
-            usuario=inspector,
-            monto=monto,
-            tipo="ingreso",  # plata que entra desde la calle
-            descripcion=descripcion
-        )
+    return MovimientoCaja.objects.create(
+        usuario=inspector,
+        monto=monto,
+        tipo="ingreso",       # 🔥 CLAVE
+        descripcion=descripcion,
+        cerrado=False         # 🔥 CLAVE
+    )
 
 def generar_cierre_caja(usuario):
 
     movimientos = MovimientoCaja.objects.filter(
         usuario=usuario,
         tipo="ingreso",
-        cerrado=False  # 🔥 CLAVE
-    )
+        cerrado=False
+    ).order_by("fecha")
+
+    if not movimientos.exists():
+        return None
 
     total = movimientos.aggregate(
         total=Sum("monto")
     )["total"] or Decimal("0")
 
+    fecha_apertura = movimientos.first().fecha
+
     cierre = CierreCaja.objects.create(
         usuario=usuario,
         total_cobrado=total,
-        fecha=timezone.now()
+        fecha_apertura=fecha_apertura,
+        cantidad_movimientos=movimientos.count()
     )
 
-    # 🔒 marcar como cerrados
     movimientos.update(cerrado=True)
 
     return cierre

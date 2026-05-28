@@ -395,4 +395,5 @@ class CierreCajaTest(TestCase):
         cierre = CierreCaja.objects.first()
 
         self.assertIsNotNone(cierre)
+        self.assertEqual(cierre.cantidad_movimientos, 1)
         self.assertEqual(cierre.total_cobrado, Decimal("500.00"))
