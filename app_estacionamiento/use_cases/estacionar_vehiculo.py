@@ -1,9 +1,12 @@
 # app_estacionamiento/use_cases/estacionar_vehiculo.py
 from decimal import Decimal
+import warnings
 from django.db import transaction
 
 from app_estacionamiento.factories import EstacionamientoFactory
 from app_estacionamiento.models import Usuario, MovimientoCaja, VehiculoUsuario
+from app_estacionamiento.domain.vehiculo_policy import VehiculoPolicy
+from app_estacionamiento.domain.saldo_policy import SaldoPolicy
 
 TARIFA_BASE = Decimal("100")
 REDIRECT_OK = "inicio"
@@ -24,33 +27,19 @@ def ejecutar(usuario, vehiculo, subcuadra, duracion):
 
     costo = duracion * TARIFA_BASE
 
-    warnings = []
-
-    # ============================
-    # WARNINGS (reglas de negocio)
-    # ============================
     relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
 
-    if relaciones.filter(es_propietario=True).exists() and not relaciones.filter(usuario=usuario, es_propietario=True).exists():
-        warnings.append("🚨 Otro propietario registrado")
-
-    if relaciones.exclude(usuario=usuario).exists():
-        warnings.append("⚠️ Múltiples usuarios asociados")
-
-    relacion = relaciones.filter(
-        usuario=usuario
-    ).first()
-
-    if relacion and not relacion.verificado:
-        warnings.append("⛔ Usuario no verificado")
-
-    # ============================
-    # VALIDACIÓN SALDO
-    # ============================
-    if usuario.saldo < costo:
+    warnings = VehiculoPolicy.generar_warnings(
+        usuario,
+        vehiculo,
+        relaciones
+    )
+    
+    # Validación rápida (UX)
+    if not SaldoPolicy.tiene_saldo(usuario, costo):
         return {
             "ok": False,
-            "redirect": "consultar_deuda",
+            "redirect": REDIRECT_SIN_SALDO,
             "warnings": warnings
         }
 
@@ -61,10 +50,11 @@ def ejecutar(usuario, vehiculo, subcuadra, duracion):
 
         usuario = Usuario.objects.select_for_update().get(id=usuario.id)
 
-        if usuario.saldo < costo:
+        # 🔒 Validación real (consistencia)
+        if not SaldoPolicy.tiene_saldo(usuario, costo):
             return {
                 "ok": False,
-                "redirect": "consultar_deuda",
+                "redirect": REDIRECT_SIN_SALDO,
                 "warnings": warnings
             }
 
@@ -87,6 +77,6 @@ def ejecutar(usuario, vehiculo, subcuadra, duracion):
 
     return {
         "ok": True,
-        "redirect": "inicio",
+        "redirect": REDIRECT_OK,
         "warnings": warnings
     }

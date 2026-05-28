@@ -1,3 +1,4 @@
+# app_estacionamiento/domain/verificacion.py
 from dataclasses import dataclass
 from typing import Optional
 from app_estacionamiento.domain.enums import EstadoVehiculo
