@@ -813,8 +813,8 @@ def cerrar_caja(request):
 
     cierre = generar_cierre_caja(usuario)
 
-    # 🛑 si no hay movimientos, no rompe
     if cierre is None:
+        # 👇 no rompe, no crea basura
         return redirect("panel_inspectores")
 
     return redirect("panel_inspectores")

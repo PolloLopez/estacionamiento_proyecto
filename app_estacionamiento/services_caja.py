@@ -26,6 +26,7 @@ def generar_cierre_caja(usuario):
         cerrado=False
     ).order_by("fecha")
 
+    # 🚫 evitar cierre vacío
     if not movimientos.exists():
         return None
 
@@ -42,6 +43,7 @@ def generar_cierre_caja(usuario):
         cantidad_movimientos=movimientos.count()
     )
 
+    # 🔒 congelar movimientos
     movimientos.update(cerrado=True)
 
     return cierre

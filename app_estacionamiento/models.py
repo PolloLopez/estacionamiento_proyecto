@@ -244,6 +244,13 @@ class MovimientoCaja(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     fecha = models.DateTimeField(auto_now_add=True)
     cerrado = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = MovimientoCaja.objects.get(pk=self.pk)
+            if original.cerrado:
+                raise Exception("No se puede modificar un movimiento cerrado")
+        super().save(*args, **kwargs)
     
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
@@ -294,15 +301,13 @@ class VerificacionInspector(models.Model):
     resultado = models.CharField(max_length=50)
 
 class CierreCaja(models.Model):
-
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+
+    total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)
 
     fecha_apertura = models.DateTimeField()
     fecha_cierre = models.DateTimeField(auto_now_add=True)
 
-    total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)
-
-    # 🔒 auditoría
     cantidad_movimientos = models.IntegerField(default=0)
 
     def __str__(self):
