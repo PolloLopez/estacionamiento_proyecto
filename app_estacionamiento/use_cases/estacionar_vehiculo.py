@@ -7,6 +7,7 @@ from app_estacionamiento.factories import EstacionamientoFactory
 from app_estacionamiento.models import Usuario, MovimientoCaja, VehiculoUsuario
 from app_estacionamiento.domain.vehiculo_policy import VehiculoPolicy
 from app_estacionamiento.domain.saldo_policy import SaldoPolicy
+from app_estacionamiento.use_cases.registrar_movimiento import ejecutar as registrar_movimiento
 
 TARIFA_BASE = Decimal("100")
 REDIRECT_OK = "inicio"
@@ -68,7 +69,7 @@ def ejecutar(usuario, vehiculo, subcuadra, duracion):
         usuario.saldo -= costo
         usuario.save()
 
-        MovimientoCaja.objects.create(
+        registrar_movimiento(
             usuario=usuario,
             monto=costo,
             tipo="egreso",
