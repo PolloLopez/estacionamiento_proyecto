@@ -1,42 +1,52 @@
-# app_estacionamiento/services_estacionamiento.py
+# app_estacionamiento/use_cases/estacionar_vehiculo.py
 from decimal import Decimal
 from django.db import transaction
+
 from app_estacionamiento.factories import EstacionamientoFactory
-from app_estacionamiento.models import MovimientoCaja, Usuario, VehiculoUsuario
+from app_estacionamiento.models import Usuario, MovimientoCaja, VehiculoUsuario
 
 TARIFA_BASE = Decimal("100")
+REDIRECT_OK = "inicio"
+REDIRECT_SIN_SALDO = "consultar_deuda"
 
+def ejecutar(usuario, vehiculo, subcuadra, duracion):
 
-def estacionar(usuario, vehiculo, subcuadra, duracion):
+    try:
+        duracion = Decimal(duracion)
+        if duracion <= 0:
+            raise ValueError()
+    except:
+        return {
+            "ok": False,
+            "redirect": "inicio",
+            "warnings": ["Duración inválida"]
+        }
 
-    costo = Decimal(duracion) * TARIFA_BASE
+    costo = duracion * TARIFA_BASE
 
     warnings = []
 
-    # =====================================
-    # WARNINGS (antes estaban en la vista)
-    # =====================================
-
+    # ============================
+    # WARNINGS (reglas de negocio)
+    # ============================
     relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
 
     if relaciones.filter(es_propietario=True).exists() and not relaciones.filter(usuario=usuario, es_propietario=True).exists():
-        warnings.append("🚨 Este vehículo tiene otro propietario")
+        warnings.append("🚨 Otro propietario registrado")
 
     if relaciones.exclude(usuario=usuario).exists():
-        warnings.append("⚠️ Vehículo asociado a múltiples usuarios")
+        warnings.append("⚠️ Múltiples usuarios asociados")
 
-    relacion = VehiculoUsuario.objects.filter(
-        usuario=usuario,
-        vehiculo=vehiculo
+    relacion = relaciones.filter(
+        usuario=usuario
     ).first()
 
     if relacion and not relacion.verificado:
         warnings.append("⛔ Usuario no verificado")
 
-    # =====================================
+    # ============================
     # VALIDACIÓN SALDO
-    # =====================================
-
+    # ============================
     if usuario.saldo < costo:
         return {
             "ok": False,
@@ -44,6 +54,9 @@ def estacionar(usuario, vehiculo, subcuadra, duracion):
             "warnings": warnings
         }
 
+    # ============================
+    # TRANSACTION CORE
+    # ============================
     with transaction.atomic():
 
         usuario = Usuario.objects.select_for_update().get(id=usuario.id)

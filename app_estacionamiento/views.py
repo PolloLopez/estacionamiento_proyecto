@@ -12,7 +12,8 @@ from decimal import Decimal
 from django.db import IntegrityError, transaction
 
 from app_estacionamiento.services_caja import generar_cierre_caja
-from app_estacionamiento.services_estacionamiento import estacionar
+
+from app_estacionamiento.use_cases.estacionar_vehiculo import ejecutar as estacionar_uc
 from .decorators import require_role, require_login
 from .forms import RegistroUsuarioForm
 from django.conf import settings
@@ -36,7 +37,7 @@ from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate
 from app_estacionamiento.services_verificacion import verificar_estado_vehiculo
 from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
-from app_estacionamiento.services_estacionamiento import estacionar as estacionar_service
+
 
 @require_role("inspector", "admin", "conductor", "vendedor") 
 def inicio_usuarios(request):
@@ -337,12 +338,6 @@ def estacionar_vehiculo(request):
         )
 
         # =============================================
-        # 4. WARNINGS (mejorados)
-        # =============================================
-
-        warning = None
-
-        # =============================================
         # 5. VALIDACIONES
         # =============================================
 
@@ -387,7 +382,7 @@ def estacionar_vehiculo(request):
         # =============================================
         subcuadra = get_subcuadra_default(usuario.municipio)
 
-        result = estacionar_service(
+        result = estacionar_uc(
             usuario,
             vehiculo,
             subcuadra,
@@ -395,7 +390,7 @@ def estacionar_vehiculo(request):
         )
 
         warning = " | ".join(result.get("warnings", [])) if result.get("warnings") else None
-        
+
         if not result["ok"]:
             return redirect(reverse(result["redirect"]))
 
