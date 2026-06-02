@@ -1,3 +1,5 @@
+/* app_estacionamiento/static/app_estacionamiento/css/global.css */
+
 /* =========================
    VARIABLES
 ========================= */
@@ -343,4 +345,105 @@ body {
   text-align: center;
   border-top: 1px solid var(--color-border);
   background: var(--color-surface-2);
+}
+
+/* =========================
+   ESTADOS VISUALES PRO
+========================= */
+
+.box {
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: var(--radius);
+  font-size: 1.2rem;
+  border: 1px solid var(--color-border);
+  transition: var(--transition);
+}
+
+.box.danger {
+  background: rgba(255,107,87,0.1);
+  border-left: 5px solid var(--color-danger);
+}
+
+.box.success {
+  background: rgba(46,125,50,0.15);
+  border-left: 5px solid #2e7d32;
+}
+
+.box.warning {
+  background: rgba(249,168,37,0.15);
+  border-left: 5px solid #f9a825;
+}
+
+.box.info {
+  background: rgba(66,165,245,0.15);
+  border-left: 5px solid #42a5f5;
+}
+
+/* =========================
+   BOTON CRITICO (INSPECTOR)
+========================= */
+
+.btn-big {
+  width: 100%;
+  font-size: 1.5rem;
+  padding: 1rem;
+  margin-top: 15px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.btn-danger {
+  background: #c62828;
+}
+
+.btn-danger:hover {
+  background: #e53935;
+  transform: scale(1.02);
+}
+
+/* =========================
+   INPUT PATENTE PRO
+========================= */
+
+.input-patente {
+  background: black;
+  color: #00ff9c;
+  border: 2px solid #00ff9c;
+  font-weight: bold;
+}
+
+/* =========================
+   FEEDBACK RAPIDO
+========================= */
+
+.box h2 {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.box h3 {
+  margin-bottom: 10px;
+}
+
+/* =========================
+   TABLAS PRO
+========================= */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+table th {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
 }

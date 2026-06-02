@@ -2,8 +2,7 @@
 
 from django.utils import timezone
 from datetime import timedelta
-from app_estacionamiento.models import Infraccion
-from app_estacionamiento.models import Estacionamiento, Vehiculo, Subcuadra
+from app_estacionamiento.models import Infraccion, Estacionamiento, Vehiculo, Subcuadra
 
 
 class ErrorInfraccion(Exception):
@@ -11,6 +10,10 @@ class ErrorInfraccion(Exception):
 
 
 def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
+
+    municipio = getattr(inspector, "municipio", None)
+    if not municipio:
+        raise ErrorInfraccion("Inspector sin municipio")
 
     # ==============================
     # VEHICULO
@@ -24,7 +27,7 @@ def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
     # ==============================
     subcuadra = Subcuadra.objects.filter(
         id=subcuadra_id,
-        municipio=inspector.municipio
+        municipio=municipio
     ).first()
 
     if not subcuadra:
@@ -45,7 +48,7 @@ def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
     estacionamiento = Estacionamiento.objects.filter(
         vehiculo=vehiculo,
         activo=True,
-        municipio=inspector.municipio
+        subcuadra__municipio=municipio
     ).order_by("-hora_inicio").first()
 
     if estacionamiento:
@@ -58,10 +61,10 @@ def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
 
     ultima = Infraccion.objects.filter(
         vehiculo=vehiculo,
-        municipio=inspector.municipio
-    ).order_by("-id").first()
+        municipio=municipio
+    ).order_by("-creado_en").first()
 
-    if ultima and ultima.fecha_creacion >= hace_15_min:
+    if ultima and ultima.creado_en >= hace_15_min:
         raise ErrorInfraccion("Ya existe una infracción reciente")
 
     # ==============================
@@ -70,7 +73,7 @@ def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
     infraccion = Infraccion.objects.create(
         vehiculo=vehiculo,
         inspector=inspector,
-        municipio=inspector.municipio,
+        municipio=municipio,
         subcuadra=subcuadra,
         estacionamiento=estacionamiento,
         foto=foto

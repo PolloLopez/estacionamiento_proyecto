@@ -1,8 +1,10 @@
 # app_estacionamiento/domain/verificacion.py
+
 from dataclasses import dataclass
 from typing import Optional
-from app_estacionamiento.domain.enums import EstadoVehiculo
 from django.db.models import QuerySet
+from app_estacionamiento.domain.enums import EstadoVehiculo
+
 
 @dataclass
 class ResultadoVerificacion:
@@ -12,13 +14,14 @@ class ResultadoVerificacion:
     registrar_infraccion_url: Optional[str] = None
     subcuadras_exentas: Optional[QuerySet] = None
 
+    # 🔴 IMPORTANTE: método, no property
     def necesita_infraccion(self) -> bool:
-        return self.estado in [ 
+        return self.estado in [
             EstadoVehiculo.NO_REGISTRADO,
             EstadoVehiculo.IMPAGO,
             EstadoVehiculo.EXENTO_PARCIAL
         ]
-    
+
     def css_class(self) -> str:
         return {
             EstadoVehiculo.NO_REGISTRADO: "danger",
@@ -26,10 +29,9 @@ class ResultadoVerificacion:
             EstadoVehiculo.PAGADO: "success",
             EstadoVehiculo.EXENTO_TOTAL: "info",
             EstadoVehiculo.EXENTO_PARCIAL: "warning",
-        }[self.estado]
+        }.get(self.estado, "info")  # fallback seguro
 
-    # 👇 clave para no romper templates
-    def estado_label(self):
+    def estado_label(self) -> str:
         return self.estado.label
 
     def to_dict(self):

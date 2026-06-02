@@ -60,9 +60,9 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             }
 
         EstacionamientoFactory.crear(
-            vehiculo,
-            subcuadra,
-            duracion,
+            vehiculo=vehiculo,
+            subcuadra=subcuadra,
+            duracion=duracion,
             registrado_por=usuario
         )
 

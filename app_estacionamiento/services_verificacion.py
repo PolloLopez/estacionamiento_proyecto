@@ -14,6 +14,9 @@ def verificar_estado_vehiculo(patente, usuario):
 
     vehiculo = Vehiculo.objects.filter(patente=patente).first()
 
+    # =========================
+    # NO REGISTRADO
+    # =========================
     if not vehiculo:
         return ResultadoVerificacion(
             patente=patente,
@@ -22,7 +25,9 @@ def verificar_estado_vehiculo(patente, usuario):
             registrar_infraccion_url=_url_infraccion(patente)
         )
 
-    # ✅ EXENTO TOTAL
+    # =========================
+    # EXENTO TOTAL
+    # =========================
     if getattr(vehiculo, "exento_global", False):
         return ResultadoVerificacion(
             patente=patente,
@@ -30,35 +35,39 @@ def verificar_estado_vehiculo(patente, usuario):
             estacionamiento_activo=True
         )
 
-    # 🔥 EXENTO PARCIAL (clave real)
-    subcuadras_exentas = []
-
-    if hasattr(vehiculo, "subcuadras_exentas"):
-        subcuadras_exentas = vehiculo.subcuadras_exentas.all()
-
-    if subcuadras_exentas and subcuadras_exentas.exists():
-        return ResultadoVerificacion(
-            patente=patente,
-            estado=EstadoVehiculo.EXENTO_PARCIAL,
-            estacionamiento_activo=False,
-            registrar_infraccion_url=_url_infraccion(patente),
-            subcuadras_exentas=subcuadras_exentas
-        )
-
-    # ✅ ESTACIONAMIENTO ACTIVO
-    est_activo = Estacionamiento.objects.filter(
+    # =========================
+    # ESTACIONAMIENTO ACTIVO (ANTES QUE PARCIAL)
+    # =========================
+    estacionamiento = Estacionamiento.objects.filter(
         vehiculo=vehiculo,
         activo=True
-    ).exists()
+    ).order_by("-hora_inicio").first()
 
-    if est_activo:
+    if estacionamiento:
         return ResultadoVerificacion(
             patente=patente,
             estado=EstadoVehiculo.PAGADO,
             estacionamiento_activo=True
         )
 
-    # ❌ IMPAGO
+    # =========================
+    # EXENTO PARCIAL
+    # =========================
+    if hasattr(vehiculo, "subcuadras_exentas"):
+        subcuadras_exentas = vehiculo.subcuadras_exentas.all()
+
+        if subcuadras_exentas.exists():
+            return ResultadoVerificacion(
+                patente=patente,
+                estado=EstadoVehiculo.EXENTO_PARCIAL,
+                estacionamiento_activo=False,
+                registrar_infraccion_url=_url_infraccion(patente),
+                subcuadras_exentas=subcuadras_exentas
+            )
+
+    # =========================
+    # IMPAGO
+    # =========================
     return ResultadoVerificacion(
         patente=patente,
         estado=EstadoVehiculo.IMPAGO,

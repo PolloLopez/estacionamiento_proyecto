@@ -72,7 +72,7 @@ def redirect_por_rol(usuario):
         return redirect("panel_inspectores")
 
     if usuario.es_vendedor:
-        return redirect("panel_vendedores")
+        return redirect("panel_vendedor")
 
     if usuario.es_conductor:
         return redirect("inicio_usuarios")
@@ -133,17 +133,21 @@ def registro_view(request):
 # =========================================================
 @require_role("admin")
 def panel_admin(request):
-    usuario = request.user
 
-    inspectores = Usuario.objects.filter(es_inspector=True, municipio=usuario.municipio)
-    vendedores = Usuario.objects.filter(es_vendedor=True, municipio=usuario.municipio)
-    usuarios = Usuario.objects.filter(es_conductor=True, municipio=usuario.municipio)
+    usuario = request.user
+    municipio = getattr(usuario, "municipio", None)
+    if not municipio:
+        return redirect("login")
+
+    inspectores = Usuario.objects.filter(es_inspector=True, municipio=municipio)
+    vendedores = Usuario.objects.filter(es_vendedor=True, municipio=municipio)
+    usuarios = Usuario.objects.filter(es_conductor=True, municipio=municipio)
 
     rol = request.GET.get("rol")
 
     estacionamientos = Estacionamiento.objects.select_related(
         "vehiculo", "subcuadra", "registrado_por"
-    ).filter(subcuadra__municipio=usuario.municipio)
+    ).filter(subcuadra__municipio=municipio)
 
     if rol == "vendedor":
         estacionamientos = estacionamientos.filter(registrado_por__in=vendedores)
@@ -156,15 +160,15 @@ def panel_admin(request):
 
     estacionamientos_activos = Estacionamiento.objects.filter(
         activo=True,
-        subcuadra__municipio=usuario.municipio
+        subcuadra__municipio=municipio
     ).count()
 
     infracciones_recientes = Infraccion.objects.filter(
-        subcuadra__municipio=usuario.municipio
-    ).order_by('-fecha')[:5]
+        subcuadra__municipio=municipio
+    ).order_by('-creado_en')[:5]
 
     total_cobrado = MovimientoCaja.objects.filter(
-        usuario__municipio=usuario.municipio,
+        usuario__municipio=municipio,
         tipo="ingreso"
     ).aggregate(total=Sum("monto"))["total"] or 0
 
@@ -213,8 +217,12 @@ def dashboard_admin(request):
 def panel_exenciones(request):
     usuario = request.user
 
-    vehiculo = None
-    subcuadras = Subcuadra.objects.filter(municipio=usuario.municipio)
+    municipio = getattr(usuario, "municipio", None)
+
+    if not municipio:
+        return redirect("login")
+
+    subcuadras = Subcuadra.objects.filter(municipio=municipio)
 
     accion = request.POST.get("accion")
 
@@ -459,6 +467,9 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 @require_role("conductor")
 def historial_estacionamientos(request):
     usuario = request.user
+    municipio = getattr(usuario, "municipio", None)
+    if not municipio:
+        return redirect("login")
     estacionamientos = Estacionamiento.objects.filter(
     vehiculo__in=usuario.vehiculos.all(),
     subcuadra__municipio=usuario.municipio
@@ -472,7 +483,7 @@ def usuarios_infracciones(request):
 
     infracciones = Infraccion.objects.filter(
         municipio=usuario.municipio
-    ).select_related("vehiculo", "inspector").order_by("-fecha")
+    ).select_related("vehiculo", "inspector").order_by("-creado_en")
 
     return render(request, "usuarios/historial_infracciones.html", {
         "usuario": usuario,
@@ -521,7 +532,7 @@ def panel_inspectores(request):
     # 💸 GASTADO (opcional si después cargás costos)
     total_gastado = MovimientoCaja.objects.filter(
         usuario=usuario,
-        tipo="ingreso"
+        tipo="egreso"
     ).aggregate(total=Sum("monto"))["total"] or 0
 
     resumen = {
@@ -536,54 +547,40 @@ def panel_inspectores(request):
         "resumen": resumen
     })
 
-
-@require_role("inspector", "admin")
+@require_role("inspector")
 def verificar_vehiculo(request):
-
-    if request.method == "GET":
-        return render(request, "inspectores/verificar_vehiculo.html", {})
-
-    patente = (request.POST.get("patente") or "").strip().upper()
-
-    if not patente:
-        return render(request, "inspectores/verificar_vehiculo.html", {
-            "error": "Debe ingresar una patente"
-        })
-
-    resultado = verificar_estado_vehiculo(patente, request.user)
-    
-    return render(request, "inspectores/verificar_vehiculo.html", {
-        "resultado": resultado.to_dict()
-    })
-
-def verificar_vehiculo_calle(request):
     resultado = None
     historial = request.session.get("historial", [])
 
-    if resultado:
-        print(resultado.estado)
-        print(resultado.estacionamiento_activo)
-        print(resultado.registrar_infraccion_url)
+    modo = request.GET.get("modo", "desktop")
 
     if request.method == "POST":
-        patente = request.POST.get("patente", "").upper().strip()
+        patente = (request.POST.get("patente") or "").upper().strip()
 
-        resultado = verificar_estado_vehiculo(patente, request.user)
+        if patente:
+            resultado = verificar_estado_vehiculo(patente, request.user)
 
-        # 🔥 guardar historial
-        historial.insert(0, patente)
-        request.session["historial"] = historial[:5]
+            # debug seguro
+            print("Estado:", resultado.estado)
+            print("Activo:", resultado.estacionamiento_activo)
+            print("URL infracción:", resultado.registrar_infraccion_url)
 
-    return render(request, "inspectores/verificar_calle.html", {
+            historial.insert(0, patente)
+            request.session["historial"] = historial[:5]
+
+    return render(request, "inspectores/verificar.html", {
         "resultado": resultado,
-        "historial": historial
+        "historial": historial,
+        "modo": modo
     })
-
 
 
 @require_role("inspector")
 def registrar_infraccion(request):
     usuario = request.user
+    municipio = getattr(usuario, "municipio", None)
+    if not municipio:
+       return redirect("login")
     mensaje = None
 
     patente = request.GET.get("patente") or request.POST.get("patente")
@@ -602,7 +599,7 @@ def registrar_infraccion(request):
 
     ultima_infraccion = Infraccion.objects.filter(
         inspector=usuario
-    ).order_by("-id").first()
+    ).order_by("-creado_en").first()
 
     subcuadra_default = (
         ultima_infraccion.subcuadra_id if ultima_infraccion else None
@@ -768,7 +765,7 @@ def resumen_infracciones(request):
 
     infracciones = Infraccion.objects.filter(
         municipio=usuario.municipio
-    ).select_related("vehiculo", "subcuadra").order_by("-fecha")
+    ).select_related("vehiculo", "subcuadra").order_by("-creado_en")
 
     return render(request, "inspectores/resumen_infracciones.html", {
         "infracciones": infracciones
@@ -789,10 +786,13 @@ def ticket_infraccion(request, infraccion_id):
 def caja_inspector(request):
 
     inspector = request.user
+    municipio = getattr(inspector, "municipio", None)
+    if not municipio:
+        return redirect("login")
 
     movimientos = MovimientoCaja.objects.filter(
         usuario=inspector
-    ).order_by("-fecha")
+    ).order_by("-creado_en")
 
     total_ingresos = movimientos.filter(tipo="ingreso").aggregate(
         total=Sum("monto")
@@ -815,12 +815,20 @@ def caja_inspector(request):
 # VIEWS VENDEDORES
 # =========================================================
 
-@require_role("vendedor", "admin")
-def panel_vendedores(request):
-    usuario = request.user
-    if not usuario.es_vendedor:
-        return redirect("inicio")
-    return render(request, 'vendedores/panel.html', {"vendedor": usuario})
+
+@require_role("vendedor")
+def panel_vendedor(request):
+
+    user = request.user
+
+    movimientos = MovimientoCaja.objects.filter(usuario=user)
+
+    total = movimientos.aggregate(total=Sum("monto"))["total"] or 0
+
+    return render(request, "vendedor/panel.html", {
+        "movimientos": movimientos,
+        "total": total
+    })
 
 @require_role("vendedor", "admin")
 def resumen_caja(request):

@@ -39,8 +39,6 @@ urlpatterns = [
 
     path("inspectores/verificar/", views.verificar_vehiculo, name="inspectores_verificar_vehiculo"),
 
-    path("inspectores/verificar_calle/", views.verificar_vehiculo_calle, name="inspectores_verificar_vehiculo_calle"),
-
     path("inspectores/infraccion/", views.registrar_infraccion, name="inspectores_registrar_infraccion"),
 
     path("inspectores/manual/", views.registrar_estacionamiento_manual, name="inspectores_registrar_estacionamiento_manual"),
@@ -54,7 +52,7 @@ urlpatterns = [
     # =========================
     # 💰 VENDEDORES
     # =========================
-    path("vendedores/", views.panel_vendedores, name="panel_vendedores"),
+    path("vendedores/", views.panel_vendedor, name="panel_vendedor"),
 
     path("vendedores/registrar/", views.registrar_estacionamiento_vendedor, name="vendedores_registrar_estacionamiento"),
 

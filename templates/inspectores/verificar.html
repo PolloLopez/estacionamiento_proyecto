@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Inspector PRO{% endblock %}
+{% block title %}Inspector{% endblock %}
 
 {% block content %}
 
@@ -10,7 +10,13 @@
     max-width: 520px;
     margin: auto;
     text-align: center;
-    padding-top: 30px;
+    padding-top: 20px;
+}
+
+/* 🚀 MODO CALLE FULLSCREEN */
+.modo-calle {
+    max-width: 100%;
+    padding: 10px;
 }
 
 .input-patente {
@@ -26,25 +32,20 @@
     margin-top: 20px;
     padding: 20px;
     border-radius: 12px;
-    font-size: 1.2rem;
+    font-size: 1.3rem;
 }
-
-.danger { background: #ffe5e5; }
-.success { background: #e5ffe5; }
-.warning { background: #fff6e5; }
-.info { background: #e5f0ff; }
 
 .btn-big {
     width: 100%;
-    font-size: 1.5rem;
-    padding: 1rem;
+    font-size: 1.6rem;
+    padding: 1.2rem;
     margin-top: 15px;
 }
 </style>
 
-<div class="pantalla">
+<div class="pantalla {% if modo == 'calle' %}modo-calle{% endif %}">
 
-    <h2>🚓 INSPECTOR PRO</h2>
+    <h2>🚓 INSPECTOR</h2>
 
     <form method="post" id="form">
         {% csrf_token %}
@@ -52,6 +53,7 @@
             id="patente"
             name="patente"
             class="input-patente"
+            placeholder="AAA111"
             autocomplete="off"
             autofocus
         />
@@ -63,7 +65,7 @@
 
             <h2>{{ resultado.patente }}</h2>
 
-            <h3>{{ resultado.estado.label }}</h3>
+            <h3>{{ resultado.estado_label }}</h3>
 
             {% if resultado.estado.name == "EXENTO_TOTAL" %}
                 <p>🟢 Exento total</p>
@@ -81,10 +83,10 @@
             {% if resultado.necesita_infraccion %}
                 <a class="btn btn-danger btn-big"
                    href="{{ resultado.registrar_infraccion_url }}">
-                    🚨 INFRACCIONAR (1 CLICK)
+                    🚨 INFRACCIONAR
                 </a>
             {% else %}
-                <p>OK</p>
+                <p>✅ OK</p>
             {% endif %}
 
         </div>
@@ -93,16 +95,32 @@
 
 </div>
 
+<!-- 🔊 SONIDOS -->
+<audio id="ok" src="{% static 'sounds/ok.mp3' %}"></audio>
+<audio id="warn" src="{% static 'sounds/warning.mp3' %}"></audio>
+<audio id="error" src="{% static 'sounds/error.mp3' %}"></audio>
+
 <script>
 const input = document.getElementById("patente");
 const form = document.getElementById("form");
 
-// limpieza fuerte
+// limpiar input
 input.addEventListener("input", () => {
     input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+
+    const val = input.value;
+
+    const esValida =
+        /^[A-Z]{3}[0-9]{3}$/.test(val) ||      // ABC123
+        /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val) || // AB123CD
+        /^[A-Z]{1}[0-9]{3}[A-Z]{3}$/.test(val);   // A123BCD (moto)
+
+    if (esValida) {
+        form.submit();
+    }
 });
 
-// ENTER inmediato
+// enter fallback
 input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
         e.preventDefault();
@@ -110,7 +128,35 @@ input.addEventListener("keydown", (e) => {
     }
 });
 
-window.onload = () => input.focus();
+// foco permanente
+window.onload = () => {
+    input.focus();
+
+    const estado = "{{ resultado.estado.name|default:'' }}";
+
+    if (!estado) return;
+
+    if (estado === "IMPAGO" || estado === "NO_REGISTRADO") {
+        document.getElementById("error").play();
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    }
+
+    if (estado === "EXENTO_PARCIAL") {
+        document.getElementById("warn").play();
+        if (navigator.vibrate) navigator.vibrate(100, 100);
+    }
+
+    if (estado === "PAGADO" || estado === "EXENTO_TOTAL") {
+        document.getElementById("ok").play();
+    }
+};
+
+// 📳 vibración móvil
+function vibrar(pattern) {
+    if (navigator.vibrate) {
+        navigator.vibrate(pattern);
+    }
+}
 </script>
 
 {% endblock %}

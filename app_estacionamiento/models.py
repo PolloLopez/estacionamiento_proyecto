@@ -235,7 +235,6 @@ class Meta:
             fields=["vehiculo"],
             condition=Q(activo=True),
             name="unique_estacionamiento_activo_por_vehiculo",
-            ordering=["-fecha"]
         )
     ]
 
@@ -281,7 +280,7 @@ class Infraccion(models.Model):
         blank=True
     )
     fecha_creacion = models.DateTimeField(auto_now_add=True, null=True)
-
+    
     estado = models.CharField(
         max_length=20,
         choices=[
@@ -303,6 +302,7 @@ class Infraccion(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     qr_code = models.CharField(max_length=255, null=True, blank=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    creado_en = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         if not self.municipio:
