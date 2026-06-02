@@ -814,6 +814,7 @@ def caja_inspector(request):
 # =========================================================
 # VIEWS VENDEDORES
 # =========================================================
+
 @require_role("vendedor", "admin")
 def panel_vendedores(request):
     usuario = request.user
@@ -829,16 +830,17 @@ def resumen_caja(request):
 
     return render(request, 'vendedores/resumen_caja.html', {"registros": registros})
 
-@require_role("inspector")
+
 def cerrar_caja(request):
     usuario = request.user
 
-    cierre = generar_cierre_caja(usuario)
+    # 🧠 opcional: permitir rango desde form
+    fecha_desde = request.POST.get("desde")
+    fecha_hasta = request.POST.get("hasta")
 
-    if cierre is None:
-        # 👇 no rompe, no crea basura
-        return redirect("panel_inspectores")
+    cierre = generar_cierre_caja(usuario, fecha_desde=fecha_desde or None, fecha_hasta=fecha_hasta or None)
 
+    # 🔒 SI NO HAY MOVIMIENTOS → igual redirige
     return redirect("panel_inspectores")
 
 def simular_pago(request, infraccion_id):

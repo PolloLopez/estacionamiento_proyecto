@@ -234,7 +234,8 @@ class Meta:
         UniqueConstraint(
             fields=["vehiculo"],
             condition=Q(activo=True),
-            name="unique_estacionamiento_activo_por_vehiculo"
+            name="unique_estacionamiento_activo_por_vehiculo",
+            ordering=["-fecha"]
         )
     ]
 
@@ -245,6 +246,7 @@ class MovimientoCaja(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     fecha = models.DateTimeField(auto_now_add=True)
     cerrado = models.BooleanField(default=False)
+    creado_en = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -259,11 +261,13 @@ class CierreCaja(models.Model):
     total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)
 
     fecha_apertura = models.DateTimeField()
-
-    # 🔥 NUEVO
-    creado_en = models.DateTimeField(default=timezone.now)
+    fecha_cierre = models.DateTimeField(auto_now_add=True)
 
     cantidad_movimientos = models.IntegerField(default=0)
+
+    # auditoria
+    creado_en = models.DateTimeField(default=timezone.now)
+    creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="cierres_creados")
 
     def __str__(self):
         return f"Cierre {self.usuario} - {self.total_cobrado}"
