@@ -13,7 +13,7 @@ from django.db import IntegrityError, transaction
 
 from app_estacionamiento.services_caja import generar_cierre_caja
 from app_estacionamiento.use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
-from app_estacionamiento.use_cases.estacionar_vehiculo import ejecutar as estacionar_uc
+from app_estacionamiento.use_cases.estacionar_vehiculo import ejecutar_estacionamiento
 from .decorators import require_role, require_login
 from .forms import RegistroUsuarioForm
 from django.conf import settings
@@ -163,6 +163,11 @@ def panel_admin(request):
         subcuadra__municipio=usuario.municipio
     ).order_by('-fecha')[:5]
 
+    total_cobrado = MovimientoCaja.objects.filter(
+        usuario__municipio=usuario.municipio,
+        tipo="ingreso"
+    ).aggregate(total=Sum("monto"))["total"] or 0
+
     return render(request, "admin/panel_admin.html", {
         "inspectores": inspectores,
         "vendedores": vendedores,
@@ -171,6 +176,7 @@ def panel_admin(request):
         "estacionamientos_activos": estacionamientos_activos,
         "infracciones_recientes": infracciones_recientes,
         "rol_seleccionado": rol,
+        "total_cobrado": total_cobrado,
     })
 
 @require_role("admin")
@@ -382,7 +388,7 @@ def estacionar_vehiculo(request):
         # =============================================
         subcuadra = get_subcuadra_default(usuario.municipio)
 
-        result = estacionar_uc(
+        result = ejecutar_estacionamiento(
             usuario,
             vehiculo,
             subcuadra,
@@ -509,7 +515,7 @@ def panel_inspectores(request):
     # 💰 COBRADO (lo que generó en calle)
     total_cobrado = MovimientoCaja.objects.filter(
         usuario=usuario,
-        tipo="egreso"
+        tipo="ingreso"
     ).aggregate(total=Sum("monto"))["total"] or 0
 
     # 💸 GASTADO (opcional si después cargás costos)
@@ -554,6 +560,11 @@ def verificar_vehiculo_calle(request):
     resultado = None
     historial = request.session.get("historial", [])
 
+    if resultado:
+        print(resultado.estado)
+        print(resultado.estacionamiento_activo)
+        print(resultado.registrar_infraccion_url)
+
     if request.method == "POST":
         patente = request.POST.get("patente", "").upper().strip()
 
@@ -567,6 +578,8 @@ def verificar_vehiculo_calle(request):
         "resultado": resultado,
         "historial": historial
     })
+
+
 
 @require_role("inspector")
 def registrar_infraccion(request):
@@ -713,8 +726,17 @@ def registrar_estacionamiento_vendedor(request):
         # Subcuadra única
         subcuadra = get_subcuadra_default(vendedor.municipio)
 
-        # Crear estacionamiento
-        EstacionamientoFactory.crear(vehiculo, subcuadra, duracion, registrado_por=vendedor)
+        result = ejecutar_estacionamiento(
+            vendedor,
+            vehiculo,
+            subcuadra,
+            duracion
+        )
+
+        if not result["ok"]:
+            return render(request, "vendedores/registrar_estacionamiento.html", {
+                "error": "No se pudo registrar estacionamiento"
+            })
 
         return redirect("vendedores_resumen_caja")
 

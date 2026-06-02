@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from app_estacionamiento.domain.enums import EstadoVehiculo
+from django.db.models import QuerySet
 
 @dataclass
 class ResultadoVerificacion:
@@ -9,10 +10,14 @@ class ResultadoVerificacion:
     estado: EstadoVehiculo
     estacionamiento_activo: bool
     registrar_infraccion_url: Optional[str] = None
-    subcuadras_exentas: list | None = None
+    subcuadras_exentas: Optional[QuerySet] = None
 
     def necesita_infraccion(self) -> bool:
-        return not self.estacionamiento_activo
+        return self.estado in [ 
+            EstadoVehiculo.NO_REGISTRADO,
+            EstadoVehiculo.IMPAGO,
+            EstadoVehiculo.EXENTO_PARCIAL
+        ]
     
     def css_class(self) -> str:
         return {
@@ -25,12 +30,12 @@ class ResultadoVerificacion:
 
     # 👇 clave para no romper templates
     def estado_label(self):
-        return self.estado.label()
+        return self.estado.label
 
     def to_dict(self):
         return {
             "patente": self.patente,
-            "estado": self.estado.label(),  # 👈 string visible
+            "estado": self.estado.label,
             "estacionamiento_activo": self.estacionamiento_activo,
             "registrar_infraccion_url": self.registrar_infraccion_url,
             "subcuadras_exentas": self.subcuadras_exentas,

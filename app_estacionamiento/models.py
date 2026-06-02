@@ -103,8 +103,9 @@ class Municipio(models.Model):
 # 🚗 Vehículo asociado a uno o varios usuarios
 class Vehiculo(models.Model):
     patente = models.CharField(max_length=10, unique=True) 
-    exento_global = models.BooleanField(default=False)  # exento total
-    subcuadras_exentas = models.ManyToManyField("Subcuadra", blank=True)  # Exenciones específicas
+    exento_global = models.BooleanField(default=False)
+    exento_parcial = models.BooleanField(default=False)
+    subcuadras_exentas = models.ManyToManyField("Subcuadra", blank=True)
     municipio = models.ForeignKey(Municipio,on_delete=models.CASCADE,null=True,blank=True) 
     fecha_creacion = models.DateTimeField(auto_now_add=True, null=True)
 
@@ -252,6 +253,21 @@ class MovimientoCaja(models.Model):
                 raise Exception("No se puede modificar un movimiento cerrado")
         super().save(*args, **kwargs)
     
+class CierreCaja(models.Model):
+    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+
+    total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)
+
+    fecha_apertura = models.DateTimeField()
+
+    # 🔥 NUEVO
+    creado_en = models.DateTimeField(default=timezone.now)
+
+    cantidad_movimientos = models.IntegerField(default=0)
+
+    def __str__(self):
+        return f"Cierre {self.usuario} - {self.total_cobrado}"
+    
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
     municipio = models.ForeignKey(
@@ -299,20 +315,7 @@ class VerificacionInspector(models.Model):
     subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)
     fecha = models.DateTimeField(auto_now_add=True)
     resultado = models.CharField(max_length=50)
-
-class CierreCaja(models.Model):
-    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
-
-    total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)
-
-    fecha_apertura = models.DateTimeField()
-    fecha_cierre = models.DateTimeField(auto_now_add=True)
-
-    cantidad_movimientos = models.IntegerField(default=0)
-
-    def __str__(self):
-        return f"Cierre {self.usuario} - {self.fecha_cierre}"
-    
+   
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 

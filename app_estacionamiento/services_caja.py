@@ -1,22 +1,9 @@
 
 # app_estacionamiento/services_caja.py
+from django.db.models import Sum
 from decimal import Decimal
 from django.utils import timezone
-from django.db.models import Sum
-from django.db import transaction
-from app_estacionamiento.models import MovimientoCaja, CierreCaja, Usuario
-
-def cobrar_estacionamiento(inspector, monto, descripcion=""):
-
-    monto = Decimal(monto)
-
-    return MovimientoCaja.objects.create(
-        usuario=inspector,
-        monto=monto,
-        tipo="ingreso",       # 🔥 CLAVE
-        descripcion=descripcion,
-        cerrado=False         # 🔥 CLAVE
-    )
+from app_estacionamiento.models import MovimientoCaja, CierreCaja
 
 def generar_cierre_caja(usuario):
 
@@ -26,7 +13,6 @@ def generar_cierre_caja(usuario):
         cerrado=False
     ).order_by("fecha")
 
-    # 🚫 evitar cierre vacío
     if not movimientos.exists():
         return None
 
@@ -35,15 +21,17 @@ def generar_cierre_caja(usuario):
     )["total"] or Decimal("0")
 
     fecha_apertura = movimientos.first().fecha
+    fecha_cierre = timezone.now()
 
     cierre = CierreCaja.objects.create(
         usuario=usuario,
         total_cobrado=total,
-        fecha_apertura=fecha_apertura,
-        cantidad_movimientos=movimientos.count()
+        fecha_apertura=movimientos.first().fecha,
+        cantidad_movimientos=movimientos.count(),
+        creado_en=timezone.now()
     )
 
-    # 🔒 congelar movimientos
+    # 🔒 corte real (auditoría)
     movimientos.update(cerrado=True)
 
     return cierre

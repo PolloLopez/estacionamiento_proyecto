@@ -1,19 +1,19 @@
 # app_estacionamiento/use_cases/estacionar_vehiculo.py
 from decimal import Decimal
-import warnings
 from django.db import transaction
 
 from app_estacionamiento.factories import EstacionamientoFactory
 from app_estacionamiento.models import Usuario, MovimientoCaja, VehiculoUsuario
 from app_estacionamiento.domain.vehiculo_policy import VehiculoPolicy
 from app_estacionamiento.domain.saldo_policy import SaldoPolicy
+
 from app_estacionamiento.use_cases.registrar_movimiento import ejecutar as registrar_movimiento
 
 TARIFA_BASE = Decimal("100")
 REDIRECT_OK = "inicio"
 REDIRECT_SIN_SALDO = "consultar_deuda"
 
-def ejecutar(usuario, vehiculo, subcuadra, duracion):
+def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
 
     try:
         duracion = Decimal(duracion)
