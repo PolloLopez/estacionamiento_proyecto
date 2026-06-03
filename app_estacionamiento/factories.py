@@ -9,32 +9,21 @@ from .models import Estacionamiento
 class EstacionamientoFactory:
 
     @staticmethod
-    def crear(vehiculo, subcuadra, duracion, registrado_por):
-
-        # cerrar activos del usuario
-        Estacionamiento.objects.filter(
-            registrado_por=registrado_por,
-            activo=True
-        ).update(activo=False)
-
-        # cerrar activos del vehículo
-        Estacionamiento.objects.filter(
-            vehiculo=vehiculo,
-            activo=True
-        ).update(activo=False)
-        if isinstance(duracion, Decimal):
-            duracion = float(duracion)
-
-        ahora = timezone.now()
-        fin = ahora + timedelta(minutes=duracion)
+    def crear(*, usuario, vehiculo, subcuadra, duracion, costo_base):
 
         estacionamiento = Estacionamiento.objects.create(
+            usuario=usuario,
             vehiculo=vehiculo,
             subcuadra=subcuadra,
-            hora_inicio=ahora,
-            hora_fin=fin,  
-            activo=True,
-            registrado_por=registrado_por
+            duracion_min=duracion,
+            costo_base=costo_base,
+            estado="ACTIVO"
         )
+
+        # cerrar otros activos del mismo vehículo
+        Estacionamiento.objects.filter(
+            vehiculo=vehiculo,
+            estado="ACTIVO"
+        ).exclude(id=estacionamiento.id).update(estado="FINALIZADO")
 
         return estacionamiento

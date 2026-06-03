@@ -151,6 +151,12 @@ class Subcuadra(models.Model):
     def __str__(self):
         return f"{self.calle}.{self.altura}"
 
+
+class Estado(models.TextChoices):
+    ACTIVO = "ACTIVO", "Activo"
+    FINALIZADO = "FINALIZADO", "Finalizado"
+
+    
 # 💰 Tarifa por hora de estacionamiento
 class Tarifa(models.Model):
     municipio = models.ForeignKey(
@@ -165,69 +171,35 @@ class Tarifa(models.Model):
     def __str__(self):
         return f"${self.precio_por_hora}/hora"
 
-# 🅿️ Estacionamiento en vía pública
 class Estacionamiento(models.Model):
-    municipio = models.ForeignKey(
-        Municipio,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True
+    vehiculo = models.ForeignKey("Vehiculo", on_delete=models.CASCADE)
+    subcuadra = models.ForeignKey("Subcuadra", on_delete=models.PROTECT)
+
+    usuario = models.ForeignKey(
+        "Usuario",
+        on_delete=models.PROTECT,
+        null=True
     )
 
-    vehiculo = models.ForeignKey("Vehiculo", on_delete=models.CASCADE)
-    subcuadra = models.ForeignKey("Subcuadra", on_delete=models.CASCADE)
-    hora_inicio = models.DateTimeField(default=timezone.now)
+    estado = models.CharField(
+        max_length=20,
+        choices=Estado.choices,
+        default=Estado.ACTIVO
+    )
+
+    hora_inicio = models.DateTimeField(auto_now_add=True)
     hora_fin = models.DateTimeField(null=True, blank=True)
-    costo = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
-    activo = models.BooleanField(default=True)
-    registrado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE)
 
-    def save(self, *args, **kwargs):
-        import traceback
+    duracion_min = models.IntegerField(default=60)
 
-        if settings.DEBUG:
-            traceback.print_stack(limit=5) 
+    costo_base = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    costo_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
-        if not self.municipio and self.registrado_por:
-            self.municipio = self.registrado_por.municipio 
+    creado_en = models.DateTimeField(auto_now_add=True)
 
-        super().save(*args, **kwargs)
-
-    def finalizar(self):
-
-        if not self.activo:
-            return self.costo
-
-        self.hora_fin = timezone.now()
-
-        costo = self.calcular_costo()
-
-        self.costo = costo
-        self.activo = False
-
-        self.save()
-
-        return costo
-
-    def calcular_costo(self):
-        if not self.activo:
-            return Decimal("0.00")
-
-        hora_fin = timezone.now()
-        duracion_horas = (hora_fin - self.hora_inicio).total_seconds() / 3600
-
-        # Redondeo hacia arriba mínimo 1 hora
-        horas_redondeadas = max(1, math.ceil(duracion_horas))
-
-        tarifa = Tarifa.objects.first()
-        if not tarifa:
-            return Decimal(horas_redondeadas) * Decimal("100.00")
-
-        costo = Decimal(horas_redondeadas) * Decimal(str(tarifa.precio_por_hora))
-        return costo.quantize(Decimal("0.01"))
-
-    def __str__(self):
-        return f"{self.vehiculo.patente} - {self.subcuadra} - {self.hora_inicio}"
+    @property
+    def activo(self):
+        return self.estado == Estado.ACTIVO
 
 class Meta:
     constraints = [
@@ -245,7 +217,7 @@ class MovimientoCaja(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     fecha = models.DateTimeField(auto_now_add=True)
     cerrado = models.BooleanField(default=False)
-    creado_en = models.DateTimeField(auto_now_add=True)
+    creado_en = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -270,7 +242,15 @@ class CierreCaja(models.Model):
 
     def __str__(self):
         return f"Cierre {self.usuario} - {self.total_cobrado}"
-    
+
+class VerificacionInspector(models.Model):
+    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
+    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)
+    fecha = models.DateTimeField(auto_now_add=True)
+    infraccion_generada = models.BooleanField(default=False)
+    resultado = models.CharField(max_length=50)
+
 # 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
     municipio = models.ForeignKey(
@@ -313,13 +293,6 @@ class Infraccion(models.Model):
 
         super().save(*args, **kwargs)
 
-class VerificacionInspector(models.Model):
-    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
-    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
-    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)
-    fecha = models.DateTimeField(auto_now_add=True)
-    resultado = models.CharField(max_length=50)
-   
 # 🔔 Notificación enviada a un usuario
 class Notificacion(models.Model):
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 

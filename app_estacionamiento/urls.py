@@ -23,10 +23,10 @@ urlpatterns = [
     path("historial/", views.historial_estacionamientos, name="historial_estacionamientos"),
     path("estacionar/", views.estacionar_vehiculo, name="usuarios_estacionar_vehiculo"),
     path("finalizar/<int:estacionamiento_id>/", views.finalizar_estacionamiento, name="usuarios_finalizar_estacionamiento"),
-    path("mis-estacionamientos/", views.mis_estacionamientos, name="usuarios_mis_estacionamientos"),
     path("infracciones/", views.usuarios_infracciones, name="usuarios_historial_infracciones"),
     path("deuda/", views.consultar_deuda, name="consultar_deuda"),
     path("vehiculo/agregar/", views.agregar_vehiculo, name="agregar_vehiculo"),
+    path("mis_estacionamientos/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),
 
     # =========================
     # 👮 INSPECTORES
@@ -40,16 +40,8 @@ urlpatterns = [
     path("inspectores/caja/", views.caja_inspector, name="inspectores_caja"),
     path("inspectores/cerrar-caja/", views.cerrar_caja, name="inspectores_cerrar_caja"),
 
-    path(
-        "inspectores/ticket/<int:infraccion_id>/",
-        views.ticket_infraccion,
-        name="inspectores_ticket"
-    ),
-    path(
-        "inspectores/ticket-cobro/<int:est_id>/",
-        views.ticket_cobro,
-        name="inspectores_ticket_cobro"
-    ),
+    path("inspectores/ticket/<int:infraccion_id>/", views.ticket_infraccion, name="inspectores_ticket"),
+    path("inspectores/ticket-cobro/<int:est_id>/", views.ticket_cobro, name="inspectores_ticket_cobro"),
 
     # =========================
     # 💰 VENDEDORES

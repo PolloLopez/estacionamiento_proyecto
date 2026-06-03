@@ -1,5 +1,6 @@
 # app_estacionamiento/use_cases/estacionar_vehiculo.py
 from decimal import Decimal
+from urllib import request
 from django.db import transaction
 
 from app_estacionamiento.factories import EstacionamientoFactory
@@ -35,8 +36,7 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
         vehiculo,
         relaciones
     )
-    
-    # Validación rápida (UX)
+
     if not SaldoPolicy.tiene_saldo(usuario, costo):
         return {
             "ok": False,
@@ -44,15 +44,11 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             "warnings": warnings
         }
 
-    # ============================
-    # TRANSACTION CORE
-    # ============================
     with transaction.atomic():
 
-        usuario = Usuario.objects.select_for_update().get(id=usuario.id)
+        usuario_db = Usuario.objects.select_for_update().get(id=usuario.id)
 
-        # 🔒 Validación real (consistencia)
-        if not SaldoPolicy.tiene_saldo(usuario, costo):
+        if not SaldoPolicy.tiene_saldo(usuario_db, costo):
             return {
                 "ok": False,
                 "redirect": REDIRECT_SIN_SALDO,
@@ -60,17 +56,18 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             }
 
         EstacionamientoFactory.crear(
+            usuario=usuario_db,
             vehiculo=vehiculo,
             subcuadra=subcuadra,
             duracion=duracion,
-            registrado_por=usuario
+            costo_base=costo
         )
 
-        usuario.saldo -= costo
-        usuario.save()
+        usuario_db.saldo -= costo
+        usuario_db.save()
 
         registrar_movimiento(
-            usuario=usuario,
+            usuario=usuario_db,
             monto=costo,
             tipo="egreso",
             descripcion="Estacionamiento"

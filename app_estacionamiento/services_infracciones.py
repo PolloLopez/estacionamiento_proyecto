@@ -47,7 +47,7 @@ def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
     # ==============================
     estacionamiento = Estacionamiento.objects.filter(
         vehiculo=vehiculo,
-        activo=True,
+        estado="ACTIVO",
         subcuadra__municipio=municipio
     ).order_by("-hora_inicio").first()
 

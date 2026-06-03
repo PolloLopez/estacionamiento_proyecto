@@ -22,7 +22,7 @@
   <div class="card">
     <h3>🚗 Estado del vehículo</h3>
 
-    {% if estacionamiento_activo %}
+    {% if estacionamiento_activo and estacionamiento_activo.estado == "ACTIVO" %}
 
       <div class="status-ok">
         🟢 Estacionamiento activo

@@ -4,12 +4,12 @@ from enum import Enum
 
 
 class EstadoVehiculo(Enum):
-    NO_REGISTRADO = "no_registrado"
-    IMPAGO = "impago"
+    NO_REGISTRADO = "no_registrado" #nunca estaciono
+    IMPAGO = "impago"   # vencido o sin pago 
     PAGADO = "pagado"
-    EXENTO_TOTAL = "exento_total"
-    EXENTO_PARCIAL = "exento_parcial"
-    PENDIENTE_PAGO = "pendiente_pago"
+    EXENTO_TOTAL = "exento_total" #exento global 
+    EXENTO_PARCIAL = "exento_parcial" #exento en ciertas subcuadras
+    PENDIENTE_PAGO = "pendiente_pago" # activo o dentro de ventana de pago, pero en plazo de pago
 
     @property
     def label(self):

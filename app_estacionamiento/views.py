@@ -27,7 +27,9 @@ from .models import (
     Infraccion,
     Municipio,
     MovimientoCaja,
-    CierreCaja
+    CierreCaja,
+    Estado, 
+    VerificacionInspector
 )
 
 from .utils import get_subcuadra_default
@@ -44,8 +46,8 @@ def inicio_usuarios(request):
     usuario = request.user
 
     estacionamiento_activo = Estacionamiento.objects.filter(
-    activo=True,
-    registrado_por=usuario
+        usuario=usuario,
+        estado="ACTIVO"
     ).order_by("-hora_inicio").first()
 
     return render(request, "usuarios/inicio_usuarios.html", {
@@ -75,7 +77,7 @@ def redirect_por_rol(usuario):
         return redirect("panel_vendedor")
 
     elif usuario.es_conductor:
-        return redirect("historial_estacionamientos")  # ✅ CORRECTO
+        return redirect("inicio_usuarios")  # ✅ CORRECTO
 
     return redirect("login")
 
@@ -146,20 +148,21 @@ def panel_admin(request):
     rol = request.GET.get("rol")
 
     estacionamientos = Estacionamiento.objects.select_related(
-        "vehiculo", "subcuadra", "registrado_por"
+        "vehiculo", "subcuadra", "usuario"
     ).filter(subcuadra__municipio=municipio)
 
+
     if rol == "vendedor":
-        estacionamientos = estacionamientos.filter(registrado_por__in=vendedores)
+        estacionamientos = estacionamientos.filter(usuario__in=vendedores)
     elif rol == "inspector":
-        estacionamientos = estacionamientos.filter(registrado_por__in=inspectores)
+        estacionamientos = estacionamientos.filter(usuario__in=inspectores)
     elif rol == "conductor":
-        estacionamientos = estacionamientos.filter(registrado_por__in=usuarios)
+        estacionamientos = estacionamientos.filter(usuario__in=usuarios)
 
     estacionamientos = estacionamientos.order_by("-hora_inicio")
 
     estacionamientos_activos = Estacionamiento.objects.filter(
-        activo=True,
+        estado=Estado.ACTIVO,
         subcuadra__municipio=municipio
     ).count()
 
@@ -366,7 +369,7 @@ def estacionar_vehiculo(request):
 
         if Estacionamiento.objects.filter(
             vehiculo=vehiculo,
-            activo=True
+            estado="ACTIVO"
         ).exists():
             return render(request, "usuarios/estacionar_vehiculo.html", {
                 "error": "El vehículo ya tiene un estacionamiento activo.",
@@ -419,25 +422,26 @@ def estacionar_vehiculo(request):
         "usuario": usuario
     })
 
-@require_role("conductor", "vendedor", "admin")
-def cargar_saldo(request):
-
-    return render(
-        request,
-        "usuarios/cargar_saldo.html"
-    )
-    
-@require_login
-def usuarios_historial(request):
+@require_role("conductor")
+def historial_estacionamientos(request):
     usuario = request.user
 
     estacionamientos = Estacionamiento.objects.filter(
-        registrado_por=usuario
-        ).order_by("-hora_inicio")
+        usuario=usuario
+    ).order_by("-hora_inicio")
 
     return render(request, "usuarios/historial_estacionamientos.html", {
-        "usuario": usuario,
-        "estacionamientos": estacionamientos,
+        "estacionamientos": estacionamientos
+    })
+
+from django.shortcuts import render
+from app_estacionamiento.models import Estacionamiento
+
+def historial_estacionamientos(request):
+    estacionamientos = Estacionamiento.objects.filter(usuario=request.user)
+
+    return render(request, "estacionamientos/mis_estacionamientos.html", {
+        "estacionamientos": estacionamientos
     })
 
 @require_role("conductor")
@@ -447,38 +451,18 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     estacionamiento = get_object_or_404(
         Estacionamiento,
         id=estacionamiento_id,
-        registrado_por=usuario  # 🔐 filtro directo (clave)
+        usuario=usuario
     )
 
-    # Ya finalizado
-    if not estacionamiento.activo:
-        return redirect("usuarios_historial_estacionamientos")
+    if estacionamiento.estado != "ACTIVO":
+        return redirect("historial_estacionamientos")
 
-    # (opcional) preview — lo dejo porque ya lo usás
-    costo_estimado = estacionamiento.calcular_costo()
-
-    # ✅ Finalizar
     costo_final = estacionamiento.finalizar()
 
-    # 💰 Descontar saldo (mantengo tu lógica actual)
     usuario.saldo -= costo_final
     usuario.save()
 
-    return redirect("usuarios_historial_estacionamientos")
-
-@require_role("conductor")
-def historial_estacionamientos(request):
-    usuario = request.user
-    municipio = getattr(usuario, "municipio", None)
-    if not municipio:
-        return redirect("login")
-    estacionamientos = Estacionamiento.objects.filter(
-    vehiculo__in=usuario.vehiculos.all(),
-    subcuadra__municipio=usuario.municipio
-    ).order_by("-hora_inicio")
-    return render(request, "usuarios/historial_estacionamientos.html", {
-        "estacionamientos": estacionamientos
-    })
+    return redirect("historial_estacionamientos")
 
 @require_role("inspector", "admin")
 def usuarios_infracciones(request):
@@ -494,15 +478,6 @@ def usuarios_infracciones(request):
         "infracciones": infracciones,
     })
 
-def mis_estacionamientos(request):
-    estacionamientos = Estacionamiento.objects.filter(
-        vehiculo__vehiculousuario__usuario=request.user
-    ).select_related("subcuadra", "vehiculo").order_by("-hora_inicio").distinct()
-
-    return render(request, "usuarios/historial_estacionamientos.html", {
-        "estacionamientos": estacionamientos
-    })
-
 @require_login
 def consultar_deuda(request):
 
@@ -511,15 +486,19 @@ def consultar_deuda(request):
 # =========================================================
 # VIEWS INSPECTORES
 # =========================================================
-@require_role("inspector")
 
+@require_role("inspector")
 def panel_inspectores(request):
     usuario = request.user
 
-    # 🚗 NO PAGADOS (simplificado por ahora)
-    no_pagados = Estacionamiento.objects.filter(
-        activo=False,
-        subcuadra__municipio=usuario.municipio
+    tolerancia = 15  # TODO: config admin
+    ahora = timezone.now()
+
+    # 🚗 PENDIENTES (vehículos dentro de tolerancia)
+    pendientes = VerificacionInspector.objects.filter(
+        inspector=usuario,
+        fecha__gte=ahora - timedelta(minutes=tolerancia),
+        infraccion_generada=False
     ).count()
 
     # 🚨 INFRACCIONES DEL INSPECTOR
@@ -527,20 +506,20 @@ def panel_inspectores(request):
         inspector=usuario
     ).count()
 
-    # 💰 COBRADO (lo que generó en calle)
+    # 💰 COBRADO (ingresos en calle)
     total_cobrado = MovimientoCaja.objects.filter(
         usuario=usuario,
         tipo="ingreso"
     ).aggregate(total=Sum("monto"))["total"] or 0
 
-    # 💸 GASTADO (opcional si después cargás costos)
+    # 💸 GASTADO (si aplica)
     total_gastado = MovimientoCaja.objects.filter(
         usuario=usuario,
         tipo="egreso"
     ).aggregate(total=Sum("monto"))["total"] or 0
 
     resumen = {
-        "no_pagados": no_pagados,
+        "pendientes": pendientes,
         "infracciones": infracciones,
         "a_rendir": total_cobrado,
         "saldo_operativo": usuario.saldo_operativo,
@@ -614,7 +593,7 @@ def registrar_infraccion(request):
     ).order_by("-id")[:3]
 
     # 🚀 NUEVO: validación previa (clave para UX real)
-    resultado = verificar_estado_vehiculo(patente, usuario)
+    resultado = verificar_estado_vehiculo(patente, usuario, subcuadras)
 
     # ==============================
     # POST → usar service
@@ -654,7 +633,11 @@ def registrar_estacionamiento_manual(request):
 
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
-        if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
+        if Estacionamiento.objects.filter(
+        vehiculo=vehiculo,
+        estado="ACTIVO"
+        ).exists():
+            
             return render(request, "inspectores/registrar_estacionamiento_manual.html", {
                 "error": "El vehículo ya tiene un estacionamiento activo."
             })
@@ -709,7 +692,10 @@ def registrar_estacionamiento_vendedor(request):
                     cliente.vehiculos.add(vehiculo)
 
         # Validar que no tenga estacionamiento activo
-        if Estacionamiento.objects.filter(vehiculo=vehiculo, activo=True).exists():
+        if Estacionamiento.objects.filter(
+            vehiculo=vehiculo,
+            estado="ACTIVO"
+        ).exists():
             return render(request, "vendedores/registrar_estacionamiento.html", {
                 "error": "El vehículo ya tiene un estacionamiento activo."
             })
@@ -838,7 +824,7 @@ def panel_vendedor(request):
 def resumen_caja(request):
     usuario = request.user
 
-    registros = Estacionamiento.objects.filter(registrado_por=usuario).order_by("-hora_inicio")
+    registros = Estacionamiento.objects.filter(usuario=usuario).order_by("-hora_inicio")
 
     return render(request, 'vendedores/resumen_caja.html', {"registros": registros})
 

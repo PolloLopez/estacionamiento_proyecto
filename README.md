@@ -67,7 +67,7 @@ class EstacionamientoFactory:
             hora_inicio=inicio,
             hora_fin=fin,
             registrado_por=registrado_por,
-            activo=True
+            estado="ACTIVO"
         )
 
         return estacionamiento

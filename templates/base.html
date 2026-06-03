@@ -40,7 +40,8 @@
         {% elif request.user.es_conductor %}
           <li><a href="{% url 'inicio' %}">Inicio</a></li>
           <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar</a></li>
-          <li><a href="{% url 'usuarios_mis_estacionamientos' %}">Mis estacionamientos</a></li>
+          <li><a href="{% url 'usuarios_historial_estacionamientos' %}">Historial de estacionamientos</a></li>
+
         {% endif %}
 
         <li><a href="{% url 'logout' %}">Salir</a></li>
