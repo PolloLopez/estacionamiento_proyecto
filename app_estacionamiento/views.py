@@ -68,14 +68,14 @@ def redirect_por_rol(usuario):
     if usuario.es_admin:
         return redirect("panel_admin")
 
-    if usuario.es_inspector:
+    elif usuario.es_inspector:
         return redirect("panel_inspectores")
 
-    if usuario.es_vendedor:
+    elif usuario.es_vendedor:
         return redirect("panel_vendedor")
 
-    if usuario.es_conductor:
-        return redirect("inicio_usuarios")
+    elif usuario.es_conductor:
+        return redirect("historial_estacionamientos")  # ✅ CORRECTO
 
     return redirect("login")
 
@@ -277,7 +277,7 @@ def agregar_vehiculo(request):
         patente = request.POST.get("patente", "").strip().upper()
 
         if not patente:
-            return redirect("inicio_usuarios")
+            return redirect("inicio")
 
         vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
@@ -286,7 +286,7 @@ def agregar_vehiculo(request):
             vehiculo=vehiculo
         )
 
-        return redirect("inicio_usuarios")
+        return redirect("inicio")
 
     return render(request, "usuarios/agregar_vehiculo.html")
 
@@ -443,22 +443,24 @@ def usuarios_historial(request):
 @require_role("conductor")
 def finalizar_estacionamiento(request, estacionamiento_id):
     usuario = request.user
-    estacionamiento = get_object_or_404(Estacionamiento, id=estacionamiento_id)
 
-    # 🔐 SOLO EL QUE LO CREÓ
-    if estacionamiento.registrado_por != usuario:
-        return redirect("inicio")
+    estacionamiento = get_object_or_404(
+        Estacionamiento,
+        id=estacionamiento_id,
+        registrado_por=usuario  # 🔐 filtro directo (clave)
+    )
 
     # Ya finalizado
     if not estacionamiento.activo:
         return redirect("usuarios_historial_estacionamientos")
 
-    # Calcular costo sin cerrar (preview)
+    # (opcional) preview — lo dejo porque ya lo usás
     costo_estimado = estacionamiento.calcular_costo()
 
-    # ✅ Finalizar correctamente
+    # ✅ Finalizar
     costo_final = estacionamiento.finalizar()
 
+    # 💰 Descontar saldo (mantengo tu lógica actual)
     usuario.saldo -= costo_final
     usuario.save()
 
@@ -474,7 +476,9 @@ def historial_estacionamientos(request):
     vehiculo__in=usuario.vehiculos.all(),
     subcuadra__municipio=usuario.municipio
     ).order_by("-hora_inicio")
-    return render(request, "usuarios/historial.html", {"estacionamientos": estacionamientos})
+    return render(request, "usuarios/historial_estacionamientos.html", {
+        "estacionamientos": estacionamientos
+    })
 
 @require_role("inspector", "admin")
 def usuarios_infracciones(request):
@@ -825,7 +829,7 @@ def panel_vendedor(request):
 
     total = movimientos.aggregate(total=Sum("monto"))["total"] or 0
 
-    return render(request, "vendedor/panel.html", {
+    return render(request, "vendedores/panel.html", {
         "movimientos": movimientos,
         "total": total
     })

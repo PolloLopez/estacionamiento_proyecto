@@ -35,13 +35,12 @@
           <li><a href="{% url 'inspectores_verificar_vehiculo' %}">Verificar</a></li>
 
         {% elif request.user.es_vendedor %}
-          <li><a href="{% url 'panel_vendedores' %}">Inicio</a></li>
+          <li><a href="{% url 'panel_vendedor' %}">Inicio</a></li>
 
         {% elif request.user.es_conductor %}
           <li><a href="{% url 'inicio' %}">Inicio</a></li>
           <li><a href="{% url 'usuarios_estacionar_vehiculo' %}">Estacionar</a></li>
           <li><a href="{% url 'usuarios_mis_estacionamientos' %}">Mis estacionamientos</a></li>
-          <li><a href="{% url 'simular_pago' %}" class="btn">💰 Cargar saldo (demo)</a></li>
         {% endif %}
 
         <li><a href="{% url 'logout' %}">Salir</a></li>

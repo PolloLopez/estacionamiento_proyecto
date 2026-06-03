@@ -110,13 +110,10 @@
 ./templates/usuarios/components
 ./templates/usuarios/components/panel.html
 ./templates/usuarios/consultar_deuda.html
-./templates/usuarios/estacionar_rapido.html
 ./templates/usuarios/estacionar_vehiculo.html
 ./templates/usuarios/finalizar_estacionamiento.html
-./templates/usuarios/historial.html
 ./templates/usuarios/historial_estacionamientos.html
 ./templates/usuarios/historial_infracciones.html
-./templates/usuarios/infracciones.html
 ./templates/usuarios/inicio_usuarios.html
 ./templates/usuarios/login.html
 ./templates/usuarios/registro.html

@@ -1,3 +1,4 @@
+# app_estacionamiento/tests.py
 from urllib import response
 
 from django.test import TestCase
@@ -398,3 +399,62 @@ class CierreCajaTest(TestCase):
         self.assertEqual(cierre.cantidad_movimientos, 1)
         self.assertEqual(cierre.total_cobrado, Decimal("500.00"))
         self.assertIsNotNone(cierre.creado_en)
+
+
+
+
+class UrlsTest(TestCase):
+
+    def setUp(self):
+        self.municipio = Municipio.objects.create(nombre="Test")
+
+        self.admin = Usuario.objects.create_user(
+            correo="admin@test.com",
+            password="12345",
+            municipio=self.municipio,
+            es_admin=True
+        )
+
+        self.inspector = Usuario.objects.create_user(
+            correo="insp@test.com",
+            password="12345",
+            municipio=self.municipio,
+            es_inspector=True
+        )
+
+        self.vendedor = Usuario.objects.create_user(
+            correo="vend@test.com",
+            password="12345",
+            municipio=self.municipio,
+            es_vendedor=True
+        )
+
+        self.conductor = Usuario.objects.create_user(
+            correo="cond@test.com",
+            password="12345",
+            municipio=self.municipio,
+            es_conductor=True
+        )
+
+    # =========================
+    # ROOT
+    # =========================
+    def test_root_redirect_admin(self):
+        self.client.force_login(self.admin)
+        response = self.client.get("/")
+        self.assertRedirects(response, reverse("panel_admin"))
+
+    def test_root_redirect_inspector(self):
+        self.client.force_login(self.inspector)
+        response = self.client.get("/")
+        self.assertRedirects(response, reverse("panel_inspectores"))
+
+    def test_root_redirect_vendedor(self):
+        self.client.force_login(self.vendedor)
+        response = self.client.get("/")
+        self.assertRedirects(response, reverse("panel_vendedor"))
+
+    def test_root_redirect_conductor(self):
+        self.client.force_login(self.conductor)
+        response = self.client.get("/")
+        self.assertRedirects(response, reverse("historial_estacionamientos"))
