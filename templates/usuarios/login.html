@@ -7,13 +7,10 @@
   <form method="post" action="{% url 'login' %}">
   {% csrf_token %}
 
-  <!--
-  
-  <a href="/accounts/google/login/" class="btn">
+  <a href="/accounts/google/login/" class="btn btn-google">
     Ingresar con Google
   </a>
-
-  -->
+  <hr style="margin: 1rem 0;">
 
   <label>Correo</label>
   <input type="email" name="correo" required>
