@@ -21,6 +21,8 @@ __pycache__/
 .env
 *.env
 .env.*
+# El ejemplo sí se commitea — es documentación de variables requeridas
+!.env.example
 
 # ============================
 # 📌 DJANGO
