@@ -3,9 +3,7 @@ Django==5.2.8
 asgiref==3.11.0
 
 # ─── Autenticación social ─────────────────────────────────────────────────────
-django-allauth==65.3.0
-requests==2.32.3
-PyJWT==2.10.1
+django-allauth[socialaccount]==65.3.0
 
 # ─── Producción ───────────────────────────────────────────────────────────────
 gunicorn==23.0.0               # servidor WSGI para Railway/Render
