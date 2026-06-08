@@ -55,7 +55,14 @@ urlpatterns = [
     # =========================
     path("cargar-saldo/<int:usuario_id>/", views.cargar_saldo, name="cargar_saldo"),
 
-
+    # =========================
+    # 💳 MERCADOPAGO
+    # =========================
+    path("mp/cargar/", views.mp_iniciar_carga, name="mp_iniciar_carga"),
+    path("mp/exitoso/", views.mp_exitoso, name="mp_exitoso"),
+    path("mp/fallido/", views.mp_fallido, name="mp_fallido"),
+    path("mp/pendiente/", views.mp_pendiente, name="mp_pendiente"),
+    path("mp/webhook/", views.mp_webhook, name="mp_webhook"),
 
     # =========================
     # 🛠 ADMIN

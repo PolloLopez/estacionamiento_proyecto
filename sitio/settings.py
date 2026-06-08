@@ -160,8 +160,17 @@ ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_EMAIL_VERIFICATION = "none"
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_ADAPTER = "app_estacionamiento.adapters.NoUsernameAccountAdapter"
 SOCIALACCOUNT_AUTO_SIGNUP = True
+
+# ─── MercadoPago ──────────────────────────────────────────────────────────────
+# En Railway: setear MP_ACCESS_TOKEN con el token de producción o sandbox.
+# Obtenerlos en: https://www.mercadopago.com.ar/developers/panel/credentials
+MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "")
+MP_PUBLIC_KEY = os.getenv("MP_PUBLIC_KEY", "")
 
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

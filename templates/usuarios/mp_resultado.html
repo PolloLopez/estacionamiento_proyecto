@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Resultado del pago{% endblock %}
+
+{% block content %}
+<section class="container">
+  <div class="panel">
+    <div class="panel-body" style="text-align: center; padding: 2rem;">
+
+      {% if estado == "exitoso" %}
+        <h2 style="color: #2e7d32;">✅ ¡Pago exitoso!</h2>
+        <p>Se acreditaron <strong>${{ monto }}</strong> a tu cuenta.</p>
+        <p>Tu nuevo saldo: <strong>${{ saldo_nuevo }}</strong></p>
+        <div class="actions" style="justify-content: center; margin-top: 1.5rem;">
+          <a href="{% url 'inicio' %}" class="btn">Ir al inicio</a>
+          <a href="{% url 'mp_iniciar_carga' %}" class="btn link">Cargar más saldo</a>
+        </div>
+
+      {% elif estado == "pendiente" %}
+        <h2 style="color: #e65100;">⏳ Pago pendiente</h2>
+        <p>Tu pago está siendo procesado. El saldo se acreditará automáticamente cuando se confirme.</p>
+        <p>No es necesario que hagas nada. Revisá tu historial en unos minutos.</p>
+        <div class="actions" style="justify-content: center; margin-top: 1.5rem;">
+          <a href="{% url 'inicio' %}" class="btn">Ir al inicio</a>
+        </div>
+
+      {% else %}
+        <h2 style="color: #c62828;">❌ Pago no completado</h2>
+        <p>El pago fue rechazado o cancelado. No se realizó ningún cobro.</p>
+        <div class="actions" style="justify-content: center; margin-top: 1.5rem;">
+          <a href="{% url 'mp_iniciar_carga' %}" class="btn">Intentar de nuevo</a>
+          <a href="{% url 'inicio' %}" class="btn link">Ir al inicio</a>
+        </div>
+      {% endif %}
+
+      {% if messages %}
+      <ul class="messages" style="margin-top: 1rem;">
+        {% for message in messages %}
+        <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+    </div>
+  </div>
+</section>
+{% endblock %}
