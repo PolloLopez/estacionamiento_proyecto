@@ -13,14 +13,14 @@ def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None):
             usuario=usuario,
             tipo="ingreso",
             cerrado=False
-        ).order_by("fecha")
+        ).order_by("creado_en")
 
         # 📅 filtro por período (opcional)
         if fecha_desde:
-            movimientos = movimientos.filter(fecha__gte=fecha_desde)
+            movimientos = movimientos.filter(creado_en__gte=fecha_desde)
 
         if fecha_hasta:
-            movimientos = movimientos.filter(fecha__lte=fecha_hasta)
+            movimientos = movimientos.filter(creado_en__lte=fecha_hasta)
 
         if not movimientos.exists():
             return None
@@ -29,7 +29,7 @@ def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None):
             total=Sum("monto")
         )["total"] or Decimal("0")
 
-        fecha_apertura = movimientos.first().fecha
+        fecha_apertura = movimientos.first().creado_en
 
         cierre = CierreCaja.objects.create(
             usuario=usuario,

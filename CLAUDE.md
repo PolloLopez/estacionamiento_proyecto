@@ -1,0 +1,2 @@
+Esta carpeta tiene un sistema de gestion de estacionamiento ciudadana, ventas, cobros, infracciones, excenciones totales y parciales.
+Explicando cada funcion y con nombres posiblemente bien descriptivos y en castellano

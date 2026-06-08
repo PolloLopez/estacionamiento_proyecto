@@ -150,13 +150,11 @@ class Subcuadra(models.Model):
 
     def __str__(self):
         return f"{self.calle}.{self.altura}"
-
-
+    
 class Estado(models.TextChoices):
     ACTIVO = "ACTIVO", "Activo"
     FINALIZADO = "FINALIZADO", "Finalizado"
 
-    
 # 💰 Tarifa por hora de estacionamiento
 class Tarifa(models.Model):
     municipio = models.ForeignKey(
@@ -201,23 +199,22 @@ class Estacionamiento(models.Model):
     def activo(self):
         return self.estado == Estado.ACTIVO
 
-class Meta:
-    constraints = [
-        UniqueConstraint(
-            fields=["vehiculo"],
-            condition=Q(activo=True),
-            name="unique_estacionamiento_activo_por_vehiculo",
-        )
-    ]
+    class Meta:
+        constraints = [
+            UniqueConstraint(
+                fields=["vehiculo"],
+                condition=Q(estado="ACTIVO"),
+                name="unique_estacionamiento_activo_por_vehiculo",
+            )
+        ]
 
 class MovimientoCaja(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
     tipo = models.CharField(max_length=10)  # egreso / ingreso
     descripcion = models.TextField(blank=True, null=True)
-    fecha = models.DateTimeField(auto_now_add=True)
     cerrado = models.BooleanField(default=False)
-    creado_en = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -251,38 +248,19 @@ class VerificacionInspector(models.Model):
     infraccion_generada = models.BooleanField(default=False)
     resultado = models.CharField(max_length=50)
 
-# 🚨 Infracción generada por un inspector
 class Infraccion(models.Model):
-    municipio = models.ForeignKey(
-        Municipio,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True
-    )
-    fecha_creacion = models.DateTimeField(auto_now_add=True, null=True)
-    
-    estado = models.CharField(
-        max_length=20,
-        choices=[
-            ("pendiente", "Pendiente"),
-            ("pagada", "Pagada"),
-            ("anulada", "Anulada"),
-        ],
-        default="pendiente"
-    )
-
+    municipio = models.ForeignKey(Municipio, on_delete=models.CASCADE, null=True, blank=True)
+    estado = models.CharField(max_length=20, choices=[("pendiente", "Pendiente"), ("pagada", "Pagada"), ("anulada", "Anulada")], default="pendiente")
     vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
     inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
     subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE, null=True, blank=True)
     estacionamiento = models.ForeignKey(Estacionamiento, on_delete=models.SET_NULL, null=True, blank=True)
     motivo = models.CharField(max_length=255, default="Impago")
-    fecha = models.DateTimeField(auto_now_add=True)
-    cancelada = models.BooleanField(default=False)
     foto = models.ImageField(upload_to="infracciones/", null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
     qr_code = models.CharField(max_length=255, null=True, blank=True)
     monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    creado_en = models.DateTimeField(auto_now_add=True)
+    creado_en = models.DateTimeField(auto_now_add=True)   # única fecha de creación
+    fecha_pago = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.municipio:

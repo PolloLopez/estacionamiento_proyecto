@@ -21,26 +21,19 @@ block content %}
             <th>Nombre</th>
             <th>Email</th>
             <th>Saldo</th>
-            <th>Exento</th>
+            <th>-</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {% for u in usuarios %}
           <tr>
-            <td>{{ u.nombre }}</td>
+            <td>{{ u.first_name|default:"-" }}</td>
             <td>{{ u.correo }}</td>
             <td>${{ u.saldo }}</td>
-            <td>{{ u.es_exento|yesno:"Sí,No" }}</td>
+            <td>-</td>
             <td>
-              <a class="btn small" href="{% url 'admin_editar_usuario' u.id %}"
-                >Editar</a
-              >
-              <a
-                class="btn small alert"
-                href="{% url 'admin_eliminar_usuario' u.id %}"
-                >Eliminar</a
-              >
+              <a class="btn small" href="{% url 'cargar_saldo' u.id %}">Cargar saldo</a>
             </td>
           </tr>
           {% empty %}

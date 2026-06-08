@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Agregar vehículo{% endblock %}
+
+{% block content %}
+<section class="container">
+  <div class="panel">
+    <h2>Agregar vehículo</h2>
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-row">
+        <label for="patente">Patente</label>
+        <input id="patente" name="patente" maxlength="10" required autofocus
+               style="text-transform:uppercase" />
+      </div>
+      {% if error %}
+        <p class="error">{{ error }}</p>
+      {% endif %}
+      <div class="form-row actions">
+        <button class="btn-general" type="submit">Agregar</button>
+        <a href="{% url 'inicio_usuarios' %}">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

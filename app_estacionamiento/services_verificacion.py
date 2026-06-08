@@ -30,10 +30,17 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
             patente=patente,
             estado=EstadoVehiculo.NO_REGISTRADO,
             estacionamiento_activo=False,
+            subcuadras_exentas=[...],
             registrar_infraccion_url=_url_infraccion(patente)
         )
 
-    # registrar verificación
+    # Guardar la verificación anterior ANTES de crear la nueva
+    # (para calcular tolerancia correctamente)
+    verificacion_anterior = VerificacionInspector.objects.filter(
+        vehiculo=vehiculo
+    ).order_by("-fecha").first()
+
+    # Registrar esta verificación
     VerificacionInspector.objects.create(
         vehiculo=vehiculo,
         inspector=usuario,
@@ -68,19 +75,19 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
             return ResultadoVerificacion(
                 patente=patente,
                 estado=EstadoVehiculo.EXENTO_PARCIAL,
+                subcuadras_exentas=[],
                 estacionamiento_activo=False
             )
 
-    # TOLERANCIA (usar verificación anterior)
-    ultima_verificacion = VerificacionInspector.objects.filter(
-        vehiculo=vehiculo
-    ).order_by("-fecha")[1:2].first()
-
-    if ultima_verificacion:
-        if timezone.now() - ultima_verificacion.fecha <= timedelta(minutes=15):
+    # TOLERANCIA: usar la verificación anterior al inspector actual
+    tolerancia_minutos = obtener_tolerancia()
+    if verificacion_anterior:
+        tiempo_desde_ultima = timezone.now() - verificacion_anterior.fecha
+        if tiempo_desde_ultima <= timedelta(minutes=tolerancia_minutos):
             return ResultadoVerificacion(
                 patente=patente,
                 estado=EstadoVehiculo.PENDIENTE_PAGO,
+                subcuadras_exentas=[],
                 estacionamiento_activo=False
             )
 

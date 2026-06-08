@@ -2,8 +2,7 @@
 
 from django.utils import timezone
 from datetime import timedelta
-from app_estacionamiento.models import Infraccion, Estacionamiento, Vehiculo, Subcuadra
-
+from app_estacionamiento.models import Infraccion, Estacionamiento, Vehiculo, Subcuadra, VerificacionInspector
 
 class ErrorInfraccion(Exception):
     pass
@@ -78,5 +77,15 @@ def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
         estacionamiento=estacionamiento,
         foto=foto
     )
+
+    # Trazabilidad: marcar la última verificación como origen de esta infracción
+    ultima_verificacion = VerificacionInspector.objects.filter(
+        vehiculo=vehiculo,
+        inspector=inspector
+    ).order_by("-fecha").first()
+
+    if ultima_verificacion:
+        ultima_verificacion.infraccion_generada = True
+        ultima_verificacion.save()
 
     return infraccion

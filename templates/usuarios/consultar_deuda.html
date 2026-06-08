@@ -1,10 +1,12 @@
-{% extends "base.html" %} {% block title %}Consultar Deuda{% endblock %} {%
-block content %}
+{% extends "base.html" %}
+{% block title %}Consultar Deuda{% endblock %}
+
+{% block content %}
 <section class="container">
   <div class="panel">
     <h2>Consultar deuda por vehículo</h2>
     <div class="panel-body">
-      <form method="get" action="{% url 'usuarios_consultar_deuda' %}">
+      <form method="get">
         <div class="form-row">
           <label>Patente</label>
           <input name="patente" placeholder="ABC123" />
@@ -17,13 +19,12 @@ block content %}
       {% if deuda is not None %}
       <div class="card">
         <p>Total deuda: <strong>${{ deuda.total }}</strong></p>
-        <a
-          class="btn"
-          href="{% url 'usuarios_pagar_estacionamiento' patente=consulta_patente %}"
-          >Pagar</a
-        >
       </div>
       {% endif %}
+
+      <p>
+        <a href="{% url 'inicio_usuarios' %}">Volver</a>
+      </p>
     </div>
   </div>
 </section>

@@ -1,34 +1,62 @@
-🧪 Cómo hacer un TEST antes del commit (bien hecho, rápido)
+// ESTACIONAMIENTO_PROYECTO/testeo.md
+# Checklist antes de commit
 
-No hace falta que te metas en testing complejo todavía.
-Hacé test funcional mínimo + sanity check.
+## 1. Tests automáticos
 
-✅ 1. TEST MANUAL (el más importante ahora)
+python manage.py test app_estacionamiento.tests
 
-Hacé este flujo:
+Resultado esperado:
 
-🔐 Login
-entrar con admin ✔
-🚗 Estacionar
-ir a:
-/usuarios/estacionar/
+Ran 17 tests
 
-Probar:
+OK
 
-✅ patente nueva → debería crear
-✅ patente existente → debería permitir
-⚠️ patente con otro usuario → warning
-❌ patente con estacionamiento activo → bloquear
-✅ 2. TEST DE URLS (evita errores como el que tuviste)
+---
 
-Corré:
+## 2. Validación Django
 
 python manage.py check
 
-✔ debe decir:
+Resultado esperado:
 
 System check identified no issues
-✅ 3. TEST DE MIGRACIONES
+
+---
+
+## 3. Migraciones
+
 python manage.py showmigrations
 
-✔ todas con [X]
+Todas deben aparecer con [X]
+
+---
+
+## 4. Migraciones pendientes
+
+python manage.py makemigrations
+
+Resultado esperado:
+
+No changes detected
+
+---
+
+## 5. Test manual
+
+### Conductor
+
+* Login
+* Estacionar
+* Finalizar
+* Consultar historial
+
+### Inspector
+
+* Verificar vehículo
+* Generar infracción
+
+### Administrador
+
+* Exenciones
+* Usuarios
+* Estadísticas

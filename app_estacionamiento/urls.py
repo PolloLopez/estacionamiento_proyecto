@@ -20,13 +20,14 @@ urlpatterns = [
     # =========================
     # 🚗 CONDUCTORES
     # =========================
-    path("historial/", views.historial_estacionamientos, name="historial_estacionamientos"),
     path("estacionar/", views.estacionar_vehiculo, name="usuarios_estacionar_vehiculo"),
     path("finalizar/<int:estacionamiento_id>/", views.finalizar_estacionamiento, name="usuarios_finalizar_estacionamiento"),
-    path("infracciones/", views.usuarios_infracciones, name="usuarios_historial_infracciones"),
+    path("gestion-infracciones/", views.gestion_infracciones, name="gestion_infracciones"),
+    path("mis-infracciones/", views.mis_infracciones, name="mis_infracciones"),
     path("deuda/", views.consultar_deuda, name="consultar_deuda"),
     path("vehiculo/agregar/", views.agregar_vehiculo, name="agregar_vehiculo"),
     path("mis_estacionamientos/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),
+    path("infracciones/<int:infraccion_id>/pagar/",views.pagar_infraccion,name="pagar_infraccion"),
 
     # =========================
     # 👮 INSPECTORES
@@ -39,7 +40,6 @@ urlpatterns = [
     path("inspectores/resumen/", views.resumen_infracciones, name="inspectores_resumen_infracciones"),
     path("inspectores/caja/", views.caja_inspector, name="inspectores_caja"),
     path("inspectores/cerrar-caja/", views.cerrar_caja, name="inspectores_cerrar_caja"),
-
     path("inspectores/ticket/<int:infraccion_id>/", views.ticket_infraccion, name="inspectores_ticket"),
     path("inspectores/ticket-cobro/<int:est_id>/", views.ticket_cobro, name="inspectores_ticket_cobro"),
 
@@ -55,9 +55,26 @@ urlpatterns = [
     # =========================
     path("cargar-saldo/<int:usuario_id>/", views.cargar_saldo, name="cargar_saldo"),
 
+
+
     # =========================
     # 🛠 ADMIN
     # =========================
     path("admin-panel/", views.panel_admin, name="panel_admin"),
+
+    # =========================
+    # 🛠 GESTIÓN ADMIN
+    # =========================
+    path("admin-inicio/", views.inicio_admin, name="inicio_admin"),
+    path("admin-inspectores/", views.gestionar_inspectores, name="gestionar_inspectores"),
+    path("admin-inspectores/<int:inspector_id>/editar/", views.editar_inspector, name="admin_editar_inspector"),
+    path("admin-inspectores/crear/", views.gestionar_inspectores, name="admin_crear_inspector"),
+    path("admin-vendedores/", views.gestionar_vendedores, name="gestionar_vendedores"),
+    path("admin-vendedores/<int:vendedor_id>/editar/", views.editar_vendedor, name="admin_editar_vendedor"),
+    path("admin-vendedores/crear/", views.gestionar_vendedores, name="admin_crear_vendedor"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
+    path("admin-usuarios/", views.gestionar_usuarios, name="gestionar_usuarios"),
+    path("admin-tarifas/", views.gestionar_tarifas, name="gestionar_tarifas"),
+    path("admin-tarifas/guardar/", views.gestionar_tarifas, name="admin_guardar_tarifa"),
+
 ]

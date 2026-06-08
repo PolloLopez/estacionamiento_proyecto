@@ -1,143 +1,182 @@
 # 🚗 Sistema de Estacionamiento Medido
 
-Aplicación web desarrollada en **Django** para la gestión del estacionamiento medido en la ciudad.  
-Permite administrar distintos roles de usuario (conductor, inspector, vendedor y administrador), registrar estacionamientos, infracciones y cobros, y visualizar historiales.
+Aplicación web en **Django 5.2** para la gestión integral del estacionamiento medido municipal.  
+Soporta múltiples municipios y roles: conductor, inspector, vendedor y administrador.
 
 ---
 
-## ✨ Funcionalidad por rol
+## ✨ Funcionalidades por rol
 
 ### 👤 Conductores
-- **Registro de estacionamiento:** el conductor ingresa la patente de su vehículo y estaciona.
-- **Finalización de estacionamiento:** al terminar, puede finalizar el estacionamiento. El sistema calcula el costo según la duración y descuenta del saldo.
-- **Saldo:** cada conductor tiene una cuenta con saldo. Si no alcanza, no puede finalizar el estacionamiento y queda como impago.
-- **Historial:** puede consultar todos sus estacionamientos pasados y ver si están pagos o impagos.
-- **Infracciones:** puede ver las infracciones registradas sobre sus vehículos.
-- **Exenciones:**
-  - **Exento total:** nunca paga estacionamiento en ninguna subcuadra.
-  - **Exento parcial:** no paga en ciertas calles/subcuadras específicas, pero sí en el resto.
-  - **Normal:** debe pagar siempre.
-
----
+- Registro y finalización de estacionamiento (descuenta saldo automáticamente)
+- Saldo personal: si no alcanza, queda como impago
+- Historial de estacionamientos e infracciones
+- Carga de saldo (en efectivo vía vendedor; MercadoPago en desarrollo)
+- Exenciones: total (nunca paga), parcial (exento en ciertas subcuadras) o normal
 
 ### 🕵️ Inspectores
-- **Panel de control:** acceso a todas las funciones desde un menú central.
-- **Verificación de vehículos:** ingresan una patente y el sistema indica si está pago, impago o exento.  
-  👉 Aquí se aplica el **patrón Strategy**, ya que la verificación se realiza según la estrategia de cálculo correspondiente al tipo de conductor (exento total, exento parcial o normal).
-- **Registro de infracciones:** pueden generar un acta de infracción, adjuntando foto y seleccionando la subcuadra.
-- **Registro manual de cobros:** en caso de cobros especiales, pueden registrarlos manualmente.
-- **Resumen rápido:** visualizan estacionamientos no pagados e infracciones recientes para tener control en la calle.
-
----
+- Verificación de vehículos por patente: pago / impago / exento
+- Registro de infracciones con foto y subcuadra
+- Registro manual de cobros
+- Caja auditada: movimientos, cierre de turno con confirmación
+- Tolerancia configurable antes de multar
 
 ### 🏪 Vendedores
-- **Registro manual de estacionamientos:** permiten a conductores pagar en efectivo y registrar el estacionamiento en el sistema.
-- **Resumen de caja:** visualizan los cobros realizados y el balance de su jornada.
-
----
+- Registro manual de estacionamientos (cobro en efectivo)
+- Carga de saldo a conductores
+- Resumen de caja de la jornada
 
 ### 🛠️ Administradores
-- **Panel administrativo:** acceso al panel de Django para gestionar usuarios, vehículos, subcuadras e infracciones.
-- **Estadísticas:** pueden ver estacionamientos recientes, infracciones registradas y distinguir entre conductores exentos totales, parciales y normales.
-- **Gestión de roles:** asignan permisos y roles a cada usuario.
+- Gestión de usuarios, inspectores y vendedores
+- Gestión de tarifas por municipio
+- Gestión de exenciones (totales y parciales por subcuadra)
+- Panel con estadísticas generales
 
 ---
 
-## 🧩 Uso de patrones de diseño
+## 🏗️ Arquitectura
 
-### 🏭 Factory
+```
+views → use_cases → services → domain
+```
 
-El sistema utiliza el patrón Factory para la creación de estacionamientos.
+- **Domain**: enums, políticas de saldo y vehículo, reglas de verificación
+- **Use Cases**: estacionar, finalizar, pagar infracción, registrar movimiento
+- **Services**: verificación (con tolerancia), infracciones, caja
+- **Views**: entrada HTTP, validaciones de formulario, mensajes al usuario
 
-Esto permite centralizar la lógica de creación, validaciones y asignación de valores
-como duración, costo inicial y usuario que registra.
+### Patrones de diseño
 
-Ejemplo conceptual:
+**Factory** — `EstacionamientoFactory.crear()` centraliza la creación de estacionamientos con validaciones y estado inicial.
 
-```python
-class EstacionamientoFactory:
-    @staticmethod
-    def crear(vehiculo, subcuadra, duracion, registrado_por=None):
-        inicio = timezone.now()
-        fin = inicio + timedelta(hours=float(duracion))
+**Strategy** — La verificación de vehículos aplica una estrategia según tipo de conductor: exento total, exento parcial o normal.
 
-        estacionamiento = Estacionamiento.objects.create(
-            vehiculo=vehiculo,
-            subcuadra=subcuadra,
-            hora_inicio=inicio,
-            hora_fin=fin,
-            registrado_por=registrado_por,
-            estado="ACTIVO"
-        )
+---
 
-        return estacionamiento
+## 🔐 Control de acceso
 
-🎯 Strategy
-En las funciones de verificación de vehículos por parte de los inspectores, se aplica el patrón Strategy. Cada vehículo puede tener una estrategia distinta para determinar si debe pagar o no:
+- `AbstractUser` con `correo` como campo de login (USERNAME_FIELD)
+- Flags booleanos: `es_admin`, `es_inspector`, `es_vendedor`, `es_conductor`
+- Decorador `@require_role(...)` en todas las vistas sensibles
+- Redirección automática según rol en el inicio
 
-Estrategia ExentoTotal: siempre devuelve "exento".
+---
 
-Estrategia ExentoParcial: verifica si la subcuadra está dentro de las exentas.
+## 🌎 Multi-municipio
 
-Estrategia Normal: calcula si el estacionamiento está pago o impago según saldo y tiempo.
+Cada entidad (usuario, vehículo, subcuadra, estacionamiento, infracción) pertenece a un municipio.  
+El sistema es multi-tenant básico: cada municipio opera de forma independiente.
 
-👉 Nota: actualmente la lógica se encuentra parcialmente implementada en vistas,
-pero se proyecta migrarla completamente a un sistema de estrategias desacopladas.
+---
 
-        
-Esto permite que el inspector simplemente invoque la estrategia correspondiente sin preocuparse por la lógica interna.
+## 🧪 Tests
 
-## 🌎 Soporte multi-municipio
+```bash
+python manage.py test app_estacionamiento
+# 45 tests, OK
 
-El sistema permite operar múltiples municipios de forma independiente.
+pytest
+# Con cobertura: pytest --cov=app_estacionamiento --cov-report=term-missing
+```
 
-Cada entidad clave está asociada a un municipio:
-- Usuarios
-- Subcuadras
-- Estacionamientos
-- Infracciones
+Cobertura por módulo:
+- Acceso anónimo y redirecciones
+- Control de roles por vista
+- Flujo completo conductor (estacionar → pagar → historial)
+- Lógica de saldo (deducción, saldo insuficiente, duplicados ACTIVO)
 
-Esto permite escalar la solución como plataforma SaaS para distintas ciudades.
+---
 
-🛠️ Tecnologías utilizadas
-Backend: Django 5.x
+## 🛠️ Tecnologías
 
-Frontend: HTML + CSS (estilos personalizados)
+| Capa | Tecnología |
+|---|---|
+| Backend | Django 5.2, Python 3.12 |
+| Base de datos | SQLite (dev) / PostgreSQL (prod) |
+| Autenticación | Django auth + `correo` como USERNAME_FIELD |
+| Frontend | HTML + CSS (estilos propios) |
+| Tests | pytest + pytest-cov |
 
-Base de datos: SQLite (por defecto, fácilmente reemplazable por PostgreSQL/MySQL)
+---
 
-Autenticación: Sistema de usuarios propio con roles
-## 🔐 Autenticación
+## 🚀 Instalación local
 
-Actualmente el sistema utiliza un esquema de autenticación basado en sesión
-
-
-Se encuentra planificada la migración al sistema estándar de Django (`request.user`)
-y posteriormente a JWT para API REST.
-
-
-Scripts de prueba: crear_usuarios.py para cargar datos iniciales
-
-Patrones de diseño: Factory y Strategy para la gestión de roles y verificación de estacionamientos
-
-🚀 Instalación y ejecución
-Clonar el repositorio:
-
-bash
+```bash
 git clone https://github.com/PolloLopez/estacionamiento_proyecto
-cd 
+cd estacionamiento_proyecto
 
-## 🚧 Estado del proyecto
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-El sistema se encuentra en fase avanzada de desarrollo.
+pip install -r requirements.txt
 
-✔ Funcionalidades principales implementadas  
-✔ Roles operativos  
-✔ Gestión de exenciones completa  
-✔ Paneles funcionales  
+python manage.py migrate
+python manage.py runscript crear_usuarios  # carga datos de prueba
 
-🔜 Próximos pasos:
-- Interfaz administrativa avanzada (exenciones desde UI)
-- API REST
-- Integración con pagos (MercadoPago)
+python manage.py runserver
+```
+
+---
+
+## ⚙️ Variables de entorno
+
+Crear un archivo `.env` en la raíz (no commitear):
+
+```env
+SECRET_KEY=tu-clave-secreta
+DEBUG=True
+DATABASE_URL=sqlite:///db.sqlite3
+
+# MercadoPago (próximamente)
+MP_ACCESS_TOKEN=
+MP_PUBLIC_KEY=
+```
+
+---
+
+## 📋 Estado del proyecto
+
+### ✅ Completado (v1.0-audit-completa)
+
+- Roles y control de acceso completo
+- Flujos de conductor, inspector, vendedor y admin
+- Exenciones totales y parciales
+- Caja auditada con cierre de turno
+- Multi-municipio básico
+- Constraint de unicidad en DB (un ACTIVO por vehículo)
+- Use Cases desacoplados
+- 45 tests pasando
+
+### 🔜 En progreso
+
+- **MercadoPago**: carga de saldo online y pago de infracciones
+- **Deploy**: Railway (PostgreSQL + HTTPS + dominio público)
+- **Settings de producción**: SECRET_KEY segura, DEBUG=False, WhiteNoise
+
+### 📅 Próximamente
+
+- API REST (Django REST Framework + JWT)
 - Frontend moderno (React / Next.js)
+- SaaS multi-municipio completo con facturación
+
+---
+
+## 📁 Estructura relevante
+
+```
+app_estacionamiento/
+├── domain/          # Reglas de negocio puras
+├── use_cases/       # Casos de uso (orquestación)
+├── services_*.py    # Servicios por dominio
+├── models.py        # Modelos Django
+├── views.py         # Vistas HTTP
+├── decorators.py    # @require_role, @require_login
+├── factories.py     # EstacionamientoFactory
+└── tests*.py        # Tests unitarios e integración
+
+templates/
+├── admin/           # Paneles de administración
+├── inspectores/     # Paneles de inspector
+├── usuarios/        # Paneles de conductor
+└── vendedores/      # Paneles de vendedor
+```

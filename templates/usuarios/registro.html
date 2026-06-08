@@ -5,8 +5,16 @@ content %}
     <h2>Crear cuenta</h2>
     <div class="panel-body">
       <form method="post">
-        {% csrf_token %} {{ form.as_p }}
-
+        {% csrf_token %} {{ form.as_p }} {% if municipios|length > 1 %}
+        <div class="form-row">
+          <label for="municipio_id">Municipio</label>
+          <select id="municipio_id" name="municipio_id">
+            {% for m in municipios %}
+            <option value="{{ m.id }}">{{ m.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
         <button class="btn">Registrarse</button>
       </form>
 

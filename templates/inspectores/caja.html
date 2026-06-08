@@ -4,9 +4,31 @@
 {% block content %}
 <h2>💰 Caja Inspector</h2>
 
-<p><b>Saldo:</b> {{ saldo }}</p>
-<p><b>Ingresos:</b> {{ ingresos }}</p>
-<p><b>Egresos:</b> {{ egresos }}</p>
+<p><b>Saldo:</b> ${{ saldo }}</p>
+<p><b>Ingresos:</b> ${{ ingresos }}</p>
+<p><b>Egresos:</b> ${{ egresos }}</p>
+
+{% if messages %}
+<ul class="messages">
+  {% for message in messages %}
+  <li class="{{ message.tags }}">{{ message }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<!-- Confirmación de cierre -->
+{% if movimientos_abiertos > 0 %}
+<div class="card" style="border: 1px solid orange; padding: 1rem; margin: 1rem 0;">
+  <p><b>Movimientos pendientes de cierre:</b> {{ movimientos_abiertos }}</p>
+  <p><b>Total a rendir:</b> ${{ total_a_cerrar }}</p>
+  <form method="post" action="{% url 'inspectores_cerrar_caja' %}">
+    {% csrf_token %}
+    <button class="btn-general" type="submit">Confirmar cierre de caja</button>
+  </form>
+</div>
+{% else %}
+<p>No hay movimientos abiertos para cerrar.</p>
+{% endif %}
 
 <hr>
 
@@ -18,14 +40,16 @@
   <th>Tipo</th>
   <th>Monto</th>
   <th>Descripción</th>
+  <th>Estado</th>
 </tr>
 
 {% for m in movimientos %}
 <tr>
-  <td>{{ m.fecha }}</td>
+  <td>{{ m.creado_en }}</td>
   <td>{{ m.tipo }}</td>
-  <td>{{ m.monto }}</td>
+  <td>${{ m.monto }}</td>
   <td>{{ m.descripcion }}</td>
+  <td>{% if m.cerrado %}Cerrado{% else %}Abierto{% endif %}</td>
 </tr>
 {% endfor %}
 </table>

@@ -1,266 +1,107 @@
-app_estacionamiento/docs/roadmap.md
-# 🚗 Sistema de Estacionamiento Medido — Roadmap del Proyecto
-
-## 📌 Estado actual del sistema (Abril 2026)
-
-El sistema ya cuenta con una base sólida funcional tanto a nivel backend como de interfaz básica.
-Se encuentra en una etapa **pre-SaaS**, con arquitectura lista para escalar.
-
-👉 Se completó la estabilización de navegación y sesiones.
+# Roadmap — Sistema de Estacionamiento Medido
 
 ---
 
-## ✅ FUNCIONALIDADES IMPLEMENTADAS
+## ✅ v0.8 — Flujo real de usuarios
 
-### 🔐 Autenticación y roles
-
-* Sistema de usuarios personalizado (`Usuario`)
-* Roles implementados:
-
-  * Conductor
-  * Inspector
-  * Vendedor
-  * Administrador
-* Uso estándar de Django Auth (`request.user`)
-* Eliminación de middleware custom legacy
-* Decoradores de acceso (`require_login`, `require_role`)
-🔥 Migración completa a `request.user` (backend + templates)
-🔥 Eliminación de sistema legacy basado en session manual
+- Services de verificación e infracciones desacoplados
+- Migración completa a `request.user`
+- Caja auditada con movimientos y cierre
+- Multi-municipio básico
+- 17 tests pasando
+- Refactor de navegación y rutas
+- Use Case `finalizar_estacionamiento`
+- Corrección ownership usuario ↔ vehículo
+- Modelo `Infraccion` simplificado (pendiente / pagada / anulada)
+- Pago de infracciones integrado a `MovimientoCaja`
+- Cobro por inspector, vendedor y admin
 
 ---
 
-### 🚗 Gestión de vehículos
+## ✅ v1.0 — Auditoría completa del sistema
 
-* Registro de vehículos por patente
-* Asociación de vehículos a usuarios
-* Soporte para:
-
-  * Exento global
-  * Exento por subcuadras
-
-⚠️ Nota futura:
-La patente es única global → esto deberá ajustarse para multi-municipio.
-
----
-
-### 🧠 Sistema de exenciones (CORE DEL NEGOCIO)
-
-* Lógica centralizada en modelo (`esta_exento_en`)
-* Soporte completo:
-
-  * Exención total
-  * Exención parcial por subcuadra
-* Integración con:
-
-  * Verificación de inspectores
-  * Registro de 
+- **9 bugs críticos corregidos** (Meta indentation, Q condition, campo fecha, indentación services, etc.)
+- Seguridad: `@require_role` en todas las vistas sensibles, validación de municipio en exenciones
+- Constraint de unicidad en DB: `UniqueConstraint` con `Q(estado="ACTIVO")` para evitar duplicados
+- `Tarifa` conectada al cálculo real de costo (era hardcoded)
+- `finalizar_estacionamiento`: GET con confirmación + POST ejecuta Use Case
+- `cerrar_caja`: GET con resumen de movimientos + POST confirma cierre
+- Mensajes Django (`messages.success/warning/error`) en lugar de strings sueltos
+- Corrección de todos los templates (`m.fecha` → `m.creado_en`, `duracion_real` → `duracion_horas`, etc.)
+- Gestión admin: inspectores, vendedores, usuarios, tarifas, exenciones
+- **45 tests pasando** (roles, acceso anónimo, flujo completo conductor)
 
 ---
 
-### 🅿️ Estacionamientos
+## 🔜 v1.1 — Producción y deploy (EN PROGRESO)
 
-* Inicio de estacionamiento
-* Finalización con cálculo de costo
-* Control de saldo
-* Historial por usuario
+### Settings de producción
+- [ ] Separar `settings_dev.py` / `settings_prod.py`
+- [ ] `SECRET_KEY` desde variable de entorno
+- [ ] `DEBUG=False` en producción
+- [ ] `ALLOWED_HOSTS` con dominio real
+- [ ] `AUTH_PASSWORD_VALIDATORS` activados
+- [ ] `WhiteNoise` para archivos estáticos
 
----
+### Base de datos
+- [ ] `psycopg2-binary` en requirements
+- [ ] `DATABASE_URL` desde variable de entorno
+- [ ] PostgreSQL en Railway
 
-### ⚠️ 
-
-* Registro manual por inspector
-* Asociación con:
-
-  * Vehículo
-  * Subcuadra
-  * Estacionamiento
-* Soporte de imagen (Pillow)
-* Validación de exenciones antes de multar
-
----
-
-### 🧑‍💼 Panel administrativo (nivel 1)
-
-* Panel HTML funcional
-* Filtros por rol
-* Visualización de:
-
-  * Estacionamientos
-  *  recientes
-* Carga de saldo manual
-* 🔥 Navegación corregida (urls + templates)
+### Deploy
+- [ ] Deploy en Railway (PostgreSQL incluido, HTTPS automático)
+- [ ] Variables de entorno configuradas en Railway
+- [ ] `collectstatic` verificado
+- [ ] Sistema público accesible
 
 ---
 
-### 🚧 Panel de exenciones (nivel 1 — funcional)
+## 🔜 v1.2 — MercadoPago
 
-* Búsqueda de vehículo por patente
-* Toggle de exención global
-* Selección de subcuadras
-* Guardado desde UI (sin código)
-* Filtro de subcuadras por texto (JS básico)
+### Carga de saldo
+- [ ] Instalar SDK `mercadopago`
+- [ ] Vista `iniciar_carga_saldo`: crea preferencia de pago en MP
+- [ ] Redireccionamiento a checkout MP
+- [ ] Webhook `mp_webhook`: verifica pago y acredita saldo
+- [ ] Vista `pago_exitoso` / `pago_fallido` / `pago_pendiente`
+- [ ] Registro en `MovimientoCaja` al acreditar
+- [ ] Sandbox con tarjetas de prueba
 
-👉 Funcional completamente desde interfaz.
-
----
-
-### 🎨 Frontend base
-
-* Template base (`base.html`)
-* Navbar dinámica por rol
-* CSS global funcionando correctamente
-* Manejo correcto de archivos estáticos
-* 🔥 Corrección de visibilidad de navegación por sesión
+### Pago de infracciones
+- [ ] Flow similar: preferencia MP → webhook → llama `pagar_infraccion_uc`
+- [ ] Actualización de estado `Infraccion.estado = "pagada"`
 
 ---
 
-## ⚙️ MEJORAS TÉCNICAS REALIZADAS
+## 📅 v2.0 — API REST
 
-* Corrección de STATIC (DEBUG vs producción)
-* Eliminación de código duplicado en lógica de exenciones
-* Unificación de validaciones (`esta_exento_en`)
-* Corrección de imports y estructura Django
-* Configuración correcta de Pillow
-* Limpieza de archivos innecesarios
-* 🔥 Corrección de:
-  * CSRF issues
-  * Login manual
-  * Sesiones
-  * Uso incorrecto de `request.user`
+- Django REST Framework
+- JWT (SimpleJWT)
+- Serializers por modelo
+- ViewSets con permisos por rol
+- Swagger / OpenAPI
 
 ---
 
-## 🧪 ESTADO ACTUAL: LISTO PARA TESTEO REAL
+## 📅 v3.0 — Frontend moderno
 
-👉 El sistema ya puede ser probado en flujo completo:
-
-* Login por roles
-* Navegación por paneles
-* Registro de estacionamientos
-* Verificación por inspector
-* Registro de 
-* Gestión de exenciones
+- React + Next.js
+- Dashboard en tiempo real
+- Mapa de subcuadras
+- App mobile (React Native)
 
 ---
 
-## 🚀 PRÓXIMOS PASOS (CORTO PLAZO)
+## 📅 v4.0 — SaaS Multi-Municipio completo
 
-### 🧪 TEST FUNCIONAL COMPLETO (PRIORIDAD 🔥)
-
-* [ ] Flujo completo inspector (calle)
-* [ ] Flujo conductor (saldo + estacionamiento)
-* [ ] Flujo vendedor
-* [ ] Validación de errores reales
-
----
-
-### 🔥 Panel de exenciones — Nivel PRO
-
-* [ ] Autocomplete de patentes (AJAX)
-* [ ] Selección dinámica sin recarga
-* [ ] Mejora de UX (feedback visual)
-* [ ] Carga automática del vehículo
-* [ ] Guardado sin reload (AJAX)
+- Tenancy completa
+- Facturación por municipio
+- Panel municipal propio
+- Reportes y métricas operativas
+- Backups automáticos
 
 ---
 
-### ⚠️ Lógica crítica faltante
+## 🎯 Objetivo final
 
-* [ ] Tolerancia de tiempo para inspectores
-* [ ] Estados de infracción (impaga / pagada)
-* [ ] Control estricto de saldo negativo
-* [ ] Validaciones adicionales de seguridad
-
----
-
-### 📊 Auditoría y control
-
-* [ ] Registro de acciones (logs)
-* [ ] Historial de cambios en exenciones
-* [ ] Trazabilidad de operaciones
-
----
-
-## 🧱 PRÓXIMA ETAPA (MEDIANO PLAZO)
-
-### 🧩 Arquitectura SaaS
-
-* Separación por apps:
-
-  * accounts
-  * municipios
-  * estacionamientos
-  * pagos
-  * multas
-* 🔥 Multi-municipio (multi-tenant) — PRIORIDAD ALTA
-* Validación de ubicación del vehículo (subcuadra) en inspecciones
-* Geolocalización de inspector (GPS)
-* Detección automática de subcuadra
-* Validación en tiempo real contra exenciones
-
----
-
-### 🔌 API REST
-
-* Implementación con Django REST Framework
-* Autenticación JWT
-* Endpoints:
-
-  * Login
-  * Estacionamientos
-  * Vehículos
-  * 
-  * Pagos
-
----
-
-### 💳 Pagos
-
-* Integración MercadoPago
-* Webhooks
-* Recarga de saldo automática
-
----
-
-### 💻 Frontend moderno
-
-* Migración a React / Next.js
-* Apps separadas:
-
-  * Usuario
-  * Inspector
-  * Admin
-
----
-
-## 🏁 OBJETIVO FINAL
-
-Construir una plataforma SaaS para municipios que permita:
-
-* Gestión completa del estacionamiento medido
-* Control en tiempo real por inspectores
-* Cobro digital integrado
-* Administración centralizada
-* Escalabilidad multi-ciudad
-
----
-
-## 🧠 NOTA DEL PROYECTO
-
-El sistema ya dejó de ser un prototipo.
-
-👉 Ahora entra en fase de:
-
-**VALIDACIÓN REAL + ENDURECIMIENTO DEL BACKEND**
-
----
-
-## 📌 SIGUIENTE HITO
-
-👉 🧪 TEST REAL DEL SISTEMA (flujo completo)
-
-ANTES de:
-
-👉 Panel de exenciones PRO
-
----
+SaaS multi-municipio para gestión integral del estacionamiento medido, operable desde cualquier municipio de Argentina.

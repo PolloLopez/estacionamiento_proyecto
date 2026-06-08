@@ -1,57 +1,73 @@
-# Arquitectura actual del sistema
+// ESTACIONAMIENTO_PROYECTO/app_estacionamiento/docs/arquitectura.md
+# Arquitectura actual
 
-## Modelo de datos
+## Capas
 
-- Usuario
-  - Roles: admin, inspector, vendedor, conductor
-  - Relación con Municipio
+### Views
 
-- Vehiculo
-  - patente única
-  - exento_global
-  - subcuadras_exentas (ManyToMany)
+Responsables de:
 
-- Subcuadra
-  - calle
-  - altura
-  - municipio
+* Recibir requests.
+* Validar permisos.
+* Invocar services y use cases.
+* Renderizar respuestas.
 
-- Estacionamiento
-  - vehiculo
-  - subcuadra
-  - activo
-  - costo
-
-- Infraccion
-  - vehiculo
-  - inspector
-  - subcuadra
-  - foto
+No deben contener reglas de negocio complejas.
 
 ---
 
-## Lógica principal
+### Services
 
-- Registro de estacionamiento (vendedor)
-- Verificación de vehículo (inspector)
-- Registro de infracción (inspector)
-- Gestión de exenciones
-  - Global
-  - Por subcuadra
+Responsables de:
 
----
+* Verificación de vehículos.
+* Gestión de infracciones.
+* Reglas reutilizables.
 
-## Autenticación actual
+Archivos principales:
 
-- Basada en session:
-
-- Middleware:
-  - request.user
+* services_verificacion.py
+* services_infracciones.py
 
 ---
 
-## Observaciones
+### Use Cases
 
-- Pendiente migración a Django Auth (`request.user`)
-- Pendiente API REST
-- Pendiente frontend separado
+Responsables de procesos completos.
+
+Ejemplos:
+
+* estacionar_vehiculo.py
+* cobrar_estacionamiento.py
+
+---
+
+### Domain
+
+Contiene:
+
+* Enums.
+* Policies.
+* Objetos de dominio.
+
+Objetivo:
+centralizar reglas de negocio desacopladas de Django.
+
+---
+
+## Estado actual
+
+Implementado:
+
+* Multi-municipio básico.
+* Verificación desacoplada.
+* Infracciones desacopladas.
+* Caja auditada.
+* Tests automatizados.
+
+Pendiente:
+
+* Ownership de vehículos.
+* Atomicidad transaccional.
+* API REST.
+* JWT.

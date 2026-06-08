@@ -4,13 +4,13 @@ from urllib import request
 from django.db import transaction
 
 from app_estacionamiento.factories import EstacionamientoFactory
-from app_estacionamiento.models import Usuario, MovimientoCaja, VehiculoUsuario
+from app_estacionamiento.models import Usuario, MovimientoCaja, VehiculoUsuario, Tarifa
 from app_estacionamiento.domain.vehiculo_policy import VehiculoPolicy
 from app_estacionamiento.domain.saldo_policy import SaldoPolicy
 
 from app_estacionamiento.use_cases.registrar_movimiento import ejecutar as registrar_movimiento
 
-TARIFA_BASE = Decimal("100")
+TARIFA_BASE_FALLBACK = Decimal("100")
 REDIRECT_OK = "inicio"
 REDIRECT_SIN_SALDO = "consultar_deuda"
 
@@ -27,7 +27,10 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             "warnings": ["Duración inválida"]
         }
 
-    costo = duracion * TARIFA_BASE
+    
+    tarifa_obj = Tarifa.objects.filter(municipio=usuario.municipio).first()
+    tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else TARIFA_BASE_FALLBACK
+    costo = duracion * tarifa_hora
 
     relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
 

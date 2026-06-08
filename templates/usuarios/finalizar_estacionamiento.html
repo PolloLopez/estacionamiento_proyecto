@@ -20,8 +20,8 @@
         <h3>Detalles</h3>
         <p>Patente: <strong>{{ estacionamiento.vehiculo.patente }}</strong></p>
         <p>Inicio: {{ estacionamiento.hora_inicio }}</p>
-        <p>Duración real: {{ estacionamiento.duracion_real }}</p>
-        <p>Costo calculado: <strong>${{ estacionamiento.costo }}</strong></p>
+        <p>Duración reservada: <strong>{{ duracion_horas }}h</strong></p>
+        <p>Costo: <strong>${{ costo_estimado }}</strong></p>
       </div>
 
       <!-- Formulario para confirmar finalización -->
