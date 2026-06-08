@@ -145,7 +145,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # WhiteNoise comprime y cachea los estáticos automáticamente en producción.
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 # ─── Archivos de media (fotos infracciones) ───────────────────────────────────
 MEDIA_URL = "/media/"
