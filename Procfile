@@ -1,1 +1,1 @@
-web: gunicorn estacionamiento_app.wsgi
+web: gunicorn sitio.wsgi:application

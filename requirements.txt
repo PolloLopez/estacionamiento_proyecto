@@ -1,24 +1,41 @@
-// ESTACIONAMIENTO_PROYECTO/requirements.md
-
-asgiref==3.11.0
-colorama==0.4.6
+# ─── Framework ────────────────────────────────────────────────────────────────
 Django==5.2.8
+asgiref==3.11.0
+
+# ─── Autenticación social ─────────────────────────────────────────────────────
+django-allauth==65.3.0
+
+# ─── Producción ───────────────────────────────────────────────────────────────
+gunicorn==23.0.0               # servidor WSGI para Railway/Render
+whitenoise==6.8.2              # archivos estáticos sin nginx
+psycopg2-binary==2.9.10        # PostgreSQL (Railway provee la DB)
+dj-database-url==2.3.0         # parsea DATABASE_URL a config de Django
+
+# ─── Utilidades Django ────────────────────────────────────────────────────────
 django-extensions==4.1
+Pillow==12.0.0                 # fotos de infracciones
+sqlparse==0.5.3
+
+# ─── Data / análisis (usados en scripts y reportes) ──────────────────────────
+pandas==2.2.3
+openpyxl==3.1.5
+numpy==2.2.6
+
+# ─── Tests ────────────────────────────────────────────────────────────────────
+pytest==9.0.1
+pytest-django==4.11.1
+pytest-cov==6.1.0
+
+# ─── Dependencias transitivas (pinned para reproducibilidad) ──────────────────
+colorama==0.4.6
 et_xmlfile==2.0.0
 geographiclib==2.0
 geopy==2.4.1
 iniconfig==2.3.0
-numpy==2.2.6
-openpyxl==3.1.5
 packaging==25.0
-pandas==2.2.3
-pillow==12.0.0
 pluggy==1.6.0
 Pygments==2.19.2
-pytest==9.0.1
-pytest-django==4.11.1
 python-dateutil==2.9.0.post0
 pytz==2025.2
 six==1.17.0
-sqlparse==0.5.3
 tzdata==2025.2
