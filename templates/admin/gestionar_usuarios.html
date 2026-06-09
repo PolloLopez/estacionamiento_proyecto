@@ -1,49 +1,65 @@
-{% extends "base.html" %} {% block title %}Gestionar Usuarios{% endblock %} {%
-block content %}
-<section class="container">
-  <div class="panel">
-    <h2>Gestionar Usuarios</h2>
-    <div class="panel-body">
-      <!-- Buscador -->
-      <form method="get" class="form-inline">
-        <input
-          name="q"
-          placeholder="Buscar por nombre, email o DNI"
-          value="{{ request.GET.q }}"
-        />
-        <button class="btn">Buscar</button>
-      </form>
+{% extends "base.html" %}
+{% block title %}Gestionar Usuarios{% endblock %}
 
-      <!-- Tabla de usuarios -->
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th>Saldo</th>
-            <th>-</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in usuarios %}
-          <tr>
-            <td>{{ u.first_name|default:"-" }}</td>
-            <td>{{ u.correo }}</td>
-            <td>${{ u.saldo }}</td>
-            <td>-</td>
-            <td>
-              <a class="btn small" href="{% url 'cargar_saldo' u.id %}">Cargar saldo</a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="5">No hay usuarios</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>👤 Conductores</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
   </div>
+
+  <!-- BUSCADOR -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <form method="get" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <label>Buscar por correo o nombre</label>
+        <input name="q" placeholder="usuario@gmail.com o Juan..." value="{{ q }}" />
+      </div>
+      <button class="btn" type="submit">Buscar</button>
+      {% if q %}
+        <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline">Limpiar</a>
+      {% endif %}
+    </form>
+    <p class="text-muted" style="font-size:0.85rem; margin-top:0.5rem;">
+      💡 También podés buscar por el Gmail de usuarios que iniciaron sesión con Google.
+    </p>
+  </div>
+
+  <!-- TABLA -->
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Correo</th>
+          <th style="text-align:right;">Saldo</th>
+          <th style="text-align:center;">Vehículos</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td><strong>{{ u.nombre|default:"—" }}</strong></td>
+          <td>{{ u.correo }}</td>
+          <td style="text-align:right; font-weight:600;">${{ u.saldo }}</td>
+          <td style="text-align:center;">{{ u.vehiculos.count }}</td>
+          <td>
+            <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
+               href="{% url 'detalle_usuario_admin' u.id %}">Ver</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" style="text-align:center; color:var(--color-text-muted); padding:1rem;">
+            {% if q %}No se encontraron conductores con "{{ q }}".{% else %}No hay conductores registrados.{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
 </section>
 {% endblock %}

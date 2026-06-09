@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Infracciones{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>📋 Infracciones</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="card" style="margin-bottom:1.2rem;">
+    <form method="get" style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+
+      <div>
+        <label>Patente</label>
+        <input name="patente" value="{{ filtros.patente }}" placeholder="ABC123"
+               style="width:110px; text-transform:uppercase; letter-spacing:2px; font-weight:700;" />
+      </div>
+
+      <div>
+        <label>Inspector</label>
+        <select name="inspector" style="min-width:160px;">
+          <option value="">Todos</option>
+          {% for insp in inspectores %}
+            <option value="{{ insp.id }}" {% if filtros.inspector == insp.id|stringformat:"s" %}selected{% endif %}>
+              {{ insp.nombre|default:insp.correo }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label>Estado</label>
+        <select name="estado" style="min-width:130px;">
+          <option value="">Todos</option>
+          <option value="pendiente" {% if filtros.estado == "pendiente" %}selected{% endif %}>Pendiente</option>
+          <option value="pagada"    {% if filtros.estado == "pagada"    %}selected{% endif %}>Pagada</option>
+          <option value="anulada"   {% if filtros.estado == "anulada"   %}selected{% endif %}>Anulada</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Desde</label>
+        <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" style="width:145px;" />
+      </div>
+
+      <div>
+        <label>Hasta</label>
+        <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" style="width:145px;" />
+      </div>
+
+      <button class="btn" type="submit">Filtrar</button>
+      <a href="{% url 'admin_infracciones' %}" class="btn btn-outline">Limpiar</a>
+    </form>
+  </div>
+
+  <!-- TABLA -->
+  <div class="card">
+    {% if infracciones %}
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Patente</th>
+              <th>Inspector</th>
+              <th>Subcuadra</th>
+              <th>Motivo</th>
+              <th style="text-align:right;">Monto</th>
+              <th>Fecha</th>
+              <th style="text-align:center;">Estado</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inf in infracciones %}
+            <tr>
+              <td style="color:var(--color-text-muted); font-size:0.8rem;">{{ inf.id }}</td>
+              <td><strong>{{ inf.vehiculo.patente }}</strong></td>
+              <td style="font-size:0.88rem;">{{ inf.inspector.nombre|default:inf.inspector.correo }}</td>
+              <td style="font-size:0.85rem;">{{ inf.subcuadra|default:"—" }}</td>
+              <td style="font-size:0.85rem; max-width:180px;">{{ inf.motivo }}</td>
+              <td style="text-align:right; font-weight:600;">${{ inf.monto }}</td>
+              <td style="font-size:0.83rem;">{{ inf.creado_en|date:"d/m/Y H:i" }}</td>
+              <td style="text-align:center;">
+                {% if inf.estado == "pendiente" %}
+                  <span style="color:var(--color-warning); font-weight:700;">Pendiente</span>
+                {% elif inf.estado == "pagada" %}
+                  <span style="color:var(--color-primary); font-weight:700;">✅ Pagada</span>
+                {% else %}
+                  <span style="color:var(--color-danger); font-weight:700;">Anulada</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if inf.estado == "pendiente" %}
+                  <form method="post" style="display:inline;"
+                        onsubmit="return confirm('¿Anular infracción #{{ inf.id }}?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="anular">
+                    <input type="hidden" name="infraccion_id" value="{{ inf.id }}">
+                    <button class="btn btn-outline" style="font-size:0.8rem; padding:0.25rem 0.5rem; color:var(--color-danger); border-color:var(--color-danger);"
+                            type="submit">Anular</button>
+                  </form>
+                {% else %}
+                  <span style="font-size:0.8rem; color:var(--color-text-muted);">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-muted" style="font-size:0.83rem; margin-top:0.75rem;">
+        Mostrando hasta 200 resultados. Usá los filtros para acotar la búsqueda.
+      </p>
+    {% else %}
+      <p class="text-muted" style="text-align:center; padding:2rem;">
+        No hay infracciones con los filtros seleccionados.
+      </p>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}

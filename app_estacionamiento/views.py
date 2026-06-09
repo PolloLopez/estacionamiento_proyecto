@@ -245,6 +245,11 @@ def panel_exenciones(request):
     vehiculo = None
     accion = request.POST.get("accion")
 
+    # Si viene ?patente=XYZ desde detalle_usuario, pre-buscamos el vehículo
+    patente_get = request.GET.get("patente", "").strip().upper()
+    if patente_get and not accion:
+        vehiculo = Vehiculo.objects.filter(patente=patente_get).first()
+
     # 🔎 BUSCAR
     if request.method == "POST" and accion == "buscar":
         #patente = (input).strip().upper()
@@ -656,14 +661,18 @@ def registrar_infraccion(request):
         except ErrorInfraccion as e:
             mensaje = str(e)
 
+    # Todas las subcuadras del municipio para que el inspector pueda elegir
+    subcuadras = Subcuadra.objects.filter(municipio=municipio).exclude(calle="Zona Única")
+
     return render(request, "inspectores/registrar_infraccion.html", {
         "mensaje": mensaje,
         "vehiculo": vehiculo,
         "patente": patente,
         "subcuadra": subcuadra,
+        "subcuadras": subcuadras,
         "infracciones_recientes": infracciones_recientes,
         "subcuadra_default": subcuadra_default,
-        "resultado": resultado,  # 🔥 clave UX
+        "resultado": resultado,
     })
 
 @require_role("inspector")
@@ -1032,8 +1041,14 @@ def editar_inspector(request, inspector_id):
         inspector.save()
         return redirect("gestionar_inspectores")
 
+    # Últimos 20 movimientos de caja del inspector
+    movimientos = MovimientoCaja.objects.filter(
+        usuario=inspector
+    ).order_by("-creado_en")[:20]
+
     return render(request, "admin/editar_inspector.html", {
         "inspector": inspector,
+        "movimientos": movimientos,
     })
 
 @require_role("admin")
@@ -1097,16 +1112,96 @@ def gestionar_usuarios(request):
     usuario = request.user
     municipio = usuario.municipio
 
+    # Búsqueda: por correo (incluye gmail de OAuth) o por nombre
     q = request.GET.get("q", "").strip()
-    usuarios = Usuario.objects.filter(es_conductor=True, municipio=municipio)
+    usuarios = Usuario.objects.filter(es_conductor=True, municipio=municipio).prefetch_related("vehiculos")
 
     if q:
-        usuarios = usuarios.filter(correo__icontains=q)
+        from django.db.models import Q as QueryQ
+        usuarios = usuarios.filter(
+            QueryQ(correo__icontains=q) | QueryQ(first_name__icontains=q)
+        )
 
     return render(request, "admin/gestionar_usuarios.html", {
         "usuarios": usuarios,
         "q": q,
     })
+
+@require_role("admin")
+def detalle_usuario_admin(request, usuario_id):
+    """Vista de detalle de un conductor: saldo, vehículos, exenciones, historial."""
+    conductor = get_object_or_404(Usuario, id=usuario_id, es_conductor=True)
+    vehiculos = Vehiculo.objects.filter(vehiculousuario__usuario=conductor)
+
+    # Agregar vehículo desde admin
+    mensaje = None
+    if request.method == "POST" and request.POST.get("accion") == "agregar_vehiculo":
+        patente = (request.POST.get("patente") or "").strip().upper()
+        if patente:
+            vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+            VehiculoUsuario.objects.get_or_create(usuario=conductor, vehiculo=vehiculo)
+            mensaje = f"Vehículo {patente} agregado."
+            vehiculos = Vehiculo.objects.filter(vehiculousuario__usuario=conductor)
+
+    return render(request, "admin/detalle_usuario.html", {
+        "conductor": conductor,
+        "vehiculos": vehiculos,
+        "mensaje": mensaje,
+    })
+
+@require_role("admin")
+def admin_infracciones(request):
+    """Lista de infracciones con filtros: patente, inspector, estado, fecha."""
+    usuario = request.user
+    municipio = usuario.municipio
+
+    infracciones = Infraccion.objects.filter(municipio=municipio).select_related(
+        "vehiculo", "inspector", "subcuadra"
+    ).order_by("-creado_en")
+
+    # Filtros GET
+    patente = request.GET.get("patente", "").strip().upper()
+    inspector_id = request.GET.get("inspector", "").strip()
+    estado = request.GET.get("estado", "").strip()
+    fecha_desde = request.GET.get("fecha_desde", "").strip()
+    fecha_hasta = request.GET.get("fecha_hasta", "").strip()
+
+    if patente:
+        infracciones = infracciones.filter(vehiculo__patente__icontains=patente)
+    if inspector_id:
+        infracciones = infracciones.filter(inspector_id=inspector_id)
+    if estado:
+        infracciones = infracciones.filter(estado=estado)
+    if fecha_desde:
+        infracciones = infracciones.filter(creado_en__date__gte=fecha_desde)
+    if fecha_hasta:
+        infracciones = infracciones.filter(creado_en__date__lte=fecha_hasta)
+
+    # Acción POST: anular infracción
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+        infraccion_id = request.POST.get("infraccion_id")
+        if accion == "anular" and infraccion_id:
+            inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
+            if inf.estado == "pendiente":
+                inf.estado = "anulada"
+                inf.save()
+        return redirect(request.get_full_path())
+
+    inspectores = Usuario.objects.filter(municipio=municipio, es_inspector=True)
+
+    return render(request, "admin/infracciones.html", {
+        "infracciones": infracciones[:200],  # limitar para performance
+        "inspectores": inspectores,
+        "filtros": {
+            "patente": patente,
+            "inspector": inspector_id,
+            "estado": estado,
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
+        },
+    })
+
 
 @require_role("admin")
 def gestionar_tarifas(request):

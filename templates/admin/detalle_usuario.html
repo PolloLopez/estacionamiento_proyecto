@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Conductor: {{ conductor.correo }}{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>👤 {{ conductor.nombre|default:conductor.correo }}</h2>
+    <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
+  </div>
+
+  {% if mensaje %}
+    <div class="alert alert-success" style="margin-bottom:1rem;">{{ mensaje }}</div>
+  {% endif %}
+
+  <div class="grid grid-2" style="margin-bottom:1rem;">
+
+    <!-- DATOS -->
+    <div class="card">
+      <h3 style="margin-bottom:0.8rem;">Datos del conductor</h3>
+      <p><strong>Correo:</strong> {{ conductor.correo }}</p>
+      <p><strong>Nombre:</strong> {{ conductor.nombre|default:"—" }}</p>
+      <p style="margin-top:0.5rem; font-size:1.3rem; font-weight:800; color:var(--color-primary);">
+        💰 Saldo: ${{ conductor.saldo }}
+      </p>
+      <div style="margin-top:0.8rem;">
+        <a href="{% url 'cargar_saldo' conductor.id %}" class="btn btn-outline" style="font-size:0.9rem;">
+          + Cargar saldo manualmente
+        </a>
+      </div>
+    </div>
+
+    <!-- AGREGAR VEHÍCULO -->
+    <div class="card">
+      <h3 style="margin-bottom:0.8rem;">🚗 Agregar vehículo</h3>
+      <p class="text-muted" style="font-size:0.9rem; margin-bottom:0.75rem;">
+        Podés agregar una patente a este conductor.
+        Después podés exentarla desde el panel de exenciones.
+      </p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="agregar_vehiculo">
+        <div style="display:flex; gap:0.5rem; align-items:flex-end;">
+          <div style="flex:1;">
+            <label>Patente</label>
+            <input name="patente" placeholder="ABC123" required
+                   style="text-transform:uppercase; letter-spacing:3px; font-weight:700;" />
+          </div>
+          <button class="btn" type="submit" style="height:fit-content;">Agregar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- VEHÍCULOS + EXENCIONES -->
+  <div class="card">
+    <h3 style="margin-bottom:0.8rem;">Vehículos registrados</h3>
+
+    {% if vehiculos %}
+      <table>
+        <thead>
+          <tr>
+            <th>Patente</th>
+            <th>Exento global</th>
+            <th>Subcuadras exentas</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in vehiculos %}
+          <tr>
+            <td><strong>{{ v.patente }}</strong></td>
+            <td style="text-align:center;">
+              {% if v.exento_global %}
+                <span style="color:var(--color-primary); font-weight:700;">✅ Sí</span>
+              {% else %}
+                <span class="text-muted">No</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center;">
+              {{ v.subcuadras_exentas.count }} subcuadra(s)
+            </td>
+            <td>
+              <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
+                 href="{% url 'exenciones' %}?patente={{ v.patente }}">
+                🚫 Gestionar exenciones
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">Este conductor no tiene vehículos registrados.</p>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}
