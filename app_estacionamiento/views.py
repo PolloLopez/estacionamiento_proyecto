@@ -461,9 +461,14 @@ def estacionar_vehiculo(request):
     # GET
     # =================================================
 
+    from app_estacionamiento.models import Tarifa
+    tarifa_obj = Tarifa.objects.filter(municipio=usuario.municipio).first()
+    tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else 100
+
     return render(request, "usuarios/estacionar_vehiculo.html", {
         "vehiculos": vehiculos,
-        "usuario": usuario
+        "usuario": usuario,
+        "tarifa_hora": tarifa_hora,
     })
 
 @require_role("conductor")
@@ -498,7 +503,8 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 
     # GET → mostrar pantalla de confirmación con el costo estimado
     if request.method != "POST":
-        duracion_horas = estacionamiento.duracion_min / 60
+        # duracion_min almacena horas (pese al nombre) — no dividir por 60
+        duracion_horas = estacionamiento.duracion_min
         return render(request, "usuarios/finalizar_estacionamiento.html", {
             "estacionamiento": estacionamiento,
             "duracion_horas": duracion_horas,

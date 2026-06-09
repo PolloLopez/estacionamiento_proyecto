@@ -149,7 +149,10 @@ class Subcuadra(models.Model):
         unique_together = ("calle", "altura")
 
     def __str__(self):
-        return f"{self.calle}.{self.altura}"
+        # Zona Única (altura=0) no muestra el número
+        if self.altura == 0:
+            return self.calle
+        return f"{self.calle} {self.altura}"
     
 class Estado(models.TextChoices):
     ACTIVO = "ACTIVO", "Activo"

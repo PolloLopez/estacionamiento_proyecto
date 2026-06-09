@@ -32,7 +32,7 @@
             <td>{{ e.subcuadra.calle }}</td>
             <td>{{ e.subcuadra.altura }}</td>
             <td>{{ e.vehiculo.patente }}</td>
-            <td>${{ e.costo }}</td>
+            <td>${{ e.costo_final|default:e.costo_base }}</td>
           </tr>
           {% endfor %}
         </tbody>

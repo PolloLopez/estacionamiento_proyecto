@@ -51,18 +51,21 @@
       <!-- DURACIÓN -->
       <label>Duración</label>
 
-      <div class="duraciones">
-        <button type="button" class="btn-outline duracion-btn" data-horas="1">1h</button>
-        <button type="button" class="btn-outline duracion-btn" data-horas="2">2h</button>
-        <button type="button" class="btn-outline duracion-btn" data-horas="4">4h</button>
+      <div class="duraciones" style="gap:0.75rem; margin: 0.75rem 0;">
+        <button type="button" class="btn btn-outline duracion-btn active" data-horas="1"
+                style="font-size:1.3rem; padding:0.9rem 0; font-weight:700;">1h</button>
+        <button type="button" class="btn btn-outline duracion-btn" data-horas="2"
+                style="font-size:1.3rem; padding:0.9rem 0; font-weight:700;">2h</button>
+        <button type="button" class="btn btn-outline duracion-btn" data-horas="4"
+                style="font-size:1.3rem; padding:0.9rem 0; font-weight:700;">4h</button>
       </div>
 
       <input type="hidden" name="horas" id="horas" value="1">
 
       <!-- RESUMEN -->
       <div class="resumen">
-        <p>Duración: <strong id="duracionTexto">1 hora</strong></p>
-        <p>Costo: <strong id="costoTexto">$100</strong></p>
+        <p style="font-size:1.05rem;">Duración: <strong id="duracionTexto">1 hora</strong></p>
+        <p style="font-size:1.05rem;">Costo estimado: <strong id="costoTexto">${{ tarifa_hora|default:"100" }}</strong></p>
       </div>
 
       {% if error %}
@@ -86,19 +89,19 @@
   const duracionTexto = document.getElementById("duracionTexto");
   const costoTexto = document.getElementById("costoTexto");
 
-  const PRECIO_HORA = 100;
+  // Tarifa real desde el servidor (fallback 100 si no está configurada)
+  const PRECIO_HORA = parseFloat("{{ tarifa_hora|default:'100' }}");
 
   botones.forEach(btn => {
     btn.addEventListener("click", () => {
-
       botones.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
-      const horas = btn.dataset.horas;
+      const horas = parseInt(btn.dataset.horas);
       horasInput.value = horas;
 
-      duracionTexto.innerText = horas + " hora(s)";
-      costoTexto.innerText = "$" + (horas * PRECIO_HORA);
+      duracionTexto.innerText = horas + (horas === 1 ? " hora" : " horas");
+      costoTexto.innerText = "$" + (horas * PRECIO_HORA).toFixed(2);
     });
   });
 </script>

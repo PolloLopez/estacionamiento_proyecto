@@ -30,7 +30,7 @@
 
       <p><b>Patente:</b> {{ estacionamiento_activo.vehiculo.patente }}</p>
       <p><b>Zona:</b> {{ estacionamiento_activo.subcuadra }}</p>
-      <p><b>Duración:</b> {{ estacionamiento_activo.duracion }} hs</p>
+      <p><b>Duración:</b> {{ estacionamiento_activo.duracion_min }} hs</p>
       <p><b>Inicio:</b> {{ estacionamiento_activo.hora_inicio }}</p>
 
       <!-- ⏱ TIMER -->
@@ -46,10 +46,11 @@
       <script>
         // Usamos timestamp Unix (entero) para evitar problemas de parsing según locale/zona horaria
         const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
-        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion }}");
+        // duracion_min almacena horas (ej: 2 = 2 horas)
+        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_min }}");
       </script>
 
-      <a class="btn danger btn-big"
+      <a class="btn btn-danger btn-big"
          href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}">
         ⛔ Finalizar estacionamiento
       </a>
