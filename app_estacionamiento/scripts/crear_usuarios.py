@@ -106,7 +106,7 @@ def run():
     admin.is_staff = True
     admin.is_superuser = True
 
-    admin.set_password("12345")
+    admin.set_password("admin12345")
     admin.save()
 
 if __name__ == "__main__":

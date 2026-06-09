@@ -44,7 +44,8 @@
       </div>
 
       <script>
-        const horaInicio = "{{ estacionamiento_activo.hora_inicio|date:'c' }}";
+        // Usamos timestamp Unix (entero) para evitar problemas de parsing según locale/zona horaria
+        const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
         const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion }}");
       </script>
 
@@ -111,10 +112,12 @@
 (function() {
 
   if (typeof horaInicio === "undefined") return;
+  // horaInicio ya es un objeto Date, no hace falta parsearlo de nuevo
+  if (isNaN(horaInicio.getTime())) return;
 
   let avisoMostrado = false;
 
-  const inicio = new Date(horaInicio);
+  const inicio = horaInicio;
   const duracionMs = duracionHoras * 60 * 60 * 1000;
   const fin = new Date(inicio.getTime() + duracionMs);
 

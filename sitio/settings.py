@@ -166,6 +166,19 @@ ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_ADAPTER = "app_estacionamiento.adapters.NoUsernameAccountAdapter"
 SOCIALACCOUNT_AUTO_SIGNUP = True
 
+# Configuración de la app de Google directamente en settings,
+# sin necesitar un registro SocialApp en la base de datos.
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "APP": {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
+            "secret": os.getenv("GOOGLE_CLIENT_SECRET", ""),
+        },
+        "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
+    }
+}
+
 # ─── MercadoPago ──────────────────────────────────────────────────────────────
 # En Railway: setear MP_ACCESS_TOKEN con el token de producción o sandbox.
 # Obtenerlos en: https://www.mercadopago.com.ar/developers/panel/credentials
