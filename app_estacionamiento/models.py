@@ -122,6 +122,32 @@ class Municipio(models.Model):
     apellido = models.CharField(max_length=100, blank=True)
     activo = models.BooleanField(default=True)
 
+    # ── Branding por municipio ────────────────────────────────────────────────
+    # El admin carga el logo y elige los colores; cada municipio tiene su propia
+    # identidad visual sin tocar el código.
+    logo = models.ImageField(
+        upload_to="municipios/logos/",
+        null=True, blank=True,
+        verbose_name="Logo del municipio",
+        help_text="Imagen PNG/SVG con fondo transparente. Altura recomendada: 80px.",
+    )
+    color_primario = models.CharField(
+        max_length=7, default="#1a7a3c",
+        verbose_name="Color primario",
+        help_text="Color principal de la barra de navegación y botones (ej: #1a7a3c).",
+    )
+    color_secundario = models.CharField(
+        max_length=7, default="#155f2e",
+        verbose_name="Color secundario",
+        help_text="Color de hover y acento (ej: #155f2e). Suele ser el primario más oscuro.",
+    )
+    nombre_sistema = models.CharField(
+        max_length=200, blank=True,
+        default="Estacionamiento Medido",
+        verbose_name="Nombre del sistema",
+        help_text="Texto que aparece en la barra de navegación si no hay logo.",
+    )
+
     def __str__(self):
         return self.nombre
     

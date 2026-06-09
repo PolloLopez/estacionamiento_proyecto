@@ -72,6 +72,8 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                # Inyecta municipio_branding (logo, colores, nombre) en todos los templates
+                "app_estacionamiento.context_processors.municipio_branding",
             ],
         },
     },

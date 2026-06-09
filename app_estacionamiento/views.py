@@ -1445,7 +1445,12 @@ def mp_iniciar_carga(request):
     sdk = mercadopago.SDK(access_token)
 
     # La URL base del sitio (necesaria para los callbacks de MP)
+    # En Railway, el proxy termina el SSL y puede no pasar HTTP_X_FORWARDED_PROTO
+    # en tiempo de procesar MP. Forzamos HTTPS en producción para que MP acepte
+    # las back_urls (auto_return requiere HTTPS obligatoriamente).
     base_url = request.build_absolute_uri("/").rstrip("/")
+    if not settings.DEBUG:
+        base_url = base_url.replace("http://", "https://")
 
     preferencia = {
         "items": [
