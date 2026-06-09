@@ -340,8 +340,21 @@ def agregar_vehiculo(request):
 
         return redirect(
             reverse("usuarios_estacionar_vehiculo")
-            +f"?patente={vehiculo.patente}"
-        )  # para prellenar el form de estacionar
+            + f"?patente={vehiculo.patente}"
+        )
+
+    return redirect("usuarios_estacionar_vehiculo")
+
+
+@require_login
+def eliminar_vehiculo(request, vehiculo_id):
+    """El conductor desvincula un vehículo de su cuenta (no lo elimina del sistema)."""
+    if request.method == "POST":
+        VehiculoUsuario.objects.filter(
+            usuario=request.user,
+            vehiculo_id=vehiculo_id
+        ).delete()
+    return redirect("usuarios_estacionar_vehiculo")
 
     return render(request, "usuarios/agregar_vehiculo.html")
 
@@ -490,10 +503,14 @@ def estacionar_vehiculo(request):
     tarifa_obj = Tarifa.objects.filter(municipio=usuario.municipio).first()
     tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else 100
 
+    # Patente preseleccionada (viene del flujo agregar_vehiculo)
+    patente_preseleccionada = request.GET.get("patente", "").strip().upper()
+
     return render(request, "usuarios/estacionar_vehiculo.html", {
         "vehiculos": vehiculos,
         "usuario": usuario,
         "tarifa_hora": tarifa_hora,
+        "patente_preseleccionada": patente_preseleccionada,
     })
 
 @require_role("conductor")
@@ -1404,7 +1421,9 @@ def mp_iniciar_carga(request):
     import mercadopago
 
     if request.method != "POST":
-        return render(request, "usuarios/mp_cargar_saldo.html")
+        return render(request, "usuarios/mp_cargar_saldo.html", {
+            "montos_rapidos": [500, 1000, 2000, 5000],
+        })
 
     monto_str = request.POST.get("monto", "")
     try:
@@ -1468,33 +1487,66 @@ def mp_iniciar_carga(request):
 @require_login
 def mp_exitoso(request):
     """
-    MP redirige aqui despues de un pago aprobado.
-    Acreditamos el saldo usando el payment_id que MP envia por GET.
+    MP redirige aquí después de un pago aprobado.
+
+    SEGURIDAD: NO confiamos en los parámetros GET (monto, estado).
+    Consultamos la API de MP con el payment_id para obtener el monto real.
+    El webhook también acredita de forma asíncrona como respaldo.
     """
+    import mercadopago
     from decimal import Decimal
     from app_estacionamiento.use_cases.acreditar_saldo_mp import ejecutar as acreditar
 
-    payment_id = request.GET.get("payment_id", "")
-    status = request.GET.get("status", "")
-    external_ref = request.GET.get("external_reference", "")
+    payment_id = request.GET.get("payment_id", "").strip()
 
-    if status != "approved" or not payment_id:
-        messages.warning(request, "El pago no fue aprobado o los datos son incompletos.")
+    if not payment_id:
+        messages.warning(request, "No se recibió confirmación del pago.")
         return render(request, "usuarios/mp_resultado.html", {"estado": "fallido"})
 
-    # Extraemos el monto del external_reference: "usuario_3_monto_500"
+    # Verificar el pago directamente con la API de MP
     try:
-        monto = Decimal(external_ref.split("_monto_")[1])
-    except (IndexError, Exception):
-        messages.error(request, "No se pudo determinar el monto del pago.")
-        return render(request, "usuarios/mp_resultado.html", {"estado": "fallido"})
+        sdk = mercadopago.SDK(settings.MP_ACCESS_TOKEN)
+        resultado = sdk.payment().get(payment_id)
+
+        if resultado["status"] != 200:
+            raise Exception("MP no devolvió el pago")
+
+        info = resultado["response"]
+
+        if info.get("status") != "approved":
+            messages.warning(request, "El pago aún no fue acreditado por MercadoPago.")
+            return render(request, "usuarios/mp_resultado.html", {"estado": "pendiente"})
+
+        # Verificar que el pago le pertenece a este usuario
+        metadata = info.get("metadata", {})
+        usuario_id_mp = str(metadata.get("usuario_id", ""))
+        if usuario_id_mp and usuario_id_mp != str(request.user.id):
+            # El pago no corresponde a este usuario — no acreditar
+            messages.error(request, "Error de validación del pago.")
+            return render(request, "usuarios/mp_resultado.html", {"estado": "fallido"})
+
+        # Monto real desde la API (no desde la URL)
+        monto = Decimal(str(info.get("transaction_amount", 0)))
+        if monto <= 0:
+            raise Exception("Monto inválido en la respuesta de MP")
+
+    except Exception as e:
+        # Si falla la verificación, el webhook igual acreditará
+        messages.warning(
+            request,
+            "Tu pago fue procesado. Si no ves el saldo en unos minutos, contactá soporte."
+        )
+        return render(request, "usuarios/mp_resultado.html", {"estado": "pendiente"})
 
     try:
         acreditar(request.user, monto, payment_id)
-        messages.success(request, f"Se acreditaron ${monto} a tu saldo.")
-    except Exception as e:
-        messages.error(request, f"Error al acreditar saldo: {e}")
-        return render(request, "usuarios/mp_resultado.html", {"estado": "fallido"})
+        messages.success(request, f"✅ Se acreditaron ${monto} a tu saldo.")
+    except Exception:
+        # Si ya fue acreditado por el webhook, está bien
+        pass
+
+    # Refrescar saldo desde la DB
+    request.user.refresh_from_db()
 
     return render(request, "usuarios/mp_resultado.html", {
         "estado": "exitoso",

@@ -1,54 +1,89 @@
 {% extends "base.html" %}
-{% block title %}Cargar saldo con MercadoPago{% endblock %}
+{% block title %}Cargar saldo{% endblock %}
 
 {% block content %}
-<section class="container">
-  <div class="panel">
+<section class="container" style="max-width:480px; margin:auto;">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:0.5rem;">
     <h2>💳 Cargar saldo</h2>
-    <div class="panel-body">
+    <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
+  </div>
 
-      {% if messages %}
-      <ul class="messages">
-        {% for message in messages %}
-        <li class="{{ message.tags }}">{{ message }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-
-      <p>Tu saldo actual: <strong>${{ request.user.saldo }}</strong></p>
-      <p>Elegí el monto a cargar. Serás redirigido a MercadoPago para completar el pago.</p>
-
-      <form method="post" action="{% url 'mp_iniciar_carga' %}">
-        {% csrf_token %}
-
-        <div class="form-row">
-          <label for="monto">Monto a cargar ($)</label>
-          <input
-            type="number"
-            id="monto"
-            name="monto"
-            min="100"
-            step="100"
-            placeholder="Ej: 500"
-            required
-          >
-        </div>
-
-        <!-- Opciones rápidas de monto -->
-        <div class="form-row" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          <button type="button" class="btn link" onclick="document.getElementById('monto').value=500">$500</button>
-          <button type="button" class="btn link" onclick="document.getElementById('monto').value=1000">$1.000</button>
-          <button type="button" class="btn link" onclick="document.getElementById('monto').value=2000">$2.000</button>
-          <button type="button" class="btn link" onclick="document.getElementById('monto').value=5000">$5.000</button>
-        </div>
-
-        <div class="form-row actions">
-          <button type="submit" class="btn">Pagar con MercadoPago</button>
-          <a href="{% url 'inicio' %}" class="btn link">Cancelar</a>
-        </div>
-      </form>
-
+  <!-- SALDO ACTUAL -->
+  <div class="card" style="text-align:center; margin-bottom:1.2rem;">
+    <div class="text-muted" style="font-size:0.88rem;">Saldo actual</div>
+    <div style="font-size:2.2rem; font-weight:800; color:var(--color-primary);">
+      ${{ request.user.saldo }}
     </div>
   </div>
+
+  <div class="card">
+    <form method="post" action="{% url 'mp_iniciar_carga' %}">
+      {% csrf_token %}
+
+      <label style="font-size:0.9rem; font-weight:600; margin-bottom:0.5rem; display:block;">
+        Elegí el monto a cargar
+      </label>
+
+      <!-- Opciones rápidas -->
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:0.5rem; margin-bottom:1rem;">
+        {% for monto_opcion in montos_rapidos %}
+        <button type="button"
+                onclick="setMonto({{ monto_opcion }})"
+                class="btn btn-outline monto-rapido"
+                data-monto="{{ monto_opcion }}"
+                style="font-size:1rem; padding:0.7rem 0; font-weight:700;">
+          ${{ monto_opcion }}
+        </button>
+        {% endfor %}
+      </div>
+
+      <!-- Input manual -->
+      <div style="margin-bottom:1.2rem;">
+        <label style="font-size:0.82rem; color:var(--color-text-muted);">O ingresá otro monto</label>
+        <div style="display:flex; align-items:center; gap:0.4rem;">
+          <span style="font-size:1.3rem; font-weight:700; color:var(--color-text-muted);">$</span>
+          <input type="number" id="monto" name="monto" min="100" step="100"
+                 placeholder="500" required
+                 style="font-size:1.4rem; font-weight:800; letter-spacing:1px; flex:1;"
+                 oninput="limpiarSeleccion()">
+        </div>
+      </div>
+
+      <button type="submit" class="btn" style="width:100%; font-size:1.1rem; padding:0.9rem;">
+        <svg viewBox="0 0 24 24" width="20" height="20" style="vertical-align:middle; margin-right:6px;"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+        </svg>
+        Pagar con MercadoPago
+      </button>
+
+    </form>
+
+    <p class="text-muted" style="font-size:0.82rem; margin-top:0.9rem; text-align:center;">
+      Serás redirigido a MercadoPago para completar el pago de forma segura.
+      El saldo se acredita automáticamente al confirmarse.
+    </p>
+  </div>
+
 </section>
+
+<script>
+function setMonto(valor) {
+  document.getElementById("monto").value = valor;
+  document.querySelectorAll(".monto-rapido").forEach(b => {
+    b.classList.toggle("btn", b.dataset.monto == valor);
+    b.classList.toggle("btn-outline", b.dataset.monto != valor);
+  });
+}
+function limpiarSeleccion() {
+  document.querySelectorAll(".monto-rapido").forEach(b => {
+    b.classList.remove("btn");
+    b.classList.add("btn-outline");
+  });
+}
+// Preseleccionar $500 por defecto
+window.addEventListener("DOMContentLoaded", () => setMonto(500));
+</script>
+
 {% endblock %}

@@ -182,8 +182,10 @@ SOCIALACCOUNT_PROVIDERS = {
 # ─── MercadoPago ──────────────────────────────────────────────────────────────
 # En Railway: setear MP_ACCESS_TOKEN con el token de producción o sandbox.
 # Obtenerlos en: https://www.mercadopago.com.ar/developers/panel/credentials
-MP_ACCESS_TOKEN = os.getenv("MP_ACCESS_TOKEN", "")
-MP_PUBLIC_KEY = os.getenv("MP_PUBLIC_KEY", "")
+MP_ACCESS_TOKEN  = os.getenv("MP_ACCESS_TOKEN", "")
+MP_PUBLIC_KEY    = os.getenv("MP_PUBLIC_KEY", "")
+MP_CLIENT_ID     = os.getenv("MP_CLIENT_ID", "")
+MP_CLIENT_SECRET = os.getenv("MP_CLIENT_SECRET", "")
 
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

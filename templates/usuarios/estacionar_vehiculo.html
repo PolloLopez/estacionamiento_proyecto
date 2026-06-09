@@ -1,109 +1,221 @@
 {% extends "base.html" %}
-{% block title %}Estacionar vehículo{% endblock %}
+{% block title %}Estacionar{% endblock %}
 
 {% block content %}
-
 <div class="container">
 
-  <!-- 💰 SALDO -->
-  <div class="card">
-    <h3>💰 Tu saldo</h3>
-    <h2>${{ usuario.saldo }}</h2>
-
-    {% if usuario.saldo < 100 %}
-      <p class="danger">Saldo insuficiente</p>
-    {% else %}
-      <p class="success">Saldo disponible</p>
-    {% endif %}
+  <!-- SALDO -->
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              background:var(--color-surface); border:1px solid var(--color-border);
+              border-radius:10px; padding:0.75rem 1.1rem; margin-bottom:1.2rem;">
+    <span style="font-size:0.9rem; color:var(--color-text-muted);">Tu saldo</span>
+    <span style="font-size:1.5rem; font-weight:800;
+          color:{% if usuario.saldo < 100 %}var(--color-danger){% else %}var(--color-primary){% endif %};">
+      ${{ usuario.saldo }}
+    </span>
   </div>
 
-  <!-- 🚗 AGREGAR VEHÍCULO -->
-  <div class="card">
-    <h3>➕ Agregar patente</h3>
+  {% if error %}
+    <div class="alert" style="background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
+         border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem;">
+      {{ error }}
+    </div>
+  {% endif %}
 
-    <form method="post" action="{% url 'agregar_vehiculo' %}">
-      {% csrf_token %}
+  <form method="post" id="form-estacionar">
+    {% csrf_token %}
+    <input type="hidden" name="vehiculo_id" id="vehiculo_id_input">
+    <input type="hidden" name="horas" id="horas" value="1">
 
-      <input name="patente" placeholder="ABC123" required style="text-transform:uppercase;">
-      <button type="submit" class="btn">
-        Agregar vehículo
-      </button>
-    </form>
-  </div>
+    <!-- ─── VEHÍCULOS ─────────────────────────────── -->
+    {% if vehiculos %}
 
-  <!-- 🚗 ESTACIONAR -->
-  <div class="card">
-    <h3>🚗 Estacionar vehículo</h3>
+      <h3 style="margin-bottom:0.75rem;">🚗 ¿Con qué vehículo?</h3>
 
-    <form method="post">
-      {% csrf_token %}
-
-      <!-- SELECT VEHICULO -->
-      <label>Seleccionar vehículo</label>
-      <select name="vehiculo_id" class="input" required>
+      <div id="tarjetas-vehiculos"
+           style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.4rem;">
         {% for v in vehiculos %}
-          <option value="{{ v.id }}">
+        <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
+             data-id="{{ v.id }}"
+             onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}')"
+             style="
+               flex:1; min-width:130px; max-width:200px;
+               border:3px solid var(--color-border);
+               border-radius:14px;
+               padding:1.2rem 1rem;
+               text-align:center;
+               cursor:pointer;
+               background:var(--color-surface);
+               transition:border-color 0.15s, background 0.15s;
+               position:relative;
+             ">
+          <div style="font-size:1.6rem; font-weight:800; letter-spacing:3px;">
             {{ v.patente }}
-          </option>
-        {% endfor %}
-      </select>
+          </div>
+          {% if v.exento_global %}
+            <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.3rem; font-weight:600;">
+              ✅ Exento
+            </div>
+          {% endif %}
 
-      <!-- DURACIÓN -->
-      <label>Duración</label>
-
-      <div class="duraciones" style="gap:0.75rem; margin: 0.75rem 0;">
-        <button type="button" class="btn btn-outline duracion-btn active" data-horas="1"
-                style="font-size:1.3rem; padding:0.9rem 0; font-weight:700;">1h</button>
-        <button type="button" class="btn btn-outline duracion-btn" data-horas="2"
-                style="font-size:1.3rem; padding:0.9rem 0; font-weight:700;">2h</button>
-        <button type="button" class="btn btn-outline duracion-btn" data-horas="4"
-                style="font-size:1.3rem; padding:0.9rem 0; font-weight:700;">4h</button>
-      </div>
-
-      <input type="hidden" name="horas" id="horas" value="1">
-
-      <!-- RESUMEN -->
-      <div class="resumen">
-        <p style="font-size:1.05rem;">Duración: <strong id="duracionTexto">1 hora</strong></p>
-        <p style="font-size:1.05rem;">Costo estimado: <strong id="costoTexto">${{ tarifa_hora|default:"100" }}</strong></p>
-      </div>
-
-      {% if error %}
-        <div class="alert alert-danger">
-          {{ error }}
+          <!-- Botón eliminar -->
+          <form method="post" action="{% url 'eliminar_vehiculo' v.id %}"
+                style="position:absolute; top:6px; right:6px;"
+                onsubmit="return confirm('¿Eliminar {{ v.patente }} de tu cuenta?');">
+            {% csrf_token %}
+            <button type="submit"
+                    onclick="event.stopPropagation();"
+                    title="Quitar vehículo"
+                    style="background:none; border:none; cursor:pointer; font-size:0.9rem;
+                           color:var(--color-text-muted); padding:2px 5px; border-radius:4px;"
+                    onmouseenter="this.style.color='var(--color-danger)'"
+                    onmouseleave="this.style.color='var(--color-text-muted)'">
+              ✕
+            </button>
+          </form>
         </div>
-      {% endif %}
+        {% endfor %}
+      </div>
 
-      <button class="btn" type="submit">
-        Confirmar estacionamiento
+    {% else %}
+      <p class="text-muted" style="margin-bottom:1rem;">
+        Todavía no tenés vehículos. Agregá uno abajo para empezar.
+      </p>
+    {% endif %}
+
+    <!-- ─── DURACIÓN (solo visible si hay vehículo seleccionado) ─── -->
+    <div id="seccion-duracion" style="display:none;">
+
+      <h3 style="margin-bottom:0.75rem;">⏱ ¿Cuánto tiempo?</h3>
+
+      <div style="display:flex; gap:0.75rem; margin-bottom:1rem;">
+        <button type="button" class="btn duracion-btn" data-horas="1"
+                style="flex:1; font-size:1.6rem; padding:1rem 0; font-weight:800;">
+          1h
+        </button>
+        <button type="button" class="btn btn-outline duracion-btn" data-horas="2"
+                style="flex:1; font-size:1.6rem; padding:1rem 0; font-weight:800;">
+          2h
+        </button>
+        <button type="button" class="btn btn-outline duracion-btn" data-horas="4"
+                style="flex:1; font-size:1.6rem; padding:1rem 0; font-weight:800;">
+          4h
+        </button>
+      </div>
+
+      <div style="background:var(--color-surface-2); border-radius:10px; padding:0.9rem 1.1rem;
+                  margin-bottom:1.2rem; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:1rem; color:var(--color-text-muted);">
+          <strong id="vehiculo-seleccionado-label">—</strong> · <span id="duracionTexto">1 hora</span>
+        </span>
+        <span style="font-size:1.4rem; font-weight:800; color:var(--color-primary);" id="costoTexto">
+          ${{ tarifa_hora|default:"100" }}
+        </span>
+      </div>
+
+      <button class="btn" type="submit" style="width:100%; font-size:1.2rem; padding:1rem;">
+        ✅ Confirmar estacionamiento
       </button>
+    </div>
 
-    </form>
+  </form>
+
+  <!-- ─── AGREGAR VEHÍCULO (secundario) ─────────── -->
+  <div style="margin-top:2rem; border-top:1px solid var(--color-border); padding-top:1.2rem;">
+    <details>
+      <summary style="cursor:pointer; font-size:0.9rem; color:var(--color-text-muted);
+                      font-weight:600; list-style:none; display:flex; align-items:center; gap:0.4rem;">
+        <span>➕</span> Agregar nuevo vehículo
+      </summary>
+      <div style="margin-top:0.75rem;">
+        <form method="post" action="{% url 'agregar_vehiculo' %}"
+              style="display:flex; gap:0.6rem; align-items:flex-end; flex-wrap:wrap;">
+          {% csrf_token %}
+          <div style="flex:1; min-width:150px;">
+            <label style="font-size:0.85rem;">Patente</label>
+            <input name="patente" placeholder="ABC123" required
+                   style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:1.1rem;" />
+          </div>
+          <button type="submit" class="btn btn-outline" style="font-size:0.9rem;">Agregar</button>
+        </form>
+      </div>
+    </details>
   </div>
 
 </div>
 
+<style>
+.tarjeta-vehiculo.seleccionada {
+  border-color: var(--color-primary) !important;
+  background: #f0fff4 !important;
+}
+</style>
+
 <script>
-  const botones = document.querySelectorAll(".duracion-btn");
-  const horasInput = document.getElementById("horas");
-  const duracionTexto = document.getElementById("duracionTexto");
-  const costoTexto = document.getElementById("costoTexto");
+const PRECIO_HORA = parseFloat("{{ tarifa_hora|default:'100' }}");
+let vehiculoActivo = null;
 
-  // Tarifa real desde el servidor (fallback 100 si no está configurada)
-  const PRECIO_HORA = parseFloat("{{ tarifa_hora|default:'100' }}");
+// Preseleccionar si viene de "agregar vehículo"
+const preseleccionada = "{{ patente_preseleccionada|default:'' }}";
 
-  botones.forEach(btn => {
-    btn.addEventListener("click", () => {
-      botones.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
+function seleccionarVehiculo(id, patente) {
+  vehiculoActivo = id;
 
-      const horas = parseInt(btn.dataset.horas);
-      horasInput.value = horas;
-
-      duracionTexto.innerText = horas + (horas === 1 ? " hora" : " horas");
-      costoTexto.innerText = "$" + (horas * PRECIO_HORA).toFixed(2);
-    });
+  // Estilos visuales
+  document.querySelectorAll(".tarjeta-vehiculo").forEach(t => {
+    t.classList.remove("seleccionada");
   });
+  document.querySelector(`[data-id="${id}"]`).classList.add("seleccionada");
+
+  // Actualizar input oculto
+  document.getElementById("vehiculo_id_input").value = id;
+
+  // Mostrar sección de duración
+  document.getElementById("seccion-duracion").style.display = "block";
+  document.getElementById("vehiculo-seleccionado-label").innerText = patente;
+
+  // Scroll suave a la sección de duración
+  document.getElementById("seccion-duracion").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// Botones de duración
+const botones = document.querySelectorAll(".duracion-btn");
+const horasInput = document.getElementById("horas");
+
+botones.forEach(btn => {
+  btn.addEventListener("click", () => {
+    botones.forEach(b => {
+      b.classList.remove("btn");
+      b.classList.add("btn-outline");
+      // restaurar estilos base
+      b.style.fontWeight = "800";
+    });
+    btn.classList.remove("btn-outline");
+    btn.classList.add("btn");
+
+    const horas = parseInt(btn.dataset.horas);
+    horasInput.value = horas;
+    document.getElementById("duracionTexto").innerText = horas + (horas === 1 ? " hora" : " horas");
+    document.getElementById("costoTexto").innerText = "$" + (horas * PRECIO_HORA).toFixed(2);
+  });
+});
+
+// Preseleccionar el primer vehículo si solo hay uno, o el que vino por URL
+window.addEventListener("DOMContentLoaded", () => {
+  const tarjetas = document.querySelectorAll(".tarjeta-vehiculo");
+
+  if (preseleccionada) {
+    tarjetas.forEach(t => {
+      const patente = t.querySelector("div").innerText.trim();
+      if (patente === preseleccionada) {
+        t.click();
+      }
+    });
+  } else if (tarjetas.length === 1) {
+    // Si solo tiene un auto, seleccionarlo automáticamente
+    tarjetas[0].click();
+  }
+});
 </script>
 
 {% endblock %}
