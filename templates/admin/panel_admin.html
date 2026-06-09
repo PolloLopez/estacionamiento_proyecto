@@ -1,17 +1,177 @@
 {% extends "base.html" %}
-
 {% block title %}Panel Admin{% endblock %}
 
 {% block content %}
-
 <section class="container">
-  <div class="panel">
-    <div class="panel-body">
 
-      <h1>Panel Admin</h1>
-
+  <!-- CABECERA -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+    <h1 style="font-size:1.6rem;">🛠️ Panel Admin</h1>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline">👤 Usuarios</a>
+      <a href="{% url 'gestionar_inspectores' %}" class="btn btn-outline">👮 Inspectores</a>
+      <a href="{% url 'gestionar_vendedores' %}" class="btn btn-outline">💰 Vendedores</a>
+      <a href="{% url 'exenciones' %}" class="btn btn-outline">🚫 Exenciones</a>
+      <a href="{% url 'gestionar_tarifas' %}" class="btn btn-outline">💲 Tarifas</a>
     </div>
   </div>
-</section>
 
+  <!-- STATS -->
+  <div class="grid grid-3" style="margin-bottom:1.5rem;">
+
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">
+        {{ estacionamientos_activos }}
+      </div>
+      <div style="color:var(--color-text-muted); font-size:0.9rem; margin-top:0.3rem;">
+        🚗 Estacionamientos activos
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">
+        ${{ total_cobrado }}
+      </div>
+      <div style="color:var(--color-text-muted); font-size:0.9rem; margin-top:0.3rem;">
+        💵 Total cobrado (histórico)
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">
+        {{ inspectores.count }}
+      </div>
+      <div style="color:var(--color-text-muted); font-size:0.9rem; margin-top:0.3rem;">
+        👮 Inspectores activos
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INFRACCIONES RECIENTES + PERSONAL -->
+  <div class="grid grid-2" style="margin-bottom:1.5rem;">
+
+    <!-- Infracciones recientes -->
+    <div class="card">
+      <h3>⚠️ Infracciones recientes</h3>
+      {% if infracciones_recientes %}
+        <table>
+          <thead>
+            <tr>
+              <th>Patente</th>
+              <th>Inspector</th>
+              <th>Monto</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inf in infracciones_recientes %}
+            <tr>
+              <td><strong>{{ inf.vehiculo.patente }}</strong></td>
+              <td>{{ inf.inspector.nombre|default:inf.inspector.correo }}</td>
+              <td>${{ inf.monto }}</td>
+              <td>{{ inf.creado_en|date:"d/m/Y H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-muted" style="margin-top:0.5rem;">Sin infracciones recientes.</p>
+      {% endif %}
+    </div>
+
+    <!-- Personal -->
+    <div class="card">
+      <h3>👥 Personal</h3>
+      <p style="margin: 0.5rem 0 0.3rem;"><strong>Inspectores</strong></p>
+      {% if inspectores %}
+        <ul style="list-style:none; padding:0;">
+          {% for i in inspectores %}
+            <li style="padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
+              {{ i.nombre|default:i.correo }}
+              <span class="text-muted" style="font-size:0.85rem;">— {{ i.correo }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted">Sin inspectores.</p>
+      {% endif %}
+
+      <p style="margin: 0.8rem 0 0.3rem;"><strong>Vendedores / Kioscos</strong></p>
+      {% if vendedores %}
+        <ul style="list-style:none; padding:0;">
+          {% for v in vendedores %}
+            <li style="padding:0.3rem 0; border-bottom:1px solid var(--color-border);">
+              {{ v.nombre|default:v.correo }}
+              <span class="text-muted" style="font-size:0.85rem;">— {{ v.correo }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted">Sin vendedores.</p>
+      {% endif %}
+
+      <div style="margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <a href="{% url 'gestionar_inspectores' %}" class="btn btn-outline" style="font-size:0.9rem; padding:0.45rem 0.9rem;">
+          + Inspector
+        </a>
+        <a href="{% url 'gestionar_vendedores' %}" class="btn btn-outline" style="font-size:0.9rem; padding:0.45rem 0.9rem;">
+          + Vendedor
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ESTACIONAMIENTOS CON FILTRO -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+      <h3>🚗 Estacionamientos</h3>
+      <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+        <a href="?rol=" class="btn {% if not rol_seleccionado %}btn-success{% else %}btn-outline{% endif %}" style="font-size:0.85rem; padding:0.4rem 0.8rem;">Todos</a>
+        <a href="?rol=inspector" class="btn {% if rol_seleccionado == 'inspector' %}btn-success{% else %}btn-outline{% endif %}" style="font-size:0.85rem; padding:0.4rem 0.8rem;">👮 Inspector</a>
+        <a href="?rol=vendedor" class="btn {% if rol_seleccionado == 'vendedor' %}btn-success{% else %}btn-outline{% endif %}" style="font-size:0.85rem; padding:0.4rem 0.8rem;">💰 Vendedor</a>
+        <a href="?rol=conductor" class="btn {% if rol_seleccionado == 'conductor' %}btn-success{% else %}btn-outline{% endif %}" style="font-size:0.85rem; padding:0.4rem 0.8rem;">🚗 Conductor</a>
+      </div>
+    </div>
+
+    {% if estacionamientos %}
+      <table>
+        <thead>
+          <tr>
+            <th>Patente</th>
+            <th>Subcuadra</th>
+            <th>Usuario</th>
+            <th>Inicio</th>
+            <th>Duración</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in estacionamientos %}
+          <tr>
+            <td><strong>{{ e.vehiculo.patente }}</strong></td>
+            <td>{{ e.subcuadra }}</td>
+            <td>{{ e.usuario.nombre|default:e.usuario.correo }}</td>
+            <td>{{ e.hora_inicio|date:"d/m/Y H:i" }}</td>
+            <td>{{ e.duracion }}h</td>
+            <td>
+              {% if e.estado == "ACTIVO" %}
+                <span style="color:var(--color-primary); font-weight:600;">● Activo</span>
+              {% elif e.estado == "FINALIZADO" %}
+                <span style="color:var(--color-text-muted);">Finalizado</span>
+              {% else %}
+                <span>{{ e.estado }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">Sin estacionamientos registrados.</p>
+    {% endif %}
+  </div>
+
+</section>
 {% endblock %}
