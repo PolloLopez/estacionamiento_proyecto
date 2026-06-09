@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Editar Vendedor{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>💰 Editar: {{ vendedor.nombre|default:vendedor.correo }}</h2>
+    <a href="{% url 'gestionar_vendedores' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
+  </div>
+
+  <form method="post" action="{% url 'admin_editar_vendedor' vendedor.id %}">
+    {% csrf_token %}
+
+    <div class="grid grid-2" style="margin-bottom:1rem;">
+
+      <!-- DATOS BÁSICOS -->
+      <div class="card">
+        <h3 style="margin-bottom:1rem;">Datos del comercio</h3>
+
+        <label>Nombre del comercio</label>
+        <input name="nombre" value="{{ vendedor.nombre }}" placeholder="Nombre del comercio" />
+
+        <label>Correo (solo lectura)</label>
+        <input value="{{ vendedor.correo }}" disabled style="background:var(--color-surface-2); color:var(--color-text-muted);" />
+
+        <label style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1rem; cursor:pointer; font-weight:600;">
+          <input type="checkbox" name="activo" {% if vendedor.is_active %}checked{% endif %}
+                 style="width:18px; height:18px;">
+          Vendedor activo
+        </label>
+      </div>
+
+      <!-- CONFIG RENDICIÓN -->
+      <div class="card">
+        <h3 style="margin-bottom:1rem;">⚙️ Configuración de rendición</h3>
+
+        <label>Periodicidad de rendición</label>
+        <select name="periodicidad_rendicion">
+          <option value="diaria" {% if vendedor.periodicidad_rendicion == "diaria" %}selected{% endif %}>Diaria</option>
+          <option value="semanal" {% if vendedor.periodicidad_rendicion == "semanal" %}selected{% endif %}>Semanal</option>
+          <option value="mensual" {% if vendedor.periodicidad_rendicion == "mensual" %}selected{% endif %}>Mensual</option>
+        </select>
+
+        <label>Comisión / Porcentaje de ganancia (%)</label>
+        <input type="number" name="porcentaje_ganancia" step="0.01" min="0" max="100"
+               value="{{ vendedor.porcentaje_ganancia }}" placeholder="0.00" style="max-width:150px;" />
+        <p class="text-muted" style="font-size:0.85rem; margin-top:-0.5rem; margin-bottom:1rem;">
+          Porcentaje del cobrado que retiene el vendedor.
+        </p>
+
+        <label>Límite de deuda ($)</label>
+        <input type="number" name="saldo_limite" step="0.01" min="0"
+               value="{{ vendedor.saldo_limite }}" placeholder="0" style="max-width:150px;" />
+        <p class="text-muted" style="font-size:0.85rem; margin-top:-0.5rem; margin-bottom:0;">
+          Máximo saldo negativo permitido. 0 = sin límite.
+        </p>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div class="card" style="margin-bottom:1rem;">
+      <h3 style="margin-bottom:0.8rem;">📊 Actividad del vendedor</h3>
+      <div class="grid grid-2">
+        <div style="text-align:center;">
+          <div style="font-size:2rem; font-weight:800; color:var(--color-primary);">
+            ${{ vendedor.saldo }}
+          </div>
+          <div class="text-muted" style="font-size:0.9rem;">Saldo actual</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:2rem; font-weight:800; color:var(--color-primary);">
+            ${{ vendedor.saldo_operativo }}
+          </div>
+          <div class="text-muted" style="font-size:0.9rem;">Cobrado total (operativo)</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:0.75rem;">
+      <button class="btn" type="submit">💾 Guardar cambios</button>
+      <a href="{% url 'gestionar_vendedores' %}" class="btn btn-outline">Cancelar</a>
+    </div>
+  </form>
+
+</section>
+{% endblock %}

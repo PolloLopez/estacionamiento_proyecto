@@ -33,7 +33,7 @@ from .models import (
 from .utils import get_subcuadra_default
 from .factories import EstacionamientoFactory
 from datetime import timedelta
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from django.db.models.functions import TruncDate
 from app_estacionamiento.services_verificacion import verificar_estado_vehiculo
 from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
@@ -993,7 +993,18 @@ def gestionar_inspectores(request):
             inspector.save()
             return redirect("gestionar_inspectores")
 
-    inspectores = Usuario.objects.filter(es_inspector=True, municipio=municipio)
+    # Anotar stats por inspector para mostrar en resumen
+    inspectores = Usuario.objects.filter(
+        es_inspector=True, municipio=municipio
+    ).annotate(
+        total_infracciones=Count("infraccion", distinct=True),
+        total_verificaciones=Count("verificacioninspector", distinct=True),
+        total_cobrado_sum=Sum(
+            "movimientocaja__monto",
+            filter=Q(movimientocaja__tipo="ingreso")
+        ),
+    )
+
     return render(request, "admin/gestionar_inspectores.html", {
         "inspectores": inspectores,
         "error": error,
@@ -1005,16 +1016,24 @@ def editar_inspector(request, inspector_id):
 
     if request.method == "POST":
         inspector.first_name = request.POST.get("nombre", "").strip()
-        activo = request.POST.get("activo") == "on"
-        inspector.is_active = activo
+        inspector.is_active = request.POST.get("activo") == "on"
+
+        # Configuración de rendición
+        try:
+            inspector.saldo_limite = Decimal(request.POST.get("saldo_limite", "0") or "0")
+        except Exception:
+            inspector.saldo_limite = 0
+        try:
+            inspector.porcentaje_ganancia = Decimal(request.POST.get("porcentaje_ganancia", "0") or "0")
+        except Exception:
+            inspector.porcentaje_ganancia = 0
+        inspector.periodicidad_rendicion = request.POST.get("periodicidad_rendicion", "semanal")
+
         inspector.save()
         return redirect("gestionar_inspectores")
 
-    return render(request, "admin/gestionar_inspectores.html", {
-        "inspector_editar": inspector,
-        "inspectores": Usuario.objects.filter(
-            es_inspector=True, municipio=inspector.municipio
-        ),
+    return render(request, "admin/editar_inspector.html", {
+        "inspector": inspector,
     })
 
 @require_role("admin")
@@ -1056,16 +1075,21 @@ def editar_vendedor(request, vendedor_id):
 
     if request.method == "POST":
         vendedor.first_name = request.POST.get("nombre", "").strip()
-        activo = request.POST.get("activo") == "on"
-        vendedor.is_active = activo
+        vendedor.is_active = request.POST.get("activo") == "on"
+        try:
+            vendedor.saldo_limite = Decimal(request.POST.get("saldo_limite", "0") or "0")
+        except Exception:
+            vendedor.saldo_limite = 0
+        try:
+            vendedor.porcentaje_ganancia = Decimal(request.POST.get("porcentaje_ganancia", "0") or "0")
+        except Exception:
+            vendedor.porcentaje_ganancia = 0
+        vendedor.periodicidad_rendicion = request.POST.get("periodicidad_rendicion", "semanal")
         vendedor.save()
         return redirect("gestionar_vendedores")
 
-    return render(request, "admin/gestionar_vendedores.html", {
-        "vendedor_editar": vendedor,
-        "vendedores": Usuario.objects.filter(
-            es_vendedor=True, municipio=vendedor.municipio
-        ),
+    return render(request, "admin/editar_vendedor.html", {
+        "vendedor": vendedor,
     })
 
 @require_role("admin")
@@ -1090,23 +1114,25 @@ def gestionar_tarifas(request):
     municipio = usuario.municipio
     from app_estacionamiento.models import Tarifa
 
+    error = None
     if request.method == "POST":
-        precio = request.POST.get("precio_por_hora")
+        precio_str = request.POST.get("precio_por_hora", "").strip()
         try:
-            precio = Decimal(precio)
+            precio = Decimal(precio_str)
             if precio <= 0:
-                raise ValueError()
-            # Actualizar si existe, crear si no
-            tarifa, _ = Tarifa.objects.get_or_create(municipio=municipio)
-            tarifa.precio_por_hora = precio
-            tarifa.save()
+                raise ValueError("El precio debe ser mayor a 0.")
+            Tarifa.objects.update_or_create(
+                municipio=municipio,
+                defaults={"precio_por_hora": precio}
+            )
             return redirect("gestionar_tarifas")
-        except (ValueError, Exception):
-            pass
+        except Exception as e:
+            error = f"Error al guardar: {e}"
 
     tarifa_actual = Tarifa.objects.filter(municipio=municipio).first()
     return render(request, "admin/gestionar_tarifas.html", {
         "tarifa_actual": tarifa_actual,
+        "error": error,
     })
 
 # =========================================================

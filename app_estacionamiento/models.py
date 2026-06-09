@@ -73,6 +73,22 @@ class Usuario(AbstractUser):
 
     saldo = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
+    # ⚙️ Configuración de rendición (aplica a inspectores y vendedores)
+    saldo_limite = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Límite de deuda antes de bloquear al usuario. 0 = sin límite."
+    )
+    porcentaje_ganancia = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Porcentaje del total cobrado que el usuario retiene como ganancia."
+    )
+    periodicidad_rendicion = models.CharField(
+        max_length=10,
+        choices=[("diaria", "Diaria"), ("semanal", "Semanal"), ("mensual", "Mensual")],
+        default="semanal",
+        help_text="Con qué frecuencia debe rendir cuentas al municipio."
+    )
+
     # 🎭 Roles
     es_conductor = models.BooleanField(default=True)
     es_inspector = models.BooleanField(default=False)
@@ -88,6 +104,15 @@ class Usuario(AbstractUser):
     REQUIRED_FIELDS = []
 
     objects = UsuarioManager()
+
+    @property
+    def nombre(self):
+        """Alias de first_name para consistencia con el sistema."""
+        return self.first_name or ""
+
+    @nombre.setter
+    def nombre(self, valor):
+        self.first_name = valor
 
     def __str__(self):
         return self.correo or f"Usuario #{self.id}"

@@ -1,71 +1,132 @@
 {% extends "base.html" %}
-
 {% block title %}Exenciones{% endblock %}
 
 {% block content %}
 <section class="container">
-  <div class="panel">
-    <h2>🚧 Panel de Exenciones</h2>
-    <div class="panel-body">
-    <form method="POST" class="grid">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="buscar">
 
-        <label>Patente:</label>
-        <input type="text" name="patente" class="input" required>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>🚫 Exenciones de estacionamiento</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
+  </div>
 
-        <button type="submit" class="btn">Buscar</button>
-    </form> 
+  <!-- BUSCAR PATENTE -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:1rem;">Buscar vehículo por patente</h3>
+    <form method="POST" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="buscar">
+      <div style="flex:1; min-width:160px;">
+        <label>Patente</label>
+        <input type="text" name="patente" class="input-patente"
+               style="font-size:1.5rem; letter-spacing:4px; text-transform:uppercase; padding:0.6rem 1rem;"
+               placeholder="ABC123" required
+               value="{% if vehiculo %}{{ vehiculo.patente }}{% endif %}">
+      </div>
+      <button type="submit" class="btn" style="height:fit-content;">Buscar</button>
+    </form>
   </div>
 
   {% if vehiculo %}
-  <div class="card" style="margin-top: 1rem;">
-    <h3>Vehículo: {{ vehiculo.patente }}</h3>
+  <!-- RESULTADO -->
+  <div class="card">
+    <h3 style="margin-bottom:1rem;">
+      Patente: <strong>{{ vehiculo.patente }}</strong>
+    </h3>
 
-    <form method="POST" class="grid">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="guardar">
-        <input type="hidden" name="patente" value="{{ vehiculo.patente }}">
+    <form method="POST">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="guardar">
+      <input type="hidden" name="patente" value="{{ vehiculo.patente }}">
 
-        <label>
-            <input type="checkbox" name="exento_global"
-            {% if vehiculo.exento_global %}checked{% endif %}>
-            Exento global
+      <!-- EXENCIÓN GLOBAL -->
+      <div style="margin-bottom:1.2rem; padding:1rem; border-radius:8px;
+                  background:{% if vehiculo.exento_global %}var(--color-success-bg){% else %}var(--color-surface-2){% endif %};
+                  border:2px solid {% if vehiculo.exento_global %}#1a7a3c{% else %}var(--color-border){% endif %};">
+        <label style="display:flex; align-items:center; gap:0.7rem; cursor:pointer; margin:0; font-size:1.1rem; font-weight:700;">
+          <input type="checkbox" name="exento_global" id="exento_global"
+                 {% if vehiculo.exento_global %}checked{% endif %}
+                 style="width:20px; height:20px; cursor:pointer;">
+          🌐 Exento GLOBAL (no paga en ninguna zona)
         </label>
+        {% if vehiculo.exento_global %}
+          <p style="color:var(--color-success); margin-top:0.4rem; font-size:0.9rem;">
+            ✅ Este vehículo está exento en todo el municipio.
+          </p>
+        {% endif %}
+      </div>
 
-        <h4>Subcuadras exentas</h4>
+      <!-- EXENCIONES PARCIALES -->
+      <div id="seccion-parcial" {% if vehiculo.exento_global %}style="opacity:0.4; pointer-events:none;"{% endif %}>
+        <h4 style="margin-bottom:0.5rem;">📍 Exención parcial por subcuadra</h4>
+        <p class="text-muted" style="font-size:0.9rem; margin-bottom:0.8rem;">
+          Seleccioná las calles/alturas donde este vehículo no paga.
+          Si marcás exento global arriba, esto se ignora.
+        </p>
 
-        <input type="text" id="buscador" class="input" placeholder="Buscar calle...">
+        <!-- Buscador de calles -->
+        <input type="text" id="buscador" placeholder="Filtrar por calle..."
+               style="margin-bottom:0.75rem; padding:0.5rem 0.75rem; border-radius:8px;
+                      border:2px solid var(--color-border); width:100%; font-size:0.95rem;">
 
-        <div id="lista-subcuadras" class="grid">
-            {% for s in subcuadras %}
-                <div class="card">
-                    <label>
-                        <input type="checkbox" name="subcuadras" value="{{ s.id }}"
-                        {% if s in vehiculo.subcuadras_exentas.all %}checked{% endif %}>
-                        {{ s.calle }} {{ s.altura }}
-                    </label>
-                </div>
-            {% endfor %}
+        <!-- Lista compacta agrupada -->
+        <div id="lista-subcuadras" style="max-height:400px; overflow-y:auto;
+             border:1px solid var(--color-border); border-radius:8px; padding:0.5rem;">
+
+          {% regroup subcuadras|dictsort:"calle" by calle as grupos %}
+          {% for grupo in grupos %}
+            {% if grupo.grouper != "Zona Única" %}
+            <div class="grupo-calle" data-calle="{{ grupo.grouper|lower }}">
+              <div style="padding:0.4rem 0.5rem; font-weight:700; font-size:0.85rem;
+                          color:var(--color-text-muted); background:var(--color-surface-2);
+                          border-radius:6px; margin-bottom:0.25rem;">
+                {{ grupo.grouper }}
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:0.3rem; margin-bottom:0.5rem; padding-left:0.5rem;">
+                {% for s in grupo.list %}
+                  <label style="display:inline-flex; align-items:center; gap:0.3rem;
+                                 padding:0.25rem 0.6rem; border-radius:6px; cursor:pointer;
+                                 border:1px solid var(--color-border); font-size:0.88rem;
+                                 background:{% if s in vehiculo.subcuadras_exentas.all %}var(--color-success-bg){% else %}var(--color-surface){% endif %};">
+                    <input type="checkbox" name="subcuadras" value="{{ s.id }}"
+                           {% if s in vehiculo.subcuadras_exentas.all %}checked{% endif %}
+                           style="width:14px; height:14px;">
+                    {{ s.altura }}
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+          {% endfor %}
         </div>
+      </div>
 
-        <button type="submit" class="btn">Guardar</button>
+      <div style="margin-top:1.2rem; display:flex; gap:0.75rem;">
+        <button type="submit" class="btn">💾 Guardar exenciones</button>
+        <span class="text-muted" style="font-size:0.85rem; align-self:center;">
+          Subcuadras exentas actuales: {{ vehiculo.subcuadras_exentas.count }}
+        </span>
+      </div>
     </form>
   </div>
   {% endif %}
-  </div>
-  </div>
+
 </section>
 
 <script>
-document.getElementById("buscador")?.addEventListener("keyup", function() {
-    let filtro = this.value.toLowerCase();
-    let items = document.querySelectorAll("#lista-subcuadras div");
+// Deshabilitar parciales si exento global está marcado
+document.getElementById("exento_global")?.addEventListener("change", function() {
+  const parcial = document.getElementById("seccion-parcial");
+  parcial.style.opacity = this.checked ? "0.4" : "1";
+  parcial.style.pointerEvents = this.checked ? "none" : "";
+});
 
-    items.forEach(item => {
-        let texto = item.innerText.toLowerCase();
-        item.style.display = texto.includes(filtro) ? "" : "none";
-    });
+// Filtro de calles
+document.getElementById("buscador")?.addEventListener("input", function() {
+  const filtro = this.value.toLowerCase();
+  document.querySelectorAll(".grupo-calle").forEach(grupo => {
+    const calle = grupo.dataset.calle || "";
+    grupo.style.display = calle.includes(filtro) ? "" : "none";
+  });
 });
 </script>
 {% endblock %}

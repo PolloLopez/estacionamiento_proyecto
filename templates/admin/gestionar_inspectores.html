@@ -3,44 +3,94 @@
 
 {% block content %}
 <section class="container">
-<div class="panel">
-  <h2>Inspectores</h2>
-  <div class="panel-body">
 
-  <!-- Nuevo inspector -->
-  <form method="post" action="{% url 'admin_crear_inspector' %}" class="form">
-    {% csrf_token %}
-    <div class="form-row">
-      <label for="nombre">Nombre</label>
-      <input id="nombre" name="nombre" />
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>👮 Inspectores</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
+  </div>
+
+  <!-- TABLA RESUMEN -->
+  {% if inspectores %}
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:0.8rem;">Actividad de inspectores</h3>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Inspector</th>
+            <th>Correo</th>
+            <th style="text-align:center;">Infracciones</th>
+            <th style="text-align:center;">Verificaciones</th>
+            <th style="text-align:right;">Total cobrado</th>
+            <th style="text-align:center;">Rendición</th>
+            <th style="text-align:center;">Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in inspectores %}
+          <tr>
+            <td><strong>{{ i.nombre|default:"—" }}</strong></td>
+            <td style="font-size:0.88rem;">{{ i.correo }}</td>
+            <td style="text-align:center;">{{ i.total_infracciones|default:"0" }}</td>
+            <td style="text-align:center;">{{ i.total_verificaciones|default:"0" }}</td>
+            <td style="text-align:right; font-weight:600;">
+              ${{ i.total_cobrado_sum|default:"0" }}
+            </td>
+            <td style="text-align:center; font-size:0.85rem;">
+              {{ i.periodicidad_rendicion|capfirst }}
+              {% if i.porcentaje_ganancia > 0 %}
+                <br><span class="text-muted">{{ i.porcentaje_ganancia }}%</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center;">
+              {% if i.is_active %}
+                <span style="color:var(--color-primary); font-weight:600;">● Activo</span>
+              {% else %}
+                <span style="color:var(--color-danger); font-weight:600;">● Inactivo</span>
+              {% endif %}
+              {% if i.saldo_limite > 0 and i.saldo_operativo < 0 %}
+                <br><span style="color:var(--color-danger); font-size:0.8rem;">⚠ Deuda</span>
+              {% endif %}
+            </td>
+            <td>
+              <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
+                 href="{% url 'admin_editar_inspector' i.id %}">Editar</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    <div class="form-row">
+  </div>
+  {% else %}
+    <div class="card" style="margin-bottom:1.5rem; text-align:center; color:var(--color-text-muted);">
+      No hay inspectores registrados.
+    </div>
+  {% endif %}
+
+  <!-- CREAR NUEVO -->
+  <div class="card">
+    <h3 style="margin-bottom:1rem;">➕ Crear inspector</h3>
+    <form method="post" action="{% url 'admin_crear_inspector' %}">
+      {% csrf_token %}
+
+      <label for="nombre">Nombre completo</label>
+      <input id="nombre" name="nombre" placeholder="Ej: Juan Pérez" />
+
       <label for="correo">Correo</label>
-      <input id="correo" name="correo" type="email" required />
-    </div>
-    <div class="form-row">
-      <label for="password">Contraseña</label>
-      <input id="password" name="password" type="password" required />
-    </div>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    <div class="form-row actions"><button class="btn-general" type="submit">Crear inspector</button></div>
-  </form>
+      <input id="correo" name="correo" type="email" required placeholder="correo@ejemplo.com" />
 
-  <!-- Tabla -->
-  <table class="table">
-    <thead><tr><th>Nombre</th><th>Email</th><th>Acciones</th></tr></thead>
-    <tbody>
-      {% for i in inspectores %}
-      <tr><td>{{ i.first_name|default:"-" }}</td><td>{{ i.correo }}</td>
-      <td>
-        <a class="btn small" href="{% url 'admin_editar_inspector' i.id %}">Editar</a>
-      </td></tr>
-      {% empty %}
-      <tr><td colspan="3">No hay inspectores</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      <label for="password">Contraseña inicial</label>
+      <input id="password" name="password" type="password" required placeholder="Mínimo 8 caracteres" />
+
+      {% if error %}
+        <p class="error">{{ error }}</p>
+      {% endif %}
+
+      <button class="btn" type="submit">+ Crear inspector</button>
+    </form>
   </div>
-  </div>
+
 </section>
 {% endblock %}

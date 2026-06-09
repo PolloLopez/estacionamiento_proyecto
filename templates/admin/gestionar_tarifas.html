@@ -1,38 +1,58 @@
-{% extends "base.html" %} {% block title %}Gestionar Tarifas{% endblock %} {%
-block content %}
+{% extends "base.html" %}
+{% block title %}Gestionar Tarifas{% endblock %}
+
+{% block content %}
 <section class="container">
-  <div class="panel">
-    <h2>Tarifas del sistema</h2>
-    <div class="panel-body">
-      <p>
-        Aquí puedes configurar la tarifa por hora que se aplicará al calcular el
-        costo
-        <!-- Form para crear / editar tarifa -->
-      </p>
 
-      <form
-        method="post"
-        action="{% url 'admin_guardar_tarifa' %}"
-        class="form-inline"
-      >
-        {% csrf_token %}
-        <label for="precio">Precio por hora</label>
-        <input
-          id="precio"
-          name="precio_por_hora"
-          type="number"
-          step="0.01"
-          required
-          value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}"
-        />
-        <button class="btn-general">Guardar</button>
-      </form>
-
-      <p class="muted">
-        La tarifa se usará en el cálculo de costos al finalizar
-        estacionamientos.
-      </p>
-    </div>
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>💲 Tarifas del sistema</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
   </div>
+
+  <!-- TARIFA ACTUAL -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:1rem;">Precio por hora</h3>
+
+    <form method="post" action="{% url 'admin_guardar_tarifa' %}">
+      {% csrf_token %}
+
+      <label for="precio">Precio por hora ($)</label>
+      <input
+        id="precio"
+        name="precio_por_hora"
+        type="number"
+        step="0.01"
+        min="0"
+        required
+        placeholder="Ej: 150.00"
+        value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}"
+        style="max-width:200px;"
+      />
+
+      {% if tarifa_actual %}
+        <p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1rem; font-size:0.9rem;">
+          Tarifa actual: <strong>${{ tarifa_actual.precio_por_hora }}/hora</strong>
+        </p>
+      {% endif %}
+
+      {% if error %}
+        <p class="error">{{ error }}</p>
+      {% endif %}
+
+      <button class="btn" type="submit">Guardar tarifa</button>
+    </form>
+  </div>
+
+  <!-- NOTA: horarios y días (pendiente de modelo) -->
+  <div class="card" style="border-left:4px solid var(--color-warning); background:var(--color-warning-bg);">
+    <h3 style="color:var(--color-warning); margin-bottom:0.5rem;">📅 Horarios y días (próximamente)</h3>
+    <p style="color:#7c4a00; font-size:0.95rem;">
+      La tarifa diferenciada por horario y día de la semana requiere ampliar el modelo de datos.
+      Por ahora se aplica una tarifa única para todos los horarios.
+      En una próxima versión se podrá definir, por ejemplo, tarifa reducida los fines de semana
+      o tarifa nocturna.
+    </p>
+  </div>
+
 </section>
 {% endblock %}
