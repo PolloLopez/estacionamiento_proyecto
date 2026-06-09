@@ -1,5 +1,8 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
 
+import logging
+logger = logging.getLogger(__name__)
+
 from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
@@ -959,7 +962,7 @@ def resumen_infracciones(request):
 
     infracciones = Infraccion.objects.filter(
         municipio=usuario.municipio
-    ).select_related("vehiculo", "subcuadra").order_by("-creado_en")
+    ).select_related("vehiculo", "subcuadra", "inspector").order_by("-creado_en")
 
     return render(request, "inspectores/resumen_infracciones.html", {
         "infracciones": infracciones
@@ -1472,8 +1475,22 @@ def mp_iniciar_carga(request):
     resultado = sdk.preference().create(preferencia)
 
     if resultado["status"] not in (200, 201):
-        messages.error(request, "No se pudo crear la preferencia de pago. Intenta de nuevo.")
-        return render(request, "usuarios/mp_cargar_saldo.html")
+        # Loguear el error completo de MP para diagnóstico en Railway logs
+        logger.error(
+            "MercadoPago error al crear preferencia | status=%s | response=%s | usuario=%s",
+            resultado.get("status"),
+            resultado.get("response"),
+            request.user.id,
+        )
+        # Mostrar detalle del error en DEBUG para facilitar diagnóstico
+        if settings.DEBUG:
+            detalle = resultado.get("response", {})
+            messages.error(request, f"Error MP ({resultado.get('status')}): {detalle}")
+        else:
+            messages.error(request, "No se pudo crear la preferencia de pago. Revisá los logs del servidor.")
+        return render(request, "usuarios/mp_cargar_saldo.html", {
+            "montos_rapidos": [500, 1000, 2000, 5000],
+        })
 
     # En sandbox usamos sandbox_init_point; en prod usamos init_point
     if settings.DEBUG:

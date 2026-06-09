@@ -1,30 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Resumen Cobros{% endblock %} 
+{% block title %}Resumen Cobros{% endblock %}
 {% block content %}
 <section class="container">
   <div class="panel">
     <h2>Resumen de cobros</h2>
-    <div class="panel-body">
-      <table class="table">
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
         <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Patente</th>
-            <th>Monto</th>
-            <th>Registrado por</th>
+          <tr style="border-bottom:2px solid var(--color-border);">
+            <th style="padding:0.6rem 0.8rem; text-align:left;">Fecha</th>
+            <th style="padding:0.6rem 0.8rem; text-align:left;">Descripción</th>
+            <th style="padding:0.6rem 0.8rem; text-align:right;">Monto</th>
+            <th style="padding:0.6rem 0.8rem; text-align:left;">Registrado por</th>
           </tr>
         </thead>
         <tbody>
           {% for c in cobros %}
-          <tr>
-            <td>{{ c.fecha }}</td>
-            <td>{{ c.vehiculo.patente }}</td>
-            <td>${{ c.monto }}</td>
-            <td>{{ c.usuario.nombre }}</td>
+          <tr style="border-bottom:1px solid var(--color-border);">
+            <td style="padding:0.6rem 0.8rem;">{{ c.creado_en|date:"d/m/Y H:i" }}</td>
+            <td style="padding:0.6rem 0.8rem;">{{ c.descripcion|default:"—" }}</td>
+            <td style="padding:0.6rem 0.8rem; text-align:right; font-weight:700;">${{ c.monto }}</td>
+            <td style="padding:0.6rem 0.8rem;">{{ c.usuario.nombre|default:c.usuario.correo }}</td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="4">No hay cobros</td>
+            <td colspan="4" style="padding:1rem; text-align:center; color:var(--color-text-muted);">
+              No hay cobros registrados
+            </td>
           </tr>
           {% endfor %}
         </tbody>

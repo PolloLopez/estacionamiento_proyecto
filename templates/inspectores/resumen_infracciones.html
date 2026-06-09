@@ -1,31 +1,40 @@
-{% extends "base.html" %} 
+{% extends "base.html" %}
 {% block title %}Resumen Infracciones{% endblock %}
 {% block content %}
 <section class="container">
   <div class="panel">
     <h2>Resumen de infracciones</h2>
-    <div class="panel-body">
-      <table class="table">
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
         <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Patente</th>
-            <th>Inspector</th>
-            <th>Estado</th>
+          <tr style="border-bottom:2px solid var(--color-border);">
+            <th style="padding:0.6rem 0.8rem; text-align:left;">Fecha</th>
+            <th style="padding:0.6rem 0.8rem; text-align:left;">Patente</th>
+            <th style="padding:0.6rem 0.8rem; text-align:left;">Inspector</th>
+            <th style="padding:0.6rem 0.8rem; text-align:left;">Estado</th>
           </tr>
         </thead>
-
         <tbody>
           {% for inf in infracciones %}
-          <tr>
-            <td>{{ inf.fecha|date:"d/m/Y H:i" }}</td>
-            <td>{{ inf.vehiculo.patente }}</td>
-            <td>{{ inf.inspector.correo }}</td>
-            <td>{{ inf.estado }}</td>
+          <tr style="border-bottom:1px solid var(--color-border);">
+            <td style="padding:0.6rem 0.8rem;">{{ inf.creado_en|date:"d/m/Y H:i" }}</td>
+            <td style="padding:0.6rem 0.8rem; font-weight:700; letter-spacing:2px;">{{ inf.vehiculo.patente }}</td>
+            <td style="padding:0.6rem 0.8rem;">{{ inf.inspector.correo|default:"—" }}</td>
+            <td style="padding:0.6rem 0.8rem;">
+              {% if inf.estado == "anulada" %}
+                <span style="color:var(--color-text-muted);">Anulada</span>
+              {% elif inf.estado == "pagada" %}
+                <span style="color:var(--color-success);">Pagada</span>
+              {% else %}
+                <span style="color:var(--color-danger); font-weight:600;">Pendiente</span>
+              {% endif %}
+            </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="4">No hay infracciones</td>
+            <td colspan="4" style="padding:1rem; text-align:center; color:var(--color-text-muted);">
+              No hay infracciones registradas
+            </td>
           </tr>
           {% endfor %}
         </tbody>

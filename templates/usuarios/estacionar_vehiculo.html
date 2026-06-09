@@ -58,21 +58,17 @@
             </div>
           {% endif %}
 
-          <!-- Botón eliminar -->
-          <form method="post" action="{% url 'eliminar_vehiculo' v.id %}"
-                style="position:absolute; top:6px; right:6px;"
-                onsubmit="return confirm('¿Eliminar {{ v.patente }} de tu cuenta?');">
-            {% csrf_token %}
-            <button type="submit"
-                    onclick="event.stopPropagation();"
-                    title="Quitar vehículo"
-                    style="background:none; border:none; cursor:pointer; font-size:0.9rem;
-                           color:var(--color-text-muted); padding:2px 5px; border-radius:4px;"
-                    onmouseenter="this.style.color='var(--color-danger)'"
-                    onmouseleave="this.style.color='var(--color-text-muted)'">
-              ✕
-            </button>
-          </form>
+          <!-- Botón eliminar: no puede ser form anidado, usamos JS -->
+          <button type="button"
+                  onclick="event.stopPropagation(); eliminarVehiculo('{% url 'eliminar_vehiculo' v.id %}', '{{ v.patente }}');"
+                  title="Quitar vehículo"
+                  style="position:absolute; top:6px; right:6px; background:none; border:none;
+                         cursor:pointer; font-size:0.9rem; color:var(--color-text-muted);
+                         padding:2px 5px; border-radius:4px;"
+                  onmouseenter="this.style.color='var(--color-danger)'"
+                  onmouseleave="this.style.color='var(--color-text-muted)'">
+            ✕
+          </button>
         </div>
         {% endfor %}
       </div>
@@ -151,6 +147,11 @@
 }
 </style>
 
+<!-- Form oculto para eliminar vehículo (evita forms anidados) -->
+<form id="form-eliminar-vehiculo" method="post" action="" style="display:none;">
+  {% csrf_token %}
+</form>
+
 <script>
 const PRECIO_HORA = parseFloat("{{ tarifa_hora|default:'100' }}");
 let vehiculoActivo = null;
@@ -199,6 +200,14 @@ botones.forEach(btn => {
     document.getElementById("costoTexto").innerText = "$" + (horas * PRECIO_HORA).toFixed(2);
   });
 });
+
+// Eliminar vehículo: usa el form oculto de arriba (evita forms anidados)
+function eliminarVehiculo(url, patente) {
+  if (!confirm(`¿Eliminar ${patente} de tu cuenta?`)) return;
+  const form = document.getElementById("form-eliminar-vehiculo");
+  form.action = url;
+  form.submit();
+}
 
 // Preseleccionar el primer vehículo si solo hay uno, o el que vino por URL
 window.addEventListener("DOMContentLoaded", () => {

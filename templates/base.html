@@ -13,9 +13,10 @@
 
   <!-- NAVBAR -->
   <nav class="navbar">
-    <div class="logo">
+    <a class="logo" style="text-decoration:none; color:inherit;"
+       href="{% if request.user.is_authenticated %}{% if request.user.es_admin %}{% url 'panel_admin' %}{% elif request.user.es_inspector %}{% url 'panel_inspectores' %}{% elif request.user.es_vendedor %}{% url 'panel_vendedor' %}{% else %}{% url 'inicio' %}{% endif %}{% else %}{% url 'login' %}{% endif %}">
       🚗 Estacionamiento
-    </div>
+    </a>
 
     <div class="menu-toggle" onclick="toggleMenu()">
       <span></span>
