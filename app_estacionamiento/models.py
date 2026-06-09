@@ -126,13 +126,32 @@ class Municipio(models.Model):
         return self.nombre
     
 # 🚗 Vehículo asociado a uno o varios usuarios
+TIPOS_EXENCION = [
+    ("discapacitado",    "Discapacitado"),
+    ("vecino_frentista", "Vecino frentista"),
+    ("jubilado",         "Jubilado"),
+    ("fuerza",           "Fuerzas de seguridad / Policía"),
+    ("vehiculo_oficial", "Vehículo oficial"),
+]
+
 class Vehiculo(models.Model):
-    patente = models.CharField(max_length=10, unique=True) 
+    patente = models.CharField(max_length=10, unique=True)
     exento_global = models.BooleanField(default=False)
     exento_parcial = models.BooleanField(default=False)
     subcuadras_exentas = models.ManyToManyField("Subcuadra", blank=True)
-    municipio = models.ForeignKey(Municipio,on_delete=models.CASCADE,null=True,blank=True) 
+    municipio = models.ForeignKey(Municipio, on_delete=models.CASCADE, null=True, blank=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True, null=True)
+
+    # Motivo de la exención (admin lo carga al aprobar)
+    tipo_exencion = models.CharField(
+        max_length=30, choices=TIPOS_EXENCION,
+        null=True, blank=True,
+        verbose_name="Tipo de exención"
+    )
+    notas_exencion = models.TextField(
+        null=True, blank=True,
+        verbose_name="Notas (nro de documento, certificado, etc.)"
+    )
 
     def __str__(self):
         return self.patente
@@ -300,6 +319,55 @@ class Infraccion(models.Model):
         super().save(*args, **kwargs)
 
 # 🔔 Notificación enviada a un usuario
+# 📅 Horario de cobro semanal por municipio
+class HorarioEstacionamiento(models.Model):
+    DIAS = [
+        (0, "Lunes"), (1, "Martes"), (2, "Miércoles"),
+        (3, "Jueves"), (4, "Viernes"), (5, "Sábado"), (6, "Domingo"),
+    ]
+
+    municipio    = models.ForeignKey(Municipio, on_delete=models.CASCADE)
+    dia_semana   = models.IntegerField(choices=DIAS)
+    hora_inicio  = models.TimeField()
+    hora_fin     = models.TimeField()
+    activo       = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("municipio", "dia_semana")
+        ordering = ["dia_semana"]
+
+    def __str__(self):
+        estado = "✅" if self.activo else "❌"
+        return f"{estado} {self.get_dia_semana_display()} {self.hora_inicio}–{self.hora_fin}"
+
+
+# 📌 Días especiales: feriados, festivos, duelos (anulan el horario semanal)
+class DiaEspecial(models.Model):
+    TIPOS = [
+        ("feriado",  "Feriado nacional"),
+        ("festivo",  "Festivo local"),
+        ("duelo",    "Duelo / Luto"),
+        ("otro",     "Otro"),
+    ]
+
+    municipio     = models.ForeignKey(Municipio, on_delete=models.CASCADE)
+    fecha         = models.DateField()
+    tipo          = models.CharField(max_length=20, choices=TIPOS, default="feriado")
+    descripcion   = models.CharField(max_length=200)
+    cobro_activo  = models.BooleanField(
+        default=False,
+        verbose_name="¿Se cobra ese día?",
+        help_text="Por defecto los días especiales son libres de cobro."
+    )
+
+    class Meta:
+        unique_together = ("municipio", "fecha")
+        ordering = ["fecha"]
+
+    def __str__(self):
+        return f"{self.fecha} — {self.descripcion}"
+
+
 class Notificacion(models.Model):
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 
     mensaje = models.TextField()  

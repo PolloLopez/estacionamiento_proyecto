@@ -26,8 +26,11 @@ from .models import (
     Municipio,
     MovimientoCaja,
     CierreCaja,
-    Estado, 
-    VerificacionInspector
+    Estado,
+    VerificacionInspector,
+    HorarioEstacionamiento,
+    DiaEspecial,
+    TIPOS_EXENCION,
 )
 
 from .utils import get_subcuadra_default
@@ -264,10 +267,11 @@ def panel_exenciones(request):
 
         if vehiculo:
             vehiculo.exento_global = request.POST.get("exento_global") == "on"
+            vehiculo.tipo_exencion = request.POST.get("tipo_exencion") or None
+            vehiculo.notas_exencion = request.POST.get("notas_exencion", "").strip() or None
             vehiculo.save()
 
             subcuadras_ids = request.POST.getlist("subcuadras")
-            # Solo permitir subcuadras del mismo municipio del admin
             subcuadras_validas = Subcuadra.objects.filter(
                 id__in=subcuadras_ids,
                 municipio=municipio
@@ -276,7 +280,8 @@ def panel_exenciones(request):
 
     return render(request, "admin/exenciones.html", {
         "vehiculo": vehiculo,
-        "subcuadras": subcuadras
+        "subcuadras": subcuadras,
+        "tipos_exencion": TIPOS_EXENCION,
     })
 
 @require_role("admin")
@@ -1289,6 +1294,91 @@ def gestionar_tarifas(request):
         "tarifa_actual": tarifa_actual,
         "error": error,
     })
+
+@require_role("admin")
+def gestionar_horarios(request):
+    """Gestión de horarios semanales de cobro por municipio."""
+    municipio = request.user.municipio
+    DIAS = HorarioEstacionamiento.DIAS
+
+    if request.method == "POST":
+        for dia_num, dia_label in DIAS:
+            activo = request.POST.get(f"activo_{dia_num}") == "1"
+            hora_inicio = request.POST.get(f"hora_inicio_{dia_num}", "").strip()
+            hora_fin = request.POST.get(f"hora_fin_{dia_num}", "").strip()
+
+            if activo and hora_inicio and hora_fin:
+                HorarioEstacionamiento.objects.update_or_create(
+                    municipio=municipio,
+                    dia_semana=dia_num,
+                    defaults={
+                        "hora_inicio": hora_inicio,
+                        "hora_fin": hora_fin,
+                        "activo": True,
+                    }
+                )
+            else:
+                # Si no está activo, guardar igual pero marcado como inactivo
+                HorarioEstacionamiento.objects.update_or_create(
+                    municipio=municipio,
+                    dia_semana=dia_num,
+                    defaults={"activo": False,
+                              "hora_inicio": hora_inicio or "08:00",
+                              "hora_fin": hora_fin or "15:00"}
+                )
+        return redirect("gestionar_horarios")
+
+    # Construir dict {dia_num: horario_o_None}
+    horarios_existentes = {
+        h.dia_semana: h
+        for h in HorarioEstacionamiento.objects.filter(municipio=municipio)
+    }
+    dias_con_horario = [
+        (dia_num, dia_label, horarios_existentes.get(dia_num))
+        for dia_num, dia_label in DIAS
+    ]
+
+    return render(request, "admin/gestionar_horarios.html", {
+        "dias_con_horario": dias_con_horario,
+    })
+
+
+@require_role("admin")
+def gestionar_dias_especiales(request):
+    """Alta, baja y listado de días especiales (feriados, festivos, duelos)."""
+    municipio = request.user.municipio
+
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+
+        if accion == "agregar":
+            fecha      = request.POST.get("fecha", "").strip()
+            tipo       = request.POST.get("tipo", "feriado")
+            descripcion = request.POST.get("descripcion", "").strip()
+            cobro_activo = request.POST.get("cobro_activo") == "1"
+            if fecha and descripcion:
+                DiaEspecial.objects.update_or_create(
+                    municipio=municipio,
+                    fecha=fecha,
+                    defaults={
+                        "tipo": tipo,
+                        "descripcion": descripcion,
+                        "cobro_activo": cobro_activo,
+                    }
+                )
+
+        elif accion == "eliminar":
+            dia_id = request.POST.get("dia_id")
+            DiaEspecial.objects.filter(id=dia_id, municipio=municipio).delete()
+
+        return redirect("gestionar_dias_especiales")
+
+    dias = DiaEspecial.objects.filter(municipio=municipio).order_by("fecha")
+    return render(request, "admin/gestionar_dias_especiales.html", {
+        "dias": dias,
+        "tipos": DiaEspecial.TIPOS,
+    })
+
 
 # =========================================================
 # VIEWS LOGIN / LOGOUT

@@ -1,65 +1,91 @@
-{% extends "base.html" %} {% block title %}Gestionar Horarios{% endblock %} {%
-block content %}
-<section class="container">
-  <div class="panel">
-    <h2>Horarios y excepciones</h2>
-    <div class="panel-body">
-      <!-- Form para crear período -->
-      <form
-        method="post"
-        action="{% url 'admin_guardar_horario' %}"
-        class="form"
-      >
-        {% csrf_token %}
-        <div class="form-row">
-          <label>Nombre</label>
-          <input name="nombre" required />
-        </div>
-        <div class="form-row">
-          <label>Inicio</label>
-          <input type="datetime-local" name="inicio" />
-        </div>
-        <div class="form-row">
-          <label>Fin</label>
-          <input type="datetime-local" name="fin" />
-        </div>
-        <div class="form-row actions">
-          <button class="btn-general">Guardar</button>
-        </div>
-      </form>
+{% extends "base.html" %}
+{% block title %}Horarios de cobro{% endblock %}
 
-      <h3>Horarios existentes</h3>
-      <table class="table">
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>🕐 Horarios de cobro</h2>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a href="{% url 'gestionar_dias_especiales' %}" class="btn btn-outline" style="font-size:0.9rem;">📌 Días especiales</a>
+      <a href="{% url 'gestionar_tarifas' %}" class="btn btn-outline" style="font-size:0.9rem;">💲 Tarifas</a>
+      <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+    </div>
+  </div>
+
+  <p class="text-muted" style="margin-bottom:1.2rem; font-size:0.9rem;">
+    Definí en qué días y horarios se cobra el estacionamiento.
+    Los días no marcados como activos son libres de cobro.
+    Los <a href="{% url 'gestionar_dias_especiales' %}">días especiales</a> tienen prioridad sobre esta tabla.
+  </p>
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="card">
+      <table>
         <thead>
           <tr>
-            <th>Nombre</th>
-            <th>Inicio</th>
-            <th>Fin</th>
-            <th>Acciones</th>
+            <th style="width:130px;">Día</th>
+            <th style="text-align:center; width:80px;">¿Activo?</th>
+            <th style="width:130px;">Hora inicio</th>
+            <th style="width:130px;">Hora fin</th>
+            <th class="text-muted" style="font-size:0.82rem;">Vigente</th>
           </tr>
         </thead>
         <tbody>
-          {% for h in horarios %}
+          {% for dia_num, dia_label, horario in dias_con_horario %}
           <tr>
-            <td>{{ h.nombre }}</td>
-            <td>{{ h.inicio }}</td>
-            <td>{{ h.fin }}</td>
-            <td>
-              <a
-                class="btn small"
-                href="{% url 'admin_eliminar_horario' h.id %}"
-                >Eliminar</a
-              >
+            <td><strong>{{ dia_label }}</strong></td>
+            <td style="text-align:center;">
+              <input type="checkbox" name="activo_{{ dia_num }}" value="1"
+                     {% if horario and horario.activo %}checked{% endif %}
+                     style="width:20px; height:20px; cursor:pointer;"
+                     onchange="toggleFila({{ dia_num }}, this.checked)">
             </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="4">No hay horarios definidos</td>
+            <td>
+              <input type="time" name="hora_inicio_{{ dia_num }}"
+                     id="inicio_{{ dia_num }}"
+                     value="{{ horario.hora_inicio|default:'08:00' }}"
+                     {% if not horario or not horario.activo %}disabled{% endif %}
+                     style="padding:0.35rem; border-radius:6px; border:1px solid var(--color-border);" />
+            </td>
+            <td>
+              <input type="time" name="hora_fin_{{ dia_num }}"
+                     id="fin_{{ dia_num }}"
+                     value="{{ horario.hora_fin|default:'15:00' }}"
+                     {% if not horario or not horario.activo %}disabled{% endif %}
+                     style="padding:0.35rem; border-radius:6px; border:1px solid var(--color-border);" />
+            </td>
+            <td style="font-size:0.82rem;">
+              {% if horario and horario.activo %}
+                <span style="color:var(--color-primary); font-weight:600;">
+                  {{ horario.hora_inicio|time:"H:i" }} – {{ horario.hora_fin|time:"H:i" }}
+                </span>
+              {% else %}
+                <span style="color:var(--color-danger);">Libre</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-  </div>
+
+    <div style="margin-top:1rem; display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+      <button class="btn" type="submit">💾 Guardar horarios</button>
+      <p class="text-muted" style="font-size:0.85rem; margin:0;">
+        ⚠️ El cierre automático al vencer el horario es una mejora futura.
+      </p>
+    </div>
+  </form>
+
 </section>
+
+<script>
+function toggleFila(dia, activo) {
+    document.getElementById("inicio_" + dia).disabled = !activo;
+    document.getElementById("fin_" + dia).disabled = !activo;
+}
+</script>
 {% endblock %}

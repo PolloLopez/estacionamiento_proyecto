@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Días especiales{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>📌 Días especiales</h2>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a href="{% url 'gestionar_horarios' %}" class="btn btn-outline" style="font-size:0.9rem;">🕐 Horarios</a>
+      <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+    </div>
+  </div>
+
+  <p class="text-muted" style="margin-bottom:1.2rem; font-size:0.9rem;">
+    Feriados, festivos y duelos. Estos días tienen prioridad sobre el horario semanal.
+    Por defecto, todos son <strong>libres de cobro</strong>.
+  </p>
+
+  <!-- FORMULARIO AGREGAR -->
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h3 style="margin-bottom:0.8rem;">+ Agregar día especial</h3>
+    <form method="post" style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="agregar">
+
+      <div>
+        <label>Fecha</label>
+        <input type="date" name="fecha" required style="width:160px;" />
+      </div>
+
+      <div>
+        <label>Tipo</label>
+        <select name="tipo" style="min-width:160px;">
+          {% for valor, etiqueta in tipos %}
+            <option value="{{ valor }}">{{ etiqueta }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="flex:1; min-width:200px;">
+        <label>Descripción</label>
+        <input name="descripcion" placeholder="Ej: 25 de Mayo — Feriado nacional" required />
+      </div>
+
+      <div style="display:flex; align-items:center; gap:0.5rem; padding-bottom:0.1rem;">
+        <input type="checkbox" name="cobro_activo" value="1" id="cobro_activo"
+               style="width:18px; height:18px;">
+        <label for="cobro_activo" style="font-size:0.9rem; cursor:pointer; margin:0;">
+          ¿Cobrar ese día?
+        </label>
+      </div>
+
+      <button class="btn" type="submit">Agregar</button>
+    </form>
+  </div>
+
+  <!-- LISTADO -->
+  <div class="card">
+    <h3 style="margin-bottom:0.8rem;">Días cargados</h3>
+    {% if dias %}
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Descripción</th>
+              <th style="text-align:center;">¿Cobro?</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in dias %}
+            <tr>
+              <td><strong>{{ d.fecha|date:"d/m/Y" }}</strong></td>
+              <td>
+                {% if d.tipo == "feriado" %}<span style="color:#721c24; background:#f8d7da; padding:2px 8px; border-radius:12px; font-size:0.82rem;">🏛 Feriado</span>
+                {% elif d.tipo == "festivo" %}<span style="color:#0c5460; background:#d1ecf1; padding:2px 8px; border-radius:12px; font-size:0.82rem;">🎉 Festivo</span>
+                {% elif d.tipo == "duelo" %}<span style="color:#383d41; background:#e2e3e5; padding:2px 8px; border-radius:12px; font-size:0.82rem;">⚫ Duelo</span>
+                {% else %}<span style="color:#856404; background:#fff3cd; padding:2px 8px; border-radius:12px; font-size:0.82rem;">📅 Otro</span>
+                {% endif %}
+              </td>
+              <td>{{ d.descripcion }}</td>
+              <td style="text-align:center;">
+                {% if d.cobro_activo %}
+                  <span style="color:var(--color-danger); font-weight:600;">Sí</span>
+                {% else %}
+                  <span style="color:var(--color-primary); font-weight:600;">Libre</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post" style="display:inline;"
+                      onsubmit="return confirm('¿Eliminar {{ d.fecha }}?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="accion" value="eliminar">
+                  <input type="hidden" name="dia_id" value="{{ d.id }}">
+                  <button type="submit" class="btn btn-outline"
+                          style="font-size:0.8rem; padding:0.25rem 0.5rem; color:var(--color-danger); border-color:var(--color-danger);">
+                    Eliminar
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted">No hay días especiales cargados.</p>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}

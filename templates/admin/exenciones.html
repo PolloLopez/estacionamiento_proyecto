@@ -38,6 +38,31 @@
       <input type="hidden" name="accion" value="guardar">
       <input type="hidden" name="patente" value="{{ vehiculo.patente }}">
 
+      <!-- TIPO Y MOTIVO DE EXENCIÓN -->
+      <div style="margin-bottom:1.2rem;">
+        <h4 style="margin-bottom:0.6rem;">📋 Motivo de exención</h4>
+        <div class="grid grid-2" style="gap:0.75rem;">
+          <div>
+            <label>Tipo</label>
+            <select name="tipo_exencion" style="width:100%;">
+              <option value="">— Sin especificar —</option>
+              {% for valor, etiqueta in tipos_exencion %}
+                <option value="{{ valor }}"
+                  {% if vehiculo.tipo_exencion == valor %}selected{% endif %}>
+                  {{ etiqueta }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>Notas del admin (nro doc., certificado, resolución, etc.)</label>
+            <input type="text" name="notas_exencion"
+                   value="{{ vehiculo.notas_exencion|default:'' }}"
+                   placeholder="Ej: Cert. discapacidad 54321 — vence 12/2026" />
+          </div>
+        </div>
+      </div>
+
       <!-- EXENCIÓN GLOBAL -->
       <div style="margin-bottom:1.2rem; padding:1rem; border-radius:8px;
                   background:{% if vehiculo.exento_global %}var(--color-success-bg){% else %}var(--color-surface-2){% endif %};

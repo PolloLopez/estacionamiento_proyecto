@@ -84,6 +84,8 @@ urlpatterns = [
     path("admin-usuarios/<int:usuario_id>/", views.detalle_usuario_admin, name="detalle_usuario_admin"),
     path("admin-infracciones/", views.admin_infracciones, name="admin_infracciones"),
     path("admin-tarifas/", views.gestionar_tarifas, name="gestionar_tarifas"),
+    path("admin-horarios/", views.gestionar_horarios, name="gestionar_horarios"),
+    path("admin-dias-especiales/", views.gestionar_dias_especiales, name="gestionar_dias_especiales"),
     path("admin-tarifas/guardar/", views.gestionar_tarifas, name="admin_guardar_tarifa"),
 
 ]
