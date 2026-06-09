@@ -70,14 +70,18 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
         )
 
     # EXENTO PARCIAL
-    if hasattr(vehiculo, "subcuadras_exentas"):
-        if vehiculo.subcuadras_exentas.filter(id=subcuadra.id).exists():
+    if hasattr(vehiculo, "subcuadras_exentas") and vehiculo.subcuadras_exentas.exists():
+        subcuadras_del_vehiculo = list(vehiculo.subcuadras_exentas.all())
+        # Si la subcuadra actual está entre las exentas → OK, no infraccionar
+        if subcuadra and vehiculo.subcuadras_exentas.filter(id=subcuadra.id).exists():
             return ResultadoVerificacion(
                 patente=patente,
                 estado=EstadoVehiculo.EXENTO_PARCIAL,
-                subcuadras_exentas=[],
-                estacionamiento_activo=False
+                subcuadras_exentas=subcuadras_del_vehiculo,
+                estacionamiento_activo=False,
+                exento_en_subcuadra_actual=True
             )
+        # La subcuadra actual NO está exenta → sí debe pagar (sigue flujo normal)
 
     # TOLERANCIA: usar la verificación anterior al inspector actual
     tolerancia_minutos = obtener_tolerancia()

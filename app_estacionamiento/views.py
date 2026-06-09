@@ -460,6 +460,21 @@ def estacionar_vehiculo(request):
         if not result["ok"]:
             return redirect(reverse(result["redirect"]))
 
+        # Verificar si el inspector escaneó este vehículo recientemente
+        # (dentro del plazo de tolerancia). Si pagó a tiempo → avisar.
+        from datetime import timedelta
+        tolerancia = timedelta(minutes=15)
+        escaneado_recientemente = VerificacionInspector.objects.filter(
+            vehiculo=vehiculo,
+            fecha__gte=timezone.now() - tolerancia
+        ).exists()
+        if escaneado_recientemente:
+            messages.info(
+                request,
+                "⚠️ Tu vehículo fue escaneado por un inspector. "
+                "Como pagaste a tiempo, la infracción quedó cancelada."
+            )
+
         return redirect(reverse(result["redirect"]))
 
     # =================================================
@@ -530,14 +545,13 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 
     return redirect("usuarios_historial_estacionamientos")
 
-@require_role("conductor")
+@require_login
 def mis_infracciones(request):
-
+    # Mostrar solo infracciones de vehículos vinculados a esta cuenta
+    # (funciona para conductores registrados Y usuarios que entraron con Google)
     infracciones = (
         Infraccion.objects
-        .filter(
-            vehiculo__vehiculousuario__usuario=request.user
-        )
+        .filter(vehiculo__vehiculousuario__usuario=request.user)
         .distinct()
         .order_by("-creado_en")
     )
@@ -558,11 +572,39 @@ def consultar_deuda(request):
 # =========================================================
 @require_role("inspector")
 def panel_inspectores(request):
+    inspector = request.user
 
-    return render(
-        request,
-        "inspectores/panel_inspectores.html"
+    # Movimientos no cerrados (lo que debe rendir)
+    movimientos_abiertos = MovimientoCaja.objects.filter(
+        usuario=inspector, tipo="ingreso", cerrado=False
     )
+    a_rendir = movimientos_abiertos.aggregate(total=Sum("monto"))["total"] or 0
+
+    # Saldo operativo total acumulado
+    total_ingresos = MovimientoCaja.objects.filter(
+        usuario=inspector, tipo="ingreso"
+    ).aggregate(total=Sum("monto"))["total"] or 0
+    total_egresos = MovimientoCaja.objects.filter(
+        usuario=inspector, tipo="egreso"
+    ).aggregate(total=Sum("monto"))["total"] or 0
+    saldo_operativo = total_ingresos - total_egresos
+
+    # Infracciones y no pagados del municipio
+    total_infracciones = Infraccion.objects.filter(
+        municipio=inspector.municipio, inspector=inspector
+    ).count()
+    no_pagados = Infraccion.objects.filter(
+        municipio=inspector.municipio, inspector=inspector, estado="pendiente"
+    ).count()
+
+    resumen = {
+        "saldo_operativo": saldo_operativo,
+        "a_rendir": a_rendir,
+        "infracciones": total_infracciones,
+        "no_pagados": no_pagados,
+    }
+
+    return render(request, "inspectores/panel_inspectores.html", {"resumen": resumen})
 
 @require_role("inspector", "admin")
 def gestion_infracciones(request):
@@ -582,32 +624,43 @@ def gestion_infracciones(request):
 def verificar_vehiculo(request):
     resultado = None
     historial = request.session.get("historial", [])
+    municipio = request.user.municipio
 
     modo = request.GET.get("modo", "desktop")
 
+    # Subcuadras disponibles (el inspector elige en cuál está patrullando)
+    subcuadras = Subcuadra.objects.filter(municipio=municipio).exclude(calle="Zona Única")
+
+    # Recordar subcuadra seleccionada en sesión
+    subcuadra_id = request.POST.get("subcuadra_id") or request.session.get("subcuadra_inspector_id")
+    subcuadra_activa = None
+    if subcuadra_id:
+        try:
+            subcuadra_activa = Subcuadra.objects.get(id=subcuadra_id, municipio=municipio)
+            request.session["subcuadra_inspector_id"] = subcuadra_activa.id
+        except Subcuadra.DoesNotExist:
+            pass
+    if not subcuadra_activa:
+        subcuadra_activa = get_subcuadra_default(municipio)
+
     if request.method == "POST":
         patente = (request.POST.get("patente") or "").upper().strip()
-        subcuadra = get_subcuadra_default(request.user.municipio)
 
         if patente:
             resultado = verificar_estado_vehiculo(
                 patente,
                 request.user,
-                subcuadra
+                subcuadra_activa
             )
-
-            # debug seguro
-            print("Estado:", resultado.estado)
-            print("Activo:", resultado.estacionamiento_activo)
-            print("URL infracción:", resultado.registrar_infraccion_url)
-
             historial.insert(0, patente)
             request.session["historial"] = historial[:5]
 
     return render(request, "inspectores/verificar.html", {
         "resultado": resultado,
         "historial": historial,
-        "modo": modo
+        "modo": modo,
+        "subcuadras": subcuadras,
+        "subcuadra_activa": subcuadra_activa,
     })
 
 @require_role("inspector")
@@ -699,20 +752,21 @@ def caja_inspector(request):
     ).order_by("-creado_en")
 
     total_ingresos = movimientos.filter(tipo="ingreso").aggregate(
-        total=Sum("monto")
-    )["total"] or 0
-
+        total=Sum("monto"))["total"] or 0
     total_egresos = movimientos.filter(tipo="egreso").aggregate(
-        total=Sum("monto")
-    )["total"] or 0
+        total=Sum("monto"))["total"] or 0
 
-    saldo = total_ingresos - total_egresos
+    movimientos_pendientes = movimientos.filter(tipo="ingreso", cerrado=False)
+    total_a_cerrar = movimientos_pendientes.aggregate(
+        total=Sum("monto"))["total"] or 0
 
     return render(request, "inspectores/caja.html", {
         "movimientos": movimientos,
         "ingresos": total_ingresos,
         "egresos": total_egresos,
-        "saldo": saldo
+        "saldo": total_ingresos - total_egresos,
+        "movimientos_abiertos": movimientos_pendientes.count(),
+        "total_a_cerrar": total_a_cerrar,
     })
 
 # =========================================================
@@ -736,6 +790,12 @@ def registrar_estacionamiento_manual(request):
         if not vehiculo.municipio:
             vehiculo.municipio = inspector.municipio
             vehiculo.save()
+
+        # Bloquear cobro manual a vehículos exentos
+        if getattr(vehiculo, "exento_global", False):
+            return render(request, "inspectores/registrar_estacionamiento_manual.html", {
+                "error": f"El vehículo {patente} tiene exención total — no se puede cobrar."
+            })
 
         if Estacionamiento.objects.filter(
             vehiculo=vehiculo,

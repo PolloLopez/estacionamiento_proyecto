@@ -12,14 +12,18 @@ class ResultadoVerificacion:
     estado: EstadoVehiculo
     estacionamiento_activo: bool
     registrar_infraccion_url: Optional[str] = None
-    subcuadras_exentas: Optional[QuerySet] = None
+    subcuadras_exentas: Optional[list] = None
+    # True si el vehículo tiene exención parcial Y está en una subcuadra exenta
+    exento_en_subcuadra_actual: Optional[bool] = None
 
     # 🔴 IMPORTANTE: método, no property
     def necesita_infraccion(self) -> bool:
+        # EXENTO_PARCIAL: solo infraccionar si NO está en su subcuadra exenta
+        if self.estado == EstadoVehiculo.EXENTO_PARCIAL:
+            return self.exento_en_subcuadra_actual is False
         return self.estado in [
             EstadoVehiculo.NO_REGISTRADO,
             EstadoVehiculo.IMPAGO,
-            EstadoVehiculo.EXENTO_PARCIAL
         ]
 
     def css_class(self) -> str:

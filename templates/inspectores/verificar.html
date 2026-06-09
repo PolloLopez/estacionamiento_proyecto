@@ -7,18 +7,15 @@
 
 <style>
 .pantalla {
-    max-width: 520px;
+    max-width: 540px;
     margin: auto;
+    padding-top: 16px;
     text-align: center;
-    padding-top: 20px;
 }
-
-/* 🚀 MODO CALLE FULLSCREEN */
 .modo-calle {
     max-width: 100%;
-    padding: 10px;
+    padding: 8px;
 }
-
 .input-patente {
     font-size: 3rem;
     text-align: center;
@@ -26,29 +23,73 @@
     width: 100%;
     padding: 1rem;
     border-radius: 12px;
+    border: 3px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: 800;
 }
-
-.box {
+.box-resultado {
     margin-top: 20px;
-    padding: 20px;
-    border-radius: 12px;
-    font-size: 1.3rem;
+    padding: 22px;
+    border-radius: 14px;
+    font-size: 1.2rem;
+    border: 3px solid var(--color-border);
+    background: var(--color-surface);
 }
-
+.box-ok { border-color: var(--color-primary); background: #f0fff4; }
+.box-warn { border-color: var(--color-warning); background: #fffbf0; }
+.box-danger { border-color: var(--color-danger); background: #fff0f0; }
 .btn-big {
     width: 100%;
-    font-size: 1.6rem;
-    padding: 1.2rem;
-    margin-top: 15px;
+    font-size: 1.5rem;
+    padding: 1.1rem;
+    margin-top: 14px;
+    border-radius: 10px;
+}
+.subcuadra-selector {
+    margin-bottom: 14px;
+    text-align: left;
 }
 </style>
 
 <div class="pantalla {% if modo == 'calle' %}modo-calle{% endif %}">
 
-    <h2>🚓 INSPECTOR</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+      <h2 style="margin:0;">🚓 INSPECTOR</h2>
+      {% if modo == 'calle' %}
+        <a href="{% url 'inspectores_verificar_vehiculo' %}" class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.7rem;">🖥 Normal</a>
+      {% else %}
+        <a href="{% url 'inspectores_verificar_vehiculo' %}?modo=calle" class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.7rem;">📱 Modo calle</a>
+      {% endif %}
+    </div>
 
+    <!-- SELECTOR DE SUBCUADRA (persiste en sesión) -->
+    {% if subcuadras %}
+    <div class="subcuadra-selector">
+      <form method="post" id="form-subcuadra">
+        {% csrf_token %}
+        <input type="hidden" name="patente" value="">
+        <label style="font-size:0.88rem; font-weight:600; color:var(--color-text-muted);">
+          📍 Estoy en:
+        </label>
+        <select name="subcuadra_id" onchange="this.form.submit()"
+                style="font-size:1rem; padding:0.4rem 0.6rem; border-radius:8px; margin-left:0.4rem;">
+          <option value="">Zona Única</option>
+          {% for s in subcuadras %}
+            <option value="{{ s.id }}"
+              {% if subcuadra_activa and subcuadra_activa.id == s.id %}selected{% endif %}>
+              {{ s }}
+            </option>
+          {% endfor %}
+        </select>
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- FORM PRINCIPAL: ingresar patente -->
     <form method="post" id="form">
         {% csrf_token %}
+        <input type="hidden" name="subcuadra_id" value="{{ subcuadra_activa.id|default:'' }}">
         <input
             id="patente"
             name="patente"
@@ -59,43 +100,85 @@
         />
     </form>
 
+    <!-- RESULTADO -->
     {% if resultado %}
 
-        <div class="box {{ resultado.css_class }}">
+        {% if resultado.estado.name == "PAGADO" or resultado.estado.name == "EXENTO_TOTAL" or resultado.exento_en_subcuadra_actual %}
+            <div class="box-resultado box-ok">
+                <div style="font-size:2rem;">✅</div>
+                <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
+                <h3>
+                    {% if resultado.estado.name == "EXENTO_TOTAL" %}Exento total
+                    {% elif resultado.estado.name == "EXENTO_PARCIAL" %}Exento en esta subcuadra
+                    {% else %}Pago activo{% endif %}
+                </h3>
+                {% if resultado.estado.name == "EXENTO_PARCIAL" and resultado.subcuadras_exentas %}
+                  <p style="font-size:0.88rem; margin-top:0.5rem; color:var(--color-text-muted);">
+                    Exento en:
+                    {% for s in resultado.subcuadras_exentas %}
+                      <strong>{{ s }}</strong>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  </p>
+                {% endif %}
+            </div>
 
-            <h2>{{ resultado.patente }}</h2>
+        {% elif resultado.estado.name == "PENDIENTE_PAGO" %}
+            <div class="box-resultado box-warn">
+                <div style="font-size:2rem;">⏳</div>
+                <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
+                <h3>En plazo de tolerancia</h3>
+                <p style="font-size:0.9rem; color:var(--color-text-muted);">
+                    No se puede infraccionar todavía. Revisá en unos minutos.
+                </p>
+            </div>
 
-            <h3>{{ resultado.estado_label }}</h3>
+        {% else %}
+            <!-- IMPAGO / NO_REGISTRADO / EXENTO_PARCIAL fuera de su subcuadra -->
+            <div class="box-resultado box-danger">
+                <div style="font-size:2rem;">🚨</div>
+                <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
+                <h3>
+                    {% if resultado.estado.name == "EXENTO_PARCIAL" %}
+                        Exento parcial — fuera de su subcuadra
+                    {% else %}
+                        {{ resultado.estado_label }}
+                    {% endif %}
+                </h3>
+                {% if resultado.estado.name == "EXENTO_PARCIAL" and resultado.subcuadras_exentas %}
+                  <p style="font-size:0.88rem; margin-top:0.4rem; color:var(--color-text-muted);">
+                    Su exención es válida en:
+                    {% for s in resultado.subcuadras_exentas %}
+                      <strong>{{ s }}</strong>{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  </p>
+                {% endif %}
+                {% if resultado.necesita_infraccion %}
+                    <a class="btn btn-danger btn-big"
+                       href="{{ resultado.registrar_infraccion_url }}">
+                        🚨 INFRACCIONAR
+                    </a>
+                {% endif %}
+            </div>
+        {% endif %}
 
-            {% if resultado.estado.name == "EXENTO_TOTAL" %}
-                <p>🟢 Exento total</p>
+    {% endif %}
 
-            {% elif resultado.estado.name == "EXENTO_PARCIAL" %}
-                <p>🟡 Exento parcial</p>
-
-            {% elif resultado.estado.name == "PAGADO" %}
-                <p>🟢 Pago activo</p>
-
-            {% else %}
-                <p>🔴 Sin pago</p>
-            {% endif %}
-
-            {% if resultado.necesita_infraccion %}
-                <a class="btn btn-danger btn-big"
-                   href="{{ resultado.registrar_infraccion_url }}">
-                    🚨 INFRACCIONAR
-                </a>
-            {% else %}
-                <p>✅ OK</p>
-            {% endif %}
-
-        </div>
-
+    <!-- HISTORIAL DE PATENTES -->
+    {% if historial %}
+    <div style="margin-top:1.2rem; text-align:left;">
+        <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.4rem;">Recientes:</p>
+        {% for p in historial %}
+        <button onclick="document.getElementById('patente').value='{{ p }}'; document.getElementById('form').submit();"
+                style="margin:2px; padding:4px 10px; font-size:0.9rem; letter-spacing:2px;
+                       background:var(--color-surface); border:1px solid var(--color-border);
+                       border-radius:6px; cursor:pointer; font-weight:700;">{{ p }}</button>
+        {% endfor %}
+    </div>
     {% endif %}
 
 </div>
 
-<!-- 🔊 SONIDOS -->
+<!-- SONIDOS -->
 <audio id="ok" src="{% static 'sounds/ok.mp3' %}"></audio>
 <audio id="warn" src="{% static 'sounds/warning.mp3' %}"></audio>
 <audio id="error" src="{% static 'sounds/error.mp3' %}"></audio>
@@ -104,35 +187,24 @@
 const input = document.getElementById("patente");
 const form = document.getElementById("form");
 
-// limpiar input
 input.addEventListener("input", () => {
     input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
-
     const val = input.value;
-
     const esValida =
-        /^[A-Z]{3}[0-9]{3}$/.test(val) ||      // ABC123
-        /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val) || // AB123CD
-        /^[A-Z]{1}[0-9]{3}[A-Z]{3}$/.test(val);   // A123BCD (moto)
-
-    if (esValida) {
-        form.submit();
-    }
+        /^[A-Z]{3}[0-9]{3}$/.test(val) ||
+        /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val) ||
+        /^[A-Z]{1}[0-9]{3}[A-Z]{3}$/.test(val);
+    if (esValida) form.submit();
 });
 
-// enter fallback
 input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-        e.preventDefault();
-        form.submit();
-    }
+    if (e.key === "Enter") { e.preventDefault(); form.submit(); }
 });
 
-// foco permanente
 window.onload = () => {
     input.focus();
-
     const estado = "{{ resultado.estado.name|default:'' }}";
+    const exentoEnSub = "{{ resultado.exento_en_subcuadra_actual|default:'' }}";
 
     if (!estado) return;
 
@@ -140,23 +212,18 @@ window.onload = () => {
         document.getElementById("error").play();
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     }
-
-    if (estado === "EXENTO_PARCIAL") {
-        document.getElementById("warn").play();
-        if (navigator.vibrate) navigator.vibrate(100, 100);
+    if (estado === "EXENTO_PARCIAL" && exentoEnSub !== "True") {
+        document.getElementById("error").play();
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     }
-
-    if (estado === "PAGADO" || estado === "EXENTO_TOTAL") {
+    if (estado === "PENDIENTE_PAGO") {
+        document.getElementById("warn").play();
+        if (navigator.vibrate) navigator.vibrate(100);
+    }
+    if (estado === "PAGADO" || estado === "EXENTO_TOTAL" || exentoEnSub === "True") {
         document.getElementById("ok").play();
     }
 };
-
-// 📳 vibración móvil
-function vibrar(pattern) {
-    if (navigator.vibrate) {
-        navigator.vibrate(pattern);
-    }
-}
 </script>
 
 {% endblock %}

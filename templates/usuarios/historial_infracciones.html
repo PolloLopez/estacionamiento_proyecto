@@ -1,58 +1,51 @@
 {% extends "base.html" %}
-
-{% block title %}
-Historial de Infracciones
-{% endblock %}
+{% block title %}Mis Infracciones{% endblock %}
 
 {% block content %}
-
 <section class="container">
 
-  <div class="panel">
+  <h2 style="margin-bottom:1rem;">⚠️ Mis infracciones</h2>
 
-    <h2>Bienvenido, {{ request.user.correo }}</h2>
-
-    <div class="panel-body">
-
-      <h2>⚠️ Historial de infracciones</h2>
-
-      {% if infracciones %}
-      <table class="table">
+  {% if infracciones %}
+    <div class="card" style="overflow-x:auto;">
+      <table>
         <thead>
           <tr>
             <th>Fecha</th>
             <th>Patente</th>
-            <th>Calle</th>
-            <th>Altura</th>
-            <th>Estado</th>
+            <th>Ubicación</th>
+            <th style="text-align:right;">Monto</th>
+            <th style="text-align:center;">Estado</th>
           </tr>
         </thead>
         <tbody>
           {% for i in infracciones %}
           <tr>
-            <td>{{ i.fecha|date:"d/m/Y H:i" }}</td>
-            <td>{{ i.vehiculo.patente }}</td>
-            <td>{{ i.subcuadra.calle }}</td>
-            <td>{{ i.subcuadra.altura }}</td>
-            <td>
-              {% if i.cancelada %}
-                ✅ Pagada
+            <td style="font-size:0.85rem;">{{ i.creado_en|date:"d/m/Y H:i" }}</td>
+            <td><strong>{{ i.vehiculo.patente }}</strong></td>
+            <td style="font-size:0.85rem;">
+              {% if i.subcuadra %}{{ i.subcuadra }}{% else %}—{% endif %}
+            </td>
+            <td style="text-align:right; font-weight:600;">${{ i.monto }}</td>
+            <td style="text-align:center;">
+              {% if i.estado == "pagada" %}
+                <span style="color:var(--color-primary); font-weight:700;">✅ Pagada</span>
+              {% elif i.estado == "anulada" %}
+                <span class="text-muted">Anulada</span>
               {% else %}
-                🚫 Impaga
+                <span style="color:var(--color-danger); font-weight:700;">Pendiente</span>
               {% endif %}
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      {% else %}
-        <p>No tenés infracciones registradas.</p>
-      {% endif %}
-
     </div>
-
-  </div>
+  {% else %}
+    <div class="card" style="text-align:center; padding:2rem;">
+      <p class="text-muted">No tenés infracciones registradas.</p>
+    </div>
+  {% endif %}
 
 </section>
-
 {% endblock %}
