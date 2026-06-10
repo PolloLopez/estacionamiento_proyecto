@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load socialaccount %}
+
+{% block title %}Ingresar con Google{% endblock %}
+
+{% block content %}
+<section class="container" style="max-width:420px;">
+  <div class="panel auth-panel" style="margin-top:3rem;">
+
+    <div style="text-align:center; margin-bottom:1.5rem;">
+      <div style="font-size:2.5rem; margin-bottom:0.5rem;">🔑</div>
+      <h2 style="margin-bottom:0.4rem;">Ingresar con Google</h2>
+      <p style="color:var(--color-text-muted); font-size:0.95rem;">
+        Vas a iniciar sesión usando tu cuenta de Google.
+      </p>
+    </div>
+
+    <form method="post" action="{% url 'socialaccount_login' provider.id %}">
+      {% csrf_token %}
+      {% if form.next.value %}
+        <input type="hidden" name="next" value="{{ form.next.value }}">
+      {% endif %}
+      <button type="submit" class="btn" style="width:100%; font-size:1rem;">
+        Continuar con Google
+      </button>
+    </form>
+
+    <div style="text-align:center; margin-top:1rem;">
+      <a href="{% url 'login' %}" style="font-size:0.9rem; color:var(--color-text-muted);">
+        ← Volver al inicio de sesión
+      </a>
+    </div>
+
+  </div>
+</section>
+{% endblock %}
