@@ -1466,7 +1466,8 @@ def mp_iniciar_carga(request):
             "failure": f"{base_url}/usuarios/mp/fallido/",
             "pending": f"{base_url}/usuarios/mp/pendiente/",
         },
-        "auto_return": "approved",
+        # auto_return eliminado: requería back_urls en HTTPS estricto y daba
+        # error 400 "auto_return invalid". El webhook + back_urls alcanzan.
         # El webhook recibe notificaciones de MP (asincrono)
         "notification_url": f"{base_url}/usuarios/mp/webhook/",
         # Metadatos para identificar al usuario en el webhook

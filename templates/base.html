@@ -150,21 +150,30 @@
       toggle.setAttribute("aria-expanded", "false");
     }
 
-    // Toggle hamburguesa
-    toggle.addEventListener("click", function () {
+    // Toggle hamburguesa — stopPropagation evita que el document listener
+    // lo cierre inmediatamente después de abrirlo.
+    toggle.addEventListener("click", function (e) {
+      e.stopPropagation();
       menu.classList.contains("abierto") ? cerrarMenu() : abrirMenu();
     });
 
-    // Cerrar tocando fuera (backdrop)
-    backdrop.addEventListener("click", cerrarMenu);
+    // Cerrar tocando fuera del menú (document listener).
+    // El backdrop tiene pointer-events:none, así que los clicks en la zona
+    // oscurecida llegan acá directamente. Los links del menú funcionan normal.
+    document.addEventListener("click", function (e) {
+      if (
+        menu.classList.contains("abierto") &&
+        !menu.contains(e.target) &&
+        !toggle.contains(e.target)
+      ) {
+        cerrarMenu();
+      }
+    });
 
     // Cerrar con Escape
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape") cerrarMenu();
     });
-
-    // Los links del menú navegan normalmente — no se interceptan.
-    // La página nueva carga sin menú abierto automáticamente.
   })();
   </script>
 

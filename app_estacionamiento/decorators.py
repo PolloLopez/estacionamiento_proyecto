@@ -2,7 +2,7 @@
 
 from functools import wraps
 from django.shortcuts import redirect
-from django.http import HttpResponseForbidden
+from django.template.response import TemplateResponse
 
 
 def require_login(view_func):
@@ -94,7 +94,8 @@ def require_role(*roles):
             # 3. BLOQUEAR SI NO TIENE PERMISOS
             # ==========================================
             if not tiene_permiso:
-                return HttpResponseForbidden("No autorizado")
+                # Render con template completo: navbar, estilos y botón de volver.
+                return TemplateResponse(request, "403.html", status=403)
 
             # ==========================================
             # 4. CONTINUAR VIEW

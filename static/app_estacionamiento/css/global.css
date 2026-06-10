@@ -202,10 +202,17 @@ main.container {
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
   z-index: 999;
-  cursor: pointer;
+  /* pointer-events: none — el backdrop es puramente visual.
+     No atrapa clics: los clicks pasan a través hacia el nav-items
+     o al document listener que cierra el menú al tocar fuera. */
+  pointer-events: none;
 }
 
-.nav-backdrop.visible { display: block; }
+.nav-backdrop.visible {
+  display: block;
+  /* Aún sin capturar eventos: el cierre se maneja en el document listener */
+  pointer-events: none;
+}
 
 /* ─── MAIN ───────────────────────────────────────────────────── */
 main {
