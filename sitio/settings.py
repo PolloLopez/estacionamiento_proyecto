@@ -169,6 +169,8 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_ADAPTER = "app_estacionamiento.adapters.NoUsernameAccountAdapter"
 SOCIALACCOUNT_AUTO_SIGNUP = True
+# Forzar HTTPS en las URLs de callback de OAuth (Railway termina SSL en el proxy)
+ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
 
 # Configuración de la app de Google directamente en settings,
 # sin necesitar un registro SocialApp en la base de datos.
