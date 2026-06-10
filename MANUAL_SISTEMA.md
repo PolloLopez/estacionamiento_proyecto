@@ -308,7 +308,43 @@ Igual que el inspector: cuando tenés movimientos abiertos aparece el botón "Co
 
 ---
 
-## 6. Mejoras Futuras (roadmap)
+## 6. Configuración de Producción
+
+### Variables de entorno requeridas en Railway
+
+| Variable | Descripción |
+|----------|-------------|
+| `SECRET_KEY` | Clave secreta de Django |
+| `DEBUG` | `False` en producción |
+| `ALLOWED_HOSTS` | `estacionamiento.up.railway.app` |
+| `DATABASE_URL` | URL de PostgreSQL (Railway lo inyecta automáticamente) |
+| `SITE_ID` | ID del site en Django Admin → Sites (actualmente `2`) |
+| `GOOGLE_CLIENT_ID` | Client ID de OAuth 2.0 de Google Cloud |
+| `GOOGLE_CLIENT_SECRET` | Client Secret de OAuth 2.0 de Google Cloud |
+| `MP_ACCESS_TOKEN` | Access token de MercadoPago (sandbox o producción) |
+| `CSRF_TRUSTED_ORIGINS` | `https://estacionamiento.up.railway.app` |
+
+### Primer deploy en un entorno nuevo
+
+1. Crear proyecto en Railway + servicio PostgreSQL
+2. Configurar todas las variables de entorno
+3. Conectar repo GitHub → Railway autodeploy
+4. En Railway Console: `python manage.py crear_admin` para el primer admin
+5. En Django Admin → Sites: crear site con el dominio real
+6. En Django Admin → Social Applications: crear app Google con el Client ID/Secret
+7. Cargar tarifa, horarios e inspectores
+
+### Branding por municipio
+
+Desde Django Admin → Municipios → editar municipio:
+- **Logo:** imagen PNG/SVG con fondo transparente (altura recomendada 80px)
+- **Color primario:** hex del color principal (ej: `#1a7a3c`)
+- **Color secundario:** hex del color hover (ej: `#155f2e`)
+- **Nombre del sistema:** texto del navbar si no hay logo (ej: `Estacionamiento Medido`)
+
+---
+
+## 7. Mejoras Futuras (roadmap)
 
 - **Cierre automático de estacionamientos** al vencer el horario + reintegro proporcional
 - **Adjunto de documentos** en exenciones (foto de cédula, certificado de discapacidad, etc.)
@@ -318,3 +354,4 @@ Igual que el inspector: cuando tenés movimientos abiertos aparece el botón "Co
 - **App móvil** para inspectores (PWA o nativa)
 - **Integración con padrón municipal** para verificar vecinos frentistas automáticamente
 - **Renovación de exenciones** con fecha de vencimiento y aviso al admin
+- **MercadoPago producción** (migrar de sandbox a credenciales productivas)

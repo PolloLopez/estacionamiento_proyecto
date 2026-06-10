@@ -39,7 +39,9 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
 ]
 
-SITE_ID = 1
+# SITE_ID debe coincidir con el ID del registro en Django Admin → Sites.
+# Se puede sobreescribir con variable de entorno en Railway si el ID cambia.
+SITE_ID = int(os.environ.get("SITE_ID", 2))
 
 # ─── Middleware ───────────────────────────────────────────────────────────────
 # WhiteNoise va justo después de SecurityMiddleware para servir estáticos en prod.

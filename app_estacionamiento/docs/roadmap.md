@@ -33,43 +33,64 @@
 
 ---
 
-## 🔜 v1.1 — Producción y deploy (EN PROGRESO)
+## ✅ v1.1 — Producción y deploy
 
 ### Settings de producción
-- [ ] Separar `settings_dev.py` / `settings_prod.py`
-- [ ] `SECRET_KEY` desde variable de entorno
-- [ ] `DEBUG=False` en producción
-- [ ] `ALLOWED_HOSTS` con dominio real
-- [ ] `AUTH_PASSWORD_VALIDATORS` activados
-- [ ] `WhiteNoise` para archivos estáticos
+- [x] `SECRET_KEY` desde variable de entorno
+- [x] `DEBUG=False` en producción
+- [x] `ALLOWED_HOSTS` con dominio real (`estacionamiento.up.railway.app`)
+- [x] `WhiteNoise` para archivos estáticos
+- [x] `SITE_ID` configurable desde variable de entorno (`int(os.environ.get("SITE_ID", 2))`)
 
 ### Base de datos
-- [ ] `psycopg2-binary` en requirements
-- [ ] `DATABASE_URL` desde variable de entorno
-- [ ] PostgreSQL en Railway
+- [x] `psycopg2-binary` en requirements
+- [x] `DATABASE_URL` desde variable de entorno
+- [x] PostgreSQL en Railway
 
 ### Deploy
-- [ ] Deploy en Railway (PostgreSQL incluido, HTTPS automático)
-- [ ] Variables de entorno configuradas en Railway
-- [ ] `collectstatic` verificado
-- [ ] Sistema público accesible
+- [x] Deploy en Railway (PostgreSQL, HTTPS automático)
+- [x] Variables de entorno configuradas en Railway
+- [x] `collectstatic` verificado
+- [x] Sistema público accesible en `https://estacionamiento.up.railway.app`
+- [x] Railway reconectado tras migración de repo GitHub
+
+### Autenticación
+- [x] Google OAuth configurado (cliente OAuth nuevo, URI autorizada, Social App en admin)
+- [x] `SITE_ID` corregido para allauth
 
 ---
 
-## 🔜 v1.2 — MercadoPago
+## ✅ v1.2 — UX y estabilidad
 
-### Carga de saldo
-- [ ] Instalar SDK `mercadopago`
-- [ ] Vista `iniciar_carga_saldo`: crea preferencia de pago en MP
-- [ ] Redireccionamiento a checkout MP
-- [ ] Webhook `mp_webhook`: verifica pago y acredita saldo
-- [ ] Vista `pago_exitoso` / `pago_fallido` / `pago_pendiente`
-- [ ] Registro en `MovimientoCaja` al acreditar
-- [ ] Sandbox con tarjetas de prueba
+### Correcciones críticas
+- [x] Backdrop hamburguesa bloqueaba links → `pointer-events:none` + document listener
+- [x] Botón "Pagar y finalizar" invisible → `class="btn"` corregido
+- [x] "No autorizado" sin estilo → template `403.html` con navbar
+- [x] `NoReverseMatch caja_inspector` → corregido a `inspectores_caja`
+- [x] Campos incorrectos en `resumen_cobros` / `resumen_infracciones`
+- [x] Historial estacionamientos desbordaba en mobile → `overflow-x:auto`
 
-### Pago de infracciones
-- [ ] Flow similar: preferencia MP → webhook → llama `pagar_infraccion_uc`
-- [ ] Actualización de estado `Infraccion.estado = "pagada"`
+### Branding por municipio
+- [x] Modelo `Municipio` con `logo`, `color_primario`, `color_secundario`, `nombre_sistema`
+- [x] Context processor inyecta branding en todos los templates
+- [x] CSS variables sobreescribibles por municipio desde `base.html`
+
+### MercadoPago
+- [x] SDK integrado, flujo completo conductor → MP checkout → webhook → acreditación
+- [x] Error 400 `invalid_auto_return` corregido (campo eliminado)
+- [x] Logging detallado de errores MP
+- [ ] Pasar de sandbox a producción (pendiente credenciales productivas)
+
+---
+
+## 🔜 v1.3 — Completar funcionalidades pendientes
+
+- [ ] Usuarios Google OAuth: asignar `es_conductor=True` automáticamente
+- [ ] Timer en inicio conductor: fix NaN:NaN (parsing de fecha JS)
+- [ ] Inspector: subcuadras en formulario de infracción
+- [ ] Vendedor: cobrar infracciones por patente
+- [ ] Vendedor: selector de período al cerrar caja
+- [ ] Modo alto contraste / uso en exterior
 
 ---
 
