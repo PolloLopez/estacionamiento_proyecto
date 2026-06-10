@@ -2,45 +2,47 @@
 {% block title %}Historial de Estacionamientos{% endblock %}
 
 {% block content %}
-
 <section class="container">
   <div class="panel">
-    <h2>Bienvenido, {{ request.user.correo }}</h2>
-    <div class="panel-body">
-      <h2>🚗 Historial de estacionamientos</h2>
 
-      {% if estacionamientos %}
-      <table class="table">
+    <div style="display:flex; justify-content:space-between; align-items:center;
+                flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
+      <h2>🚗 Historial de estacionamientos</h2>
+      <a href="{% url 'inicio' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
+    </div>
+
+    {% if estacionamientos %}
+    <!-- overflow-x:auto para que la tabla no rompa el contenedor en mobile -->
+    <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
+      <table>
         <thead>
           <tr>
             <th>Fecha inicio</th>
-            <th>Fecha fin</th>
-            <th>Calle</th>
-            <th>Altura</th>
+            <th>Fin</th>
+            <th>Zona</th>
             <th>Patente</th>
-            <th>Costo</th>
+            <th style="text-align:right;">Costo</th>
           </tr>
         </thead>
         <tbody>
           {% for e in estacionamientos %}
           <tr>
-            <td>{{ e.hora_inicio|date:"d/m/Y H:i" }}</td>
-            <td>
-              {% if e.hora_fin %} {{ e.hora_fin|date:"d/m/Y H:i" }} {% else %}
-              Activo {% endif %}
+            <td style="white-space:nowrap;">{{ e.hora_inicio|date:"d/m/Y H:i" }}</td>
+            <td style="white-space:nowrap;">
+              {% if e.hora_fin %}{{ e.hora_fin|date:"d/m H:i" }}{% else %}<span style="color:var(--color-success); font-weight:600;">Activo</span>{% endif %}
             </td>
-            <td>{{ e.subcuadra.calle }}</td>
-            <td>{{ e.subcuadra.altura }}</td>
-            <td>{{ e.vehiculo.patente }}</td>
-            <td>${{ e.costo_final|default:e.costo_base }}</td>
+            <td>{{ e.subcuadra.calle|default:"—" }}</td>
+            <td style="font-weight:700; letter-spacing:2px;">{{ e.vehiculo.patente }}</td>
+            <td style="text-align:right; font-weight:700;">${{ e.costo_final|default:e.costo_base }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      {% else %}
-      <p>No tenés estacionamientos registrados.</p>
-      {% endif %}
     </div>
+    {% else %}
+    <p class="text-muted" style="margin-top:0.5rem;">No tenés estacionamientos registrados.</p>
+    {% endif %}
+
   </div>
 </section>
 {% endblock %}

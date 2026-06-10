@@ -27,8 +27,9 @@ class UsuarioAdmin(UserAdmin):
 
     inlines = [VehiculoUsuarioInline]
 
-    list_display = ("correo", "es_admin", "es_inspector", "es_conductor", "municipio")
-    search_fields = ("correo",)
+    list_display = ("correo", "es_conductor", "es_inspector", "es_vendedor", "es_admin", "municipio", "saldo")
+    list_filter = ("es_conductor", "es_inspector", "es_vendedor", "es_admin", "municipio")
+    search_fields = ("correo", "first_name")
     ordering = ("correo",)
 
     fieldsets = (
