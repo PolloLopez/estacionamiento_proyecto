@@ -39,7 +39,7 @@
              alt="{{ municipio_branding.nombre }}"
              style="height:38px; width:auto;">
       {% else %}
-        🚗 {% if municipio_branding %}{{ municipio_branding.nombre_sistema }}{% else %}Estacionamiento{% endif %}
+        🅿️ <span>Estacionamiento</span>
       {% endif %}
     </a>
 
@@ -125,7 +125,7 @@
     {% if municipio_branding and municipio_branding.nombre %}
       {{ municipio_branding.nombre }} · Sistema de Estacionamiento Medido
     {% else %}
-      Sistema de estacionamiento medido
+      Estacionamiento medido
     {% endif %}
   </footer>
 
