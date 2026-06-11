@@ -168,7 +168,11 @@ ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 ACCOUNT_ADAPTER = "app_estacionamiento.adapters.NoUsernameAccountAdapter"
+# Adapter social: mapea email de Google al campo 'correo' de nuestro modelo
+SOCIALACCOUNT_ADAPTER = "app_estacionamiento.adapters.SocialAccountAdapter"
 SOCIALACCOUNT_AUTO_SIGNUP = True
+# Campo email del modelo de usuario (usamos 'correo' en lugar del estándar 'email')
+ACCOUNT_USER_MODEL_EMAIL_FIELD = "correo"
 # Forzar HTTPS en las URLs de callback de OAuth (Railway termina SSL en el proxy)
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
 
