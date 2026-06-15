@@ -316,6 +316,20 @@ class CierreCaja(models.Model):
     creado_en = models.DateTimeField(default=timezone.now)
     creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="cierres_creados")
 
+    # 💰 Comisión aplicada al momento del cierre (snapshot)
+    porcentaje_ganancia_aplicado = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Porcentaje de ganancia del usuario al momento del cierre."
+    )
+    ganancia_usuario = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Monto que retiene el usuario (comisión)."
+    )
+    monto_municipio = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Monto neto que le corresponde al municipio."
+    )
+
     # certificación por el admin
     certificado = models.BooleanField(default=False, help_text="El admin auditó y certificó este cierre.")
     certificado_en = models.DateTimeField(null=True, blank=True, help_text="Fecha en que el admin certificó el cierre.")

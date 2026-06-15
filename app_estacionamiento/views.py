@@ -316,7 +316,7 @@ def completar_perfil(request):
 
 @require_role("admin","inspector","vendedor")
 def pagar_infraccion(request, infraccion_id):
-    infraccion = get_object_or_404(Infraccion, id=infraccion_id)
+    infraccion = get_object_or_404(Infraccion, id=infraccion_id, municipio=request.user.municipio)
     try:
         pagar_infraccion_uc(request.user, infraccion)
         messages.success(request, "Infracción cobrada.")
@@ -476,7 +476,7 @@ def panel_exenciones(request):
 @require_role("admin")
 def cargar_saldo(request, usuario_id):
     admin = request.user
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+    usuario = get_object_or_404(Usuario, id=usuario_id, municipio=admin.municipio)
 
     if request.method == "POST":
         monto = request.POST.get("monto")
@@ -941,7 +941,7 @@ def registrar_infraccion(request):
 
 @require_role("inspector")
 def ticket_infraccion(request, infraccion_id):
-    infraccion = Infraccion.objects.get(id=infraccion_id)
+    infraccion = get_object_or_404(Infraccion, id=infraccion_id, municipio=request.user.municipio)
 
     return render(request, "ticket_infraccion.html", {
         "patente": infraccion.vehiculo.patente,
@@ -1315,7 +1315,7 @@ def gestionar_inspectores(request):
 
 @require_role("admin")
 def editar_inspector(request, inspector_id):
-    inspector = get_object_or_404(Usuario, id=inspector_id, es_inspector=True)
+    inspector = get_object_or_404(Usuario, id=inspector_id, es_inspector=True, municipio=request.user.municipio)
 
     if request.method == "POST":
         inspector.first_name = request.POST.get("nombre", "").strip()
@@ -1380,7 +1380,7 @@ def gestionar_vendedores(request):
 
 @require_role("admin")
 def editar_vendedor(request, vendedor_id):
-    vendedor = get_object_or_404(Usuario, id=vendedor_id, es_vendedor=True)
+    vendedor = get_object_or_404(Usuario, id=vendedor_id, es_vendedor=True, municipio=request.user.municipio)
 
     if request.method == "POST":
         vendedor.first_name = request.POST.get("nombre", "").strip()
@@ -1424,7 +1424,7 @@ def gestionar_usuarios(request):
 @require_role("admin")
 def detalle_usuario_admin(request, usuario_id):
     """Vista de detalle de un conductor: saldo, vehículos, exenciones, historial."""
-    conductor = get_object_or_404(Usuario, id=usuario_id, es_conductor=True)
+    conductor = get_object_or_404(Usuario, id=usuario_id, es_conductor=True, municipio=request.user.municipio)
     vehiculos = Vehiculo.objects.filter(vehiculousuario__usuario=conductor)
 
     # Agregar vehículo desde admin
@@ -2005,7 +2005,8 @@ def resolver_verificacion(request, solicitud_id):
     """
     solicitud = get_object_or_404(
         SolicitudVerificacion.objects.select_related("usuario", "vehiculo"),
-        id=solicitud_id
+        id=solicitud_id,
+        usuario__municipio=request.user.municipio,
     )
 
     if request.method != "POST":

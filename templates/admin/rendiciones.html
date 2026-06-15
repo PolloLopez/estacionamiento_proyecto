@@ -55,6 +55,13 @@
       <div style="font-size:0.85rem; margin-top:0.2rem;">
         {{ cierre.cantidad_movimientos }} movimiento{% if cierre.cantidad_movimientos != 1 %}s{% endif %}
       </div>
+      {% if cierre.porcentaje_ganancia_aplicado > 0 %}
+      <div style="font-size:0.82rem; margin-top:0.3rem; color:var(--color-text-muted);">
+        Comisión {{ cierre.porcentaje_ganancia_aplicado }}%:
+        <strong style="color:var(--color-success);">${{ cierre.ganancia_usuario }}</strong>
+        · Municipio: <strong>${{ cierre.monto_municipio }}</strong>
+      </div>
+      {% endif %}
     </div>
 
     {# Total + estado #}
