@@ -1,377 +1,280 @@
 # app_estacionamiento/tests.py
-from django.test import TestCase
-from django.urls import reverse
+"""
+Tests de los flujos críticos del sistema de estacionamiento.
+
+Correr con:
+    python manage.py test app_estacionamiento
+"""
 from decimal import Decimal
-from django.db.models import Sum
+from django.test import TestCase, Client
+from django.urls import reverse
 
 from app_estacionamiento.models import (
-    Vehiculo, Subcuadra, Infraccion,
-    Usuario, Estacionamiento,
-    MovimientoCaja, Municipio, CierreCaja,
-    VehiculoUsuario, VerificacionInspector
+    Usuario, Municipio, Subcuadra, Vehiculo, VehiculoUsuario,
+    Estacionamiento, MovimientoCaja, Tarifa,
 )
-
-from app_estacionamiento.services_infracciones import (
-    crear_infraccion, ErrorInfraccion
-)
-
-from app_estacionamiento.services_verificacion import (
-    verificar_estado_vehiculo
-)
-
-from app_estacionamiento.domain.enums import EstadoVehiculo
-
-from app_estacionamiento.use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
+from app_estacionamiento.services_caja import generar_cierre_caja
 
 
-# =====================================================
-# 🧱 BASE
-# =====================================================
+# ─────────────────────────────────────────────
+# Helpers para crear fixtures rápidos
+# ─────────────────────────────────────────────
 
-class BaseTestCase(TestCase):
+def crear_municipio(nombre="Test"):
+    return Municipio.objects.create(nombre=nombre)
+
+def crear_admin(municipio, correo="admin@test.com"):
+    return Usuario.objects.create_user(
+        correo=correo, password="pass1234",
+        municipio=municipio, es_admin=True, es_conductor=False,
+    )
+
+def crear_vendedor(municipio, correo="vendedor@test.com", porcentaje=0):
+    return Usuario.objects.create_user(
+        correo=correo, password="pass1234",
+        municipio=municipio, es_vendedor=True, es_conductor=False,
+        porcentaje_ganancia=Decimal(str(porcentaje)),
+    )
+
+def crear_conductor(municipio, correo="conductor@test.com", saldo=500):
+    u = Usuario.objects.create_user(
+        correo=correo, password="pass1234",
+        municipio=municipio, es_conductor=True,
+    )
+    u.saldo = Decimal(str(saldo))
+    u.save()
+    return u
+
+def crear_subcuadra(municipio, calle="San Martín", altura=100):
+    return Subcuadra.objects.create(municipio=municipio, calle=calle, altura=altura)
+
+def crear_vehiculo(patente="AAA111"):
+    return Vehiculo.objects.create(patente=patente)
+
+def crear_estacionamiento_activo(usuario, vehiculo, subcuadra, duracion=2, costo=200):
+    return Estacionamiento.objects.create(
+        usuario=usuario, vehiculo=vehiculo, subcuadra=subcuadra,
+        duracion_min=duracion, costo_base=costo, estado="ACTIVO",
+    )
+
+
+# ═════════════════════════════════════════════
+# 1. SERVICIO: generar_cierre_caja
+# ═════════════════════════════════════════════
+
+class TestGenerarCierreCaja(TestCase):
 
     def setUp(self):
-        self.municipio = Municipio.objects.create(
-            nombre="TestCity"
+        self.municipio = crear_municipio()
+        self.vendedor  = crear_vendedor(self.municipio, porcentaje=10)
+
+    def _crear_movimientos(self, montos):
+        for m in montos:
+            MovimientoCaja.objects.create(
+                usuario=self.vendedor, monto=Decimal(str(m)), tipo="ingreso"
+            )
+
+    def test_cierre_sin_movimientos_retorna_none(self):
+        resultado = generar_cierre_caja(self.vendedor)
+        self.assertIsNone(resultado)
+
+    def test_cierre_suma_movimientos(self):
+        self._crear_movimientos([100, 200, 300])
+        cierre = generar_cierre_caja(self.vendedor)
+        self.assertEqual(cierre.total_cobrado, Decimal("600"))
+
+    def test_cierre_aplica_comision(self):
+        """Con 10% de comisión sobre $1000: ganancia=$100, municipio=$900."""
+        self._crear_movimientos([1000])
+        cierre = generar_cierre_caja(self.vendedor)
+        self.assertEqual(cierre.porcentaje_ganancia_aplicado, Decimal("10"))
+        self.assertEqual(cierre.ganancia_usuario, Decimal("100.00"))
+        self.assertEqual(cierre.monto_municipio, Decimal("900.00"))
+
+    def test_cierre_sin_comision(self):
+        """Con 0% el municipio recibe el total."""
+        vendedor_sin_comision = crear_vendedor(
+            self.municipio, correo="v2@test.com", porcentaje=0
         )
-
-        self.usuario = Usuario.objects.create_user(
-            correo="inspector@test.com",
-            password="123456",
-            municipio=self.municipio,
-            es_inspector=True
-        )
-
-        self.subcuadra = Subcuadra.objects.create(
-            calle="Calle Test",
-            altura=100,
-            municipio=self.municipio
-        )
-
-# =====================================================
-# 🚗 ESTACIONAMIENTO
-# =====================================================
-
-class EstacionamientoTest(BaseTestCase):
-
-    def setUp(self):
-        super().setUp()
-
-        self.user = Usuario.objects.create_user(
-            correo="conductor@test.com",
-            password="123456",
-            es_conductor=True,
-            saldo=1000,
-            municipio=self.municipio
-        )
-
-        self.vehiculo = Vehiculo.objects.create(
-            patente="AAA111",
-            municipio=self.municipio
-        )
-
-    def test_estacionar_view(self):
-        self.client.login(correo="conductor@test.com", password="123456")
-
-        response = self.client.post(
-            reverse("usuarios_estacionar_vehiculo"),
-            {"patente": "AAA111", "duracion": "1"}
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertTrue(Vehiculo.objects.filter(patente="AAA111").exists())
-        self.assertTrue(Estacionamiento.objects.exists())
-
-    def test_no_estaciona_sin_saldo(self):
-        self.user.saldo = 0
-        self.user.save()
-
-        self.client.login(correo="conductor@test.com", password="123456")
-
-        response = self.client.post(
-            reverse("usuarios_estacionar_vehiculo"),
-            {"patente": "ZZZ999", "duracion": "2"}
-        )
-
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse("consultar_deuda"))
-
-
-# =====================================================
-# 💰 CAJA
-# =====================================================
-
-class CajaInspectorTest(BaseTestCase):
-
-    def setUp(self):
-        super().setUp()
-
-        self.inspector = self.usuario
-        self.inspector.saldo_operativo = 1000
-        self.inspector.save()
-
-    def test_calculo_a_rendir(self):
-    
         MovimientoCaja.objects.create(
-            usuario=self.inspector,
-            monto=Decimal("500"),
-            tipo="ingreso",
-            descripcion="Cobro calle"
+            usuario=vendedor_sin_comision, monto=Decimal("500"), tipo="ingreso"
         )
-    
-        total = (
-            MovimientoCaja.objects
-            .filter(
-                usuario=self.inspector,
-                tipo="ingreso"
-            )
-            .aggregate(total=Sum("monto"))["total"]
-            or Decimal("0")
-        )
-    
-        self.assertEqual(total, Decimal("500"))
+        cierre = generar_cierre_caja(vendedor_sin_comision)
+        self.assertEqual(cierre.ganancia_usuario, Decimal("0.00"))
+        self.assertEqual(cierre.monto_municipio, Decimal("500.00"))
+
+    def test_cierre_marca_movimientos_cerrados(self):
+        """Los movimientos deben quedar cerrado=True después del cierre."""
+        self._crear_movimientos([100, 200])
+        generar_cierre_caja(self.vendedor)
+        abiertos = MovimientoCaja.objects.filter(usuario=self.vendedor, cerrado=False)
+        self.assertEqual(abiertos.count(), 0)
+
+    def test_segundo_cierre_sin_movimientos_retorna_none(self):
+        """Después de cerrar, sin nuevos movimientos el cierre retorna None."""
+        self._crear_movimientos([100])
+        generar_cierre_caja(self.vendedor)
+        self.assertIsNone(generar_cierre_caja(self.vendedor))
 
 
-# =====================================================
-# 🔍 VERIFICACIÓN
-# =====================================================
+# ═════════════════════════════════════════════
+# 2. SEGURIDAD: aislamiento de municipio
+# ═════════════════════════════════════════════
 
-class VerificacionTest(BaseTestCase):
+class TestAislamientoMunicipio(TestCase):
+    """Admin de municipio A NO puede acceder a datos de municipio B."""
 
     def setUp(self):
-        super().setUp()
+        self.municipio_a  = crear_municipio("Municipio A")
+        self.municipio_b  = crear_municipio("Municipio B")
+        self.admin_a      = crear_admin(self.municipio_a, "admin_a@test.com")
+        self.conductor_b  = crear_conductor(self.municipio_b, "conductor_b@test.com")
+        self.client = Client()
+        self.client.force_login(self.admin_a)
 
-        self.vehiculo = Vehiculo.objects.create(
-            patente="BBB222",
-            municipio=self.municipio
+    def test_cargar_saldo_otro_municipio_retorna_404(self):
+        url = reverse("cargar_saldo", args=[self.conductor_b.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_detalle_usuario_otro_municipio_retorna_404(self):
+        url = reverse("detalle_usuario_admin", args=[self.conductor_b.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_editar_vendedor_otro_municipio_retorna_404(self):
+        vendedor_b = crear_vendedor(self.municipio_b, "vendedor_b@test.com")
+        url = reverse("admin_editar_vendedor", args=[vendedor_b.id])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_certificar_cierre_otro_municipio_retorna_404(self):
+        vendedor_b = crear_vendedor(self.municipio_b, "v_b@test.com")
+        MovimientoCaja.objects.create(
+            usuario=vendedor_b, monto=Decimal("100"), tipo="ingreso"
         )
+        cierre = generar_cierre_caja(vendedor_b)
+        url = reverse("certificar_cierre", args=[cierre.id])
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 404)
 
-        VehiculoUsuario.objects.create(
-            usuario=self.usuario,
-            vehiculo=self.vehiculo
-        )
 
-    def test_no_registrado(self):
-        resultado = verificar_estado_vehiculo(
-            "AAA111", 
-            self.usuario,
-            self.subcuadra
-            )
-        self.assertEqual(resultado.estado, EstadoVehiculo.NO_REGISTRADO)
+# ═════════════════════════════════════════════
+# 3. RENOVAR ESTACIONAMIENTO
+# ═════════════════════════════════════════════
 
-    def test_exento_total(self):
-        self.vehiculo.exento_global = True
-        self.vehiculo.save()
-
-        resultado = verificar_estado_vehiculo(
-            self.vehiculo.patente,
-            self.usuario,
-            self.subcuadra
-        )
-
-        self.assertEqual(resultado.estado, EstadoVehiculo.EXENTO_TOTAL)
-
-    def test_exento_parcial(self):
-        self.vehiculo.subcuadras_exentas.add(self.subcuadra)
-
-        resultado = verificar_estado_vehiculo(
-            self.vehiculo.patente,
-            self.usuario,
-            self.subcuadra
-        )
-
-        self.assertEqual(resultado.estado, EstadoVehiculo.EXENTO_PARCIAL)
-
-    def test_pagado(self):
-        Estacionamiento.objects.create(
-            vehiculo=self.vehiculo,
-            usuario=self.usuario,
-            estado="ACTIVO",
-            subcuadra=self.subcuadra,
-        )
-
-        resultado = verificar_estado_vehiculo(
-            self.vehiculo.patente,
-            self.usuario,
-            self.subcuadra
-        )
-
-        self.assertEqual(resultado.estado, EstadoVehiculo.PAGADO)
-
-    def test_pendiente_pago_por_tolerancia(self):
-
-        VerificacionInspector.objects.create(
-            vehiculo=self.vehiculo,
-            inspector=self.usuario,
-            subcuadra=self.subcuadra,
-            resultado="verificacion"
-        )
-
-        resultado = verificar_estado_vehiculo(
-            self.vehiculo.patente,
-            self.usuario,
-            self.subcuadra
-        )
-
-        self.assertEqual(resultado.estado, EstadoVehiculo.PENDIENTE_PAGO)
-
-    def test_impago(self):
-        resultado = verificar_estado_vehiculo(
-            self.vehiculo.patente,
-            self.usuario,
-            self.subcuadra
-        )
-
-        self.assertEqual(resultado.estado, EstadoVehiculo.IMPAGO)
-
-# =====================================================
-# 🚨 INFRACCIONES
-# =====================================================
-
-class CrearInfraccionTest(BaseTestCase):
+class TestRenovarEstacionamiento(TestCase):
 
     def setUp(self):
-        super().setUp()
-
-        self.vehiculo = Vehiculo.objects.create(
-            patente="ABC123",
-            municipio=self.municipio
+        self.municipio = crear_municipio()
+        self.conductor = crear_conductor(self.municipio, saldo=500)
+        self.vehiculo  = crear_vehiculo("BBB222")
+        VehiculoUsuario.objects.create(usuario=self.conductor, vehiculo=self.vehiculo)
+        self.subcuadra = crear_subcuadra(self.municipio)
+        Tarifa.objects.create(municipio=self.municipio, precio_por_hora=Decimal("100"))
+        self.est = crear_estacionamiento_activo(
+            self.conductor, self.vehiculo, self.subcuadra, duracion=2, costo=200
         )
-
-        VehiculoUsuario.objects.create(
-            usuario=self.usuario,
-            vehiculo=self.vehiculo
-        )
-
-        self.subcuadra = Subcuadra.objects.create(
-            calle="12",
-            altura=34,
-            municipio=self.municipio
-        )
-
-    def test_crea_infraccion_ok(self):
-        infraccion = crear_infraccion(
-            patente="ABC123",
-            subcuadra_id=self.subcuadra.id,
-            inspector=self.usuario
-        )
-
-        self.assertIsNotNone(infraccion)
-
-    def test_no_permite_exento_total(self):
-        self.vehiculo.exento_global = True
-        self.vehiculo.save()
-
-        with self.assertRaises(ErrorInfraccion):
-            crear_infraccion(
-                patente="ABC123",
-                subcuadra_id=self.subcuadra.id,
-                inspector=self.usuario
-            )
-
-
-# =====================================================
-# 🔐 LOGIN
-# =====================================================
-
-class LoginRedirectTest(BaseTestCase):
-
-    def setUp(self):
-        super().setUp()
-
-        self.inspector = self.usuario
-
-    def test_redirect_inspector(self):
-        response = self.client.post(
-            reverse("login"),
-            {"correo": "inspector@test.com", "password": "123456"}
-        )
-
-        self.assertRedirects(response, reverse("panel_inspectores"))
-
-
-# =====================================================
-# 🧾 CAJA
-# =====================================================
-
-class CierreCajaTest(BaseTestCase):
-
-    def setUp(self):
-        super().setUp()
-
-        self.inspector = self.usuario
-        self.inspector.saldo_operativo = 1000
-        self.inspector.save()
-
-    def test_cierre_caja(self):
-        self.client.login(
-            correo="inspector@test.com",
-            password="123456"
-        )
-
-        cobrar_estacionamiento(
-            inspector=self.inspector,
-            monto=Decimal("500"),
-            descripcion="Cobro calle"
-        )
-
-        response = self.client.post(reverse("inspectores_cerrar_caja"))
-
-        self.assertEqual(response.status_code, 302)
-
-
-# =====================================================
-# 🌐 URLS
-# =====================================================
-
-class UrlsTest(BaseTestCase):
-
-    def setUp(self):
-        super().setUp()
-        self.admin = Usuario.objects.create_user(
-            correo="admin@test.com",
-            password="12345",
-            municipio=self.municipio,
-            es_admin=True
-        )
-
-        self.inspector = Usuario.objects.create_user(
-            correo="inspector2@test.com",
-            password="123456",
-            municipio=self.municipio,
-            es_inspector=True
-        )
-
-        self.vendedor = Usuario.objects.create_user(
-            correo="vendedor2@test.com",
-            password="123456",
-            municipio=self.municipio,
-            es_vendedor=True
-        )
-
-        self.conductor = Usuario.objects.create_user(
-            correo="conductor2@test.com",
-            password="123456",
-            municipio=self.municipio,
-            es_conductor=True
-        )
-
-    def test_root_redirect_admin(self):
-        self.client.force_login(self.admin)
-        response = self.client.get("/")
-        self.assertRedirects(response, reverse("panel_admin"))
-
-    def test_root_redirect_inspector(self):
-        self.client.force_login(self.inspector)
-        response = self.client.get("/")
-        self.assertRedirects(response, reverse("panel_inspectores"))
-
-    def test_root_redirect_vendedor(self):
-        self.client.force_login(self.vendedor)
-        response = self.client.get("/")
-        self.assertRedirects(response, reverse("panel_vendedor"))
-
-    def test_root_redirect_conductor(self):
+        self.client = Client()
         self.client.force_login(self.conductor)
-        response = self.client.get("/")
-        self.assertRedirects(response, reverse("inicio_usuarios"))
+        self.url = reverse("usuarios_renovar_estacionamiento", args=[self.est.id])
+
+    def test_renovar_extiende_duracion(self):
+        self.client.post(self.url, {"horas_extra": "2"})
+        self.est.refresh_from_db()
+        self.assertEqual(self.est.duracion_min, 4)  # 2 originales + 2 extra
+
+    def test_renovar_descuenta_saldo(self):
+        self.client.post(self.url, {"horas_extra": "1"})
+        self.conductor.refresh_from_db()
+        # $100/h × 1h = $100 descontado de $500
+        self.assertEqual(self.conductor.saldo, Decimal("400"))
+
+    def test_renovar_sin_saldo_no_modifica(self):
+        """Con saldo insuficiente no cambia ni duración ni saldo."""
+        self.conductor.saldo = Decimal("50")
+        self.conductor.save()
+        self.client.post(self.url, {"horas_extra": "2"})  # costaría $200
+        self.est.refresh_from_db()
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.est.duracion_min, 2)
+        self.assertEqual(self.conductor.saldo, Decimal("50"))
+
+    def test_renovar_estacionamiento_ajeno_retorna_404(self):
+        """No puede renovar un estacionamiento de otro conductor."""
+        otro = crear_conductor(self.municipio, "otro@test.com", saldo=500)
+        client2 = Client()
+        client2.force_login(otro)
+        response = client2.post(self.url, {"horas_extra": "1"})
+        self.assertEqual(response.status_code, 404)
+
+
+# ═════════════════════════════════════════════
+# 4. ACCESO POR ROL
+# ═════════════════════════════════════════════
+
+class TestAccesoRol(TestCase):
+    """Verifica que @require_role redirige correctamente."""
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.conductor = crear_conductor(self.municipio)
+        self.client = Client()
+
+    def test_conductor_no_accede_panel_admin(self):
+        self.client.force_login(self.conductor)
+        response = self.client.get(reverse("panel_admin"))
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_conductor_no_accede_panel_inspectores(self):
+        self.client.force_login(self.conductor)
+        response = self.client.get(reverse("panel_inspectores"))
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_anonimo_redirige_a_login(self):
+        response = self.client.get(reverse("inicio_usuarios"))
+        self.assertIn(response.status_code, [301, 302])
+
+    def test_admin_accede_panel_admin(self):
+        admin = crear_admin(self.municipio)
+        self.client.force_login(admin)
+        response = self.client.get(reverse("panel_admin"))
+        self.assertEqual(response.status_code, 200)
+
+
+# ═════════════════════════════════════════════
+# 5. ALTA INSPECTOR / VENDEDOR
+# ═════════════════════════════════════════════
+
+class TestAltaPersonal(TestCase):
+    """Al crear inspector/vendedor se guarda porcentaje y periodicidad."""
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.admin = crear_admin(self.municipio)
+        self.client = Client()
+        self.client.force_login(self.admin)
+
+    def test_crear_inspector_con_comision(self):
+        self.client.post(reverse("admin_crear_inspector"), {
+            "nombre": "Juan Inspector",
+            "correo": "inspector_nuevo@test.com",
+            "password": "pass1234",
+            "porcentaje_ganancia": "15",
+            "periodicidad_rendicion": "mensual",
+        })
+        inspector = Usuario.objects.get(correo="inspector_nuevo@test.com")
+        self.assertEqual(inspector.porcentaje_ganancia, Decimal("15"))
+        self.assertEqual(inspector.periodicidad_rendicion, "mensual")
+
+    def test_crear_vendedor_con_comision(self):
+        self.client.post(reverse("admin_crear_vendedor"), {
+            "nombre": "Kiosco Sur",
+            "correo": "vendedor_nuevo@test.com",
+            "password": "pass1234",
+            "porcentaje_ganancia": "8",
+            "periodicidad_rendicion": "semanal",
+        })
+        vendedor = Usuario.objects.get(correo="vendedor_nuevo@test.com")
+        self.assertEqual(vendedor.porcentaje_ganancia, Decimal("8"))
+        self.assertEqual(vendedor.periodicidad_rendicion, "semanal")

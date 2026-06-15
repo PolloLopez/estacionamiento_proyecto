@@ -2132,7 +2132,7 @@ def gestionar_verificaciones(request):
     ).count()
 
     # Subcuadras del municipio para el selector de exención parcial
-    subcuadras = Subcuadra.objects.filter(municipio=municipio).order_by("calle", "altura_desde")
+    subcuadras = Subcuadra.objects.filter(municipio=municipio).order_by("calle", "altura")
 
     return render(request, "admin/gestionar_verificaciones.html", {
         "solicitudes": solicitudes,
