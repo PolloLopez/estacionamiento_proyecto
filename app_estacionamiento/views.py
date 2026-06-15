@@ -374,6 +374,11 @@ def panel_admin(request):
         usuario__municipio=municipio
     ).count()
 
+    rendiciones_pendientes = CierreCaja.objects.filter(
+        usuario__municipio=municipio,
+        certificado=False,
+    ).count()
+
     return render(request, "admin/panel_admin.html", {
         "inspectores": inspectores,
         "vendedores": vendedores,
@@ -384,6 +389,7 @@ def panel_admin(request):
         "rol_seleccionado": rol,
         "total_cobrado": total_cobrado,
         "verificaciones_pendientes": verificaciones_pendientes,
+        "rendiciones_pendientes": rendiciones_pendientes,
     })
 
 @require_role("admin")
@@ -944,16 +950,20 @@ def ticket_infraccion(request, infraccion_id):
         "inspector": infraccion.inspector.correo
     })
 
-@require_role("inspector")
+@require_role("inspector", "vendedor", "admin")
 def caja_inspector(request):
-
-    inspector = request.user
-    municipio = getattr(inspector, "municipio", None)
+    """
+    Vista de caja compartida para inspectores y vendedores.
+    Muestra movimientos del período actual, permite cerrar caja,
+    y muestra el historial de cierres anteriores con su estado de certificación.
+    """
+    usuario = request.user
+    municipio = getattr(usuario, "municipio", None)
     if not municipio:
         return redirect("login")
 
     movimientos = MovimientoCaja.objects.filter(
-        usuario=inspector
+        usuario=usuario
     ).order_by("-creado_en")
 
     total_ingresos = movimientos.filter(tipo="ingreso").aggregate(
@@ -965,6 +975,11 @@ def caja_inspector(request):
     total_a_cerrar = movimientos_pendientes.aggregate(
         total=Sum("monto"))["total"] or 0
 
+    # Historial de cierres anteriores de este usuario
+    historial_cierres = CierreCaja.objects.filter(
+        usuario=usuario
+    ).select_related("certificado_por").order_by("-fecha_cierre")[:20]
+
     return render(request, "inspectores/caja.html", {
         "movimientos": movimientos,
         "ingresos": total_ingresos,
@@ -972,6 +987,7 @@ def caja_inspector(request):
         "saldo": total_ingresos - total_egresos,
         "movimientos_abiertos": movimientos_pendientes.count(),
         "total_a_cerrar": total_a_cerrar,
+        "historial_cierres": historial_cierres,
     })
 
 # =========================================================
@@ -1153,16 +1169,29 @@ def resumen_infracciones(request):
 # =========================================================
 @require_role("vendedor")
 def panel_vendedor(request):
+    from django.utils import timezone as tz
 
     user = request.user
+    hoy = tz.localdate()
 
-    movimientos = MovimientoCaja.objects.filter(usuario=user)
+    # Movimientos del día actual
+    movimientos_hoy = MovimientoCaja.objects.filter(
+        usuario=user,
+        tipo="ingreso",
+        creado_en__date=hoy,
+    )
+    total_hoy = movimientos_hoy.aggregate(total=Sum("monto"))["total"] or 0
+    cantidad_operaciones = movimientos_hoy.count()
 
-    total = movimientos.aggregate(total=Sum("monto"))["total"] or 0
+    # Movimientos pendientes de cierre (a rendir)
+    a_rendir = MovimientoCaja.objects.filter(
+        usuario=user, tipo="ingreso", cerrado=False
+    ).aggregate(total=Sum("monto"))["total"] or 0
 
     return render(request, "vendedores/panel.html", {
-        "movimientos": movimientos,
-        "total": total
+        "total_hoy": total_hoy,
+        "cantidad_operaciones": cantidad_operaciones,
+        "a_rendir": a_rendir,
     })
 
 @require_role("vendedor", "admin")
@@ -1688,12 +1717,14 @@ def mp_iniciar_carga(request):
         "android", "iphone", "ipad", "ipod", "mobile", "blackberry", "windows phone"
     ))
 
-    if settings.DEBUG:
-        # Sandbox solo tiene sandbox_init_point (no tiene mobile)
+    if settings.MP_SANDBOX:
+        # Sandbox: solo tiene sandbox_init_point (sin mobile)
         checkout_url = respuesta_mp.get("sandbox_init_point", "")
     elif es_mobile and respuesta_mp.get("mobile_init_point"):
+        # Producción mobile: abre la app de MercadoPago si está instalada
         checkout_url = respuesta_mp["mobile_init_point"]
     else:
+        # Producción desktop
         checkout_url = respuesta_mp.get("init_point", "")
 
     if not checkout_url:
@@ -1846,6 +1877,77 @@ def mp_webhook(request):
         pass  # Si ya fue acreditado (idempotencia) no hay problema
 
     return HttpResponse(status=200)
+
+
+# =========================================================
+# =========================================================
+# ADMIN — RENDICIONES (CIERRES DE CAJA)
+# =========================================================
+
+@require_role("admin")
+def admin_rendiciones(request):
+    """
+    Lista todos los cierres de caja del municipio.
+    El admin puede ver el detalle de cada uno y certificarlos.
+    """
+    from django.utils import timezone as tz
+
+    municipio = getattr(request.user, "municipio", None)
+
+    # Filtro por estado
+    filtro = request.GET.get("filtro", "todos")
+    cierres = CierreCaja.objects.filter(
+        usuario__municipio=municipio
+    ).select_related("usuario", "certificado_por").order_by("-fecha_cierre")
+
+    if filtro == "pendientes":
+        cierres = cierres.filter(certificado=False)
+    elif filtro == "certificados":
+        cierres = cierres.filter(certificado=True)
+
+    conteo_pendientes = CierreCaja.objects.filter(
+        usuario__municipio=municipio,
+        certificado=False,
+    ).count()
+
+    return render(request, "admin/rendiciones.html", {
+        "cierres": cierres,
+        "filtro": filtro,
+        "conteo_pendientes": conteo_pendientes,
+    })
+
+
+@require_role("admin")
+def certificar_cierre(request, cierre_id):
+    """
+    El admin certifica (audita) un cierre de caja.
+    Solo acepta POST. Marca el cierre como certificado.
+    """
+    from django.utils import timezone as tz
+
+    cierre = get_object_or_404(
+        CierreCaja.objects.select_related("usuario"),
+        id=cierre_id,
+        usuario__municipio=request.user.municipio,
+    )
+
+    if request.method != "POST":
+        return redirect("admin_rendiciones")
+
+    if cierre.certificado:
+        messages.warning(request, "Este cierre ya estaba certificado.")
+        return redirect("admin_rendiciones")
+
+    cierre.certificado = True
+    cierre.certificado_en = tz.now()
+    cierre.certificado_por = request.user
+    cierre.save(update_fields=["certificado", "certificado_en", "certificado_por"])
+
+    messages.success(
+        request,
+        f"✅ Cierre de {cierre.usuario.correo} del {cierre.fecha_cierre:%d/%m/%Y} certificado."
+    )
+    return redirect("admin_rendiciones")
 
 
 # =========================================================

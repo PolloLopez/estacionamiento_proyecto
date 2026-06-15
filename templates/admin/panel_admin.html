@@ -27,6 +27,18 @@
           </span>
         {% endif %}
       </a>
+      <a href="{% url 'admin_rendiciones' %}" class="btn btn-outline"
+         style="position:relative;">
+        💼 Rendiciones
+        {% if rendiciones_pendientes > 0 %}
+          <span style="position:absolute; top:-6px; right:-8px;
+                       background:#e53935; color:#fff; font-size:0.7rem;
+                       font-weight:700; border-radius:99px;
+                       padding:1px 6px; line-height:1.4;">
+            {{ rendiciones_pendientes }}
+          </span>
+        {% endif %}
+      </a>
     </div>
   </div>
 

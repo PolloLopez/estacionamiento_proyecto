@@ -185,8 +185,7 @@
                   {% endif %}
                 </label>
                 <input type="file" id="id_doc1_discapacidad" name="documento_1"
-                       accept=".pdf,.jpg,.jpeg,.png"
-                       {% if not solicitud or not solicitud.documento_1 %}required{% endif %}>
+                       accept=".pdf,.jpg,.jpeg,.png">
               </div>
             </div>
 
@@ -204,8 +203,7 @@
                   {% endif %}
                 </label>
                 <input type="file" id="id_doc1_frentista" name="documento_1"
-                       accept=".pdf,.jpg,.jpeg,.png"
-                       {% if not solicitud or not solicitud.documento_1 %}required{% endif %}>
+                       accept=".pdf,.jpg,.jpeg,.png">
               </div>
               <div class="form-group">
                 <label for="id_doc2_frentista">
@@ -215,8 +213,7 @@
                   {% endif %}
                 </label>
                 <input type="file" id="id_doc2_frentista" name="documento_2"
-                       accept=".pdf,.jpg,.jpeg,.png"
-                       {% if not solicitud or not solicitud.documento_2 %}required{% endif %}>
+                       accept=".pdf,.jpg,.jpeg,.png">
               </div>
             </div>
 
@@ -246,9 +243,27 @@
   var ayudaD = document.getElementById("ayuda_discapacidad");
   var ayudaF = document.getElementById("ayuda_frentista");
 
+  // Activa/desactiva required solo en los inputs VISIBLES para evitar
+  // que el navegador bloquee el submit por inputs ocultos con required.
+  function actualizarRequired() {
+    var tipo = sel ? sel.value : "";
+    var exencionActiva = chk && chk.checked;
+
+    var doc1D = document.getElementById("id_doc1_discapacidad");
+    var doc1F = document.getElementById("id_doc1_frentista");
+    var doc2F = document.getElementById("id_doc2_frentista");
+
+    if (doc1D) doc1D.required = exencionActiva && tipo === "discapacidad";
+    if (doc1F) doc1F.required = exencionActiva && tipo === "vecino_frentista";
+    if (doc2F) doc2F.required = exencionActiva && tipo === "vecino_frentista";
+  }
+
   function toggleExencion() {
     sec.style.display = chk && chk.checked ? "block" : "none";
-    if (!chk || !chk.checked) return;
+    if (!chk || !chk.checked) {
+      actualizarRequired();
+      return;
+    }
     toggleTipo();
   }
 
@@ -257,6 +272,7 @@
     var tipo = sel.value;
     if (ayudaD) ayudaD.style.display = tipo === "discapacidad"    ? "block" : "none";
     if (ayudaF) ayudaF.style.display = tipo === "vecino_frentista" ? "block" : "none";
+    actualizarRequired();
   }
 
   if (chk)  chk.addEventListener("change", toggleExencion);

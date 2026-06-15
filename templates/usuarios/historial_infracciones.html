@@ -6,6 +6,20 @@
 
   <h2 style="margin-bottom:1rem;">⚠️ Mis infracciones</h2>
 
+  {# Aviso de visibilidad #}
+  {% if not request.user.es_verificado %}
+    <div class="alert alert-info" style="margin-bottom:1rem; display:block;">
+      ℹ️ Solo se muestran infracciones vinculadas a los vehículos registrados en tu cuenta.
+      Para ver la totalidad de tus infracciones,
+      <a href="{% url 'solicitar_verificacion' %}">verificá tu cuenta</a>
+      y agregá tus vehículos.
+    </div>
+  {% else %}
+    <div class="alert alert-info" style="margin-bottom:1rem; display:block; font-size:0.9rem;">
+      ℹ️ Se muestran las infracciones de los vehículos vinculados a tu cuenta verificada.
+    </div>
+  {% endif %}
+
   {% if infracciones %}
     <div class="card" style="overflow-x:auto;">
       <table>

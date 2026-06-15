@@ -312,12 +312,28 @@ class CierreCaja(models.Model):
 
     cantidad_movimientos = models.IntegerField(default=0)
 
-    # auditoria
+    # auditoria — quién generó el cierre
     creado_en = models.DateTimeField(default=timezone.now)
     creado_por = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="cierres_creados")
 
+    # certificación por el admin
+    certificado = models.BooleanField(default=False, help_text="El admin auditó y certificó este cierre.")
+    certificado_en = models.DateTimeField(null=True, blank=True, help_text="Fecha en que el admin certificó el cierre.")
+    certificado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cierres_certificados",
+        help_text="Admin que certificó el cierre.",
+    )
+
+    class Meta:
+        ordering = ["-fecha_cierre"]
+
     def __str__(self):
-        return f"Cierre {self.usuario} - {self.total_cobrado}"
+        estado = "✅" if self.certificado else "⏳"
+        return f"{estado} Cierre {self.usuario} — ${self.total_cobrado} ({self.fecha_cierre:%d/%m/%Y})"
 
 class VerificacionInspector(models.Model):
     inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)

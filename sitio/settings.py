@@ -15,6 +15,12 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-key-insegura-cambiar-en-produccion")
 # Railway setea DEBUG=False; en local no setees esta variable y queda True.
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
+# MP_SANDBOX controla si MercadoPago usa el sandbox o producción.
+# Por defecto sigue a DEBUG: True en local, False en producción.
+# Para forzar producción en local: MP_SANDBOX=False en .env
+# Para forzar sandbox en producción: MP_SANDBOX=True en Railway vars
+MP_SANDBOX = os.getenv("MP_SANDBOX", str(DEBUG)) == "True"
+
 # En Railway: ALLOWED_HOSTS=tuapp.up.railway.app
 # En local: deja la variable vacía o no la definas (usará "*")
 _allowed = os.getenv("ALLOWED_HOSTS", "")

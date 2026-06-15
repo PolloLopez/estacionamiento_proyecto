@@ -10,16 +10,25 @@
 
       <h1>💼 Panel vendedor</h1>
 
-      <div class="grid grid-2">
+      <div class="grid grid-3">
 
-        <div class="card">
-          <h3>💰 Caja del día</h3>
-          <p class="success">$ {{ total_hoy }}</p>
+        <div class="card" style="text-align:center;">
+          <div class="text-muted" style="font-size:0.85rem;">Cobrado hoy</div>
+          <div style="font-size:1.8rem; font-weight:800; color:var(--color-primary);">
+            ${{ total_hoy }}
+          </div>
         </div>
 
-        <div class="card">
-          <h3>🚗 Operaciones</h3>
-          <p>{{ cantidad_operaciones }} registros</p>
+        <div class="card" style="text-align:center;">
+          <div class="text-muted" style="font-size:0.85rem;">Operaciones hoy</div>
+          <div style="font-size:1.8rem; font-weight:800;">{{ cantidad_operaciones }}</div>
+        </div>
+
+        <div class="card" style="text-align:center;">
+          <div class="text-muted" style="font-size:0.85rem;">A rendir</div>
+          <div style="font-size:1.8rem; font-weight:800; color:var(--color-warning);">
+            ${{ a_rendir }}
+          </div>
         </div>
 
       </div>
@@ -27,6 +36,9 @@
       <div style="margin-top:1.2rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
         <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}">
           ➕ Registrar estacionamiento
+        </a>
+        <a class="btn btn-outline" href="{% url 'vendedores_caja' %}">
+          🧾 Mi caja
         </a>
         <a class="btn btn-outline" href="{% url 'vendedores_resumen_caja' %}">
           📊 Ver resumen

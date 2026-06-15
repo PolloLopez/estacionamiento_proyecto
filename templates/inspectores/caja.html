@@ -1,12 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Caja{% endblock %}
+{% block title %}Mi caja{% endblock %}
 
 {% block content %}
 <section class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
-    <h2>🧾 Caja</h2>
-    <a href="{% url 'panel_inspectores' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>🧾 Mi caja</h2>
+    {% if request.user.es_inspector %}
+      <a href="{% url 'panel_inspectores' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+    {% elif request.user.es_vendedor %}
+      <a href="{% url 'panel_vendedor' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+    {% endif %}
   </div>
 
   {% if messages %}
@@ -16,31 +21,34 @@
     {% endfor %}
   {% endif %}
 
-  <!-- RESUMEN -->
+  {# ── Resumen del período actual ──────────────────────────────── #}
   <div class="grid grid-3" style="margin-bottom:1.2rem;">
     <div class="card" style="text-align:center;">
-      <div style="font-size:2rem; font-weight:800; color:var(--color-primary);">${{ ingresos }}</div>
+      <div style="font-size:1.8rem; font-weight:800; color:var(--color-primary);">${{ ingresos }}</div>
       <div class="text-muted" style="font-size:0.88rem;">Total ingresado</div>
     </div>
     <div class="card" style="text-align:center;">
-      <div style="font-size:2rem; font-weight:800; color:var(--color-danger);">${{ egresos }}</div>
+      <div style="font-size:1.8rem; font-weight:800; color:var(--color-danger);">${{ egresos }}</div>
       <div class="text-muted" style="font-size:0.88rem;">Total egresado</div>
     </div>
     <div class="card" style="text-align:center;">
-      <div style="font-size:2rem; font-weight:800;">${{ saldo }}</div>
+      <div style="font-size:1.8rem; font-weight:800;">${{ saldo }}</div>
       <div class="text-muted" style="font-size:0.88rem;">Saldo neto</div>
     </div>
   </div>
 
-  <!-- CIERRE DE CAJA -->
+  {# ── Cierre pendiente ──────────────────────────────────────────── #}
   {% if movimientos_abiertos > 0 %}
   <div class="card" style="margin-bottom:1.2rem; border-left:4px solid var(--color-warning);">
     <h3 style="margin-bottom:0.6rem;">⚠️ Pendiente de cierre</h3>
-    <p>Movimientos abiertos: <strong>{{ movimientos_abiertos }}</strong></p>
-    <p style="font-size:1.3rem; font-weight:800; color:var(--color-primary); margin-bottom:1rem;">
+    <p style="font-size:0.95rem;">
+      Movimientos abiertos: <strong>{{ movimientos_abiertos }}</strong>
+    </p>
+    <p style="font-size:1.4rem; font-weight:800; color:var(--color-primary); margin-bottom:1rem;">
       Total a rendir: ${{ total_a_cerrar }}
     </p>
-    <form method="post" action="{% url 'inspectores_cerrar_caja' %}"
+    <form method="post"
+          action="{% if request.user.es_vendedor %}{% url 'vendedores_cerrar_caja' %}{% else %}{% url 'inspectores_cerrar_caja' %}{% endif %}"
           onsubmit="return confirm('¿Confirmar cierre de caja por ${{ total_a_cerrar }}?');">
       {% csrf_token %}
       <button class="btn" type="submit">✅ Confirmar cierre de caja</button>
@@ -52,50 +60,58 @@
   </div>
   {% endif %}
 
-  <!-- MOVIMIENTOS -->
-  <div class="card">
-    <h3 style="margin-bottom:0.8rem;">Movimientos</h3>
+  {# ── Movimientos del período actual ────────────────────────────── #}
+  <div class="card" style="margin-bottom:1.2rem;">
+    <h3 style="margin-bottom:0.8rem;">Movimientos del período</h3>
     {% if movimientos %}
-      <div style="overflow-x:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Tipo</th>
-              <th style="text-align:right;">Monto</th>
-              <th>Descripción</th>
-              <th style="text-align:center;">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for m in movimientos %}
-            <tr>
-              <td style="font-size:0.85rem;">{{ m.creado_en|date:"d/m/Y H:i" }}</td>
-              <td>
-                {% if m.tipo == "ingreso" %}
-                  <span style="color:var(--color-primary); font-weight:600;">↑ Ingreso</span>
-                {% else %}
-                  <span style="color:var(--color-danger); font-weight:600;">↓ Egreso</span>
-                {% endif %}
-              </td>
-              <td style="text-align:right; font-weight:600;">${{ m.monto }}</td>
-              <td style="font-size:0.85rem;">{{ m.descripcion|default:"—" }}</td>
-              <td style="text-align:center; font-size:0.82rem;">
-                {% if m.cerrado %}
-                  <span class="text-muted">Rendido</span>
-                {% else %}
-                  <span style="color:var(--color-warning); font-weight:600;">Pendiente</span>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      {% for m in movimientos %}
+        {% if not m.cerrado %}
+        <div style="display:flex; justify-content:space-between; align-items:center;
+                    padding:0.5rem 0; border-bottom:1px solid var(--color-border);
+                    font-size:0.9rem;">
+          <div>
+            <span style="color:var(--color-text-muted);">{{ m.creado_en|date:"d/m H:i" }}</span>
+            {% if m.descripcion %}
+              <span style="margin-left:0.5rem;">{{ m.descripcion }}</span>
+            {% endif %}
+          </div>
+          <strong style="color:{% if m.tipo == 'ingreso' %}var(--color-success){% else %}var(--color-danger){% endif %}">
+            {% if m.tipo == "ingreso" %}+{% else %}−{% endif %}${{ m.monto }}
+          </strong>
+        </div>
+        {% endif %}
+      {% endfor %}
     {% else %}
-      <p class="text-muted">Sin movimientos registrados.</p>
+      <p class="text-muted">Sin movimientos.</p>
     {% endif %}
   </div>
+
+  {# ── Historial de cierres anteriores ──────────────────────────── #}
+  {% if historial_cierres %}
+  <div class="card">
+    <h3 style="margin-bottom:0.8rem;">📋 Rendiciones anteriores</h3>
+    {% for cierre in historial_cierres %}
+    <div style="display:flex; justify-content:space-between; align-items:center;
+                padding:0.6rem 0; border-bottom:1px solid var(--color-border);
+                flex-wrap:wrap; gap:0.4rem;">
+      <div style="font-size:0.9rem;">
+        <div>{{ cierre.fecha_cierre|date:"d/m/Y H:i" }}</div>
+        <div class="text-muted" style="font-size:0.82rem;">
+          {{ cierre.cantidad_movimientos }} movimiento{% if cierre.cantidad_movimientos != 1 %}s{% endif %}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-weight:700; font-size:1rem;">${{ cierre.total_cobrado }}</div>
+        {% if cierre.certificado %}
+          <span class="badge badge-aprobada">✅ Certificado</span>
+        {% else %}
+          <span class="badge badge-pendiente">⏳ Sin certificar</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
 </section>
 {% endblock %}

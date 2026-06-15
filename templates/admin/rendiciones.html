@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Rendiciones{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+  <h2 style="margin:0;">💼 Rendiciones</h2>
+  {% if conteo_pendientes > 0 %}
+    <span class="badge badge-pendiente">{{ conteo_pendientes }} sin certificar</span>
+  {% endif %}
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-warning{% endif %}"
+         style="margin-bottom:1rem;">{{ message }}</div>
+  {% endfor %}
+{% endif %}
+
+{# ── Filtros ────────────────────────────────────────────────────── #}
+<div style="display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+  <a href="?filtro=todos"
+     class="btn {% if filtro != 'todos' %}btn-outline{% endif %}"
+     style="font-size:0.9rem; padding:0.4rem 1rem;">Todos</a>
+  <a href="?filtro=pendientes"
+     class="btn {% if filtro != 'pendientes' %}btn-outline{% endif %}"
+     style="font-size:0.9rem; padding:0.4rem 1rem;">⏳ Sin certificar</a>
+  <a href="?filtro=certificados"
+     class="btn {% if filtro != 'certificados' %}btn-outline{% endif %}"
+     style="font-size:0.9rem; padding:0.4rem 1rem;">✅ Certificados</a>
+</div>
+
+{# ── Lista de cierres ───────────────────────────────────────────── #}
+{% if not cierres %}
+  <div class="card" style="text-align:center; color:var(--color-text-muted); padding:2rem;">
+    No hay rendiciones en este filtro.
+  </div>
+{% endif %}
+
+{% for cierre in cierres %}
+<div class="panel" style="margin-bottom:1rem; padding:1rem 1.2rem;">
+
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;
+              flex-wrap:wrap; gap:0.75rem;">
+
+    {# Info del cierre #}
+    <div>
+      <div style="font-weight:700; font-size:1rem;">{{ cierre.usuario.correo }}</div>
+      <div style="font-size:0.85rem; color:var(--color-text-muted); margin-top:0.2rem;">
+        {% if cierre.usuario.es_inspector %}Inspector{% elif cierre.usuario.es_vendedor %}Vendedor{% endif %}
+        · Cierre: {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
+      </div>
+      <div style="font-size:0.85rem; color:var(--color-text-muted);">
+        Período: {{ cierre.fecha_apertura|date:"d/m/Y H:i" }} → {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
+      </div>
+      <div style="font-size:0.85rem; margin-top:0.2rem;">
+        {{ cierre.cantidad_movimientos }} movimiento{% if cierre.cantidad_movimientos != 1 %}s{% endif %}
+      </div>
+    </div>
+
+    {# Total + estado #}
+    <div style="text-align:right;">
+      <div style="font-size:1.5rem; font-weight:800; color:var(--color-primary);">
+        ${{ cierre.total_cobrado }}
+      </div>
+      {% if cierre.certificado %}
+        <span class="badge badge-aprobada">✅ Certificado</span>
+        <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.3rem;">
+          por {{ cierre.certificado_por.correo }}
+          el {{ cierre.certificado_en|date:"d/m/Y H:i" }}
+        </div>
+      {% else %}
+        <span class="badge badge-pendiente">⏳ Sin certificar</span>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {# Botón certificar (solo si no está certificado) #}
+  {% if not cierre.certificado %}
+  <div style="margin-top:0.75rem;">
+    <form method="post" action="{% url 'certificar_cierre' cierre.id %}"
+          onsubmit="return confirm('¿Certificar este cierre de ${{ cierre.total_cobrado }}?');">
+      {% csrf_token %}
+      <button type="submit" class="btn" style="font-size:0.9rem; padding:0.4rem 1.2rem;">
+        ✅ Certificar rendición
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+{% endfor %}
+
+<div style="margin-top:1.5rem;">
+  <a href="{% url 'panel_admin' %}" class="btn btn-outline">← Volver al panel</a>
+</div>
+{% endblock %}

@@ -52,6 +52,8 @@ urlpatterns = [
     path("vendedores/", views.panel_vendedor, name="panel_vendedor"),
     path("vendedores/registrar/", views.registrar_estacionamiento_vendedor, name="vendedores_registrar_estacionamiento"),
     path("vendedores/resumen/", views.resumen_caja, name="vendedores_resumen_caja"),
+    path("vendedores/caja/", views.caja_inspector, name="vendedores_caja"),
+    path("vendedores/cerrar-caja/", views.cerrar_caja, name="vendedores_cerrar_caja"),
 
     # =========================
     # 💳 SALDO
@@ -90,6 +92,12 @@ urlpatterns = [
     path("admin-horarios/", views.gestionar_horarios, name="gestionar_horarios"),
     path("admin-dias-especiales/", views.gestionar_dias_especiales, name="gestionar_dias_especiales"),
     path("admin-tarifas/guardar/", views.gestionar_tarifas, name="admin_guardar_tarifa"),
+
+    # =========================
+    # 💼 RENDICIONES (ADMIN)
+    # =========================
+    path("admin-rendiciones/", views.admin_rendiciones, name="admin_rendiciones"),
+    path("admin-rendiciones/<int:cierre_id>/certificar/", views.certificar_cierre, name="certificar_cierre"),
 
     # =========================
     # ✅ VERIFICACIONES
