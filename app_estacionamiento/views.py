@@ -140,6 +140,35 @@ def registro_view(request):
             "municipios": Municipio.objects.filter(activo=True),
         })
 
+@login_required
+def completar_perfil(request):
+    """
+    Muestra un formulario para que el usuario seleccione su municipio.
+
+    Se usa cuando el usuario se registró via Google OAuth en un sistema
+    con múltiples municipios y aún no tiene municipio asignado.
+
+    Una vez que selecciona, se redirige a su panel según el rol.
+    """
+    municipios = Municipio.objects.filter(activo=True)
+
+    if request.method == "POST":
+        municipio_id = request.POST.get("municipio_id")
+        municipio = Municipio.objects.filter(id=municipio_id, activo=True).first()
+
+        if not municipio:
+            messages.error(request, "Seleccioná un municipio válido.")
+            return render(request, "usuarios/completar_perfil.html", {"municipios": municipios})
+
+        request.user.municipio = municipio
+        request.user.save(update_fields=["municipio"])
+
+        messages.success(request, f"¡Bienvenido/a! Tu municipio fue configurado como {municipio.nombre}.")
+        return redirect_por_rol(request.user)
+
+    return render(request, "usuarios/completar_perfil.html", {"municipios": municipios})
+
+
 @require_role("admin","inspector","vendedor")
 def pagar_infraccion(request, infraccion_id):
     infraccion = get_object_or_404(Infraccion, id=infraccion_id)

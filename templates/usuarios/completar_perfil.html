@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Completar perfil — Estacionamiento{% endblock %}
+
+{% block content %}
+<section class="container" style="max-width:460px;">
+  <div class="panel auth-panel" style="margin-top:3rem; text-align:center;">
+
+    <div style="font-size:2.2rem; margin-bottom:0.5rem;">🏙️</div>
+    <h2 style="margin-bottom:0.3rem;">Un paso más</h2>
+    <p style="color:var(--color-text-muted); font-size:0.95rem; margin-bottom:1.5rem;">
+      Seleccioná el municipio al que pertenecés para continuar.
+    </p>
+
+    <form method="post" style="text-align:left;">
+      {% csrf_token %}
+
+      <div class="form-row">
+        <label for="municipio_id">Municipio <span style="color:#c0392b;">*</span></label>
+        <select id="municipio_id" name="municipio_id" required>
+          <option value="" disabled selected>— Seleccioná tu municipio —</option>
+          {% for m in municipios %}
+            <option value="{{ m.id }}">{{ m.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button type="submit" class="btn" style="width:100%; margin-top:0.5rem;">
+        Confirmar municipio
+      </button>
+    </form>
+
+    <div style="margin-top:1.25rem;">
+      <a href="{% url 'logout' %}" style="font-size:0.85rem; color:var(--color-text-muted);">
+        Salir de la cuenta
+      </a>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

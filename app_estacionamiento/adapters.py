@@ -36,6 +36,8 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
         return user
 
     def save_user(self, request, sociallogin, form=None):
+        from .models import Municipio
+
         user = super().save_user(request, sociallogin, form)
 
         # Asegurar que correo esté seteado después de guardar
@@ -46,8 +48,20 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
                 user.save(update_fields=["correo"])
 
         # Los usuarios que ingresan por Google son conductores por defecto
+        campos_a_guardar = []
         if not user.es_conductor and not user.es_inspector and not user.es_vendedor and not user.es_admin:
             user.es_conductor = True
-            user.save(update_fields=["es_conductor"])
+            campos_a_guardar.append("es_conductor")
+
+        # Si hay exactamente un municipio activo, asignarlo automáticamente.
+        # Si hay más de uno, el middleware redirigirá al usuario a completar_perfil.
+        if not user.municipio_id:
+            municipios = Municipio.objects.filter(activo=True)
+            if municipios.count() == 1:
+                user.municipio = municipios.first()
+                campos_a_guardar.append("municipio")
+
+        if campos_a_guardar:
+            user.save(update_fields=campos_a_guardar)
 
         return user

@@ -11,6 +11,7 @@ urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("logout/", views.logout_view, name="logout"),
     path("registro/", views.registro_view, name="registro"),
+    path("completar-perfil/", views.completar_perfil, name="completar_perfil"),
 
     # =========================
     # 🧭 INICIO

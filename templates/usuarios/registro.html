@@ -1,27 +1,100 @@
-{% extends "base.html" %} {% block title %}Registro{% endblock %} {% block
-content %}
-<section class="container">
-  <div class="panel">
-    <h2>Crear cuenta</h2>
-    <div class="panel-body">
-      <form method="post">
-        {% csrf_token %} {{ form.as_p }} {% if municipios|length > 1 %}
-        <div class="form-row">
-          <label for="municipio_id">Municipio</label>
-          <select id="municipio_id" name="municipio_id">
-            {% for m in municipios %}
-            <option value="{{ m.id }}">{{ m.nombre }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        {% endif %}
-        <button class="btn">Registrarse</button>
-      </form>
+{% extends "base.html" %}
+{% block title %}Crear cuenta — Estacionamiento{% endblock %}
 
-      <div class="actions">
-        <a href="{% url 'login' %}">Ya tengo cuenta</a>
-      </div>
+{% block content %}
+<section class="container" style="max-width:460px;">
+  <div class="panel auth-panel" style="margin-top:2rem;">
+
+    <div style="text-align:center; margin-bottom:1.5rem;">
+      <div style="font-size:2rem; margin-bottom:0.4rem;">🅿️</div>
+      <h2 style="margin:0;">Crear cuenta</h2>
     </div>
+
+    {% if form.errors %}
+      <div style="background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
+                  padding:0.75rem 1rem; border-radius:8px; margin-bottom:1rem;
+                  font-weight:600;">
+        Corregí los errores del formulario.
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {# Campo correo #}
+      <div class="form-row">
+        <label for="id_correo">Correo electrónico</label>
+        <input type="email"
+               id="id_correo"
+               name="correo"
+               value="{{ form.correo.value|default:'' }}"
+               required
+               autocomplete="email"
+               placeholder="tucorreo@ejemplo.com">
+        {% if form.correo.errors %}
+          <span style="color:#c0392b; font-size:0.85rem;">{{ form.correo.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+
+      {# Contraseña #}
+      <div class="form-row">
+        <label for="id_password1">Contraseña</label>
+        <input type="password"
+               id="id_password1"
+               name="password1"
+               required
+               autocomplete="new-password"
+               placeholder="Mínimo 8 caracteres">
+        {% if form.password1.errors %}
+          <span style="color:#c0392b; font-size:0.85rem;">{{ form.password1.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+
+      <div class="form-row">
+        <label for="id_password2">Repetí la contraseña</label>
+        <input type="password"
+               id="id_password2"
+               name="password2"
+               required
+               autocomplete="new-password"
+               placeholder="Repetí la contraseña">
+        {% if form.password2.errors %}
+          <span style="color:#c0392b; font-size:0.85rem;">{{ form.password2.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+
+      {% if municipios|length > 1 %}
+      {# Selector de municipio (solo cuando hay más de uno) #}
+      <div class="form-row">
+        <label for="municipio_id">Municipio <span style="color:#c0392b;">*</span></label>
+        <select id="municipio_id" name="municipio_id" required>
+          <option value="" disabled selected>— Seleccioná tu municipio —</option>
+          {% for m in municipios %}
+            <option value="{{ m.id }}"
+              {% if request.POST.municipio_id == m.id|stringformat:"s" %}selected{% endif %}>
+              {{ m.nombre }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <button type="submit" class="btn" style="width:100%; margin-top:0.5rem;">
+        Crear cuenta
+      </button>
+    </form>
+
+    {% if form.non_field_errors %}
+      <div style="color:#c0392b; font-size:0.9rem; margin-top:0.75rem; text-align:center;">
+        {{ form.non_field_errors|join:" · " }}
+      </div>
+    {% endif %}
+
+    <div style="text-align:center; margin-top:1.25rem; color:var(--color-text-muted); font-size:0.9rem;">
+      ¿Ya tenés cuenta?
+      <a href="{% url 'login' %}" style="font-weight:600;">Ingresá acá</a>
+    </div>
+
   </div>
 </section>
 {% endblock %}

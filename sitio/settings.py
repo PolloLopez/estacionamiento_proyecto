@@ -55,6 +55,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
+    # Redirige a completar-perfil si el usuario no tiene municipio asignado
+    # (solo en sistemas con más de un municipio activo)
+    "app_estacionamiento.middleware.RequiereMunicipioMiddleware",
 ]
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
