@@ -95,6 +95,12 @@ class Usuario(AbstractUser):
     es_vendedor = models.BooleanField(default=False)
     es_admin = models.BooleanField(default=False)
 
+    # ✅ Verificación de identidad del conductor (aprobada por el admin)
+    es_verificado = models.BooleanField(
+        default=False,
+        help_text="El admin verificó la identidad del conductor."
+    )
+
     # 🔐 Django admin / permisos
     #is_staff → acceso admin Django
     #es_admin → lógica de negocio
@@ -395,11 +401,119 @@ class DiaEspecial(models.Model):
 
 
 class Notificacion(models.Model):
-    destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario 
-    mensaje = models.TextField()  
-    fecha = models.DateTimeField(auto_now_add=True)  
-    leida = models.BooleanField(default=False)  
+    destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario
+    mensaje = models.TextField()
+    fecha = models.DateTimeField(auto_now_add=True)
+    leida = models.BooleanField(default=False)
 
     def __str__(self):
         # Usamos 'correo' porque los tests esperan ese campo en Usuario
         return f"Notificación para {self.destinatario.correo}"
+
+
+class SolicitudVerificacion(models.Model):
+    """
+    Solicitud de verificación de identidad (y opcionalmente de exención)
+    que un conductor envía para que el admin la revise.
+
+    Flujo de identidad:
+      conductor llena formulario → estado=pendiente
+      admin aprueba → estado=aprobada → usuario.es_verificado=True
+      admin rechaza → estado=rechazada + notas_admin
+
+    Flujo de exención (opcional, dentro de la misma solicitud):
+      conductor marca solicita_exencion=True, elige tipo y vehículo, adjunta docs
+      admin aprueba → estado_exencion=aprobada → setea exención en vehiculo
+      admin rechaza → estado_exencion=rechazada + notas_exencion_admin
+
+    Documentos requeridos según tipo:
+      discapacidad  → documento_1 = CUD
+      frentista     → documento_1 = licencia de conducir
+                      documento_2 = cédula del domicilio
+    """
+    ESTADOS = [
+        ("pendiente",  "Pendiente"),
+        ("aprobada",   "Aprobada"),
+        ("rechazada",  "Rechazada"),
+    ]
+
+    TIPOS_EXENCION_SOLICITADOS = [
+        ("discapacidad",     "Discapacidad (CUD)"),
+        ("vecino_frentista", "Vecino frentista"),
+    ]
+
+    # ── Identidad ────────────────────────────────────────────────────────────
+    usuario         = models.OneToOneField(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name="solicitud_verificacion"
+    )
+    nombre          = models.CharField(max_length=100, verbose_name="Nombre")
+    apellido        = models.CharField(max_length=100, verbose_name="Apellido")
+    dni             = models.CharField(max_length=20,  verbose_name="DNI")
+    telefono        = models.CharField(max_length=30, blank=True, verbose_name="Teléfono")
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    estado          = models.CharField(max_length=20, choices=ESTADOS, default="pendiente")
+    notas_admin     = models.TextField(
+        blank=True,
+        verbose_name="Notas del admin (identidad)",
+        help_text="Motivo de rechazo de identidad u observaciones."
+    )
+
+    # ── Exención (opcional) ───────────────────────────────────────────────────
+    solicita_exencion = models.BooleanField(
+        default=False,
+        verbose_name="¿Solicita exención?",
+    )
+    tipo_exencion_solicitado = models.CharField(
+        max_length=30,
+        choices=TIPOS_EXENCION_SOLICITADOS,
+        blank=True,
+        verbose_name="Tipo de exención solicitada",
+    )
+    vehiculo = models.ForeignKey(
+        "Vehiculo",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="solicitudes_exencion",
+        verbose_name="Vehículo a exentar",
+    )
+    # documento_1:
+    #   discapacidad  → CUD
+    #   frentista     → Licencia de conducir
+    documento_1 = models.FileField(
+        upload_to="solicitudes_verificacion/",
+        null=True,
+        blank=True,
+        verbose_name="Documento principal",
+    )
+    # documento_2:
+    #   frentista     → Cédula con domicilio en zona de estacionamiento
+    #   discapacidad  → no se usa
+    documento_2 = models.FileField(
+        upload_to="solicitudes_verificacion/",
+        null=True,
+        blank=True,
+        verbose_name="Cédula / domicilio (solo frentista)",
+    )
+    estado_exencion = models.CharField(
+        max_length=20,
+        choices=ESTADOS,
+        blank=True,
+        default="",
+        verbose_name="Estado de la exención",
+    )
+    notas_exencion_admin = models.TextField(
+        blank=True,
+        verbose_name="Notas del admin (exención)",
+        help_text="Motivo de rechazo de la exención."
+    )
+
+    class Meta:
+        ordering = ["-fecha_solicitud"]
+        verbose_name = "Solicitud de verificación"
+        verbose_name_plural = "Solicitudes de verificación"
+
+    def __str__(self):
+        return f"{self.usuario} — {self.estado}"

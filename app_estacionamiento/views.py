@@ -33,6 +33,7 @@ from .models import (
     VerificacionInspector,
     HorarioEstacionamiento,
     DiaEspecial,
+    SolicitudVerificacion,
     TIPOS_EXENCION,
 )
 
@@ -46,7 +47,7 @@ from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInf
 from app_estacionamiento.use_cases.finalizar_estacionamiento import ( ejecutar as finalizar_estacionamiento_uc)
 
 
-@require_role("inspector", "admin", "conductor", "vendedor") 
+@require_role("inspector", "admin", "conductor", "vendedor")
 def inicio_usuarios(request):
     usuario = request.user
 
@@ -55,9 +56,13 @@ def inicio_usuarios(request):
         estado="ACTIVO"
     ).order_by("-hora_inicio").first()
 
+    # Estado de verificación: None si no existe solicitud
+    solicitud_verificacion = getattr(usuario, "solicitud_verificacion", None)
+
     return render(request, "usuarios/inicio_usuarios.html", {
         "usuario": usuario,
         "estacionamiento_activo": estacionamiento_activo,
+        "solicitud_verificacion": solicitud_verificacion,
     })
 
 # =========================================================
@@ -139,6 +144,146 @@ def registro_view(request):
             "form": form,
             "municipios": Municipio.objects.filter(activo=True),
         })
+
+@require_role("conductor")
+def solicitar_verificacion(request):
+    """
+    El conductor envía una solicitud de verificación de identidad y,
+    opcionalmente, una solicitud de exención (discapacidad o frentista).
+
+    Flujo de identidad:
+      - Si la solicitud está aprobada → solo lectura, sin reenvío.
+      - Si está pendiente → muestra estado.
+      - Si está rechazada o no existe → puede enviar/reenviar.
+
+    Flujo de exención (dentro de la misma solicitud):
+      - Marcando "Solicito exención" aparecen: tipo, vehículo y documentos.
+      - discapacidad  → documento_1 = CUD
+      - frentista     → documento_1 = licencia, documento_2 = cédula de domicilio
+    """
+    usuario = request.user
+
+    try:
+        solicitud = usuario.solicitud_verificacion
+    except SolicitudVerificacion.DoesNotExist:
+        solicitud = None
+
+    # Vehículos registrados del conductor para el selector de exención
+    vehiculos_usuario = Vehiculo.objects.filter(
+        vehiculousuario__usuario=usuario
+    )
+
+    if request.method == "POST":
+        if usuario.es_verificado:
+            messages.error(request, "Tu cuenta ya está verificada.")
+            return redirect("inicio_usuarios")
+
+        nombre   = request.POST.get("nombre", "").strip()
+        apellido = request.POST.get("apellido", "").strip()
+        dni      = request.POST.get("dni", "").strip()
+        telefono = request.POST.get("telefono", "").strip()
+
+        if not nombre or not apellido or not dni:
+            messages.error(request, "Nombre, apellido y DNI son obligatorios.")
+            return render(request, "usuarios/solicitar_verificacion.html", {
+                "solicitud": solicitud,
+                "vehiculos": vehiculos_usuario,
+            })
+
+        # ── Datos de exención (opcionales) ─────────────────────────────────
+        solicita_exencion     = request.POST.get("solicita_exencion") == "on"
+        tipo_exencion_sol     = request.POST.get("tipo_exencion_solicitado", "").strip()
+        vehiculo_id           = request.POST.get("vehiculo_id", "").strip()
+
+        vehiculo_obj = None
+        if solicita_exencion and vehiculo_id:
+            vehiculo_obj = Vehiculo.objects.filter(
+                id=vehiculo_id,
+                vehiculousuario__usuario=usuario
+            ).first()
+
+        # Validar docs según tipo de exención
+        doc1 = request.FILES.get("documento_1")
+        doc2 = request.FILES.get("documento_2")
+
+        if solicita_exencion:
+            if not tipo_exencion_sol:
+                messages.error(request, "Seleccioná el tipo de exención.")
+                return render(request, "usuarios/solicitar_verificacion.html", {
+                    "solicitud": solicitud, "vehiculos": vehiculos_usuario,
+                })
+            if not vehiculo_obj:
+                messages.error(request, "Seleccioná el vehículo para la exención.")
+                return render(request, "usuarios/solicitar_verificacion.html", {
+                    "solicitud": solicitud, "vehiculos": vehiculos_usuario,
+                })
+            if not doc1 and not (solicitud and solicitud.documento_1):
+                messages.error(request, "Adjuntá el documento principal requerido.")
+                return render(request, "usuarios/solicitar_verificacion.html", {
+                    "solicitud": solicitud, "vehiculos": vehiculos_usuario,
+                })
+            if tipo_exencion_sol == "vecino_frentista" and not doc2 and not (solicitud and solicitud.documento_2):
+                messages.error(request, "La exención de frentista requiere la cédula de domicilio.")
+                return render(request, "usuarios/solicitar_verificacion.html", {
+                    "solicitud": solicitud, "vehiculos": vehiculos_usuario,
+                })
+
+        # ── Crear o actualizar la solicitud ──────────────────────────────────
+        if solicitud:
+            solicitud.nombre   = nombre
+            solicitud.apellido = apellido
+            solicitud.dni      = dni
+            solicitud.telefono = telefono
+            solicitud.estado   = "pendiente"
+            solicitud.notas_admin = ""
+
+            # Actualizar exención
+            solicitud.solicita_exencion     = solicita_exencion
+            solicitud.tipo_exencion_solicitado = tipo_exencion_sol if solicita_exencion else ""
+            solicitud.vehiculo              = vehiculo_obj if solicita_exencion else None
+
+            if solicita_exencion:
+                # Resetear estado de exención al reenviar
+                solicitud.estado_exencion    = "pendiente"
+                solicitud.notas_exencion_admin = ""
+                if doc1:
+                    solicitud.documento_1 = doc1
+                if doc2:
+                    solicitud.documento_2 = doc2
+            else:
+                solicitud.estado_exencion = ""
+                solicitud.documento_1 = None
+                solicitud.documento_2 = None
+
+            solicitud.save()
+        else:
+            kwargs = dict(
+                usuario=usuario,
+                nombre=nombre,
+                apellido=apellido,
+                dni=dni,
+                telefono=telefono,
+                solicita_exencion=solicita_exencion,
+            )
+            if solicita_exencion:
+                kwargs["tipo_exencion_solicitado"] = tipo_exencion_sol
+                kwargs["vehiculo"]                = vehiculo_obj
+                kwargs["estado_exencion"]         = "pendiente"
+                if doc1:
+                    kwargs["documento_1"] = doc1
+                if doc2:
+                    kwargs["documento_2"] = doc2
+
+            solicitud = SolicitudVerificacion.objects.create(**kwargs)
+
+        messages.success(request, "¡Solicitud enviada! El admin la revisará a la brevedad.")
+        return redirect("inicio_usuarios")
+
+    return render(request, "usuarios/solicitar_verificacion.html", {
+        "solicitud": solicitud,
+        "vehiculos": vehiculos_usuario,
+    })
+
 
 @login_required
 def completar_perfil(request):
@@ -224,6 +369,11 @@ def panel_admin(request):
         tipo="ingreso"
     ).aggregate(total=Sum("monto"))["total"] or 0
 
+    verificaciones_pendientes = SolicitudVerificacion.objects.filter(
+        estado="pendiente",
+        usuario__municipio=municipio
+    ).count()
+
     return render(request, "admin/panel_admin.html", {
         "inspectores": inspectores,
         "vendedores": vendedores,
@@ -233,6 +383,7 @@ def panel_admin(request):
         "infracciones_recientes": infracciones_recientes,
         "rol_seleccionado": rol,
         "total_cobrado": total_cobrado,
+        "verificaciones_pendientes": verificaciones_pendientes,
     })
 
 @require_role("admin")
@@ -1527,11 +1678,29 @@ def mp_iniciar_carga(request):
             "montos_rapidos": [500, 1000, 2000, 5000],
         })
 
-    # En sandbox usamos sandbox_init_point; en prod usamos init_point
+    respuesta_mp = resultado["response"]
+
+    # Detectar si el request viene de un dispositivo mobile.
+    # En mobile usamos mobile_init_point: abre la app de MercadoPago si está instalada,
+    # y cae al browser como fallback. En desktop usamos init_point (web).
+    user_agent = request.META.get("HTTP_USER_AGENT", "").lower()
+    es_mobile = any(kw in user_agent for kw in (
+        "android", "iphone", "ipad", "ipod", "mobile", "blackberry", "windows phone"
+    ))
+
     if settings.DEBUG:
-        checkout_url = resultado["response"]["sandbox_init_point"]
+        # Sandbox solo tiene sandbox_init_point (no tiene mobile)
+        checkout_url = respuesta_mp.get("sandbox_init_point", "")
+    elif es_mobile and respuesta_mp.get("mobile_init_point"):
+        checkout_url = respuesta_mp["mobile_init_point"]
     else:
-        checkout_url = resultado["response"]["init_point"]
+        checkout_url = respuesta_mp.get("init_point", "")
+
+    if not checkout_url:
+        messages.error(request, "No se pudo obtener la URL de pago de MercadoPago.")
+        return render(request, "usuarios/mp_cargar_saldo.html", {
+            "montos_rapidos": [500, 1000, 2000, 5000],
+        })
 
     return redirect(checkout_url)
 
@@ -1677,3 +1846,135 @@ def mp_webhook(request):
         pass  # Si ya fue acreditado (idempotencia) no hay problema
 
     return HttpResponse(status=200)
+
+
+# =========================================================
+# ADMIN — VERIFICACIONES DE CONDUCTORES
+# =========================================================
+
+@require_role("admin")
+def gestionar_verificaciones(request):
+    """
+    Lista todas las solicitudes de verificación.
+    El admin puede filtrar por estado (pendiente / aprobada / rechazada).
+    """
+    municipio     = getattr(request.user, "municipio", None)
+    estado_filtro = request.GET.get("estado", "pendiente")
+
+    solicitudes = SolicitudVerificacion.objects.select_related(
+        "usuario", "vehiculo"
+    ).filter(usuario__municipio=municipio)
+
+    if estado_filtro in ("pendiente", "aprobada", "rechazada"):
+        solicitudes = solicitudes.filter(estado=estado_filtro)
+
+    conteo_pendientes = SolicitudVerificacion.objects.filter(
+        estado="pendiente",
+        usuario__municipio=municipio
+    ).count()
+
+    # Subcuadras del municipio para el selector de exención parcial
+    subcuadras = Subcuadra.objects.filter(municipio=municipio).order_by("calle", "altura_desde")
+
+    return render(request, "admin/gestionar_verificaciones.html", {
+        "solicitudes": solicitudes,
+        "estado_filtro": estado_filtro,
+        "conteo_pendientes": conteo_pendientes,
+        "subcuadras": subcuadras,
+        "tipos_exencion": TIPOS_EXENCION,
+    })
+
+
+@require_role("admin")
+def resolver_verificacion(request, solicitud_id):
+    """
+    El admin resuelve una solicitud de verificación.
+
+    Acciones disponibles (campo 'accion' en POST):
+      aprobar          → identidad aprobada → usuario.es_verificado=True
+      rechazar         → identidad rechazada + notas_admin
+      aprobar_exencion → aplica exención al vehículo según tipo y subcuadras elegidas
+      rechazar_exencion → marca exención rechazada + notas_exencion_admin
+    """
+    solicitud = get_object_or_404(
+        SolicitudVerificacion.objects.select_related("usuario", "vehiculo"),
+        id=solicitud_id
+    )
+
+    if request.method != "POST":
+        return redirect("gestionar_verificaciones")
+
+    accion = request.POST.get("accion")
+
+    # ── Identidad ─────────────────────────────────────────────────────────────
+    if accion == "aprobar":
+        solicitud.estado = "aprobada"
+        solicitud.notas_admin = ""
+        solicitud.save(update_fields=["estado", "notas_admin"])
+
+        solicitud.usuario.es_verificado = True
+        solicitud.usuario.save(update_fields=["es_verificado"])
+
+        messages.success(request, f"✅ Identidad aprobada: {solicitud.usuario.correo}.")
+
+    elif accion == "rechazar":
+        notas = request.POST.get("notas_admin", "").strip()
+        solicitud.estado = "rechazada"
+        solicitud.notas_admin = notas
+        solicitud.save(update_fields=["estado", "notas_admin"])
+
+        solicitud.usuario.es_verificado = False
+        solicitud.usuario.save(update_fields=["es_verificado"])
+
+        messages.warning(request, f"❌ Identidad rechazada: {solicitud.usuario.correo}.")
+
+    # ── Exención ──────────────────────────────────────────────────────────────
+    elif accion == "aprobar_exencion":
+        vehiculo = solicitud.vehiculo
+        if not vehiculo:
+            messages.error(request, "La solicitud no tiene vehículo asociado.")
+            return redirect("gestionar_verificaciones")
+
+        tipo_exencion  = request.POST.get("tipo_exencion", solicitud.tipo_exencion_solicitado)
+        exento_global  = request.POST.get("exento_global") == "on"
+        subcuadras_ids = request.POST.getlist("subcuadras")
+        notas          = request.POST.get("notas_exencion", "").strip()
+
+        vehiculo.tipo_exencion  = tipo_exencion
+        vehiculo.exento_global  = exento_global
+        vehiculo.notas_exencion = (
+            notas or f"Aprobado por {request.user.correo} — solicitud #{solicitud.id}"
+        )
+        vehiculo.save(update_fields=["tipo_exencion", "exento_global", "notas_exencion"])
+
+        if not exento_global and subcuadras_ids:
+            municipio = request.user.municipio
+            subcuadras_validas = Subcuadra.objects.filter(
+                id__in=subcuadras_ids,
+                municipio=municipio
+            )
+            vehiculo.subcuadras_exentas.set(subcuadras_validas)
+        elif exento_global:
+            vehiculo.subcuadras_exentas.clear()
+
+        solicitud.estado_exencion    = "aprobada"
+        solicitud.notas_exencion_admin = ""
+        solicitud.save(update_fields=["estado_exencion", "notas_exencion_admin"])
+
+        messages.success(
+            request,
+            f"✅ Exención aprobada para {vehiculo.patente} ({solicitud.usuario.correo})."
+        )
+
+    elif accion == "rechazar_exencion":
+        notas = request.POST.get("notas_exencion_admin", "").strip()
+        solicitud.estado_exencion    = "rechazada"
+        solicitud.notas_exencion_admin = notas
+        solicitud.save(update_fields=["estado_exencion", "notas_exencion_admin"])
+
+        messages.warning(
+            request,
+            f"❌ Exención rechazada para {solicitud.usuario.correo}."
+        )
+
+    return redirect("gestionar_verificaciones")

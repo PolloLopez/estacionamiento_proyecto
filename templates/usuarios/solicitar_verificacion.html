@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Verificar mi cuenta{% endblock %}
+
+{% block content %}
+<section class="container" style="max-width:560px;">
+  <div class="panel" style="margin-top:1.5rem;">
+
+    <h2 style="margin-bottom:0.3rem;">✅ Verificar mi cuenta</h2>
+    <p style="color:var(--color-text-muted); font-size:0.95rem; margin-bottom:1.5rem;">
+      Completá tus datos para que el municipio pueda verificar tu identidad.
+    </p>
+
+    {# ── Ya verificado ─────────────────────────────────────────────────── #}
+    {% if request.user.es_verificado %}
+      <div style="background:#d4edda; color:#155724; border:1px solid #b7dfcb;
+                  padding:1rem; border-radius:8px; text-align:center;">
+        <div style="font-size:1.8rem; margin-bottom:0.4rem;">🎉</div>
+        <strong>¡Tu cuenta ya está verificada!</strong>
+      </div>
+      <div style="text-align:center; margin-top:1.5rem;">
+        <a href="{% url 'inicio_usuarios' %}" class="btn">← Volver al inicio</a>
+      </div>
+
+    {# ── Solicitud pendiente (solo lectura) ────────────────────────────── #}
+    {% elif solicitud and solicitud.estado == "pendiente" %}
+      <div style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;
+                  padding:1rem; border-radius:8px; margin-bottom:1.5rem;">
+        <strong>⏳ Tu solicitud está en revisión.</strong><br>
+        <span style="font-size:0.9rem;">
+          Enviada el {{ solicitud.fecha_solicitud|date:"d/m/Y H:i" }}.
+          El admin la revisará pronto.
+        </span>
+      </div>
+
+      <table style="width:100%; border-collapse:collapse; font-size:0.9rem; margin-bottom:1rem;">
+        <tr><td style="padding:0.35rem 0; color:var(--color-text-muted); width:140px;">Nombre</td>
+            <td><strong>{{ solicitud.nombre }} {{ solicitud.apellido }}</strong></td></tr>
+        <tr><td style="padding:0.35rem 0; color:var(--color-text-muted);">DNI</td>
+            <td>{{ solicitud.dni }}</td></tr>
+        {% if solicitud.telefono %}
+        <tr><td style="padding:0.35rem 0; color:var(--color-text-muted);">Teléfono</td>
+            <td>{{ solicitud.telefono }}</td></tr>
+        {% endif %}
+        {% if solicitud.solicita_exencion %}
+        <tr><td style="padding:0.35rem 0; color:var(--color-text-muted);">Exención</td>
+            <td>
+              {{ solicitud.get_tipo_exencion_solicitado_display }}
+              {% if solicitud.vehiculo %} — {{ solicitud.vehiculo.patente }}{% endif %}
+              <br>
+              {% if solicitud.estado_exencion == "pendiente" %}
+                <span style="font-size:0.82rem; color:#856404;">⏳ En revisión</span>
+              {% elif solicitud.estado_exencion == "aprobada" %}
+                <span style="font-size:0.82rem; color:#155724;">✅ Aprobada</span>
+              {% elif solicitud.estado_exencion == "rechazada" %}
+                <span style="font-size:0.82rem; color:#721c24;">❌ Rechazada
+                  {% if solicitud.notas_exencion_admin %} — {{ solicitud.notas_exencion_admin }}{% endif %}
+                </span>
+              {% endif %}
+            </td></tr>
+        {% endif %}
+      </table>
+
+      <div style="text-align:center; margin-top:1rem;">
+        <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline">← Volver al inicio</a>
+      </div>
+
+    {# ── Formulario (nueva solicitud o reenvío tras rechazo) ────────────── #}
+    {% else %}
+
+      {% if solicitud and solicitud.estado == "rechazada" %}
+        <div style="background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
+                    padding:1rem; border-radius:8px; margin-bottom:1.5rem;">
+          <strong>❌ Tu solicitud anterior fue rechazada.</strong>
+          {% if solicitud.notas_admin %}
+            <br><span style="font-size:0.9rem;">Motivo: {{ solicitud.notas_admin }}</span>
+          {% endif %}
+          <br><span style="font-size:0.88rem; margin-top:0.3rem; display:block;">
+            Corregí tus datos y volvé a enviar.
+          </span>
+        </div>
+      {% endif %}
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {# ── Datos personales ────────────────────────────────────────── #}
+        <h3 style="font-size:1rem; margin-bottom:1rem; border-bottom:1px solid #eee; padding-bottom:0.5rem;">
+          👤 Datos personales
+        </h3>
+
+        <div class="form-row">
+          <label for="id_nombre">Nombre <span style="color:#c0392b;">*</span></label>
+          <input type="text" id="id_nombre" name="nombre" required
+                 value="{{ solicitud.nombre|default:'' }}" placeholder="Tu nombre">
+        </div>
+        <div class="form-row">
+          <label for="id_apellido">Apellido <span style="color:#c0392b;">*</span></label>
+          <input type="text" id="id_apellido" name="apellido" required
+                 value="{{ solicitud.apellido|default:'' }}" placeholder="Tu apellido">
+        </div>
+        <div class="form-row">
+          <label for="id_dni">DNI <span style="color:#c0392b;">*</span></label>
+          <input type="text" id="id_dni" name="dni" required
+                 value="{{ solicitud.dni|default:'' }}" placeholder="Número de documento">
+        </div>
+        <div class="form-row">
+          <label for="id_telefono">
+            Teléfono
+            <span style="font-weight:400; color:var(--color-text-muted);">(opcional)</span>
+          </label>
+          <input type="tel" id="id_telefono" name="telefono"
+                 value="{{ solicitud.telefono|default:'' }}" placeholder="Ej: 2991234567">
+        </div>
+
+        {# ── Sección exención ────────────────────────────────────────── #}
+        <div style="margin-top:1.5rem; border-top:1px solid #eee; padding-top:1rem;">
+          <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer;
+                        font-weight:600; font-size:0.97rem;">
+            <input type="checkbox" id="chk_exencion" name="solicita_exencion"
+                   {% if solicitud and solicitud.solicita_exencion %}checked{% endif %}
+                   style="width:18px; height:18px; cursor:pointer;">
+            Solicitar también una exención de estacionamiento
+          </label>
+          <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.4rem 0 0 1.6rem;">
+            Si tenés certificado de discapacidad o vivís frente a una zona de cobro.
+          </p>
+        </div>
+
+        {# ── Campos de exención (se muestran con JS) ─────────────────── #}
+        <div id="seccion_exencion" style="display:none; margin-top:1rem;">
+
+          {% if not vehiculos %}
+            <div style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;
+                        padding:0.75rem 1rem; border-radius:8px; font-size:0.9rem;">
+              ⚠️ No tenés vehículos registrados. Primero
+              <a href="{% url 'agregar_vehiculo' %}">agregá un vehículo</a>
+              para poder solicitar exención.
+            </div>
+          {% else %}
+
+            <div class="form-row">
+              <label for="id_tipo_exencion">Tipo de exención <span style="color:#c0392b;">*</span></label>
+              <select id="id_tipo_exencion" name="tipo_exencion_solicitado">
+                <option value="" disabled {% if not solicitud or not solicitud.tipo_exencion_solicitado %}selected{% endif %}>
+                  — Seleccioná —
+                </option>
+                <option value="discapacidad"
+                  {% if solicitud and solicitud.tipo_exencion_solicitado == "discapacidad" %}selected{% endif %}>
+                  Discapacidad (CUD)
+                </option>
+                <option value="vecino_frentista"
+                  {% if solicitud and solicitud.tipo_exencion_solicitado == "vecino_frentista" %}selected{% endif %}>
+                  Vecino frentista
+                </option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label for="id_vehiculo">Vehículo a exentar <span style="color:#c0392b;">*</span></label>
+              <select id="id_vehiculo" name="vehiculo_id">
+                <option value="" disabled {% if not solicitud or not solicitud.vehiculo %}selected{% endif %}>
+                  — Seleccioná una patente —
+                </option>
+                {% for v in vehiculos %}
+                  <option value="{{ v.id }}"
+                    {% if solicitud and solicitud.vehiculo_id == v.id %}selected{% endif %}>
+                    {{ v.patente }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            {# ── Ayuda contextual + docs según tipo ────────────────── #}
+            <div id="ayuda_discapacidad" style="display:none;">
+              <div style="background:#d1ecf1; color:#0c5460; border:1px solid #bee5eb;
+                          padding:0.75rem 1rem; border-radius:8px; font-size:0.88rem; margin-bottom:0.75rem;">
+                🏥 <strong>Certificado de discapacidad (CUD)</strong><br>
+                Adjuntá el frente y dorso en un solo archivo, o el PDF del certificado vigente.
+              </div>
+              <div class="form-row">
+                <label for="id_doc1_discapacidad">
+                  CUD <span style="color:#c0392b;">*</span>
+                  {% if solicitud and solicitud.documento_1 %}
+                    <span style="font-size:0.82rem; color:#155724; font-weight:400;">
+                      ✅ Ya adjunto
+                    </span>
+                  {% endif %}
+                </label>
+                <input type="file" id="id_doc1_discapacidad" name="documento_1"
+                       accept=".pdf,.jpg,.jpeg,.png"
+                       {% if not solicitud or not solicitud.documento_1 %}required{% endif %}>
+              </div>
+            </div>
+
+            <div id="ayuda_frentista" style="display:none;">
+              <div style="background:#d1ecf1; color:#0c5460; border:1px solid #bee5eb;
+                          padding:0.75rem 1rem; border-radius:8px; font-size:0.88rem; margin-bottom:0.75rem;">
+                🏠 <strong>Documentación requerida para vecino frentista:</strong><br>
+                Ambos documentos deben mostrar un domicilio dentro de la zona de estacionamiento medido.
+              </div>
+              <div class="form-row">
+                <label for="id_doc1_frentista">
+                  Licencia de conducir <span style="color:#c0392b;">*</span>
+                  {% if solicitud and solicitud.documento_1 %}
+                    <span style="font-size:0.82rem; color:#155724; font-weight:400;">✅ Ya adjunto</span>
+                  {% endif %}
+                </label>
+                <input type="file" id="id_doc1_frentista" name="documento_1"
+                       accept=".pdf,.jpg,.jpeg,.png"
+                       {% if not solicitud or not solicitud.documento_1 %}required{% endif %}>
+              </div>
+              <div class="form-row">
+                <label for="id_doc2_frentista">
+                  Cédula / domicilio <span style="color:#c0392b;">*</span>
+                  {% if solicitud and solicitud.documento_2 %}
+                    <span style="font-size:0.82rem; color:#155724; font-weight:400;">✅ Ya adjunto</span>
+                  {% endif %}
+                </label>
+                <input type="file" id="id_doc2_frentista" name="documento_2"
+                       accept=".pdf,.jpg,.jpeg,.png"
+                       {% if not solicitud or not solicitud.documento_2 %}required{% endif %}>
+              </div>
+            </div>
+
+          {% endif %}{# fin if vehiculos #}
+        </div>{# fin seccion_exencion #}
+
+        <button type="submit" class="btn" style="width:100%; margin-top:1.5rem;">
+          Enviar solicitud
+        </button>
+      </form>
+
+      <div style="text-align:center; margin-top:1rem;">
+        <a href="{% url 'inicio_usuarios' %}" style="font-size:0.9rem; color:var(--color-text-muted);">
+          ← Cancelar
+        </a>
+      </div>
+    {% endif %}
+
+  </div>
+</section>
+
+<script>
+(function () {
+  var chk   = document.getElementById("chk_exencion");
+  var sec   = document.getElementById("seccion_exencion");
+  var sel   = document.getElementById("id_tipo_exencion");
+  var ayudaD = document.getElementById("ayuda_discapacidad");
+  var ayudaF = document.getElementById("ayuda_frentista");
+
+  function toggleExencion() {
+    sec.style.display = chk && chk.checked ? "block" : "none";
+    if (!chk || !chk.checked) return;
+    toggleTipo();
+  }
+
+  function toggleTipo() {
+    if (!sel) return;
+    var tipo = sel.value;
+    if (ayudaD) ayudaD.style.display = tipo === "discapacidad"    ? "block" : "none";
+    if (ayudaF) ayudaF.style.display = tipo === "vecino_frentista" ? "block" : "none";
+  }
+
+  if (chk)  chk.addEventListener("change", toggleExencion);
+  if (sel)  sel.addEventListener("change", toggleTipo);
+
+  // Estado inicial
+  toggleExencion();
+})();
+</script>
+{% endblock %}

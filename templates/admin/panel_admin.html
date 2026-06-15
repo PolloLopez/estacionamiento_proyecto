@@ -15,6 +15,18 @@
       <a href="{% url 'exenciones' %}" class="btn btn-outline">🚫 Exenciones</a>
       <a href="{% url 'gestionar_tarifas' %}" class="btn btn-outline">💲 Tarifas</a>
       <a href="{% url 'gestionar_horarios' %}" class="btn btn-outline">🕐 Horarios</a>
+      <a href="{% url 'gestionar_verificaciones' %}" class="btn btn-outline"
+         style="position:relative;">
+        ✅ Verificaciones
+        {% if verificaciones_pendientes > 0 %}
+          <span style="position:absolute; top:-6px; right:-8px;
+                       background:#e53935; color:#fff; font-size:0.7rem;
+                       font-weight:700; border-radius:99px;
+                       padding:1px 6px; line-height:1.4;">
+            {{ verificaciones_pendientes }}
+          </span>
+        {% endif %}
+      </a>
     </div>
   </div>
 

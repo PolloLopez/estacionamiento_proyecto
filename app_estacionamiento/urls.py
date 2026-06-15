@@ -12,6 +12,7 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
     path("registro/", views.registro_view, name="registro"),
     path("completar-perfil/", views.completar_perfil, name="completar_perfil"),
+    path("verificacion/solicitar/", views.solicitar_verificacion, name="solicitar_verificacion"),
 
     # =========================
     # 🧭 INICIO
@@ -89,5 +90,11 @@ urlpatterns = [
     path("admin-horarios/", views.gestionar_horarios, name="gestionar_horarios"),
     path("admin-dias-especiales/", views.gestionar_dias_especiales, name="gestionar_dias_especiales"),
     path("admin-tarifas/guardar/", views.gestionar_tarifas, name="admin_guardar_tarifa"),
+
+    # =========================
+    # ✅ VERIFICACIONES
+    # =========================
+    path("admin-verificaciones/", views.gestionar_verificaciones, name="gestionar_verificaciones"),
+    path("admin-verificaciones/<int:solicitud_id>/resolver/", views.resolver_verificacion, name="resolver_verificacion"),
 
 ]
