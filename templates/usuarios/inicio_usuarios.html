@@ -56,10 +56,16 @@
         const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_min }}");
       </script>
 
-      <a class="btn btn-danger btn-big"
-         href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}">
-        ⛔ Finalizar estacionamiento
-      </a>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+        <a class="btn btn-outline"
+           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}">
+          🔄 Renovar
+        </a>
+        <a class="btn btn-danger"
+           href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}">
+          ⛔ Finalizar
+        </a>
+      </div>
 
     {% else %}
 
@@ -84,7 +90,9 @@
 <!-- ✅ BANNER DE VERIFICACIÓN (solo conductores no verificados) -->
 {% if request.user.es_conductor %}
   {% if request.user.es_verificado %}
-    {# Sin banner — ya está verificado #}
+    <div class="alert alert-success" style="margin-top:1rem;">
+      ✅ <strong>Cuenta verificada</strong> — tu identidad fue confirmada por el municipio.
+    </div>
   {% elif solicitud_verificacion and solicitud_verificacion.estado == "pendiente" %}
     <div class="alert alert-warning" style="margin-top:1rem;">
       <span>⏳ <strong>Verificación pendiente</strong> — el admin está revisando tus datos.</span>

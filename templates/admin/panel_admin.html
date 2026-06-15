@@ -180,7 +180,7 @@
             <td>{{ e.subcuadra }}</td>
             <td>{{ e.usuario.nombre|default:e.usuario.correo }}</td>
             <td>{{ e.hora_inicio|date:"d/m/Y H:i" }}</td>
-            <td>{{ e.duracion }}h</td>
+            <td>{{ e.duracion_min }}h</td>
             <td>
               {% if e.estado == "ACTIVO" %}
                 <span style="color:var(--color-primary); font-weight:600;">● Activo</span>
@@ -194,6 +194,24 @@
           {% endfor %}
         </tbody>
       </table>
+
+      {# Paginación #}
+      {% if page_obj.paginator.num_pages > 1 %}
+      <div style="display:flex; justify-content:center; gap:0.4rem; margin-top:1rem; flex-wrap:wrap;">
+        {% if page_obj.has_previous %}
+          <a href="?{% if rol_seleccionado %}rol={{ rol_seleccionado }}&{% endif %}page={{ page_obj.previous_page_number }}"
+             class="btn btn-outline" style="font-size:0.85rem; padding:0.35rem 0.8rem;">‹ Anterior</a>
+        {% endif %}
+        <span style="padding:0.35rem 0.8rem; font-size:0.85rem; color:var(--color-text-muted);">
+          Pág. {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}
+        </span>
+        {% if page_obj.has_next %}
+          <a href="?{% if rol_seleccionado %}rol={{ rol_seleccionado }}&{% endif %}page={{ page_obj.next_page_number }}"
+             class="btn btn-outline" style="font-size:0.85rem; padding:0.35rem 0.8rem;">Siguiente ›</a>
+        {% endif %}
+      </div>
+      {% endif %}
+
     {% else %}
       <p class="text-muted">Sin estacionamientos registrados.</p>
     {% endif %}

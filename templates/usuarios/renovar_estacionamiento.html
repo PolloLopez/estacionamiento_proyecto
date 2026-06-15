@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Renovar estacionamiento{% endblock %}
+
+{% block content %}
+<section class="container" style="max-width:480px; margin:0 auto;">
+
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1.2rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2 style="margin:0;">🔄 Extender estacionamiento</h2>
+    <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
+  </div>
+
+  {# Resumen del estacionamiento actual #}
+  <div class="card" style="margin-bottom:1.2rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+      <div>
+        <div style="font-size:1.2rem; font-weight:700;">{{ estacionamiento.vehiculo.patente }}</div>
+        <div class="text-muted" style="font-size:0.88rem;">{{ estacionamiento.subcuadra }}</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="text-muted" style="font-size:0.85rem;">Duración actual</div>
+        <div style="font-size:1.4rem; font-weight:800; color:var(--color-primary);">
+          {{ estacionamiento.duracion_min }}h
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);
+                font-size:0.88rem; color:var(--color-text-muted);">
+      Inicio: {{ estacionamiento.hora_inicio|date:"d/m/Y H:i" }}
+    </div>
+  </div>
+
+  {# Selector de horas a agregar #}
+  <div class="card">
+    <h3 style="margin-bottom:1rem;">Agregar horas</h3>
+
+    {% if error %}
+      <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
+    {% endif %}
+
+    <div style="margin-bottom:1rem; padding:0.75rem 1rem;
+                background:var(--color-surface-2); border-radius:var(--radius-sm);
+                display:flex; justify-content:space-between;">
+      <span class="text-muted" style="font-size:0.9rem;">Tu saldo</span>
+      <strong style="color:var(--color-primary);">${{ saldo }}</strong>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <label style="font-weight:600; margin-bottom:0.5rem; display:block;">
+        ¿Cuántas horas querés agregar?
+      </label>
+
+      {# Botones rápidos #}
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:0.5rem; margin-bottom:1rem;"
+           id="opciones-horas">
+        <button type="button" class="btn btn-outline opcion-hora" data-horas="1"
+                style="font-size:1rem; padding:0.6rem;">1h</button>
+        <button type="button" class="btn btn-outline opcion-hora" data-horas="2"
+                style="font-size:1rem; padding:0.6rem;">2h</button>
+        <button type="button" class="btn btn-outline opcion-hora" data-horas="3"
+                style="font-size:1rem; padding:0.6rem;">3h</button>
+        <button type="button" class="btn btn-outline opcion-hora" data-horas="4"
+                style="font-size:1rem; padding:0.6rem;">4h</button>
+        <button type="button" class="btn btn-outline opcion-hora" data-horas="6"
+                style="font-size:1rem; padding:0.6rem;">6h</button>
+        <button type="button" class="btn btn-outline opcion-hora" data-horas="8"
+                style="font-size:1rem; padding:0.6rem;">8h</button>
+      </div>
+
+      <input type="hidden" name="horas_extra" id="horas-input" value="0" />
+
+      {# Preview del costo #}
+      <div id="preview-costo" style="display:none; margin-bottom:1rem;
+           padding:0.75rem 1rem; border-radius:var(--radius-sm);
+           background:var(--color-success-bg); color:var(--color-success);
+           font-weight:600;">
+        Costo adicional: $<span id="preview-monto">0</span>
+      </div>
+
+      <button type="submit" class="btn" id="btn-confirmar"
+              style="width:100%; font-size:1rem; padding:0.75rem;"
+              disabled>
+        ✅ Confirmar extensión
+      </button>
+    </form>
+
+  </div>
+
+</section>
+
+<script>
+(function() {
+  const tarifaHora  = parseFloat("{{ tarifa_hora }}");
+  const saldo       = parseFloat("{{ saldo }}");
+  const horasInput  = document.getElementById("horas-input");
+  const previewDiv  = document.getElementById("preview-costo");
+  const previewMonto = document.getElementById("preview-monto");
+  const btnConfirmar = document.getElementById("btn-confirmar");
+
+  document.querySelectorAll(".opcion-hora").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      // Desmarcar todos
+      document.querySelectorAll(".opcion-hora").forEach(function(b) {
+        b.classList.remove("btn-success");
+        b.classList.add("btn-outline");
+      });
+      // Marcar este
+      btn.classList.remove("btn-outline");
+      btn.classList.add("btn-success");
+
+      const horas  = parseFloat(btn.dataset.horas);
+      const costo  = horas * tarifaHora;
+
+      horasInput.value = horas;
+      previewMonto.textContent = costo.toFixed(2);
+      previewDiv.style.display = "block";
+
+      if (saldo >= costo) {
+        previewDiv.style.background = "var(--color-success-bg)";
+        previewDiv.style.color = "var(--color-success)";
+        btnConfirmar.disabled = false;
+      } else {
+        previewDiv.style.background = "var(--color-danger-bg)";
+        previewDiv.style.color = "var(--color-danger)";
+        previewDiv.textContent = "Saldo insuficiente para " + horas + "h ($" + costo.toFixed(2) + ")";
+        btnConfirmar.disabled = true;
+      }
+    });
+  });
+})();
+</script>
+
+{% endblock %}

@@ -45,6 +45,41 @@ from django.db.models.functions import TruncDate
 from app_estacionamiento.services_verificacion import verificar_estado_vehiculo
 from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
 from app_estacionamiento.use_cases.finalizar_estacionamiento import ( ejecutar as finalizar_estacionamiento_uc)
+from django.core.mail import send_mail
+
+
+# ─── Helpers internos ─────────────────────────────────────────────────────────
+
+def _enviar_email_verificacion(correo, nombre, aprobado, motivo=""):
+    """
+    Envía un email al conductor informando el resultado de su verificación.
+    Si el backend es consola (sin SMTP configurado), lo imprime en el log.
+    No lanza excepciones — un email que falla no debe interrumpir el flujo.
+    """
+    try:
+        if aprobado:
+            asunto = "✅ Tu cuenta fue verificada"
+            cuerpo = (
+                f"Hola {nombre},\n\n"
+                "¡Buenas noticias! Tu identidad fue verificada correctamente por el municipio.\n"
+                "Ya podés acceder a todas las funciones de la plataforma.\n\n"
+                "Sistema de Estacionamiento"
+            )
+        else:
+            asunto = "❌ Tu verificación fue rechazada"
+            cuerpo = (
+                f"Hola {nombre},\n\n"
+                "Tu solicitud de verificación fue rechazada."
+            )
+            if motivo:
+                cuerpo += f"\n\nMotivo: {motivo}"
+            cuerpo += (
+                "\n\nPodés volver a enviar tu solicitud desde la plataforma.\n\n"
+                "Sistema de Estacionamiento"
+            )
+        send_mail(asunto, cuerpo, None, [correo], fail_silently=True)
+    except Exception:
+        pass  # No interrumpir el flujo si el email falla
 
 
 @require_role("inspector", "admin", "conductor", "vendedor")
@@ -355,6 +390,12 @@ def panel_admin(request):
 
     estacionamientos = estacionamientos.order_by("-hora_inicio")
 
+    # Paginación de estacionamientos
+    from django.core.paginator import Paginator
+    paginator_est  = Paginator(estacionamientos, 25)
+    page_est       = request.GET.get("page", 1)
+    estacionamientos_page = paginator_est.get_page(page_est)
+
     estacionamientos_activos = Estacionamiento.objects.filter(
         estado=Estado.ACTIVO,
         subcuadra__municipio=municipio
@@ -383,7 +424,8 @@ def panel_admin(request):
         "inspectores": inspectores,
         "vendedores": vendedores,
         "usuarios": usuarios,
-        "estacionamientos": estacionamientos,
+        "estacionamientos": estacionamientos_page,
+        "page_obj": estacionamientos_page,
         "estacionamientos_activos": estacionamientos_activos,
         "infracciones_recientes": infracciones_recientes,
         "rol_seleccionado": rol,
@@ -719,6 +761,74 @@ def historial_estacionamientos(request):
             "estacionamientos": estacionamientos
         }
     )
+
+@require_role("conductor")
+def renovar_estacionamiento(request, est_id):
+    """
+    Permite al conductor extender las horas de su estacionamiento activo.
+    Cobra la diferencia de saldo según la tarifa vigente.
+    """
+    from app_estacionamiento.models import Tarifa
+
+    usuario = request.user
+    estacionamiento = get_object_or_404(
+        Estacionamiento,
+        id=est_id,
+        usuario=usuario,
+        estado="ACTIVO",
+    )
+
+    tarifa_obj = Tarifa.objects.filter(municipio=usuario.municipio).first()
+    tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
+
+    error = None
+
+    if request.method == "POST":
+        try:
+            horas_extra = Decimal(request.POST.get("horas_extra", "0"))
+            if horas_extra <= 0:
+                raise ValueError()
+        except Exception:
+            error = "Ingresá una cantidad de horas válida."
+        else:
+            costo_extra = horas_extra * tarifa_hora
+
+            if usuario.saldo < costo_extra:
+                error = f"Saldo insuficiente. Necesitás ${costo_extra:.2f} y tenés ${usuario.saldo:.2f}."
+            else:
+                with transaction.atomic():
+                    usuario_db = Usuario.objects.select_for_update().get(id=usuario.id)
+                    if usuario_db.saldo < costo_extra:
+                        error = "Saldo insuficiente."
+                    else:
+                        # Extender duración y cobrar
+                        estacionamiento.duracion_min = estacionamiento.duracion_min + int(horas_extra)
+                        estacionamiento.save(update_fields=["duracion_min"])
+
+                        usuario_db.saldo -= costo_extra
+                        usuario_db.save(update_fields=["saldo"])
+
+                        MovimientoCaja.objects.create(
+                            usuario=usuario_db,
+                            monto=costo_extra,
+                            tipo="egreso",
+                            descripcion=f"Renovación {horas_extra:.0f}h — {estacionamiento.vehiculo.patente}",
+                        )
+
+                        messages.success(
+                            request,
+                            f"✅ Estacionamiento extendido {horas_extra:.0f}h más. "
+                            f"Se descontaron ${costo_extra:.2f} de tu saldo."
+                        )
+                        return redirect("inicio_usuarios")
+
+    return render(request, "usuarios/renovar_estacionamiento.html", {
+        "estacionamiento": estacionamiento,
+        "tarifa_hora": tarifa_hora,
+        "saldo": usuario.saldo,
+        "error": error,
+    })
+
 
 @require_role("conductor")
 def finalizar_estacionamiento(request, estacionamiento_id):
@@ -1285,12 +1395,18 @@ def gestionar_inspectores(request):
         elif Usuario.objects.filter(correo=correo).exists():
             error = "Ya existe un usuario con ese correo"
         else:
+            try:
+                porcentaje = Decimal(request.POST.get("porcentaje_ganancia", "0") or "0")
+            except Exception:
+                porcentaje = Decimal("0")
             inspector = Usuario.objects.create_user(
                 correo=correo,
                 password=password,
                 municipio=municipio,
                 es_inspector=True,
                 es_conductor=False,
+                porcentaje_ganancia=porcentaje,
+                periodicidad_rendicion=request.POST.get("periodicidad_rendicion", "semanal"),
             )
             inspector.first_name = nombre
             inspector.save()
@@ -1361,12 +1477,18 @@ def gestionar_vendedores(request):
         elif Usuario.objects.filter(correo=correo).exists():
             error = "Ya existe un usuario con ese correo"
         else:
+            try:
+                porcentaje = Decimal(request.POST.get("porcentaje_ganancia", "0") or "0")
+            except Exception:
+                porcentaje = Decimal("0")
             vendedor = Usuario.objects.create_user(
                 correo=correo,
                 password=password,
                 municipio=municipio,
                 es_vendedor=True,
                 es_conductor=False,
+                porcentaje_ganancia=porcentaje,
+                periodicidad_rendicion=request.POST.get("periodicidad_rendicion", "semanal"),
             )
             vendedor.first_name = nombre
             vendedor.save()
@@ -1888,14 +2010,18 @@ def mp_webhook(request):
 def admin_rendiciones(request):
     """
     Lista todos los cierres de caja del municipio.
-    El admin puede ver el detalle de cada uno y certificarlos.
+    El admin puede filtrar por estado, usuario, y rango de fechas.
     """
-    from django.utils import timezone as tz
+    from django.core.paginator import Paginator
 
     municipio = getattr(request.user, "municipio", None)
 
-    # Filtro por estado
-    filtro = request.GET.get("filtro", "todos")
+    # Filtros GET
+    filtro      = request.GET.get("filtro", "todos")
+    usuario_id  = request.GET.get("usuario_id", "").strip()
+    fecha_desde = request.GET.get("fecha_desde", "").strip()
+    fecha_hasta = request.GET.get("fecha_hasta", "").strip()
+
     cierres = CierreCaja.objects.filter(
         usuario__municipio=municipio
     ).select_related("usuario", "certificado_por").order_by("-fecha_cierre")
@@ -1905,15 +2031,40 @@ def admin_rendiciones(request):
     elif filtro == "certificados":
         cierres = cierres.filter(certificado=True)
 
+    if usuario_id:
+        cierres = cierres.filter(usuario_id=usuario_id)
+    if fecha_desde:
+        cierres = cierres.filter(fecha_cierre__date__gte=fecha_desde)
+    if fecha_hasta:
+        cierres = cierres.filter(fecha_cierre__date__lte=fecha_hasta)
+
     conteo_pendientes = CierreCaja.objects.filter(
         usuario__municipio=municipio,
         certificado=False,
     ).count()
 
+    # Paginación
+    paginator = Paginator(cierres, 20)
+    page_num  = request.GET.get("page", 1)
+    page_obj  = paginator.get_page(page_num)
+
+    # Usuarios con cierres (para el selector de filtro)
+    usuarios_con_cierres = Usuario.objects.filter(
+        municipio=municipio,
+        cierrecaja__isnull=False,
+    ).filter(
+        Q(es_inspector=True) | Q(es_vendedor=True)
+    ).distinct().order_by("first_name", "correo")
+
     return render(request, "admin/rendiciones.html", {
-        "cierres": cierres,
+        "cierres": page_obj,
         "filtro": filtro,
         "conteo_pendientes": conteo_pendientes,
+        "usuario_id": usuario_id,
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "usuarios_con_cierres": usuarios_con_cierres,
+        "page_obj": page_obj,
     })
 
 
@@ -2025,6 +2176,13 @@ def resolver_verificacion(request, solicitud_id):
 
         messages.success(request, f"✅ Identidad aprobada: {solicitud.usuario.correo}.")
 
+        # 📧 Notificar al conductor por email
+        _enviar_email_verificacion(
+            correo=solicitud.usuario.correo,
+            nombre=solicitud.nombre or solicitud.usuario.correo,
+            aprobado=True,
+        )
+
     elif accion == "rechazar":
         notas = request.POST.get("notas_admin", "").strip()
         solicitud.estado = "rechazada"
@@ -2035,6 +2193,14 @@ def resolver_verificacion(request, solicitud_id):
         solicitud.usuario.save(update_fields=["es_verificado"])
 
         messages.warning(request, f"❌ Identidad rechazada: {solicitud.usuario.correo}.")
+
+        # 📧 Notificar al conductor por email
+        _enviar_email_verificacion(
+            correo=solicitud.usuario.correo,
+            nombre=solicitud.nombre or solicitud.usuario.correo,
+            aprobado=False,
+            motivo=notas,
+        )
 
     # ── Exención ──────────────────────────────────────────────────────────────
     elif accion == "aprobar_exencion":

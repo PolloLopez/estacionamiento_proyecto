@@ -16,8 +16,8 @@
   {% endfor %}
 {% endif %}
 
-{# ── Filtros ────────────────────────────────────────────────────── #}
-<div style="display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+{# ── Filtros rápidos ─────────────────────────────────────────────── #}
+<div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
   <a href="?filtro=todos"
      class="btn {% if filtro != 'todos' %}btn-outline{% endif %}"
      style="font-size:0.9rem; padding:0.4rem 1rem;">Todos</a>
@@ -28,6 +28,56 @@
      class="btn {% if filtro != 'certificados' %}btn-outline{% endif %}"
      style="font-size:0.9rem; padding:0.4rem 1rem;">✅ Certificados</a>
 </div>
+
+{# ── Filtros avanzados (usuario + fecha) ─────────────────────────── #}
+<form method="get" style="margin-bottom:1.5rem;">
+  {# Preservar filtro de estado #}
+  {% if filtro != "todos" %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
+
+  <div class="card" style="padding:0.75rem 1rem;">
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+
+      <div style="flex:1; min-width:160px;">
+        <label style="font-size:0.85rem; font-weight:600; margin-bottom:0.25rem; display:block;">
+          Usuario
+        </label>
+        <select name="usuario_id" style="width:100%;">
+          <option value="">— Todos —</option>
+          {% for u in usuarios_con_cierres %}
+            <option value="{{ u.id }}" {% if usuario_id == u.id|stringformat:"s" %}selected{% endif %}>
+              {{ u.nombre|default:u.correo }}
+              {% if u.es_inspector %}(Inspector){% elif u.es_vendedor %}(Vendedor){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size:0.85rem; font-weight:600; margin-bottom:0.25rem; display:block;">
+          Desde
+        </label>
+        <input type="date" name="fecha_desde" value="{{ fecha_desde }}" />
+      </div>
+
+      <div>
+        <label style="font-size:0.85rem; font-weight:600; margin-bottom:0.25rem; display:block;">
+          Hasta
+        </label>
+        <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" />
+      </div>
+
+      <div style="display:flex; gap:0.5rem;">
+        <button type="submit" class="btn" style="font-size:0.9rem; padding:0.45rem 1rem;">
+          🔍 Filtrar
+        </button>
+        <a href="?filtro={{ filtro }}" class="btn btn-outline" style="font-size:0.9rem; padding:0.45rem 1rem;">
+          ✕ Limpiar
+        </a>
+      </div>
+
+    </div>
+  </div>
+</form>
 
 {# ── Lista de cierres ───────────────────────────────────────────── #}
 {% if not cierres %}
@@ -44,7 +94,12 @@
 
     {# Info del cierre #}
     <div>
-      <div style="font-weight:700; font-size:1rem;">{{ cierre.usuario.correo }}</div>
+      <div style="font-weight:700; font-size:1rem;">
+        {{ cierre.usuario.nombre|default:cierre.usuario.correo }}
+        <span class="text-muted" style="font-weight:400; font-size:0.88rem;">
+          — {{ cierre.usuario.correo }}
+        </span>
+      </div>
       <div style="font-size:0.85rem; color:var(--color-text-muted); margin-top:0.2rem;">
         {% if cierre.usuario.es_inspector %}Inspector{% elif cierre.usuario.es_vendedor %}Vendedor{% endif %}
         · Cierre: {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
@@ -97,6 +152,23 @@
 
 </div>
 {% endfor %}
+
+{# ── Paginación ──────────────────────────────────────────────────── #}
+{% if page_obj.paginator.num_pages > 1 %}
+<div style="display:flex; justify-content:center; gap:0.4rem; margin-top:1.5rem; flex-wrap:wrap;">
+  {% if page_obj.has_previous %}
+    <a href="?{% if filtro != 'todos' %}filtro={{ filtro }}&{% endif %}{% if usuario_id %}usuario_id={{ usuario_id }}&{% endif %}{% if fecha_desde %}fecha_desde={{ fecha_desde }}&{% endif %}{% if fecha_hasta %}fecha_hasta={{ fecha_hasta }}&{% endif %}page={{ page_obj.previous_page_number }}"
+       class="btn btn-outline" style="font-size:0.9rem; padding:0.4rem 0.9rem;">‹ Anterior</a>
+  {% endif %}
+  <span style="padding:0.4rem 0.9rem; font-size:0.9rem; color:var(--color-text-muted);">
+    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+  </span>
+  {% if page_obj.has_next %}
+    <a href="?{% if filtro != 'todos' %}filtro={{ filtro }}&{% endif %}{% if usuario_id %}usuario_id={{ usuario_id }}&{% endif %}{% if fecha_desde %}fecha_desde={{ fecha_desde }}&{% endif %}{% if fecha_hasta %}fecha_hasta={{ fecha_hasta }}&{% endif %}page={{ page_obj.next_page_number }}"
+       class="btn btn-outline" style="font-size:0.9rem; padding:0.4rem 0.9rem;">Siguiente ›</a>
+  {% endif %}
+</div>
+{% endif %}
 
 <div style="margin-top:1.5rem;">
   <a href="{% url 'panel_admin' %}" class="btn btn-outline">← Volver al panel</a>
