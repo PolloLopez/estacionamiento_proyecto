@@ -14,8 +14,6 @@
 
 {# ── Filtros ─────────────────────────────────────────────────────────────── #}
 <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem; flex-wrap:wrap;">
-  {% for valor, etiqueta in "pendiente,⏳ Pendientes|aprobada,✅ Aprobadas|rechazada,❌ Rechazadas"|split:"|" %}
-  {% endfor %}
   <a href="?estado=pendiente"
      class="btn {% if estado_filtro != 'pendiente' %}btn-outline{% endif %}"
      style="font-size:0.9rem; padding:0.4rem 1rem;">⏳ Pendientes</a>
@@ -58,20 +56,11 @@
     {# Badge estado identidad #}
     <div>
       {% if s.estado == "pendiente" %}
-        <span style="background:#fff3cd; color:#856404; font-weight:700;
-                     padding:0.3rem 0.8rem; border-radius:6px; font-size:0.85rem;">
-          ⏳ Identidad pendiente
-        </span>
+        <span class="badge badge-pendiente">⏳ Identidad pendiente</span>
       {% elif s.estado == "aprobada" %}
-        <span style="background:#d4edda; color:#155724; font-weight:700;
-                     padding:0.3rem 0.8rem; border-radius:6px; font-size:0.85rem;">
-          ✅ Identidad aprobada
-        </span>
+        <span class="badge badge-aprobada">✅ Identidad aprobada</span>
       {% elif s.estado == "rechazada" %}
-        <span style="background:#f8d7da; color:#721c24; font-weight:700;
-                     padding:0.3rem 0.8rem; border-radius:6px; font-size:0.85rem;">
-          ❌ Identidad rechazada
-        </span>
+        <span class="badge badge-rechazada">❌ Identidad rechazada</span>
       {% endif %}
     </div>
   </div>
@@ -111,7 +100,7 @@
 
   </div>
   {% elif s.estado == "rechazada" and s.notas_admin %}
-    <p style="font-size:0.88rem; color:#721c24; margin-bottom:1rem;">
+    <p style="font-size:0.88rem; color:var(--color-danger); margin-bottom:1rem;">
       <strong>Motivo de rechazo:</strong> {{ s.notas_admin }}
     </p>
   {% endif %}
@@ -123,23 +112,17 @@
     <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;
                 flex-wrap:wrap;">
       <strong style="font-size:0.95rem;">🚫 Exención solicitada:</strong>
-      <span style="background:#e8f5e9; color:#2e7d32; padding:0.2rem 0.6rem;
-                   border-radius:6px; font-size:0.85rem; font-weight:600;">
-        {{ s.get_tipo_exencion_solicitado_display }}
-      </span>
+      <span class="badge badge-aprobada">{{ s.get_tipo_exencion_solicitado_display }}</span>
       {% if s.vehiculo %}
         <span style="font-size:0.9rem;">Patente: <strong>{{ s.vehiculo.patente }}</strong></span>
       {% endif %}
       {# Badge estado exención #}
       {% if s.estado_exencion == "pendiente" %}
-        <span style="background:#fff3cd; color:#856404; padding:0.2rem 0.6rem;
-                     border-radius:6px; font-size:0.82rem; font-weight:600;">⏳ Pendiente</span>
+        <span class="badge badge-pendiente">⏳ Pendiente</span>
       {% elif s.estado_exencion == "aprobada" %}
-        <span style="background:#d4edda; color:#155724; padding:0.2rem 0.6rem;
-                     border-radius:6px; font-size:0.82rem; font-weight:600;">✅ Aprobada</span>
+        <span class="badge badge-aprobada">✅ Aprobada</span>
       {% elif s.estado_exencion == "rechazada" %}
-        <span style="background:#f8d7da; color:#721c24; padding:0.2rem 0.6rem;
-                     border-radius:6px; font-size:0.82rem; font-weight:600;">❌ Rechazada</span>
+        <span class="badge badge-rechazada">❌ Rechazada</span>
       {% endif %}
     </div>
 
@@ -182,7 +165,7 @@
           <input type="hidden" name="accion" value="aprobar_exencion">
 
           {# Tipo de exención (admin puede confirmar o ajustar) #}
-          <div class="form-row">
+          <div class="form-group">
             <label style="font-size:0.88rem;">Tipo de exención a aplicar</label>
             <select name="tipo_exencion">
               {% for val, etiq in tipos_exencion %}
@@ -228,7 +211,7 @@
           </div>
           {% endif %}
 
-          <div class="form-row" style="margin-top:0.75rem;">
+          <div class="form-group" style="margin-top:0.75rem;">
             <label style="font-size:0.88rem;">Notas (opcional)</label>
             <input type="text" name="notas_exencion"
                    placeholder="Ej: CUD vence 12/2026">
@@ -265,7 +248,7 @@
       </details>
 
     {% elif s.estado_exencion == "rechazada" and s.notas_exencion_admin %}
-      <p style="font-size:0.88rem; color:#721c24;">
+      <p style="font-size:0.88rem; color:var(--color-danger);">
         <strong>Motivo de rechazo:</strong> {{ s.notas_exencion_admin }}
       </p>
     {% endif %}

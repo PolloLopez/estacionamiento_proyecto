@@ -70,7 +70,7 @@ def inicio_usuarios(request):
 # =========================================================
 
 def home(request):
-    if not request.user:
+    if not request.user.is_authenticated:
         return redirect("login")
 
     return redirect("inicio")
@@ -1865,7 +1865,12 @@ def gestionar_verificaciones(request):
         "usuario", "vehiculo"
     ).filter(usuario__municipio=municipio)
 
-    if estado_filtro in ("pendiente", "aprobada", "rechazada"):
+    if estado_filtro == "pendiente":
+        # Incluir solicitudes con identidad pendiente O exención pendiente (aunque la identidad ya esté aprobada)
+        solicitudes = solicitudes.filter(
+            Q(estado="pendiente") | Q(estado_exencion="pendiente")
+        )
+    elif estado_filtro in ("aprobada", "rechazada"):
         solicitudes = solicitudes.filter(estado=estado_filtro)
 
     conteo_pendientes = SolicitudVerificacion.objects.filter(
@@ -1930,6 +1935,11 @@ def resolver_verificacion(request, solicitud_id):
 
     # ── Exención ──────────────────────────────────────────────────────────────
     elif accion == "aprobar_exencion":
+        # Primero debe estar verificada la identidad del conductor
+        if solicitud.estado != "aprobada":
+            messages.error(request, "Debés aprobar la identidad del conductor antes de aprobar la exención.")
+            return redirect("gestionar_verificaciones")
+
         vehiculo = solicitud.vehiculo
         if not vehiculo:
             messages.error(request, "La solicitud no tiene vehículo asociado.")

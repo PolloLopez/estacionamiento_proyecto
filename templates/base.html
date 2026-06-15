@@ -31,8 +31,8 @@
   <!-- ═══ NAVBAR ══════════════════════════════════════════════ -->
   <nav class="navbar">
 
-    <!-- Logo: imagen si el municipio la tiene, texto si no -->
-    <a class="logo"
+    <!-- Logo: imagen si el munici pio la tiene, texto si no -->
+    <a class="logo" 
        href="{% if request.user.is_authenticated %}{% if request.user.es_admin %}{% url 'panel_admin' %}{% elif request.user.es_inspector %}{% url 'panel_inspectores' %}{% elif request.user.es_vendedor %}{% url 'panel_vendedor' %}{% else %}{% url 'inicio' %}{% endif %}{% else %}{% url 'login' %}{% endif %}">
       {% if municipio_branding and municipio_branding.logo %}
         <img src="{{ municipio_branding.logo.url }}"

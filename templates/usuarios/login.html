@@ -23,6 +23,12 @@
   {% if form.errors %}
     <p class="error">Correo o contraseña incorrectos</p>
   {% endif %}
+
+  <div style="margin-top:1rem; font-size:0.9rem; text-align:center; color:var(--color-text-muted);">
+    <a href="{% url 'registro' %}">¿No tenés cuenta? Registrate</a>
+    &nbsp;·&nbsp;
+    <a href="{% url 'account_reset_password' %}">¿Olvidaste tu contraseña?</a>
+  </div>
 </form>
 </section>
 {% endblock %}

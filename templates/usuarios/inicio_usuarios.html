@@ -38,6 +38,12 @@
         <span id="timer">--:--</span>
       </div>
 
+      <!-- ⚠️ Aviso cuando quedan menos de 5 minutos (reemplaza el alert intrusivo) -->
+      <div id="aviso-tiempo" style="display:none; margin-top:0.5rem;"
+           class="alert alert-warning">
+        ⚠️ <strong>¡Te quedan menos de 5 minutos!</strong>
+      </div>
+
       <!-- 📊 PROGRESS -->
       <div class="progress-bar">
         <div id="progress"></div>
@@ -80,15 +86,11 @@
   {% if request.user.es_verificado %}
     {# Sin banner — ya está verificado #}
   {% elif solicitud_verificacion and solicitud_verificacion.estado == "pendiente" %}
-    <div style="background:#fff3cd; color:#856404; border:1px solid #ffeeba;
-                padding:0.75rem 1rem; border-radius:8px; margin-top:1rem;
-                display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+    <div class="alert alert-warning" style="margin-top:1rem;">
       <span>⏳ <strong>Verificación pendiente</strong> — el admin está revisando tus datos.</span>
     </div>
   {% elif solicitud_verificacion and solicitud_verificacion.estado == "rechazada" %}
-    <div style="background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
-                padding:0.75rem 1rem; border-radius:8px; margin-top:1rem;
-                display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+    <div class="alert alert-danger" style="margin-top:1rem;">
       <span>❌ <strong>Verificación rechazada.</strong>
         {% if solicitud_verificacion.notas_admin %}
           Motivo: {{ solicitud_verificacion.notas_admin }}
@@ -101,9 +103,7 @@
     </div>
   {% else %}
     {# Sin solicitud → invitar a verificarse #}
-    <div style="background:#d1ecf1; color:#0c5460; border:1px solid #bee5eb;
-                padding:0.75rem 1rem; border-radius:8px; margin-top:1rem;
-                display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+    <div class="alert alert-info" style="margin-top:1rem;">
       <span>ℹ️ Tu cuenta aún <strong>no está verificada</strong>.</span>
       <a href="{% url 'solicitar_verificacion' %}" class="btn btn-outline"
          style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
@@ -155,44 +155,50 @@
   const duracionMs = duracionHoras * 60 * 60 * 1000;
   const fin = new Date(inicio.getTime() + duracionMs);
 
-  const timerEl = document.getElementById("timer");
+  const timerEl   = document.getElementById("timer");
   const progressEl = document.getElementById("progress");
+  const avisoEl   = document.getElementById("aviso-tiempo");
 
   function actualizarTimer() {
 
-    const ahora = new Date();
+    const ahora    = new Date();
     const restante = fin - ahora;
 
     if (restante <= 0) {
       timerEl.innerText = "VENCIDO";
+      timerEl.style.color = "var(--color-danger)";
       progressEl.style.width = "100%";
-      progressEl.style.background = "#c62828";
+      progressEl.style.background = "var(--color-danger)";
       return;
     }
 
-    const minutos = Math.floor(restante / 60000);
+    const minutos  = Math.floor(restante / 60000);
     const segundos = Math.floor((restante % 60000) / 1000);
 
-    if (minutos === 5 && segundos === 0 && !avisoMostrado) {
-      alert("⚠️ Te quedan 5 minutos");
+    // Mostrar banner (en lugar de alert) cuando quedan menos de 5 minutos
+    if (minutos < 5 && !avisoMostrado) {
+      if (avisoEl) avisoEl.style.display = "flex";
       avisoMostrado = true;
     }
 
     timerEl.innerText =
       `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
 
-    const total = duracionMs;
-    const usado = ahora - inicio;
+    const total      = duracionMs;
+    const usado      = ahora - inicio;
     const porcentaje = Math.min((usado / total) * 100, 100);
 
     progressEl.style.width = porcentaje + "%";
 
     if (porcentaje > 80) {
-      progressEl.style.background = "#c62828";
+      progressEl.style.background = "var(--color-danger)";
+      timerEl.style.color = "var(--color-danger)";
     } else if (porcentaje > 50) {
       progressEl.style.background = "#f9a825";
+      timerEl.style.color = "";
     } else {
-      progressEl.style.background = "#2e7d32";
+      progressEl.style.background = "var(--color-success)";
+      timerEl.style.color = "";
     }
   }
 
