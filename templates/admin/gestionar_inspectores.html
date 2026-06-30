@@ -19,6 +19,8 @@
           <tr>
             <th>Inspector</th>
             <th>Correo</th>
+            <th>DNI</th>
+            <th>Teléfono</th>
             <th style="text-align:center;">Infracciones</th>
             <th style="text-align:center;">Verificaciones</th>
             <th style="text-align:right;">Total cobrado</th>
@@ -30,13 +32,18 @@
         <tbody>
           {% for i in inspectores %}
           <tr>
-            <td><strong>{{ i.nombre|default:"—" }}</strong></td>
+            <td>
+              <strong>{{ i.nombre|default:"—" }}</strong>
+              {% if i.numero_legajo %}
+                <br><span class="text-muted" style="font-size:0.8rem;">Leg. {{ i.numero_legajo }}</span>
+              {% endif %}
+            </td>
             <td style="font-size:0.88rem;">{{ i.correo }}</td>
+            <td style="font-size:0.88rem;">{{ i.numero_dni|default:"—" }}</td>
+            <td style="font-size:0.88rem;">{{ i.telefono|default:"—" }}</td>
             <td style="text-align:center;">{{ i.total_infracciones|default:"0" }}</td>
             <td style="text-align:center;">{{ i.total_verificaciones|default:"0" }}</td>
-            <td style="text-align:right; font-weight:600;">
-              ${{ i.total_cobrado_sum|default:"0" }}
-            </td>
+            <td style="text-align:right; font-weight:600;">${{ i.total_cobrado_sum|default:"0" }}</td>
             <td style="text-align:center; font-size:0.85rem;">
               {{ i.periodicidad_rendicion|capfirst }}
               {% if i.porcentaje_ganancia > 0 %}
@@ -48,9 +55,6 @@
                 <span style="color:var(--color-primary); font-weight:600;">● Activo</span>
               {% else %}
                 <span style="color:var(--color-danger); font-weight:600;">● Inactivo</span>
-              {% endif %}
-              {% if i.saldo_limite > 0 and i.saldo_operativo < 0 %}
-                <br><span style="color:var(--color-danger); font-size:0.8rem;">⚠ Deuda</span>
               {% endif %}
             </td>
             <td>
@@ -75,16 +79,40 @@
     <form method="post" action="{% url 'admin_crear_inspector' %}">
       {% csrf_token %}
 
-      <label for="nombre">Nombre completo</label>
-      <input id="nombre" name="nombre" placeholder="Ej: Juan Pérez" />
+      <div class="grid grid-2" style="margin-bottom:0.75rem;">
+        <div>
+          <label for="nombre">Nombre completo *</label>
+          <input id="nombre" name="nombre" placeholder="Ej: Juan Pérez" />
+        </div>
+        <div>
+          <label for="telefono">Teléfono</label>
+          <input id="telefono" name="telefono" type="tel" placeholder="Ej: 2354 12-3456" />
+        </div>
+      </div>
 
-      <label for="correo">Correo</label>
-      <input id="correo" name="correo" type="email" required placeholder="correo@ejemplo.com" />
+      <div class="grid grid-2" style="margin-bottom:0.75rem;">
+        <div>
+          <label for="numero_dni">DNI *</label>
+          <input id="numero_dni" name="numero_dni" placeholder="Ej: 30123456" />
+        </div>
+        <div>
+          <label for="numero_legajo">Legajo (opcional)</label>
+          <input id="numero_legajo" name="numero_legajo" placeholder="Ej: 00142" />
+        </div>
+      </div>
 
-      <label for="password">Contraseña inicial</label>
-      <input id="password" name="password" type="password" required placeholder="Mínimo 8 caracteres" />
+      <div class="grid grid-2" style="margin-bottom:0.75rem;">
+        <div>
+          <label for="correo">Correo *</label>
+          <input id="correo" name="correo" type="email" required placeholder="correo@ejemplo.com" />
+        </div>
+        <div>
+          <label for="password">Contraseña inicial *</label>
+          <input id="password" name="password" type="password" required placeholder="Mínimo 8 caracteres" />
+        </div>
+      </div>
 
-      <div class="grid grid-2" style="margin-top:0.5rem;">
+      <div class="grid grid-2" style="margin-bottom:0.75rem;">
         <div>
           <label for="periodicidad_rendicion">Periodicidad de rendición</label>
           <select id="periodicidad_rendicion" name="periodicidad_rendicion">
@@ -96,15 +124,12 @@
         <div>
           <label for="porcentaje_ganancia">Comisión (%)</label>
           <input id="porcentaje_ganancia" name="porcentaje_ganancia" type="number"
-                 step="0.01" min="0" max="100" value="0"
-                 placeholder="0.00" />
+                 step="0.01" min="0" max="100" value="0" placeholder="0.00" />
           <p class="text-muted" style="font-size:0.82rem; margin-top:0.2rem;">0 = sin comisión</p>
         </div>
       </div>
 
-      {% if error %}
-        <p class="error">{{ error }}</p>
-      {% endif %}
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
 
       <button class="btn" type="submit">+ Crear inspector</button>
     </form>

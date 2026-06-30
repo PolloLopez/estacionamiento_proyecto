@@ -18,8 +18,26 @@
       <div class="card">
         <h3 style="margin-bottom:1rem;">Datos del comercio</h3>
 
-        <label>Nombre del comercio</label>
+        <label>Nombre de fantasía del negocio</label>
         <input name="nombre" value="{{ vendedor.nombre }}" placeholder="Nombre del comercio" />
+
+        <label>Nombre del propietario</label>
+        <input name="nombre_propietario" value="{{ vendedor.nombre_propietario }}" placeholder="Ej: María García" />
+
+        <div class="grid grid-2" style="gap:1rem;">
+          <div>
+            <label>Documento / CUIL</label>
+            <input name="documento_cuil" value="{{ vendedor.documento_cuil }}" placeholder="Ej: 20-30123456-7" />
+          </div>
+          <div>
+            <label>Teléfono</label>
+            <input name="telefono" value="{{ vendedor.telefono }}" placeholder="Ej: 2354 55-6677" />
+          </div>
+        </div>
+
+        <label>Horarios de atención</label>
+        <input name="horario_atencion" value="{{ vendedor.horario_atencion }}"
+               placeholder="Ej: Lun-Vie 8-20, Sáb 8-13" />
 
         <label>Correo (solo lectura)</label>
         <input value="{{ vendedor.correo }}" disabled style="background:var(--color-surface-2); color:var(--color-text-muted);" />

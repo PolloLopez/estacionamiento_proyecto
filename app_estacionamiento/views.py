@@ -382,15 +382,24 @@ def completar_perfil(request):
     return render(request, "usuarios/completar_perfil.html", {"municipios": municipios})
 
 
-@require_role("admin","inspector","vendedor")
+@require_login
 def pagar_infraccion(request, infraccion_id):
-    infraccion = get_object_or_404(Infraccion, id=infraccion_id, municipio=request.user.municipio)
+    # Solo conductores pagan sus propias infracciones con saldo.
+    # Verificamos que la patente de la infracción esté vinculada a este usuario.
+    infraccion = get_object_or_404(
+        Infraccion,
+        id=infraccion_id,
+        municipio=request.user.municipio,
+        vehiculo__vehiculousuario__usuario=request.user,  # seguridad: solo sus patentes
+    )
+    if request.method != "POST":
+        return redirect("mis_infracciones")
     try:
         pagar_infraccion_uc(request.user, infraccion)
-        messages.success(request, "Infracción cobrada.")
+        messages.success(request, f"✅ Infracción #{infraccion.id} pagada con tu saldo.")
     except Exception as e:
         messages.error(request, str(e))
-    return redirect("gestion_infracciones")
+    return redirect("mis_infracciones")
 
 # =========================================================
 # VIEWS ADMIN
@@ -917,7 +926,10 @@ def mis_infracciones(request):
     return render(
         request,
         "usuarios/historial_infracciones.html",
-        {"infracciones": infracciones}
+        {
+            "infracciones": infracciones,
+            "saldo_usuario": request.user.saldo,
+        }
     )
 
 @require_login
@@ -1460,7 +1472,10 @@ def gestionar_inspectores(request):
                 porcentaje_ganancia=porcentaje,
                 periodicidad_rendicion=request.POST.get("periodicidad_rendicion", "semanal"),
             )
-            inspector.first_name = nombre
+            inspector.first_name       = nombre
+            inspector.telefono         = request.POST.get("telefono", "").strip()
+            inspector.numero_dni       = request.POST.get("numero_dni", "").strip()
+            inspector.numero_legajo    = request.POST.get("numero_legajo", "").strip()
             inspector.save()
             return redirect("gestionar_inspectores")
 
@@ -1486,8 +1501,11 @@ def editar_inspector(request, inspector_id):
     inspector = get_object_or_404(Usuario, id=inspector_id, es_inspector=True, municipio=request.user.municipio)
 
     if request.method == "POST":
-        inspector.first_name = request.POST.get("nombre", "").strip()
-        inspector.is_active = request.POST.get("activo") == "on"
+        inspector.first_name    = request.POST.get("nombre", "").strip()
+        inspector.is_active     = request.POST.get("activo") == "on"
+        inspector.telefono      = request.POST.get("telefono", "").strip()
+        inspector.numero_dni    = request.POST.get("numero_dni", "").strip()
+        inspector.numero_legajo = request.POST.get("numero_legajo", "").strip()
 
         # Configuración de rendición
         try:
@@ -1542,7 +1560,11 @@ def gestionar_vendedores(request):
                 porcentaje_ganancia=porcentaje,
                 periodicidad_rendicion=request.POST.get("periodicidad_rendicion", "semanal"),
             )
-            vendedor.first_name = nombre
+            vendedor.first_name          = nombre
+            vendedor.nombre_propietario  = request.POST.get("nombre_propietario", "").strip()
+            vendedor.documento_cuil      = request.POST.get("documento_cuil", "").strip()
+            vendedor.telefono            = request.POST.get("telefono", "").strip()
+            vendedor.horario_atencion    = request.POST.get("horario_atencion", "").strip()
             vendedor.save()
             return redirect("gestionar_vendedores")
 
@@ -1557,8 +1579,12 @@ def editar_vendedor(request, vendedor_id):
     vendedor = get_object_or_404(Usuario, id=vendedor_id, es_vendedor=True, municipio=request.user.municipio)
 
     if request.method == "POST":
-        vendedor.first_name = request.POST.get("nombre", "").strip()
-        vendedor.is_active = request.POST.get("activo") == "on"
+        vendedor.first_name         = request.POST.get("nombre", "").strip()
+        vendedor.is_active          = request.POST.get("activo") == "on"
+        vendedor.nombre_propietario = request.POST.get("nombre_propietario", "").strip()
+        vendedor.documento_cuil     = request.POST.get("documento_cuil", "").strip()
+        vendedor.telefono           = request.POST.get("telefono", "").strip()
+        vendedor.horario_atencion   = request.POST.get("horario_atencion", "").strip()
         try:
             vendedor.saldo_limite = Decimal(request.POST.get("saldo_limite", "0") or "0")
         except Exception:

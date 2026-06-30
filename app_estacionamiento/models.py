@@ -90,6 +90,24 @@ class Usuario(AbstractUser):
     )
 
     # 🎭 Roles
+
+    # ── Datos adicionales para inspectores ──────────────────────────────────
+    telefono         = models.CharField(max_length=30, blank=True, default="",
+                           verbose_name="Teléfono de contacto")
+    numero_dni       = models.CharField(max_length=20, blank=True, default="",
+                           verbose_name="Número de DNI")
+    numero_legajo    = models.CharField(max_length=30, blank=True, default="",
+                           verbose_name="Número de legajo", help_text="Opcional")
+
+    # ── Datos adicionales para vendedores / kioscos ─────────────────────────
+    nombre_propietario = models.CharField(max_length=200, blank=True, default="",
+                             verbose_name="Nombre del propietario")
+    documento_cuil     = models.CharField(max_length=20, blank=True, default="",
+                             verbose_name="Documento / CUIL")
+    horario_atencion   = models.CharField(max_length=200, blank=True, default="",
+                             verbose_name="Horarios de atención",
+                             help_text="Ej: Lun-Vie 9-18, Sáb 9-13")
+
     es_conductor = models.BooleanField(default=True)
     es_inspector = models.BooleanField(default=False)
     es_vendedor = models.BooleanField(default=False)

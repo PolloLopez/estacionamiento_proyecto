@@ -85,8 +85,22 @@
       <div class="card">
         <h3 style="margin-bottom:0.8rem;">Datos personales</h3>
 
-        <label>Nombre</label>
+        <label>Nombre completo</label>
         <input name="nombre" value="{{ inspector.nombre }}" placeholder="Nombre completo" />
+
+        <div class="grid grid-2" style="gap:1rem;">
+          <div>
+            <label>DNI</label>
+            <input name="numero_dni" value="{{ inspector.numero_dni }}" placeholder="Ej: 30123456" />
+          </div>
+          <div>
+            <label>Legajo (opcional)</label>
+            <input name="numero_legajo" value="{{ inspector.numero_legajo }}" placeholder="Ej: 00142" />
+          </div>
+        </div>
+
+        <label>Teléfono</label>
+        <input name="telefono" value="{{ inspector.telefono }}" placeholder="Ej: 2354 12-3456" />
 
         <label>Correo (solo lectura)</label>
         <input value="{{ inspector.correo }}" disabled
