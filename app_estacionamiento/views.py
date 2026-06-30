@@ -105,6 +105,10 @@ def inicio_usuarios(request):
                 "⏰ Tu estacionamiento finalizó automáticamente porque venció el tiempo pago."
             )
 
+    # Cerrar estacionamientos activos si el horario del municipio ya terminó
+    if usuario.municipio:
+        cerrar_estacionamientos_vencidos_por_horario(usuario.municipio)
+
     # Notificaciones no leídas (ej: resultado de verificación de identidad)
     notificaciones_nuevas = Notificacion.objects.filter(
         destinatario=usuario, leida=False
@@ -635,6 +639,71 @@ def eliminar_vehiculo(request, vehiculo_id):
 
     return render(request, "usuarios/agregar_vehiculo.html")
 
+
+def puede_estacionar_ahora(municipio):
+    """
+    Verifica si el horario del municipio permite estacionar en este momento.
+    Tiene en cuenta días especiales (feriados, etc.) y el horario semanal.
+    Retorna (permitido: bool, mensaje_error: str|None)
+    """
+    from app_estacionamiento.models import HorarioEstacionamiento, DiaEspecial
+    ahora       = timezone.localtime()
+    hoy_fecha   = ahora.date()
+    hoy_dia     = ahora.weekday()   # 0=Lunes … 6=Domingo
+    hora_actual = ahora.time()
+
+    # 1. Día especial sin cobro activo → libre de estacionamiento
+    dia_especial = DiaEspecial.objects.filter(
+        municipio=municipio, fecha=hoy_fecha
+    ).first()
+    if dia_especial and not dia_especial.cobro_activo:
+        return False, f"Hoy es {dia_especial.descripcion}. No hay cobro de estacionamiento."
+
+    # 2. Horario semanal configurado para este día
+    horario = HorarioEstacionamiento.objects.filter(
+        municipio=municipio, dia_semana=hoy_dia, activo=True
+    ).first()
+
+    if horario is None:
+        # Sin horario configurado para hoy → libre de restricciones
+        return True, None
+
+    if hora_actual < horario.hora_inicio or hora_actual > horario.hora_fin:
+        return False, (
+            f"El estacionamiento está habilitado de "
+            f"{horario.hora_inicio.strftime('%H:%M')} a "
+            f"{horario.hora_fin.strftime('%H:%M')}. "
+            f"Actualmente son las {hora_actual.strftime('%H:%M')}."
+        )
+
+    return True, None
+
+
+def cerrar_estacionamientos_vencidos_por_horario(municipio):
+    """
+    Cierra todos los estacionamientos activos del municipio si el
+    horario de cobro ya terminó para el día de hoy.
+    Se llama en inicio_usuarios para que el cierre ocurra de forma reactiva.
+    """
+    from app_estacionamiento.models import HorarioEstacionamiento
+    ahora       = timezone.localtime()
+    hoy_dia     = ahora.weekday()
+    hora_actual = ahora.time()
+
+    horario = HorarioEstacionamiento.objects.filter(
+        municipio=municipio, dia_semana=hoy_dia, activo=True
+    ).first()
+
+    # Solo cerrar si hay horario y ya pasó la hora fin
+    if horario and hora_actual > horario.hora_fin:
+        activos = Estacionamiento.objects.filter(
+            estado="ACTIVO",
+            subcuadra__municipio=municipio
+        )
+        for est in activos:
+            finalizar_estacionamiento_uc(est)
+
+
 @require_role("conductor")
 def estacionar_vehiculo(request):
 
@@ -721,7 +790,20 @@ def estacionar_vehiculo(request):
             })
 
         # =============================================
-        # 6. DURACIÓN
+        # 6. VALIDACIÓN DE HORARIO
+        # =============================================
+
+        permitido, msg_horario = puede_estacionar_ahora(usuario.municipio)
+        if not permitido:
+            return render(request, "usuarios/estacionar_vehiculo.html", {
+                "error": msg_horario,
+                "warning": warning,
+                "vehiculos": vehiculos,
+                "usuario": usuario,
+            })
+
+        # =============================================
+        # 7. DURACIÓN
         # =============================================
 
         try:
@@ -929,6 +1011,7 @@ def mis_infracciones(request):
         {
             "infracciones": infracciones,
             "saldo_usuario": request.user.saldo,
+            "tiene_pendientes": infracciones.filter(estado="pendiente").exists(),
         }
     )
 

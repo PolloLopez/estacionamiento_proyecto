@@ -29,13 +29,13 @@
 
   {% if infracciones %}
 
-    {# Mostrar saldo solo si hay alguna pendiente #}
-    {% for i in infracciones %}{% if i.estado == "pendiente" %}
+    {# Mostrar saldo si hay alguna pendiente #}
+    {% if tiene_pendientes %}
     <div class="card" style="margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
       <span style="font-size:0.95rem;">💰 Saldo disponible: <strong>${{ saldo_usuario }}</strong></span>
       <a href="{% url 'usuarios_cargar_saldo' %}" class="btn btn-outline" style="font-size:0.85rem;">Cargar saldo</a>
     </div>
-    {% endfor %}{% endfor %}
+    {% endif %}
 
     <div class="card" style="overflow-x:auto;">
       <table>
