@@ -2367,36 +2367,3 @@ def resolver_verificacion(request, solicitud_id):
         )
 
     return redirect("gestionar_verificaciones")
-ect("gestionar_verificaciones")"tipo_exencion", "exento_global", "notas_exencion"])
-
-        if not exento_global and subcuadras_ids:
-            municipio = request.user.municipio
-            subcuadras_validas = Subcuadra.objects.filter(
-                id__in=subcuadras_ids,
-                municipio=municipio
-            )
-            vehiculo.subcuadras_exentas.set(subcuadras_validas)
-        elif exento_global:
-            vehiculo.subcuadras_exentas.clear()
-
-        solicitud.estado_exencion    = "aprobada"
-        solicitud.notas_exencion_admin = ""
-        solicitud.save(update_fields=["estado_exencion", "notas_exencion_admin"])
-
-        messages.success(
-            request,
-            f"✅ Exención aprobada para {vehiculo.patente} ({solicitud.usuario.correo})."
-        )
-
-    elif accion == "rechazar_exencion":
-        notas = request.POST.get("notas_exencion_admin", "").strip()
-        solicitud.estado_exencion    = "rechazada"
-        solicitud.notas_exencion_admin = notas
-        solicitud.save(update_fields=["estado_exencion", "notas_exencion_admin"])
-
-        messages.warning(
-            request,
-            f"❌ Exención rechazada para {solicitud.usuario.correo}."
-        )
-
-    return redirect("gestionar_verificaciones")
