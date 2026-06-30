@@ -11,9 +11,10 @@ from django.urls import reverse
 
 from app_estacionamiento.models import (
     Usuario, Municipio, Subcuadra, Vehiculo, VehiculoUsuario,
-    Estacionamiento, MovimientoCaja, Tarifa,
+    Estacionamiento, MovimientoCaja, Tarifa, Infraccion,
 )
 from app_estacionamiento.services_caja import generar_cierre_caja
+from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
 
 
 # ─────────────────────────────────────────────
@@ -278,3 +279,73 @@ class TestAltaPersonal(TestCase):
         vendedor = Usuario.objects.get(correo="vendedor_nuevo@test.com")
         self.assertEqual(vendedor.porcentaje_ganancia, Decimal("8"))
         self.assertEqual(vendedor.periodicidad_rendicion, "semanal")
+
+
+# ═════════════════════════════════════════════
+# 6. MONTO DE INFRACCIÓN DESDE TARIFA
+# ═════════════════════════════════════════════
+
+class TestMontoInfraccion(TestCase):
+    """
+    El monto de cada infracción debe tomarse de Tarifa.monto_infraccion
+    configurada por el admin, no quedar en $0.
+    """
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.inspector = Usuario.objects.create_user(
+            correo="inspector@test.com", password="pass1234",
+            municipio=self.municipio, es_inspector=True, es_conductor=False,
+        )
+        self.subcuadra = crear_subcuadra(self.municipio)
+        self.vehiculo  = crear_vehiculo("ZZZ999")
+
+    def test_infraccion_toma_monto_de_tarifa(self):
+        """Si la tarifa tiene monto_infraccion=3000, la infracción se crea con $3000."""
+        Tarifa.objects.create(
+            municipio=self.municipio,
+            precio_por_hora=Decimal("100"),
+            monto_infraccion=Decimal("3000"),
+        )
+        infraccion = crear_infraccion(
+            patente=self.vehiculo.patente,
+            subcuadra_id=self.subcuadra.id,
+            inspector=self.inspector,
+        )
+        self.assertEqual(infraccion.monto, Decimal("3000"))
+
+    def test_infraccion_sin_tarifa_monto_cero(self):
+        """Sin tarifa configurada el monto queda en $0 (estado seguro)."""
+        infraccion = crear_infraccion(
+            patente=self.vehiculo.patente,
+            subcuadra_id=self.subcuadra.id,
+            inspector=self.inspector,
+        )
+        self.assertEqual(infraccion.monto, Decimal("0"))
+
+    def test_infraccion_monto_no_depende_de_precio_hora(self):
+        """El precio/hora NO afecta el monto de infracción — son campos independientes."""
+        Tarifa.objects.create(
+            municipio=self.municipio,
+            precio_por_hora=Decimal("500"),   # precio alto de estacionamiento
+            monto_infraccion=Decimal("1500"),  # infracción separada
+        )
+        infraccion = crear_infraccion(
+            patente=self.vehiculo.patente,
+            subcuadra_id=self.subcuadra.id,
+            inspector=self.inspector,
+        )
+        self.assertEqual(infraccion.monto, Decimal("1500"))
+
+    def test_admin_actualiza_monto_infraccion(self):
+        """POST a gestionar_tarifas guarda monto_infraccion correctamente."""
+        admin = crear_admin(self.municipio)
+        client = Client()
+        client.force_login(admin)
+        client.post(reverse("admin_guardar_tarifa"), {
+            "precio_por_hora": "200",
+            "monto_infraccion": "4500",
+        })
+        tarifa = Tarifa.objects.get(municipio=self.municipio)
+        self.assertEqual(tarifa.monto_infraccion, Decimal("4500"))
+        self.assertEqual(tarifa.precio_por_hora, Decimal("200"))

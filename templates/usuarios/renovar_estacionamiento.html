@@ -26,7 +26,11 @@
     </div>
     <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);
                 font-size:0.88rem; color:var(--color-text-muted);">
-      Inicio: {{ estacionamiento.hora_inicio|date:"d/m/Y H:i" }}
+      <div>Inicio: {{ estacionamiento.hora_inicio|date:"d/m/Y H:i" }}</div>
+      <div id="fin-actual" style="margin-top:0.2rem;">
+        Vence: <span style="font-weight:600; color:var(--color-warning);"
+                     id="hora-fin-actual">calculando…</span>
+      </div>
     </div>
   </div>
 
@@ -94,6 +98,15 @@
 (function() {
   const tarifaHora  = parseFloat("{{ tarifa_hora }}");
   const saldo       = parseFloat("{{ saldo }}");
+  const horaInicioTs = parseInt("{{ estacionamiento.hora_inicio|date:'U' }}", 10);
+  const duracionActualH = parseFloat("{{ estacionamiento.duracion_min }}");
+
+  // Mostrar hora de fin actual
+  const horaFin = new Date((horaInicioTs + duracionActualH * 3600) * 1000);
+  const pad = n => String(n).padStart(2, "0");
+  document.getElementById("hora-fin-actual").textContent =
+    pad(horaFin.getDate()) + "/" + pad(horaFin.getMonth() + 1) + "/" + horaFin.getFullYear() +
+    " " + pad(horaFin.getHours()) + ":" + pad(horaFin.getMinutes());
   const horasInput  = document.getElementById("horas-input");
   const previewDiv  = document.getElementById("preview-costo");
   const previewMonto = document.getElementById("preview-monto");
@@ -114,12 +127,21 @@
       const costo  = horas * tarifaHora;
 
       horasInput.value = horas;
+
+      // Nueva hora de fin con las horas extra
+      const nuevoFin = new Date((horaInicioTs + (duracionActualH + horas) * 3600) * 1000);
+      const pad = n => String(n).padStart(2, "0");
+      const finStr = pad(nuevoFin.getDate()) + "/" + pad(nuevoFin.getMonth() + 1) + "/" + nuevoFin.getFullYear() +
+                     " " + pad(nuevoFin.getHours()) + ":" + pad(nuevoFin.getMinutes());
+
       previewMonto.textContent = costo.toFixed(2);
       previewDiv.style.display = "block";
 
       if (saldo >= costo) {
         previewDiv.style.background = "var(--color-success-bg)";
         previewDiv.style.color = "var(--color-success)";
+        previewDiv.innerHTML = "Costo adicional: $<span id='preview-monto'>" + costo.toFixed(2) + "</span>" +
+          " &nbsp;·&nbsp; Nueva hora de fin: <strong>" + finStr + "</strong>";
         btnConfirmar.disabled = false;
       } else {
         previewDiv.style.background = "var(--color-danger-bg)";

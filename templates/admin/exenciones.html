@@ -9,6 +9,13 @@
     <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
   </div>
 
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-danger{% else %}alert-warning{% endif %}"
+           style="margin-bottom:1rem;">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
   <!-- BUSCAR PATENTE -->
   <div class="card" style="margin-bottom:1.5rem;">
     <h3 style="margin-bottom:1rem;">Buscar vehículo por patente</h3>

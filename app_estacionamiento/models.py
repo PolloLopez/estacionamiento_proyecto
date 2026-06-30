@@ -245,8 +245,15 @@ class Tarifa(models.Model):
 
     precio_por_hora = models.DecimalField(max_digits=6, decimal_places=2)
 
+    # Monto fijo que se aplica a cada infracción generada por inspectores.
+    # El admin lo configura desde Tarifas. El inspector no puede modificarlo.
+    monto_infraccion = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Monto fijo cobrado por cada infracción."
+    )
+
     def __str__(self):
-        return f"${self.precio_por_hora}/hora"
+        return f"${self.precio_por_hora}/hora | infracción: ${self.monto_infraccion}"
 
 class Estacionamiento(models.Model):
     vehiculo = models.ForeignKey("Vehiculo", on_delete=models.CASCADE)

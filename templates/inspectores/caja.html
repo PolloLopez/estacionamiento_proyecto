@@ -47,12 +47,9 @@
     <p style="font-size:1.4rem; font-weight:800; color:var(--color-primary); margin-bottom:1rem;">
       Total a rendir: ${{ total_a_cerrar }}
     </p>
-    <form method="post"
-          action="{% if request.user.es_vendedor %}{% url 'vendedores_cerrar_caja' %}{% else %}{% url 'inspectores_cerrar_caja' %}{% endif %}"
-          onsubmit="return confirm('¿Confirmar cierre de caja por ${{ total_a_cerrar }}?');">
-      {% csrf_token %}
-      <button class="btn" type="submit">✅ Confirmar cierre de caja</button>
-    </form>
+    <button class="btn" type="button" onclick="document.getElementById('modal-cierre').style.display='flex'">
+      ✅ Confirmar cierre de caja
+    </button>
   </div>
   {% else %}
   <div class="card" style="margin-bottom:1.2rem; text-align:center; padding:1.5rem;">
@@ -112,7 +109,9 @@
         {% if cierre.certificado %}
           <span class="badge badge-aprobada">✅ Certificado</span>
         {% else %}
-          <span class="badge badge-pendiente">⏳ Sin certificar</span>
+          <span class="badge badge-pendiente" title="El admin debe revisar y certificar esta rendición">
+            ⏳ Pendiente de certificación
+          </span>
         {% endif %}
       </div>
     </div>
@@ -121,4 +120,34 @@
   {% endif %}
 
 </section>
+
+<!-- 🔒 MODAL CONFIRMACIÓN CIERRE DE CAJA -->
+<div id="modal-cierre"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
+            z-index:9999; justify-content:center; align-items:center; padding:1rem;">
+  <div style="background:var(--color-surface); border-radius:var(--radius); padding:1.5rem 2rem;
+              max-width:380px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+    <h3 style="margin-bottom:0.75rem;">¿Confirmar cierre de caja?</h3>
+    <p style="font-size:1.3rem; font-weight:800; color:var(--color-primary); margin-bottom:0.5rem;">
+      ${{ total_a_cerrar }}
+    </p>
+    <p class="text-muted" style="font-size:0.9rem; margin-bottom:1.2rem;">
+      Se cerrarán <strong>{{ movimientos_abiertos }}</strong> movimiento(s) abiertos.
+      Esta acción no se puede deshacer.
+    </p>
+    <div style="display:flex; gap:0.75rem;">
+      <form method="post"
+            action="{% if request.user.es_vendedor %}{% url 'vendedores_cerrar_caja' %}{% else %}{% url 'inspectores_cerrar_caja' %}{% endif %}"
+            style="flex:1;">
+        {% csrf_token %}
+        <button class="btn" type="submit" style="width:100%;">✅ Sí, cerrar</button>
+      </form>
+      <button class="btn btn-outline" type="button" style="flex:1;"
+              onclick="document.getElementById('modal-cierre').style.display='none'">
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

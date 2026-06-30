@@ -87,12 +87,27 @@
 
 </div>
 
-<!-- ✅ BANNER DE VERIFICACIÓN (solo conductores no verificados) -->
-{% if request.user.es_conductor %}
-  {% if request.user.es_verificado %}
-    <div class="alert alert-success" style="margin-top:1rem;">
-      ✅ <strong>Cuenta verificada</strong> — tu identidad fue confirmada por el municipio.
+<!-- 🔔 NOTIFICACIONES DEL SISTEMA (resultado de verificación, etc.) -->
+{% if notificaciones_nuevas %}
+  {% for notif in notificaciones_nuevas %}
+    <div class="alert {% if '✅' in notif.mensaje %}alert-success{% else %}alert-warning{% endif %}"
+         style="margin-top:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+      <span>{{ notif.mensaje }}</span>
+      <form method="post" action="{% url 'marcar_notificacion_leida' notif.id %}" style="margin:0;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline"
+                style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
+          Entendido
+        </button>
+      </form>
     </div>
+  {% endfor %}
+{% endif %}
+
+<!-- ✅ BANNER DE ESTADO DE VERIFICACIÓN (solo si no hay notificación activa) -->
+{% if request.user.es_conductor and not notificaciones_nuevas %}
+  {% if request.user.es_verificado %}
+    {# Ya verificado y sin notificaciones: no mostramos nada, es el estado normal #}
   {% elif solicitud_verificacion and solicitud_verificacion.estado == "pendiente" %}
     <div class="alert alert-warning" style="margin-top:1rem;">
       <span>⏳ <strong>Verificación pendiente</strong> — el admin está revisando tus datos.</span>
@@ -142,7 +157,7 @@
   <div class="card">
     <h4>⚠️ Infracciones</h4>
     <a class="btn btn-outline"
-       href="{% url 'gestion_infracciones' %}">
+       href="{% url 'mis_infracciones' %}">
       Ver
     </a>
   </div>

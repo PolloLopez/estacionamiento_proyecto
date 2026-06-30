@@ -9,37 +9,70 @@
     <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
   </div>
 
-  <!-- TARIFA ACTUAL -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}"
+           style="margin-bottom:1rem;">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- TARIFAS -->
   <div class="card" style="margin-bottom:1.5rem;">
-    <h3 style="margin-bottom:1rem;">Precio por hora</h3>
+    <h3 style="margin-bottom:1rem;">Configuración de tarifas</h3>
 
     <form method="post" action="{% url 'admin_guardar_tarifa' %}">
       {% csrf_token %}
 
-      <label for="precio">Precio por hora ($)</label>
-      <input
-        id="precio"
-        name="precio_por_hora"
-        type="number"
-        step="0.01"
-        min="0"
-        required
-        placeholder="Ej: 150.00"
-        value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}"
-        style="max-width:200px;"
-      />
+      <div class="grid grid-2" style="gap:1.2rem; margin-bottom:1rem;">
+        <div>
+          <label for="precio">Precio por hora ($)</label>
+          <input
+            id="precio"
+            name="precio_por_hora"
+            type="number"
+            step="0.01"
+            min="0.01"
+            required
+            placeholder="Ej: 150.00"
+            value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}"
+          />
+          <p class="text-muted" style="font-size:0.85rem; margin-top:0.25rem;">
+            Monto que paga el conductor por hora de estacionamiento.
+          </p>
+        </div>
+
+        <div>
+          <label for="monto_inf">Monto de infracción ($)</label>
+          <input
+            id="monto_inf"
+            name="monto_infraccion"
+            type="number"
+            step="0.01"
+            min="0"
+            required
+            placeholder="Ej: 5000.00"
+            value="{{ tarifa_actual.monto_infraccion|default_if_none:'0' }}"
+          />
+          <p class="text-muted" style="font-size:0.85rem; margin-top:0.25rem;">
+            Monto fijo que genera el inspector al labrar una infracción.
+          </p>
+        </div>
+      </div>
 
       {% if tarifa_actual %}
-        <p class="text-muted" style="margin-top:-0.5rem; margin-bottom:1rem; font-size:0.9rem;">
+        <div style="padding:0.75rem 1rem; background:var(--color-surface-2);
+                    border-radius:var(--radius-sm); margin-bottom:1rem; font-size:0.9rem;">
           Tarifa actual: <strong>${{ tarifa_actual.precio_por_hora }}/hora</strong>
-        </p>
+          &nbsp;·&nbsp;
+          Infracción: <strong>${{ tarifa_actual.monto_infraccion }}</strong>
+        </div>
       {% endif %}
 
       {% if error %}
-        <p class="error">{{ error }}</p>
+        <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
       {% endif %}
 
-      <button class="btn" type="submit">Guardar tarifa</button>
+      <button class="btn" type="submit">Guardar tarifas</button>
     </form>
   </div>
 

@@ -9,25 +9,39 @@
     <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
   </div>
 
-  {% if mensaje %}
-    <div class="alert alert-success" style="margin-bottom:1rem;">{{ mensaje }}</div>
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-danger{% else %}alert-warning{% endif %}"
+           style="margin-bottom:1rem;">{{ message }}</div>
+    {% endfor %}
   {% endif %}
 
   <div class="grid grid-2" style="margin-bottom:1rem;">
 
-    <!-- DATOS -->
+    <!-- DATOS + EDICIÓN -->
     <div class="card">
       <h3 style="margin-bottom:0.8rem;">Datos del conductor</h3>
       <p><strong>Correo:</strong> {{ conductor.correo }}</p>
-      <p><strong>Nombre:</strong> {{ conductor.nombre|default:"—" }}</p>
       <p style="margin-top:0.5rem; font-size:1.3rem; font-weight:800; color:var(--color-primary);">
         💰 Saldo: ${{ conductor.saldo }}
       </p>
-      <div style="margin-top:0.8rem;">
+      <div style="margin-top:0.8rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
         <a href="{% url 'cargar_saldo' conductor.id %}" class="btn btn-outline" style="font-size:0.9rem;">
-          + Cargar saldo manualmente
+          + Cargar saldo
         </a>
       </div>
+
+      {# Editar nombre #}
+      <form method="post" style="margin-top:1rem;">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="editar_datos">
+        <label style="font-size:0.88rem; color:var(--color-text-muted);">Nombre</label>
+        <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+          <input name="nombre" value="{{ conductor.first_name }}" placeholder="Nombre del conductor"
+                 style="flex:1;" />
+          <button class="btn btn-outline" type="submit" style="font-size:0.9rem;">Guardar</button>
+        </div>
+      </form>
     </div>
 
     <!-- AGREGAR VEHÍCULO -->
@@ -53,7 +67,7 @@
   </div>
 
   <!-- VEHÍCULOS + EXENCIONES -->
-  <div class="card">
+  <div class="card" style="margin-bottom:1rem;">
     <h3 style="margin-bottom:0.8rem;">Vehículos registrados</h3>
 
     {% if vehiculos %}
@@ -92,6 +106,49 @@
       </table>
     {% else %}
       <p class="text-muted">Este conductor no tiene vehículos registrados.</p>
+    {% endif %}
+  </div>
+
+  <!-- HISTORIAL DE INFRACCIONES -->
+  <div class="card">
+    <h3 style="margin-bottom:0.8rem;">⚠️ Infracciones (últimas 20)</h3>
+    {% if infracciones %}
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Patente</th>
+              <th>Motivo</th>
+              <th style="text-align:right;">Monto</th>
+              <th>Fecha</th>
+              <th style="text-align:center;">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inf in infracciones %}
+            <tr>
+              <td style="color:var(--color-text-muted); font-size:0.8rem;">{{ inf.id }}</td>
+              <td><strong>{{ inf.vehiculo.patente }}</strong></td>
+              <td style="font-size:0.85rem; max-width:160px;">{{ inf.motivo }}</td>
+              <td style="text-align:right; font-weight:600;">${{ inf.monto }}</td>
+              <td style="font-size:0.83rem;">{{ inf.creado_en|date:"d/m/Y" }}</td>
+              <td style="text-align:center;">
+                {% if inf.estado == "pendiente" %}
+                  <span style="color:var(--color-warning); font-weight:700;">Pendiente</span>
+                {% elif inf.estado == "pagada" %}
+                  <span style="color:var(--color-primary); font-weight:700;">✅ Pagada</span>
+                {% else %}
+                  <span style="color:var(--color-danger);">Anulada</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted">Sin infracciones registradas.</p>
     {% endif %}
   </div>
 

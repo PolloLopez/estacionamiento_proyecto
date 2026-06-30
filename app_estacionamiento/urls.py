@@ -32,6 +32,7 @@ urlpatterns = [
     path("mis_estacionamientos/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),
     path("infracciones/<int:infraccion_id>/pagar/",views.pagar_infraccion,name="pagar_infraccion"),
     path("estacionamiento/<int:est_id>/renovar/", views.renovar_estacionamiento, name="usuarios_renovar_estacionamiento"),
+    path("notificacion/<int:notif_id>/leida/", views.marcar_notificacion_leida, name="marcar_notificacion_leida"),
 
     # =========================
     # 👮 INSPECTORES
@@ -89,6 +90,7 @@ urlpatterns = [
     path("admin-usuarios/", views.gestionar_usuarios, name="gestionar_usuarios"),
     path("admin-usuarios/<int:usuario_id>/", views.detalle_usuario_admin, name="detalle_usuario_admin"),
     path("admin-infracciones/", views.admin_infracciones, name="admin_infracciones"),
+    path("admin-infracciones/<int:infraccion_id>/comprobante/", views.comprobante_infraccion, name="comprobante_infraccion"),
     path("admin-tarifas/", views.gestionar_tarifas, name="gestionar_tarifas"),
     path("admin-horarios/", views.gestionar_horarios, name="gestionar_horarios"),
     path("admin-dias-especiales/", views.gestionar_dias_especiales, name="gestionar_dias_especiales"),

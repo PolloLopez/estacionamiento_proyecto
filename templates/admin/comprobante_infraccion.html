@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Comprobante Infracción #{{ infraccion.id }}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 14px; color: #222; padding: 2rem; max-width: 480px; margin: 0 auto; }
+    h1 { font-size: 1.3rem; border-bottom: 2px solid #222; padding-bottom: 0.5rem; margin-bottom: 1rem; }
+    .municipio { font-size: 0.95rem; color: #555; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    td { padding: 0.4rem 0; vertical-align: top; }
+    td:first-child { color: #555; width: 45%; font-size: 0.88rem; }
+    td:last-child { font-weight: 600; }
+    .estado { display: inline-block; padding: 0.3rem 0.9rem; border-radius: 4px;
+              font-weight: 700; font-size: 1rem; margin-bottom: 1rem; }
+    .pagada { background: #e8f5e9; color: #2e7d32; }
+    .footer { font-size: 0.78rem; color: #888; border-top: 1px solid #ddd; padding-top: 0.75rem; }
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="no-print" style="margin-bottom:1.5rem; display:flex; gap:0.75rem;">
+    <button onclick="window.print()" style="padding:0.5rem 1.2rem; cursor:pointer; font-size:0.9rem;">
+      🖨️ Imprimir
+    </button>
+    <button onclick="window.close()" style="padding:0.5rem 1rem; cursor:pointer; font-size:0.9rem;">
+      ✕ Cerrar
+    </button>
+  </div>
+
+  <h1>Comprobante de Pago — Infracción #{{ infraccion.id }}</h1>
+  <p class="municipio">{{ municipio.nombre }}</p>
+
+  <span class="estado pagada">✅ PAGADA</span>
+
+  <table>
+    <tr>
+      <td>Patente</td>
+      <td>{{ infraccion.vehiculo.patente }}</td>
+    </tr>
+    <tr>
+      <td>Motivo</td>
+      <td>{{ infraccion.motivo }}</td>
+    </tr>
+    <tr>
+      <td>Monto</td>
+      <td>${{ infraccion.monto }}</td>
+    </tr>
+    <tr>
+      <td>Subcuadra</td>
+      <td>{{ infraccion.subcuadra|default:"—" }}</td>
+    </tr>
+    <tr>
+      <td>Inspector</td>
+      <td>{{ infraccion.inspector.first_name|default:infraccion.inspector.correo }}</td>
+    </tr>
+    <tr>
+      <td>Fecha infracción</td>
+      <td>{{ infraccion.creado_en|date:"d/m/Y H:i" }}</td>
+    </tr>
+  </table>
+
+  <div class="footer">
+    Comprobante generado por el Sistema de Gestión de Estacionamiento.
+    Este documento acredita el pago de la infracción indicada.
+  </div>
+
+</body>
+</html>

@@ -34,6 +34,7 @@ from .models import (
     HorarioEstacionamiento,
     DiaEspecial,
     SolicitudVerificacion,
+    Notificacion,
     TIPOS_EXENCION,
 )
 
@@ -91,6 +92,24 @@ def inicio_usuarios(request):
         estado="ACTIVO"
     ).order_by("-hora_inicio").first()
 
+    # Auto-cierre: si el tiempo pago ya venció, finalizar automáticamente
+    if estacionamiento_activo:
+        expiracion = estacionamiento_activo.hora_inicio + timedelta(
+            hours=estacionamiento_activo.duracion_min
+        )
+        if timezone.now() >= expiracion:
+            finalizar_estacionamiento_uc(estacionamiento_activo)
+            estacionamiento_activo = None
+            messages.info(
+                request,
+                "⏰ Tu estacionamiento finalizó automáticamente porque venció el tiempo pago."
+            )
+
+    # Notificaciones no leídas (ej: resultado de verificación de identidad)
+    notificaciones_nuevas = Notificacion.objects.filter(
+        destinatario=usuario, leida=False
+    ).order_by("-fecha")
+
     # Estado de verificación: None si no existe solicitud
     solicitud_verificacion = getattr(usuario, "solicitud_verificacion", None)
 
@@ -98,11 +117,25 @@ def inicio_usuarios(request):
         "usuario": usuario,
         "estacionamiento_activo": estacionamiento_activo,
         "solicitud_verificacion": solicitud_verificacion,
+        "notificaciones_nuevas": notificaciones_nuevas,
     })
 
 # =========================================================
 # VIEWS USUARIOS
 # =========================================================
+
+@require_login
+def marcar_notificacion_leida(request, notif_id):
+    """
+    Marca una notificación como leída cuando el conductor presiona 'Entendido'.
+    Solo acepta POST para evitar que se marque por error con un GET.
+    """
+    if request.method == "POST":
+        Notificacion.objects.filter(
+            id=notif_id, destinatario=request.user
+        ).update(leida=True)
+    return redirect("inicio_usuarios")
+
 
 def home(request):
     if not request.user.is_authenticated:
@@ -508,6 +541,10 @@ def panel_exenciones(request):
                 municipio=municipio
             ).values_list("id", flat=True)
             vehiculo.subcuadras_exentas.set(subcuadras_validas)
+
+            messages.success(request, f"✅ Exención guardada para {vehiculo.patente}.")
+        else:
+            messages.error(request, "No se encontró el vehículo con esa patente.")
 
     return render(request, "admin/exenciones.html", {
         "vehiculo": vehiculo,
@@ -968,6 +1005,21 @@ def verificar_vehiculo(request):
         patente = (request.POST.get("patente") or "").upper().strip()
 
         if patente:
+            # Auto-cierre de estacionamientos vencidos ANTES de verificar
+            # Así el inspector no ve un vehículo como "pagado" cuando en realidad expiró
+            from app_estacionamiento.models import Vehiculo as VehiculoModel
+            vehiculo_check = VehiculoModel.objects.filter(patente=patente).first()
+            if vehiculo_check:
+                est_vencido = Estacionamiento.objects.filter(
+                    vehiculo=vehiculo_check, estado="ACTIVO"
+                ).first()
+                if est_vencido:
+                    expiracion = est_vencido.hora_inicio + timedelta(
+                        hours=est_vencido.duracion_min
+                    )
+                    if timezone.now() >= expiracion:
+                        finalizar_estacionamiento_uc(est_vencido)
+
             resultado = verificar_estado_vehiculo(
                 patente,
                 request.user,
@@ -1545,24 +1597,39 @@ def gestionar_usuarios(request):
 
 @require_role("admin")
 def detalle_usuario_admin(request, usuario_id):
-    """Vista de detalle de un conductor: saldo, vehículos, exenciones, historial."""
+    """Vista de detalle de un conductor: datos, saldo, vehículos, exenciones, historial infracciones."""
     conductor = get_object_or_404(Usuario, id=usuario_id, es_conductor=True, municipio=request.user.municipio)
     vehiculos = Vehiculo.objects.filter(vehiculousuario__usuario=conductor)
 
+    accion = request.POST.get("accion") if request.method == "POST" else None
+
     # Agregar vehículo desde admin
-    mensaje = None
-    if request.method == "POST" and request.POST.get("accion") == "agregar_vehiculo":
+    if accion == "agregar_vehiculo":
         patente = (request.POST.get("patente") or "").strip().upper()
         if patente:
             vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
             VehiculoUsuario.objects.get_or_create(usuario=conductor, vehiculo=vehiculo)
-            mensaje = f"Vehículo {patente} agregado."
+            messages.success(request, f"Vehículo {patente} agregado.")
             vehiculos = Vehiculo.objects.filter(vehiculousuario__usuario=conductor)
+
+    # Editar datos básicos del conductor
+    elif accion == "editar_datos":
+        nombre = request.POST.get("nombre", "").strip()
+        if nombre:
+            conductor.first_name = nombre
+            conductor.save(update_fields=["first_name"])
+            messages.success(request, "Datos actualizados.")
+
+    # Historial de infracciones de sus vehículos
+    infracciones = Infraccion.objects.filter(
+        vehiculo__vehiculousuario__usuario=conductor,
+        municipio=request.user.municipio,
+    ).distinct().order_by("-creado_en")[:20]
 
     return render(request, "admin/detalle_usuario.html", {
         "conductor": conductor,
         "vehiculos": vehiculos,
-        "mensaje": mensaje,
+        "infracciones": infracciones,
     })
 
 @require_role("admin")
@@ -1593,15 +1660,25 @@ def admin_infracciones(request):
     if fecha_hasta:
         infracciones = infracciones.filter(creado_en__date__lte=fecha_hasta)
 
-    # Acción POST: anular infracción
+    # Acciones POST: anular o cobrar infracción
     if request.method == "POST":
         accion = request.POST.get("accion")
         infraccion_id = request.POST.get("infraccion_id")
+
         if accion == "anular" and infraccion_id:
             inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
             if inf.estado == "pendiente":
                 inf.estado = "anulada"
                 inf.save()
+                messages.success(request, f"Infracción #{inf.id} anulada.")
+
+        elif accion == "cobrar" and infraccion_id:
+            inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
+            if inf.estado == "pendiente":
+                inf.estado = "pagada"
+                inf.save()
+                messages.success(request, f"Infracción #{inf.id} marcada como pagada.")
+
         return redirect(request.get_full_path())
 
     inspectores = Usuario.objects.filter(municipio=municipio, es_inspector=True)
@@ -1628,14 +1705,22 @@ def gestionar_tarifas(request):
     error = None
     if request.method == "POST":
         precio_str = request.POST.get("precio_por_hora", "").strip()
+        monto_inf_str = request.POST.get("monto_infraccion", "0").strip() or "0"
         try:
             precio = Decimal(precio_str)
             if precio <= 0:
-                raise ValueError("El precio debe ser mayor a 0.")
+                raise ValueError("El precio por hora debe ser mayor a 0.")
+            monto_infraccion = Decimal(monto_inf_str)
+            if monto_infraccion < 0:
+                raise ValueError("El monto de infracción no puede ser negativo.")
             Tarifa.objects.update_or_create(
                 municipio=municipio,
-                defaults={"precio_por_hora": precio}
+                defaults={
+                    "precio_por_hora": precio,
+                    "monto_infraccion": monto_infraccion,
+                }
             )
+            messages.success(request, "✅ Tarifas guardadas correctamente.")
             return redirect("gestionar_tarifas")
         except Exception as e:
             error = f"Error al guardar: {e}"
@@ -1728,6 +1813,18 @@ def gestionar_dias_especiales(request):
     return render(request, "admin/gestionar_dias_especiales.html", {
         "dias": dias,
         "tipos": DiaEspecial.TIPOS,
+    })
+
+
+@require_role("admin")
+def comprobante_infraccion(request, infraccion_id):
+    """Vista de impresión para comprobante de pago de infracción."""
+    infraccion = get_object_or_404(
+        Infraccion, id=infraccion_id, municipio=request.user.municipio
+    )
+    return render(request, "admin/comprobante_infraccion.html", {
+        "infraccion": infraccion,
+        "municipio": request.user.municipio,
     })
 
 
@@ -2183,6 +2280,12 @@ def resolver_verificacion(request, solicitud_id):
             aprobado=True,
         )
 
+        # 🔔 Notificación en la app (se muestra con botón "Entendido")
+        Notificacion.objects.create(
+            destinatario=solicitud.usuario,
+            mensaje="✅ ¡Tu identidad fue verificada! El municipio confirmó tu cuenta.",
+        )
+
     elif accion == "rechazar":
         notas = request.POST.get("notas_admin", "").strip()
         solicitud.estado = "rechazada"
@@ -2200,6 +2303,13 @@ def resolver_verificacion(request, solicitud_id):
             nombre=solicitud.nombre or solicitud.usuario.correo,
             aprobado=False,
             motivo=notas,
+        )
+
+        # 🔔 Notificación en la app
+        motivo_texto = f" Motivo: {notas}" if notas else ""
+        Notificacion.objects.create(
+            destinatario=solicitud.usuario,
+            mensaje=f"❌ Tu verificación fue rechazada.{motivo_texto} Podés reenviar tu solicitud.",
         )
 
     # ── Exención ──────────────────────────────────────────────────────────────
@@ -2225,6 +2335,39 @@ def resolver_verificacion(request, solicitud_id):
             notas or f"Aprobado por {request.user.correo} — solicitud #{solicitud.id}"
         )
         vehiculo.save(update_fields=["tipo_exencion", "exento_global", "notas_exencion"])
+
+        if not exento_global and subcuadras_ids:
+            municipio = request.user.municipio
+            subcuadras_validas = Subcuadra.objects.filter(
+                id__in=subcuadras_ids,
+                municipio=municipio
+            )
+            vehiculo.subcuadras_exentas.set(subcuadras_validas)
+        elif exento_global:
+            vehiculo.subcuadras_exentas.clear()
+
+        solicitud.estado_exencion    = "aprobada"
+        solicitud.notas_exencion_admin = ""
+        solicitud.save(update_fields=["estado_exencion", "notas_exencion_admin"])
+
+        messages.success(
+            request,
+            f"✅ Exención aprobada para {vehiculo.patente} ({solicitud.usuario.correo})."
+        )
+
+    elif accion == "rechazar_exencion":
+        notas = request.POST.get("notas_exencion_admin", "").strip()
+        solicitud.estado_exencion    = "rechazada"
+        solicitud.notas_exencion_admin = notas
+        solicitud.save(update_fields=["estado_exencion", "notas_exencion_admin"])
+
+        messages.warning(
+            request,
+            f"❌ Exención rechazada para {solicitud.usuario.correo}."
+        )
+
+    return redirect("gestionar_verificaciones")
+ect("gestionar_verificaciones")"tipo_exencion", "exento_global", "notas_exencion"])
 
         if not exento_global and subcuadras_ids:
             municipio = request.user.municipio

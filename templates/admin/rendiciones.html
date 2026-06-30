@@ -140,13 +140,35 @@
   {# Botón certificar (solo si no está certificado) #}
   {% if not cierre.certificado %}
   <div style="margin-top:0.75rem;">
-    <form method="post" action="{% url 'certificar_cierre' cierre.id %}"
-          onsubmit="return confirm('¿Certificar este cierre de ${{ cierre.total_cobrado }}?');">
-      {% csrf_token %}
-      <button type="submit" class="btn" style="font-size:0.9rem; padding:0.4rem 1.2rem;">
-        ✅ Certificar rendición
-      </button>
-    </form>
+    <button type="button" class="btn" style="font-size:0.9rem; padding:0.4rem 1.2rem;"
+            onclick="document.getElementById('modal-cert-{{ cierre.id }}').style.display='flex'">
+      ✅ Certificar rendición
+    </button>
+  </div>
+  {# Modal de confirmación (inline, sin JS externo) #}
+  <div id="modal-cert-{{ cierre.id }}"
+       style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
+              z-index:9999; justify-content:center; align-items:center; padding:1rem;">
+    <div style="background:var(--color-surface); border-radius:var(--radius); padding:1.5rem 2rem;
+                max-width:360px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+      <h3 style="margin-bottom:0.6rem;">Certificar rendición</h3>
+      <p style="font-size:0.9rem; color:var(--color-text-muted); margin-bottom:0.5rem;">
+        {{ cierre.usuario.first_name|default:cierre.usuario.correo }}
+      </p>
+      <p style="font-size:1.3rem; font-weight:800; color:var(--color-primary); margin-bottom:1.2rem;">
+        ${{ cierre.total_cobrado }}
+      </p>
+      <div style="display:flex; gap:0.75rem;">
+        <form method="post" action="{% url 'certificar_cierre' cierre.id %}" style="flex:1;">
+          {% csrf_token %}
+          <button class="btn" type="submit" style="width:100%;">Confirmar</button>
+        </form>
+        <button class="btn btn-outline" type="button" style="flex:1;"
+                onclick="document.getElementById('modal-cert-{{ cierre.id }}').style.display='none'">
+          Cancelar
+        </button>
+      </div>
+    </div>
   </div>
   {% endif %}
 

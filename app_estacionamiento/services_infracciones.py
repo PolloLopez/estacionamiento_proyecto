@@ -1,8 +1,9 @@
 # app_estacionamiento/services_infracciones.py
 
+from decimal import Decimal
 from django.utils import timezone
 from datetime import timedelta
-from app_estacionamiento.models import Infraccion, Estacionamiento, Vehiculo, Subcuadra, VerificacionInspector
+from app_estacionamiento.models import Infraccion, Estacionamiento, Vehiculo, Subcuadra, VerificacionInspector, Tarifa
 
 class ErrorInfraccion(Exception):
     pass
@@ -67,6 +68,12 @@ def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
         raise ErrorInfraccion("Ya existe una infracción reciente")
 
     # ==============================
+    # MONTO: se toma de la tarifa configurada por el admin
+    # ==============================
+    tarifa = Tarifa.objects.filter(municipio=municipio).first()
+    monto = tarifa.monto_infraccion if tarifa else Decimal("0")
+
+    # ==============================
     # CREACIÓN
     # ==============================
     infraccion = Infraccion.objects.create(
@@ -75,7 +82,8 @@ def crear_infraccion(*, patente, subcuadra_id, inspector, foto=None):
         municipio=municipio,
         subcuadra=subcuadra,
         estacionamiento=estacionamiento,
-        foto=foto
+        foto=foto,
+        monto=monto,
     )
 
     # Trazabilidad: marcar la última verificación como origen de esta infracción
