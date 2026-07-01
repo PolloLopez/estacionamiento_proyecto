@@ -30,18 +30,22 @@
 
       <p><b>Patente:</b> {{ estacionamiento_activo.vehiculo.patente }}</p>
       <p><b>Zona:</b> {{ estacionamiento_activo.subcuadra }}</p>
-      <p><b>Duración:</b> {{ estacionamiento_activo.duracion_min }} hs</p>
-      <p><b>Inicio:</b> {{ estacionamiento_activo.hora_inicio }}</p>
+      <p><b>Inicio:</b> {{ estacionamiento_activo.hora_inicio|date:"H:i" }}</p>
 
-      <!-- ⏱ TIMER -->
-      <div class="timer-box">
-        <span id="timer">--:--</span>
+      <!-- ⏱ VENCIMIENTO / TIMER -->
+      <div class="timer-box" style="margin:0.5rem 0;">
+        <span id="timer" style="font-size:1.3rem; font-weight:700;">calculando…</span>
       </div>
 
-      <!-- ⚠️ Aviso cuando quedan menos de 5 minutos (reemplaza el alert intrusivo) -->
+      <!-- ⚠️ Aviso cuando quedan menos de 5 minutos -->
       <div id="aviso-tiempo" style="display:none; margin-top:0.5rem;"
            class="alert alert-warning">
         ⚠️ <strong>¡Te quedan menos de 5 minutos!</strong>
+        <a class="btn btn-outline"
+           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}"
+           style="font-size:0.85rem; padding:0.3rem 0.8rem; margin-left:0.5rem; white-space:nowrap;">
+          🔄 Renovar ahora
+        </a>
       </div>
 
       <!-- 📊 PROGRESS -->
@@ -50,14 +54,12 @@
       </div>
 
       <script>
-        // Usamos timestamp Unix (entero) para evitar problemas de parsing según locale/zona horaria
         const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
-        // duracion_min almacena horas (ej: 2 = 2 horas)
         const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_min }}");
       </script>
 
-      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
-        <a class="btn btn-outline"
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+        <a class="btn btn-outline" id="btn-renovar"
            href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}">
           🔄 Renovar
         </a>
@@ -169,59 +171,76 @@
 (function() {
 
   if (typeof horaInicio === "undefined") return;
-  // horaInicio ya es un objeto Date, no hace falta parsearlo de nuevo
   if (isNaN(horaInicio.getTime())) return;
+
+  const duracionMs = duracionHoras * 60 * 60 * 1000;
+  const fin = new Date(horaInicio.getTime() + duracionMs);
+
+  const timerEl    = document.getElementById("timer");
+  const progressEl = document.getElementById("progress");
+  const avisoEl    = document.getElementById("aviso-tiempo");
+  const btnRenovar = document.getElementById("btn-renovar");
+
+  // Hora de vencimiento formateada una sola vez
+  const pad = n => String(n).padStart(2, "0");
+  const horaVencStr = pad(fin.getHours()) + ":" + pad(fin.getMinutes());
 
   let avisoMostrado = false;
 
-  const inicio = horaInicio;
-  const duracionMs = duracionHoras * 60 * 60 * 1000;
-  const fin = new Date(inicio.getTime() + duracionMs);
-
-  const timerEl   = document.getElementById("timer");
-  const progressEl = document.getElementById("progress");
-  const avisoEl   = document.getElementById("aviso-tiempo");
-
   function actualizarTimer() {
-
     const ahora    = new Date();
     const restante = fin - ahora;
 
     if (restante <= 0) {
       timerEl.innerText = "VENCIDO";
       timerEl.style.color = "var(--color-danger)";
-      progressEl.style.width = "100%";
-      progressEl.style.background = "var(--color-danger)";
+      if (progressEl) {
+        progressEl.style.width = "100%";
+        progressEl.style.background = "var(--color-danger)";
+      }
       return;
     }
 
-    const minutos  = Math.floor(restante / 60000);
+    const minutosRestantes = Math.floor(restante / 60000);
     const segundos = Math.floor((restante % 60000) / 1000);
 
-    // Mostrar banner (en lugar de alert) cuando quedan menos de 5 minutos
-    if (minutos < 5 && !avisoMostrado) {
-      if (avisoEl) avisoEl.style.display = "flex";
-      avisoMostrado = true;
+    if (minutosRestantes < 5) {
+      // Últimos 5 minutos: mostrar countdown numérico MM:SS
+      timerEl.innerText = pad(minutosRestantes) + ":" + pad(segundos);
+      timerEl.style.color = "var(--color-danger)";
+      timerEl.style.fontSize = "1.6rem";
+
+      if (!avisoMostrado) {
+        if (avisoEl) avisoEl.style.display = "flex";
+        // Destacar el botón Renovar
+        if (btnRenovar) {
+          btnRenovar.classList.remove("btn-outline");
+          btnRenovar.classList.add("btn");
+        }
+        avisoMostrado = true;
+      }
+    } else {
+      // Tiempo suficiente: mostrar hora de vencimiento
+      const horas    = Math.floor(minutosRestantes / 60);
+      const minutos  = minutosRestantes % 60;
+      let restanteStr = "";
+      if (horas > 0)   restanteStr += horas + "h ";
+      if (minutos > 0) restanteStr += minutos + "min";
+      timerEl.innerText = "Vence a las " + horaVencStr + " (" + restanteStr.trim() + ")";
+      timerEl.style.color = "";
     }
 
-    timerEl.innerText =
-      `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
-
-    const total      = duracionMs;
-    const usado      = ahora - inicio;
-    const porcentaje = Math.min((usado / total) * 100, 100);
-
-    progressEl.style.width = porcentaje + "%";
-
-    if (porcentaje > 80) {
-      progressEl.style.background = "var(--color-danger)";
-      timerEl.style.color = "var(--color-danger)";
-    } else if (porcentaje > 50) {
-      progressEl.style.background = "#f9a825";
-      timerEl.style.color = "";
-    } else {
-      progressEl.style.background = "var(--color-success)";
-      timerEl.style.color = "";
+    if (progressEl) {
+      const usado      = ahora - horaInicio;
+      const porcentaje = Math.min((usado / duracionMs) * 100, 100);
+      progressEl.style.width = porcentaje + "%";
+      if (porcentaje > 80) {
+        progressEl.style.background = "var(--color-danger)";
+      } else if (porcentaje > 50) {
+        progressEl.style.background = "#f9a825";
+      } else {
+        progressEl.style.background = "var(--color-success)";
+      }
     }
   }
 

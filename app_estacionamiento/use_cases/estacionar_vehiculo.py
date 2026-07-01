@@ -12,7 +12,7 @@ from app_estacionamiento.use_cases.registrar_movimiento import ejecutar as regis
 
 TARIFA_BASE_FALLBACK = Decimal("100")
 REDIRECT_OK = "inicio"
-REDIRECT_SIN_SALDO = "consultar_deuda"
+REDIRECT_SIN_SALDO = "mp_iniciar_carga"
 
 def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
 

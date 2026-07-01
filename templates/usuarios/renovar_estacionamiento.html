@@ -36,7 +36,7 @@
 
   {# Selector de horas a agregar #}
   <div class="card">
-    <h3 style="margin-bottom:1rem;">Agregar horas</h3>
+    <h3 style="margin-bottom:1rem;">Agregar tiempo</h3>
 
     {% if error %}
       <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
@@ -52,26 +52,30 @@
     <form method="post">
       {% csrf_token %}
 
-      <label style="font-weight:600; margin-bottom:0.5rem; display:block;">
-        ¿Cuántas horas querés agregar?
-      </label>
+      {% if opciones_duracion %}
+        <label style="font-weight:600; margin-bottom:0.5rem; display:block;">
+          ¿Cuánto tiempo querés agregar?
+        </label>
 
-      {# Botones rápidos #}
-      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:0.5rem; margin-bottom:1rem;"
-           id="opciones-horas">
-        <button type="button" class="btn btn-outline opcion-hora" data-horas="1"
-                style="font-size:1rem; padding:0.6rem;">1h</button>
-        <button type="button" class="btn btn-outline opcion-hora" data-horas="2"
-                style="font-size:1rem; padding:0.6rem;">2h</button>
-        <button type="button" class="btn btn-outline opcion-hora" data-horas="3"
-                style="font-size:1rem; padding:0.6rem;">3h</button>
-        <button type="button" class="btn btn-outline opcion-hora" data-horas="4"
-                style="font-size:1rem; padding:0.6rem;">4h</button>
-        <button type="button" class="btn btn-outline opcion-hora" data-horas="6"
-                style="font-size:1rem; padding:0.6rem;">6h</button>
-        <button type="button" class="btn btn-outline opcion-hora" data-horas="8"
-                style="font-size:1rem; padding:0.6rem;">8h</button>
-      </div>
+        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;"
+             id="opciones-horas">
+          {% for op in opciones_duracion %}
+          <button type="button"
+                  class="btn btn-outline opcion-hora"
+                  data-horas="{{ op.horas }}"
+                  data-costo="{{ op.costo }}"
+                  data-label="{{ op.label }}"
+                  style="font-size:1rem; padding:0.6rem 1rem; font-weight:600;">
+            {{ op.label }}
+          </button>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="alert" style="background:#fff3cd; color:#856404; border:1px solid #ffc107;
+             border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem;">
+          ⏰ No hay tiempo disponible para extender — el horario de estacionamiento cierra pronto.
+        </div>
+      {% endif %}
 
       <input type="hidden" name="horas_extra" id="horas-input" value="0" />
 
@@ -114,39 +118,36 @@
 
   document.querySelectorAll(".opcion-hora").forEach(function(btn) {
     btn.addEventListener("click", function() {
-      // Desmarcar todos
       document.querySelectorAll(".opcion-hora").forEach(function(b) {
         b.classList.remove("btn-success");
         b.classList.add("btn-outline");
       });
-      // Marcar este
       btn.classList.remove("btn-outline");
       btn.classList.add("btn-success");
 
       const horas  = parseFloat(btn.dataset.horas);
-      const costo  = horas * tarifaHora;
+      // El costo ya viene calculado desde el servidor (respeta la tarifa exacta)
+      const costo  = parseFloat(btn.dataset.costo);
+      const label  = btn.dataset.label;
 
       horasInput.value = horas;
 
-      // Nueva hora de fin con las horas extra
       const nuevoFin = new Date((horaInicioTs + (duracionActualH + horas) * 3600) * 1000);
       const pad = n => String(n).padStart(2, "0");
-      const finStr = pad(nuevoFin.getDate()) + "/" + pad(nuevoFin.getMonth() + 1) + "/" + nuevoFin.getFullYear() +
-                     " " + pad(nuevoFin.getHours()) + ":" + pad(nuevoFin.getMinutes());
+      const finStr = pad(nuevoFin.getHours()) + ":" + pad(nuevoFin.getMinutes());
 
-      previewMonto.textContent = costo.toFixed(2);
       previewDiv.style.display = "block";
 
       if (saldo >= costo) {
         previewDiv.style.background = "var(--color-success-bg)";
         previewDiv.style.color = "var(--color-success)";
-        previewDiv.innerHTML = "Costo adicional: $<span id='preview-monto'>" + costo.toFixed(2) + "</span>" +
-          " &nbsp;·&nbsp; Nueva hora de fin: <strong>" + finStr + "</strong>";
+        previewDiv.innerHTML = "+" + label + " · Costo: $<strong>" + costo.toFixed(2) +
+          "</strong> · Nuevo vencimiento: <strong>" + finStr + "</strong>";
         btnConfirmar.disabled = false;
       } else {
         previewDiv.style.background = "var(--color-danger-bg)";
         previewDiv.style.color = "var(--color-danger)";
-        previewDiv.textContent = "Saldo insuficiente para " + horas + "h ($" + costo.toFixed(2) + ")";
+        previewDiv.textContent = "Saldo insuficiente para " + label + " ($" + costo.toFixed(2) + ")";
         btnConfirmar.disabled = true;
       }
     });

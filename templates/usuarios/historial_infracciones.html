@@ -15,11 +15,14 @@
 
   {# Aviso de visibilidad #}
   {% if not request.user.es_verificado %}
-    <div class="alert alert-info" style="margin-bottom:1rem; display:block;">
-      ℹ️ Solo se muestran infracciones vinculadas a los vehículos registrados en tu cuenta.
-      Para ver la totalidad de tus infracciones,
-      <a href="{% url 'solicitar_verificacion' %}">verificá tu cuenta</a>
-      y agregá tus vehículos.
+    <div class="alert alert-warning" style="margin-bottom:1rem; display:flex; align-items:center;
+         justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+      <span>⚠️ Solo se muestran las infracciones de tus vehículos registrados.
+        Para ver <strong>todas tus infracciones</strong>, verificá tu cuenta.</span>
+      <a href="{% url 'solicitar_verificacion' %}" class="btn btn-outline"
+         style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
+        Verificar mi cuenta
+      </a>
     </div>
   {% else %}
     <div class="alert alert-info" style="margin-bottom:1rem; display:block; font-size:0.9rem;">

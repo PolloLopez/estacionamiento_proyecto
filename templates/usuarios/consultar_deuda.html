@@ -1,31 +1,112 @@
 {% extends "base.html" %}
-{% block title %}Consultar Deuda{% endblock %}
+{% block title %}Cobrar deuda por patente{% endblock %}
 
 {% block content %}
-<section class="container">
+<div class="container">
   <div class="panel">
-    <h2>Consultar deuda por vehículo</h2>
     <div class="panel-body">
-      <form method="get">
-        <div class="form-row">
-          <label>Patente</label>
-          <input name="patente" placeholder="ABC123" />
-        </div>
-        <div class="form-row actions">
-          <button class="btn">Consultar</button>
-        </div>
-      </form>
 
-      {% if deuda is not None %}
-      <div class="card">
-        <p>Total deuda: <strong>${{ deuda.total }}</strong></p>
-      </div>
+      <h1>💳 Cobrar deuda por patente</h1>
+      <p class="text-muted" style="margin-bottom:1.5rem;">
+        Buscá el vehículo por patente para ver y cobrar sus infracciones pendientes.
+      </p>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-danger{% endif %}"
+               style="margin-bottom:1rem;">{{ message }}</div>
+        {% endfor %}
       {% endif %}
 
-      <p>
-        <a href="{% url 'inicio_usuarios' %}">Volver</a>
-      </p>
+      {# Formulario de búsqueda por GET #}
+      <form method="get" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1.5rem;">
+        <div>
+          <label for="patente" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.3rem;">Patente</label>
+          <input type="text"
+                 id="patente"
+                 name="patente"
+                 value="{{ patente }}"
+                 placeholder="Ej: ABC123"
+                 maxlength="10"
+                 style="text-transform:uppercase; width:180px;"
+                 autocomplete="off"
+                 required>
+        </div>
+        <button type="submit" class="btn">🔍 Buscar</button>
+        {% if patente %}
+          <a href="{% url 'consultar_deuda' %}" class="btn btn-outline">Limpiar</a>
+        {% endif %}
+      </form>
+
+      {# Resultado de búsqueda #}
+      {% if patente %}
+        {% if not vehiculo %}
+          <div class="card" style="text-align:center; padding:1.5rem; color:var(--color-muted);">
+            🚗 No se encontró ningún vehículo con patente <strong>{{ patente }}</strong>.
+          </div>
+
+        {% elif not infracciones %}
+          <div class="card" style="text-align:center; padding:1.5rem; color:var(--color-muted);">
+            ✅ El vehículo <strong>{{ vehiculo.patente }}</strong> no tiene infracciones pendientes.
+          </div>
+
+        {% else %}
+          <div class="card" style="margin-bottom:1rem; background:var(--color-bg-alt, #f8f9fa);">
+            <div style="font-size:0.85rem; color:var(--color-muted); margin-bottom:0.25rem;">Vehículo</div>
+            <div style="font-size:1.1rem; font-weight:700;">
+              🚗 {{ vehiculo.patente }}
+              {% if vehiculo.marca or vehiculo.modelo %}— {{ vehiculo.marca }} {{ vehiculo.modelo }}{% endif %}
+            </div>
+          </div>
+
+          <div class="card" style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Fecha</th>
+                  <th>Inspector</th>
+                  <th style="text-align:right;">Monto</th>
+                  <th style="text-align:center;">Cobrar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for inf in infracciones %}
+                <tr>
+                  <td style="font-weight:600;">{{ inf.id }}</td>
+                  <td style="font-size:0.85rem;">{{ inf.creado_en|date:"d/m/Y H:i" }}</td>
+                  <td style="font-size:0.85rem;">{{ inf.inspector.get_full_name|default:inf.inspector.correo }}</td>
+                  <td style="text-align:right; font-weight:700; color:var(--color-danger);">${{ inf.monto }}</td>
+                  <td style="text-align:center;">
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="infraccion_id" value="{{ inf.id }}">
+                      <button type="submit" class="btn btn-sm"
+                              style="font-size:0.82rem; background:var(--color-danger); border-color:var(--color-danger);"
+                              onclick="return confirm('Cobrar infracción #{{ inf.id }} por ${{ inf.monto }}?')">
+                        💵 Cobrar
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      <div style="margin-top:1.5rem;">
+        {% if request.user.es_admin %}
+          <a href="{% url 'inicio_admin' %}" class="btn btn-outline">← Volver</a>
+        {% elif request.user.es_vendedor %}
+          <a href="{% url 'panel_vendedor' %}" class="btn btn-outline">← Volver</a>
+        {% else %}
+          <a href="{% url 'panel_inspectores' %}" class="btn btn-outline">← Volver</a>
+        {% endif %}
+      </div>
+
     </div>
   </div>
-</section>
+</div>
 {% endblock %}

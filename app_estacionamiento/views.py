@@ -692,6 +692,59 @@ def puede_estacionar_ahora(municipio):
     return True, None
 
 
+def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, duracion_actual_h=0):
+    """
+    Retorna lista de dicts {horas, label, costo} con múltiplos de 30 min disponibles
+    hasta el cierre del día para el municipio.
+
+    hora_inicio_est + duracion_actual_h: si se pasan (renovar), el punto de partida
+    es el vencimiento actual del estacionamiento en lugar de "ahora".
+    """
+    ahora = timezone.localtime()
+    hoy_dia = ahora.weekday()
+
+    horario = HorarioEstacionamiento.objects.filter(
+        municipio=municipio, dia_semana=hoy_dia, activo=True
+    ).first()
+
+    if horario:
+        from datetime import datetime as _dt
+        cierre = timezone.make_aware(
+            _dt.combine(ahora.date(), horario.hora_fin),
+            timezone.get_current_timezone(),
+        )
+        if hora_inicio_est:
+            # Para renovar: calcular desde el vencimiento actual
+            vencimiento_actual = hora_inicio_est + timedelta(hours=float(duracion_actual_h))
+            if vencimiento_actual >= cierre:
+                return []
+            minutos_disponibles = int((cierre - vencimiento_actual).total_seconds() / 60)
+        else:
+            minutos_disponibles = int((cierre - ahora).total_seconds() / 60)
+    else:
+        # Sin horario configurado → máximo 8 horas
+        minutos_disponibles = 8 * 60
+
+    opciones = []
+    for n in range(1, 17):          # 30 min × 1..16 → hasta 8 h
+        horas = n * 0.5
+        minutos = int(horas * 60)
+        if minutos > minutos_disponibles:
+            break
+        if horas < 1:
+            label = "30 min"
+        elif horas == 1.0:
+            label = "1 hora"
+        elif horas % 1 == 0:
+            label = f"{int(horas)} horas"
+        else:
+            label = f"{int(horas)}h 30min"
+        costo = round(float(horas) * float(tarifa_hora), 2)
+        opciones.append({"horas": horas, "label": label, "costo": costo})
+
+    return opciones
+
+
 def cerrar_estacionamientos_vencidos_por_horario(municipio):
     """
     Cierra todos los estacionamientos activos del municipio si el
@@ -884,11 +937,15 @@ def estacionar_vehiculo(request):
     # Patente preseleccionada (viene del flujo agregar_vehiculo)
     patente_preseleccionada = request.GET.get("patente", "").strip().upper()
 
+    # Opciones de duración recortadas al horario de cierre del municipio
+    opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora)
+
     return render(request, "usuarios/estacionar_vehiculo.html", {
         "vehiculos": vehiculos,
         "usuario": usuario,
         "tarifa_hora": tarifa_hora,
         "patente_preseleccionada": patente_preseleccionada,
+        "opciones_duracion": opciones_duracion,
     })
 
 @require_role("conductor")
@@ -969,11 +1026,20 @@ def renovar_estacionamiento(request, est_id):
                         )
                         return redirect("inicio_usuarios")
 
+    # Opciones de horas extra limitadas al horario de cierre del municipio
+    opciones_duracion = calcular_opciones_duracion(
+        municipio=usuario.municipio,
+        tarifa_hora=tarifa_hora,
+        hora_inicio_est=estacionamiento.hora_inicio,
+        duracion_actual_h=float(estacionamiento.duracion_min),
+    )
+
     return render(request, "usuarios/renovar_estacionamiento.html", {
         "estacionamiento": estacionamiento,
         "tarifa_hora": tarifa_hora,
         "saldo": usuario.saldo,
         "error": error,
+        "opciones_duracion": opciones_duracion,
     })
 
 
@@ -1051,9 +1117,60 @@ def mis_infracciones(request):
     )
 
 @require_login
+@require_role("admin", "vendedor", "inspector")
 def consultar_deuda(request):
+    """
+    Vista para admin/vendedor/inspector: busca todas las infracciones pendientes
+    de un vehículo por patente y permite cobrarlas.
+    No es accesible para conductores; ellos son redirigidos a cargar saldo.
+    """
+    municipio = request.user.municipio
+    patente = (request.GET.get("patente") or "").strip().upper()
+    infracciones = []
+    vehiculo = None
 
-    return render(request, 'usuarios/consultar_deuda.html')
+    if patente:
+        from django.db.models import Q
+        vehiculo = Vehiculo.objects.filter(patente=patente).filter(
+            Q(municipio=municipio) | Q(municipio__isnull=True)
+        ).first()
+        if vehiculo:
+            infracciones = Infraccion.objects.filter(
+                vehiculo=vehiculo,
+                municipio=municipio,
+                estado="pendiente",
+            ).order_by("-creado_en")
+
+    if request.method == "POST":
+        infraccion_id = request.POST.get("infraccion_id")
+        if infraccion_id:
+            with transaction.atomic():
+                inf = get_object_or_404(
+                    Infraccion.objects.select_for_update(),
+                    id=infraccion_id,
+                    municipio=municipio,
+                    estado="pendiente",
+                )
+                inf.estado = "pagada"
+                inf.fecha_pago = timezone.now()
+                inf.save()
+                MovimientoCaja.objects.create(
+                    usuario=request.user,
+                    monto=inf.monto,
+                    tipo="ingreso",
+                    descripcion=f"Cobro deuda infracción #{inf.id} — {inf.vehiculo.patente}",
+                )
+            messages.success(
+                request,
+                f"✅ Infracción #{inf.id} cobrada. Se registró ${inf.monto} en tu caja."
+            )
+            return redirect(f"{request.path}?patente={inf.vehiculo.patente}")
+
+    return render(request, "usuarios/consultar_deuda.html", {
+        "patente": patente,
+        "vehiculo": vehiculo,
+        "infracciones": infracciones,
+    })
 
 # =========================================================
 # VIEWS INSPECTORES

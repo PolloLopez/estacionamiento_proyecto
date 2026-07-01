@@ -84,32 +84,38 @@
 
       <h3 style="margin-bottom:0.75rem;">⏱ ¿Cuánto tiempo?</h3>
 
-      <div style="display:flex; gap:0.75rem; margin-bottom:1rem;">
-        <button type="button" class="btn duracion-btn" data-horas="1"
-                style="flex:1; font-size:1.6rem; padding:1rem 0; font-weight:800;">
-          1h
-        </button>
-        <button type="button" class="btn btn-outline duracion-btn" data-horas="2"
-                style="flex:1; font-size:1.6rem; padding:1rem 0; font-weight:800;">
-          2h
-        </button>
-        <button type="button" class="btn btn-outline duracion-btn" data-horas="4"
-                style="flex:1; font-size:1.6rem; padding:1rem 0; font-weight:800;">
-          4h
-        </button>
-      </div>
+      {% if opciones_duracion %}
+        <div style="display:flex; flex-wrap:wrap; gap:0.6rem; margin-bottom:1rem;">
+          {% for op in opciones_duracion %}
+          <button type="button"
+                  class="btn btn-outline duracion-btn"
+                  data-horas="{{ op.horas }}"
+                  data-costo="{{ op.costo }}"
+                  data-label="{{ op.label }}"
+                  style="flex:1; min-width:80px; font-size:1.1rem; padding:0.75rem 0; font-weight:700;">
+            {{ op.label }}
+          </button>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="alert" style="background:#fff3cd; color:#856404; border:1px solid #ffc107;
+             border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem;">
+          ⏰ No quedan minutos disponibles antes del cierre del horario de estacionamiento.
+        </div>
+      {% endif %}
 
       <div style="background:var(--color-surface-2); border-radius:10px; padding:0.9rem 1.1rem;
                   margin-bottom:1.2rem; display:flex; justify-content:space-between; align-items:center;">
         <span style="font-size:1rem; color:var(--color-text-muted);">
-          <strong id="vehiculo-seleccionado-label">—</strong> · <span id="duracionTexto">1 hora</span>
+          <strong id="vehiculo-seleccionado-label">—</strong> · <span id="duracionTexto">—</span>
         </span>
         <span style="font-size:1.4rem; font-weight:800; color:var(--color-primary);" id="costoTexto">
-          ${{ tarifa_hora|default:"100" }}
+          —
         </span>
       </div>
 
-      <button class="btn" type="submit" style="width:100%; font-size:1.2rem; padding:1rem;">
+      <button class="btn" type="submit" id="btn-confirmar-est"
+              style="width:100%; font-size:1.2rem; padding:1rem;" disabled>
         ✅ Confirmar estacionamiento
       </button>
     </div>
@@ -179,25 +185,28 @@ function seleccionarVehiculo(id, patente) {
   document.getElementById("seccion-duracion").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-// Botones de duración
+// Botones de duración (generados desde el servidor, con opciones recortadas al horario)
 const botones = document.querySelectorAll(".duracion-btn");
 const horasInput = document.getElementById("horas");
+const btnConfirmar = document.getElementById("btn-confirmar-est");
 
 botones.forEach(btn => {
   btn.addEventListener("click", () => {
     botones.forEach(b => {
       b.classList.remove("btn");
       b.classList.add("btn-outline");
-      // restaurar estilos base
-      b.style.fontWeight = "800";
     });
     btn.classList.remove("btn-outline");
     btn.classList.add("btn");
 
-    const horas = parseInt(btn.dataset.horas);
+    const horas = parseFloat(btn.dataset.horas);
+    const costo = parseFloat(btn.dataset.costo);
+    const label = btn.dataset.label;
+
     horasInput.value = horas;
-    document.getElementById("duracionTexto").innerText = horas + (horas === 1 ? " hora" : " horas");
-    document.getElementById("costoTexto").innerText = "$" + (horas * PRECIO_HORA).toFixed(2);
+    document.getElementById("duracionTexto").innerText = label;
+    document.getElementById("costoTexto").innerText = "$" + costo.toFixed(2);
+    if (btnConfirmar) btnConfirmar.disabled = false;
   });
 });
 
