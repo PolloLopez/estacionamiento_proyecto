@@ -21,8 +21,8 @@
       margin: 10px 0;
     }
   </style>
+  <style>@media print { .no-print { display:none; } }</style>
 </head>
-
 <body onload="window.print()">
 
   <div class="ticket">
@@ -41,10 +41,13 @@
 
     <p>Gracias por su pago</p>
 
-    <button type="button" class="btn" onclick="imprimirTicket()">
-          🧾 Imprimir
-    </button>
+  </div>
 
+  <div style="margin-top:1.5rem; text-align:center;" class="no-print">
+    <button onclick="window.print()" style="margin-right:0.5rem; padding:0.5rem 1rem;
+            font-size:0.95rem; cursor:pointer;">🖨 Imprimir</button>
+    <button onclick="history.back()" style="padding:0.5rem 1rem;
+            font-size:0.95rem; cursor:pointer;">← Volver</button>
   </div>
 
 </body>

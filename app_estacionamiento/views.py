@@ -1492,62 +1492,83 @@ def registrar_estacionamiento_manual(request):
 
 @require_role("vendedor", "inspector", "admin")
 def registrar_estacionamiento_vendedor(request):
+    """
+    El vendedor cobra en efectivo: registra el estacionamiento en el sistema
+    y crea un INGRESO en su caja. No descuenta saldo propio.
+    Respeta el horario del municipio (igual que el conductor).
+    """
     vendedor = request.user
+    from app_estacionamiento.models import Tarifa
 
-    if request.method == "POST":
-        #patente = (input).strip().upper()
-        patente = (request.POST.get('patente') or "").strip().upper()
-        duracion = request.POST.get("duracion")
-        cliente_email = request.POST.get("cliente_email", "").strip()
+    tarifa_obj = Tarifa.objects.filter(municipio=vendedor.municipio).first()
+    tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
+    opciones_duracion = calcular_opciones_duracion(vendedor.municipio, tarifa_hora)
 
-        # Buscar o crear vehículo
-        vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+    def _render_form(error=None):
+        return render(request, "vendedores/registrar_estacionamiento.html", {
+            "error": error,
+            "tarifa_hora": tarifa_hora,
+            "opciones_duracion": opciones_duracion,
+        })
 
-        # Asociar vehículo al cliente (si existe y si es ManyToMany)
-        if cliente_email:
-            cliente = Usuario.objects.filter(correo=cliente_email).first()
-            if cliente:
-                # si la relación es ManyToMany
-                if hasattr(cliente, "vehiculos"):
-                    cliente.vehiculos.add(vehiculo)
+    if request.method != "POST":
+        return _render_form()
 
-        # Validar que no tenga estacionamiento activo
-        if Estacionamiento.objects.filter(
+    patente = (request.POST.get("patente") or "").strip().upper()
+    duracion_raw = request.POST.get("duracion")
+
+    if not patente:
+        return _render_form("Ingresá la patente del vehículo.")
+
+    # Validar horario del municipio
+    permitido, msg_horario = puede_estacionar_ahora(vendedor.municipio)
+    if not permitido:
+        return _render_form(msg_horario)
+
+    # Validar duración (múltiplos de 0.5 h)
+    try:
+        duracion = Decimal(str(duracion_raw))
+        if duracion <= 0 or (duracion * 2) % 1 != 0:
+            raise ValueError()
+    except Exception:
+        return _render_form("Duración inválida.")
+
+    vehiculo, _ = Vehiculo.objects.get_or_create(
+        patente=patente,
+        defaults={"municipio": vendedor.municipio}
+    )
+    if not vehiculo.municipio:
+        vehiculo.municipio = vendedor.municipio
+        vehiculo.save()
+
+    if getattr(vehiculo, "exento_global", False):
+        return _render_form(f"El vehículo {patente} tiene exención total — no se puede cobrar.")
+
+    if Estacionamiento.objects.filter(vehiculo=vehiculo, estado="ACTIVO").exists():
+        return _render_form("El vehículo ya tiene un estacionamiento activo.")
+
+    subcuadra = get_subcuadra_default(vendedor.municipio)
+    if not subcuadra:
+        return _render_form("No hay subcuadra configurada para este municipio.")
+
+    monto = duracion * tarifa_hora
+
+    with transaction.atomic():
+        est = EstacionamientoFactory.crear(
+            usuario=vendedor,
             vehiculo=vehiculo,
-            estado="ACTIVO"
-        ).exists():
-            return render(request, "vendedores/registrar_estacionamiento.html", {
-                "error": "El vehículo ya tiene un estacionamiento activo."
-            })
-
-        # Validar duración (múltiplos de 1 hora; usa (duracion*2)%1 != 0 si querés medias horas)
-        try:
-            duracion = Decimal(duracion)
-            if duracion <= 0 or duracion % 1 != 0:
-                raise ValueError("Duración inválida")
-        except Exception:
-            return render(request, "vendedores/registrar_estacionamiento.html", {
-                "error": "La duración debe ser en pasos de horas (ej: 1, 2)."
-            })
-
-        # Subcuadra única
-        subcuadra = get_subcuadra_default(vendedor.municipio)
-
-        result = ejecutar_estacionamiento(
-            vendedor,
-            vehiculo,
-            subcuadra,
-            duracion
+            subcuadra=subcuadra,
+            duracion=duracion,
+            costo_base=monto,
+        )
+        # Registrar el efectivo cobrado en la caja del vendedor
+        cobrar_estacionamiento(
+            inspector=vendedor,
+            monto=monto,
+            descripcion=f"Estacionamiento {patente}",
         )
 
-        if not result["ok"]:
-            return render(request, "vendedores/registrar_estacionamiento.html", {
-                "error": "No se pudo registrar estacionamiento"
-            })
-
-        return redirect("vendedores_resumen_caja")
-
-    return render(request, "vendedores/registrar_estacionamiento.html")
+    return redirect(reverse("inspectores_ticket_cobro", args=[est.id]))
 
 @require_role("inspector", "vendedor", "admin")
 def resumen_cobros(request):
@@ -1622,11 +1643,33 @@ def panel_vendedor(request):
 
 @require_role("vendedor", "admin")
 def resumen_caja(request):
+    """Resumen de movimientos de caja del vendedor/inspector."""
     usuario = request.user
+    hoy = timezone.localdate()
 
-    registros = Estacionamiento.objects.filter(usuario=usuario).order_by("-hora_inicio")
+    # Movimientos de hoy
+    cobros_hoy = MovimientoCaja.objects.filter(
+        usuario=usuario,
+        tipo="ingreso",
+        creado_en__date=hoy,
+    ).order_by("-creado_en")
 
-    return render(request, 'vendedores/resumen_caja.html', {"registros": registros})
+    # Movimientos pendientes de cierre
+    cobros_abiertos = MovimientoCaja.objects.filter(
+        usuario=usuario,
+        tipo="ingreso",
+        cerrado=False,
+    ).order_by("-creado_en")
+
+    total_hoy = cobros_hoy.aggregate(total=Sum("monto"))["total"] or 0
+    total_abierto = cobros_abiertos.aggregate(total=Sum("monto"))["total"] or 0
+
+    return render(request, "vendedores/resumen_caja.html", {
+        "cobros_hoy": cobros_hoy,
+        "cobros_abiertos": cobros_abiertos,
+        "total_hoy": total_hoy,
+        "total_abierto": total_abierto,
+    })
 
 
 @require_role("vendedor", "admin")
@@ -1742,7 +1785,14 @@ def cerrar_caja(request):
     else:
         messages.warning(request, "No había movimientos abiertos para cerrar.")
 
-    return redirect("panel_inspectores")
+    # Redirigir al panel que corresponde según el rol
+    usuario = request.user
+    if getattr(usuario, "es_vendedor", False):
+        return redirect("panel_vendedor")
+    elif getattr(usuario, "es_inspector", False):
+        return redirect("panel_inspectores")
+    else:
+        return redirect("inicio_admin")
 
 @require_login
 def simular_pago(request, infraccion_id):

@@ -2,94 +2,125 @@
 {% block title %}Registrar Estacionamiento{% endblock %}
 
 {% block content %}
-
 <div class="container">
-
   <div class="panel">
     <div class="panel-body">
 
-      <h2>💰 Registrar estacionamiento</h2>
+      <h2>💰 Cobrar estacionamiento</h2>
 
       {% if error %}
-        <div class="alert alert-danger">
-          {{ error }}
-        </div>
+        <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
       {% endif %}
 
-      {% if mensaje %}
-        <div class="alert success">
-          {{ mensaje }}
-        </div>
-      {% endif %}
-
-      <form method="post">
+      <form method="post" id="form-cobro">
         {% csrf_token %}
 
         <!-- 🚗 PATENTE -->
-        <label>Patente</label>
-        <input 
-          name="patente" 
-          class="input" 
-          placeholder="ABC123" 
-          required 
-          autofocus
-          style="text-transform:uppercase;"
-        />
+        <div style="margin-bottom:1.2rem;">
+          <label style="font-weight:600; display:block; margin-bottom:0.4rem;">Patente del vehículo</label>
+          <input
+            name="patente"
+            id="patente-input"
+            placeholder="ABC123"
+            required
+            autofocus
+            maxlength="10"
+            style="text-transform:uppercase; font-size:1.3rem; font-weight:700;
+                   letter-spacing:3px; width:100%; max-width:220px;"
+          />
+        </div>
 
         <!-- ⏱ DURACIÓN -->
-        <label style="margin-top:1rem;">Duración</label>
+        <div style="margin-bottom:1.2rem;">
+          <label style="font-weight:600; display:block; margin-bottom:0.6rem;">Duración</label>
 
-        <div class="grid grid-3">
+          {% if opciones_duracion %}
+            <div style="display:flex; flex-wrap:wrap; gap:0.6rem; margin-bottom:0.75rem;">
+              {% for op in opciones_duracion %}
+              <button type="button"
+                      class="btn btn-outline duracion-btn"
+                      data-horas="{{ op.horas }}"
+                      data-costo="{{ op.costo }}"
+                      data-label="{{ op.label }}"
+                      style="font-size:1.1rem; padding:0.7rem 1.2rem; font-weight:700; min-width:80px;">
+                {{ op.label }}
+              </button>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="alert" style="background:#fff3cd; color:#856404; border:1px solid #ffc107;
+                 border-radius:8px; padding:0.75rem 1rem;">
+              ⏰ No quedan minutos disponibles antes del cierre del horario de estacionamiento.
+            </div>
+          {% endif %}
 
-          <button type="button" class="btn btn-outline duracion-btn" data-horas="1">1h</button>
-          <button type="button" class="btn btn-outline duracion-btn" data-horas="2">2h</button>
-          <button type="button" class="btn btn-outline duracion-btn" data-horas="3">3h</button>
-
+          <input type="hidden" name="duracion" id="duracion-input" value="">
         </div>
 
-        <input type="hidden" name="duracion" id="duracion" value="1">
-
-        <!-- 💸 COSTO -->
-        <div class="card" style="margin-top:1rem;">
-          <h3>Total: $<span id="costo">100</span></h3>
+        <!-- 💸 RESUMEN DEL COBRO -->
+        <div id="resumen-cobro" style="display:none; margin-bottom:1.2rem;
+             background:var(--color-surface-2); border-radius:10px; padding:0.9rem 1.1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:1rem; color:var(--color-text-muted);">
+              Total a cobrar:
+            </span>
+            <span style="font-size:1.8rem; font-weight:800; color:var(--color-primary);" id="costo-texto">
+              —
+            </span>
+          </div>
+          <div style="font-size:0.85rem; color:var(--color-text-muted); margin-top:0.2rem;" id="duracion-texto">
+            —
+          </div>
         </div>
 
-        <!-- 💳 ACCIÓN -->
-        <button class="btn" style="width:100%; margin-top:1rem;">
-          💰 Cobrar y registrar
+        <button class="btn" type="submit" id="btn-cobrar"
+                style="width:100%; font-size:1.2rem; padding:1rem;" disabled>
+          💵 Cobrar y registrar
         </button>
 
       </form>
 
+      <div style="margin-top:1.2rem;">
+        <a href="{% url 'panel_vendedor' %}" class="btn btn-outline">← Volver al panel</a>
+      </div>
+
     </div>
   </div>
-
 </div>
 
 <script>
-  const tarifa = 100;
-  const botones = document.querySelectorAll(".duracion-btn");
-  const inputDuracion = document.getElementById("duracion");
-  const costo = document.getElementById("costo");
+const TARIFA_HORA = parseFloat("{{ tarifa_hora|default:'100' }}");
+const duracionInput = document.getElementById("duracion-input");
+const btnCobrar = document.getElementById("btn-cobrar");
+const resumenDiv = document.getElementById("resumen-cobro");
 
-  botones.forEach(btn => {
-    btn.addEventListener("click", () => {
-      const horas = btn.dataset.horas;
-
-      inputDuracion.value = horas;
-      costo.textContent = horas * tarifa;
-
-      botones.forEach(b => b.classList.remove("btn-success"));
-      btn.classList.add("btn-success");
+document.querySelectorAll(".duracion-btn").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    // Desmarcar todos
+    document.querySelectorAll(".duracion-btn").forEach(function(b) {
+      b.classList.remove("btn");
+      b.classList.add("btn-outline");
     });
+    // Marcar este
+    btn.classList.remove("btn-outline");
+    btn.classList.add("btn");
+
+    const horas  = parseFloat(btn.dataset.horas);
+    const costo  = parseFloat(btn.dataset.costo);
+    const label  = btn.dataset.label;
+
+    duracionInput.value = horas;
+    document.getElementById("costo-texto").textContent = "$" + costo.toFixed(2);
+    document.getElementById("duracion-texto").textContent = label + " · $" + TARIFA_HORA.toFixed(2) + "/h";
+    resumenDiv.style.display = "block";
+    btnCobrar.disabled = false;
   });
-  function imprimir() {
-    window.print();
-  
-    setTimeout(() => {
-      window.location.href = "/usuarios/vendedores/";
-    }, 1000);
-  }
+});
+
+// Forzar uppercase en patente
+document.getElementById("patente-input").addEventListener("input", function() {
+  this.value = this.value.toUpperCase();
+});
 </script>
 
 {% endblock %}
