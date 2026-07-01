@@ -1511,78 +1511,86 @@ def caja_inspector(request):
 @require_role("vendedor", "inspector", "admin")
 def registrar_estacionamiento_manual(request):
     inspector = request.user
+    from app_estacionamiento.models import Tarifa
 
-    if request.method == "POST":
+    tarifa_obj = Tarifa.objects.filter(municipio=inspector.municipio).first()
+    tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
+    opciones_duracion = calcular_opciones_duracion(inspector.municipio, tarifa_hora)
 
-        patente = (request.POST.get('patente') or "").strip().upper()
-        duracion = request.POST.get("duracion")
+    def _render_form(error=None):
+        return render(request, "inspectores/registrar_estacionamiento_manual.html", {
+            "error": error,
+            "tarifa_hora": tarifa_hora,
+            "opciones_duracion": opciones_duracion,
+        })
 
-        vehiculo, _ = Vehiculo.objects.get_or_create(
-            patente=patente,
-            defaults={"municipio": inspector.municipio}
+    if request.method != "POST":
+        return _render_form()
+
+    patente = (request.POST.get("patente") or "").strip().upper()
+    duracion_raw = request.POST.get("duracion")
+
+    if not patente:
+        return _render_form("Ingresa la patente del vehiculo.")
+
+    # Validar horario del municipio
+    permitido, msg_horario = puede_estacionar_ahora(inspector.municipio)
+    if not permitido:
+        return _render_form(msg_horario)
+
+    # Validar duracion contra el horario de cierre
+    try:
+        duracion = Decimal(str(duracion_raw))
+        if duracion <= 0 or (duracion * 2) % 1 != 0:
+            raise ValueError()
+    except Exception:
+        return _render_form("Duracion invalida. Selecciona una opcion de la lista.")
+
+    # Verificar que la duracion elegida este dentro de las opciones validas
+    valores_validos = [op["horas"] for op in opciones_duracion]
+    if float(duracion) not in valores_validos:
+        return _render_form(
+            "La duracion seleccionada excede el horario de cierre del estacionamiento."
         )
 
-        # Asignar municipio si el vehículo no lo tiene
-        if not vehiculo.municipio:
-            vehiculo.municipio = inspector.municipio
-            vehiculo.save()
+    vehiculo, _ = Vehiculo.objects.get_or_create(
+        patente=patente,
+        defaults={"municipio": inspector.municipio}
+    )
+    if not vehiculo.municipio:
+        vehiculo.municipio = inspector.municipio
+        vehiculo.save()
 
-        # Bloquear cobro manual a vehículos exentos
-        if getattr(vehiculo, "exento_global", False):
-            return render(request, "inspectores/registrar_estacionamiento_manual.html", {
-                "error": f"El vehículo {patente} tiene exención total — no se puede cobrar."
-            })
+    # Bloquear cobro manual a vehiculos exentos
+    if getattr(vehiculo, "exento_global", False):
+        return _render_form(f"El vehiculo {patente} tiene exencion total — no se puede cobrar.")
 
-        if Estacionamiento.objects.filter(
+    if Estacionamiento.objects.filter(vehiculo=vehiculo, estado="ACTIVO").exists():
+        return _render_form("El vehiculo ya tiene un estacionamiento activo.")
+
+    subcuadra = get_subcuadra_default(inspector.municipio)
+    if not subcuadra:
+        return _render_form("No hay subcuadra configurada para este municipio.")
+
+    monto = duracion * tarifa_hora
+
+    with transaction.atomic():
+        # 1. Crear el estacionamiento
+        est = EstacionamientoFactory.crear(
+            usuario=inspector,
             vehiculo=vehiculo,
-            estado="ACTIVO"
-        ).exists():
-            return render(request, "inspectores/registrar_estacionamiento_manual.html", {
-                "error": "El vehículo ya tiene un estacionamiento activo."
-            })
+            subcuadra=subcuadra,
+            duracion=duracion,
+            costo_base=monto,
+        )
+        # 2. Registrar el ingreso en caja del inspector
+        cobrar_estacionamiento(
+            inspector=inspector,
+            monto=monto,
+            descripcion=f"Cobro manual {vehiculo.patente}",
+        )
 
-        try:
-            duracion = Decimal(duracion)
-            if duracion <= 0 or duracion % 1 != 0:
-                raise ValueError()
-        except Exception:
-            return render(request, "inspectores/registrar_estacionamiento_manual.html", {
-                "error": "La duración debe ser en horas (ej: 1, 2)."
-            })
-
-        # Tarifa desde el modelo (si no hay, usamos 100 como fallback)
-        from app_estacionamiento.models import Tarifa
-        tarifa_obj = Tarifa.objects.filter(municipio=inspector.municipio).first()
-        tarifa = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
-        monto = duracion * tarifa
-
-        subcuadra = get_subcuadra_default(inspector.municipio)
-
-        if not subcuadra:
-            return render(request, "inspectores/registrar_estacionamiento_manual.html", {
-                "error": "No hay subcuadra configurada para este municipio."
-            })
-
-        with transaction.atomic():
-            # 1. Crear el estacionamiento (para que luego no aparezca como impago)
-            EstacionamientoFactory.crear(
-                usuario=inspector,
-                vehiculo=vehiculo,
-                subcuadra=subcuadra,
-                duracion=duracion,
-                costo_base=monto
-            )
-
-            # 2. Registrar el ingreso en caja del inspector
-            cobrar_estacionamiento(
-                inspector=inspector,
-                monto=monto,
-                descripcion=f"Cobro manual {vehiculo.patente}"
-            )
-
-        return redirect("panel_inspectores")
-
-    return render(request, "inspectores/registrar_estacionamiento_manual.html")
+    return redirect(reverse("inspectores_ticket_cobro", args=[est.id]))
 
 @require_role("vendedor", "inspector", "admin")
 def registrar_estacionamiento_vendedor(request):
@@ -2334,29 +2342,38 @@ def admin_infracciones(request):
                 messages.success(request, f"Infracción #{inf.id} anulada.")
 
         elif accion == "cobrar" and infraccion_id:
-            with transaction.atomic():
-                # select_for_update bloquea la fila — si dos admins cobran
-                # la misma infracción al mismo tiempo, el segundo espera y
-                # luego falla por estado != pendiente
-                inf = get_object_or_404(
-                    Infraccion.objects.select_for_update(),
-                    id=infraccion_id,
-                    municipio=municipio,
-                )
-                if inf.estado == "pendiente":
+            try:
+                with transaction.atomic():
+                    # select_for_update bloquea la fila — si dos admins cobran
+                    # la misma infraccion al mismo tiempo, el segundo espera y
+                    # luego falla por estado != pendiente
+                    inf = get_object_or_404(
+                        Infraccion.objects.select_for_update(),
+                        id=infraccion_id,
+                        municipio=municipio,
+                    )
+                    if inf.estado != "pendiente":
+                        messages.warning(request, f"La infraccion #{inf.id} ya fue procesada.")
+                        return redirect(request.get_full_path())
                     inf.estado = "pagada"
                     inf.fecha_pago = timezone.now()
                     inf.save()
-                    # Registrar ingreso en caja de quien cobró
+                    # Registrar ingreso en caja de quien cobro
+                    comision_pct = municipio.comision_vendedor or 0
+                    comision = round(inf.monto * comision_pct / 100, 2)
                     MovimientoCaja.objects.create(
                         usuario=usuario,
                         monto=inf.monto,
                         tipo="ingreso",
-                        descripcion=f"Cobro en efectivo infracción #{inf.id} — {inf.vehiculo.patente}",
+                        medio_pago="efectivo",
+                        comision_monto=comision,
+                        descripcion=f"Cobro en efectivo infraccion #{inf.id} — {inf.vehiculo.patente}",
                     )
-                    messages.success(request, f"Infracción #{inf.id} cobrada. Se registró ${inf.monto} en tu caja.")
-                else:
-                    messages.warning(request, f"La infracción #{inf.id} ya fue procesada.")
+            except Exception as e:
+                messages.error(request, f"Error al cobrar: {e}")
+                return redirect(request.get_full_path())
+            # Redirigir al comprobante (no agregar messages aqui — el comprobante es la confirmacion)
+            return redirect(reverse("ticket_pago_multa", args=[inf.id]))
 
         return redirect(request.get_full_path())
 
@@ -2728,31 +2745,26 @@ def mp_exitoso(request):
 
     try:
         acreditar(request.user, monto, payment_id)
-        messages.success(request, f"✅ Se acreditaron ${monto} a tu saldo.")
     except Exception:
-        # Si ya fue acreditado por el webhook, está bien
+        # Si ya fue acreditado por el webhook, esta bien
         pass
 
-    # Refrescar saldo desde la DB
+    # Refrescar saldo desde la DB y redirigir al inicio con mensaje
     request.user.refresh_from_db()
-
-    return render(request, "usuarios/mp_resultado.html", {
-        "estado": "exitoso",
-        "monto": monto,
-        "saldo_nuevo": request.user.saldo,
-    })
+    messages.success(request, f"✅ Se acreditaron ${monto} a tu saldo. Nuevo saldo: ${request.user.saldo}")
+    return redirect("inicio_usuarios")
 
 
 @require_login
 def mp_fallido(request):
-    messages.error(request, "El pago fue rechazado. Podes intentarlo de nuevo.")
-    return render(request, "usuarios/mp_resultado.html", {"estado": "fallido"})
+    messages.error(request, "El pago fue rechazado o cancelado. No se realizó ningún cobro.")
+    return redirect("mp_iniciar_carga")
 
 
 @require_login
 def mp_pendiente(request):
-    messages.warning(request, "El pago esta pendiente de acreditacion. Te avisaremos cuando se confirme.")
-    return render(request, "usuarios/mp_resultado.html", {"estado": "pendiente"})
+    messages.warning(request, "El pago está siendo procesado. El saldo se acreditará automáticamente cuando se confirme.")
+    return redirect("inicio_usuarios")
 
 
 from django.views.decorators.csrf import csrf_exempt

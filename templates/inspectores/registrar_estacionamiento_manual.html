@@ -1,40 +1,63 @@
 {% extends "base.html" %}
-
 {% block title %}Registrar estacionamiento{% endblock %}
 
 {% block content %}
-
 <section class="container">
   <div class="panel">
     <div class="panel-body">
 
-      <h2>Registrar estacionamiento manual</h2>
+      <h2>🚗 Registrar estacionamiento manual</h2>
 
       {% if error %}
-        <p class="error">{{ error }}</p>
+        <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
       {% endif %}
 
-      <form method="post">
+      {% if not opciones_duracion %}
+        <div class="alert alert-warning">
+          No hay horario disponible para registrar estacionamientos en este momento.
+        </div>
+      {% else %}
+
+      <form method="post" style="max-width:420px;">
         {% csrf_token %}
 
-        <div class="form-row">
-          <label>Patente</label>
-          <input name="patente" class="input" required />
+        <div class="form-row" style="margin-bottom:1rem;">
+          <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Patente</label>
+          <input name="patente"
+                 class="input"
+                 style="text-transform:uppercase; letter-spacing:2px; font-size:1.1rem; font-weight:700; width:100%;"
+                 placeholder="Ej: ABC123"
+                 maxlength="10"
+                 autocomplete="off"
+                 autofocus
+                 required />
+        </div>
+
+        <div class="form-row" style="margin-bottom:1.2rem;">
+          <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Duración</label>
+          <select name="duracion" class="input" style="width:100%;" required>
+            {% for op in opciones_duracion %}
+              <option value="{{ op.horas }}">{{ op.label }} — ${{ op.costo }}</option>
+            {% endfor %}
+          </select>
+          <small class="text-muted" style="font-size:0.82rem;">
+            Opciones disponibles hasta el cierre del horario de hoy.
+          </small>
         </div>
 
         <div class="form-row">
-          <label>Duración (horas)</label>
-          <input name="duracion" type="number" min="1" value="1" class="input" />
-        </div>
-
-        <div class="form-row">
-          <button class="btn">Registrar</button>
+          <button class="btn" style="width:100%; font-size:1.05rem;">✅ Registrar</button>
         </div>
 
       </form>
 
+      {% endif %}
+
+      <div style="margin-top:1.2rem;">
+        <a href="{% url 'panel_inspectores' %}" class="btn btn-outline">← Volver al panel</a>
+      </div>
+
     </div>
   </div>
 </section>
-
 {% endblock %}

@@ -9,13 +9,6 @@
     <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
   </div>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-danger{% else %}alert-warning{% endif %}"
-           style="margin-bottom:1rem;">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-
   <!-- FILTROS -->
   <div class="card" style="margin-bottom:1.2rem;">
     <form method="get" style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
@@ -108,7 +101,8 @@
                     <input type="hidden" name="accion" value="cobrar">
                     <input type="hidden" name="infraccion_id" value="{{ inf.id }}">
                     <button class="btn btn-outline" type="submit"
-                            style="font-size:0.8rem; padding:0.25rem 0.5rem; color:var(--color-success); border-color:var(--color-success);">
+                            style="font-size:0.8rem; padding:0.25rem 0.5rem; color:var(--color-success); border-color:var(--color-success);"
+                            onclick="return confirm('¿Cobrar infracción #{{ inf.id }} por ${{ inf.monto }}?\n\nConfirmá que recibiste el efectivo.')">
                       💵 Cobrar
                     </button>
                   </form>

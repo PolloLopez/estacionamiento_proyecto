@@ -202,6 +202,8 @@ ACCOUNT_ADAPTER = "app_estacionamiento.adapters.NoUsernameAccountAdapter"
 # Adapter social: mapea email de Google al campo 'correo' de nuestro modelo
 SOCIALACCOUNT_ADAPTER = "app_estacionamiento.adapters.SocialAccountAdapter"
 SOCIALACCOUNT_AUTO_SIGNUP = True
+# Siempre recordar la sesión (cookie persistente, no de solo sesión de browser)
+ACCOUNT_SESSION_REMEMBER = True
 # Campo email del modelo de usuario (usamos 'correo' en lugar del estándar 'email')
 ACCOUNT_USER_MODEL_EMAIL_FIELD = "correo"
 # Forzar HTTPS en las URLs de callback de OAuth (Railway termina SSL en el proxy)
