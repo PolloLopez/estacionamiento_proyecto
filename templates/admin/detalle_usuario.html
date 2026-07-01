@@ -5,7 +5,7 @@
 <section class="container">
 
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
-    <h2>👤 {{ conductor.nombre|default:conductor.correo }}</h2>
+    <h2>👤 {% if conductor.nombre %}{{ conductor.nombre }}{% if conductor.apellido %} {{ conductor.apellido }}{% endif %}{% else %}{{ conductor.correo }}{% endif %}</h2>
     <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
   </div>
 
@@ -31,15 +31,24 @@
         </a>
       </div>
 
-      {# Editar nombre #}
+      {# Editar nombre y apellido #}
       <form method="post" style="margin-top:1rem;">
         {% csrf_token %}
         <input type="hidden" name="accion" value="editar_datos">
-        <label style="font-size:0.88rem; color:var(--color-text-muted);">Nombre</label>
-        <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
-          <input name="nombre" value="{{ conductor.first_name }}" placeholder="Nombre del conductor"
-                 style="flex:1;" />
-          <button class="btn btn-outline" type="submit" style="font-size:0.9rem;">Guardar</button>
+        <div style="display:flex; gap:0.5rem; margin-top:0.25rem; flex-wrap:wrap;">
+          <div style="flex:1; min-width:120px;">
+            <label style="font-size:0.88rem; color:var(--color-text-muted);">Nombre</label>
+            <input name="nombre" value="{{ conductor.first_name }}" placeholder="Nombre"
+                   style="width:100%; margin-top:0.2rem;" />
+          </div>
+          <div style="flex:1; min-width:120px;">
+            <label style="font-size:0.88rem; color:var(--color-text-muted);">Apellido</label>
+            <input name="apellido" value="{{ conductor.last_name }}" placeholder="Apellido"
+                   style="width:100%; margin-top:0.2rem;" />
+          </div>
+          <div style="display:flex; align-items:flex-end;">
+            <button class="btn btn-outline" type="submit" style="font-size:0.9rem;">Guardar</button>
+          </div>
         </div>
       </form>
     </div>

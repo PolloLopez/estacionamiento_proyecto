@@ -13,8 +13,8 @@
   <div class="card" style="margin-bottom:1.5rem;">
     <form method="get" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
       <div style="flex:1; min-width:200px;">
-        <label>Buscar por correo o nombre</label>
-        <input name="q" placeholder="usuario@gmail.com o Juan..." value="{{ q }}" />
+        <label>Buscar por correo, nombre o apellido</label>
+        <input name="q" placeholder="usuario@gmail.com, Juan o López..." value="{{ q }}" />
       </div>
       <button class="btn" type="submit">Buscar</button>
       {% if q %}
@@ -32,6 +32,7 @@
       <thead>
         <tr>
           <th>Nombre</th>
+          <th>Apellido</th>
           <th>Correo</th>
           <th style="text-align:right;">Saldo</th>
           <th style="text-align:center;">Vehículos</th>
@@ -42,6 +43,7 @@
         {% for u in usuarios %}
         <tr>
           <td><strong>{{ u.nombre|default:"—" }}</strong></td>
+          <td>{{ u.apellido|default:"—" }}</td>
           <td>{{ u.correo }}</td>
           <td style="text-align:right; font-weight:600;">${{ u.saldo }}</td>
           <td style="text-align:center;">{{ u.vehiculos.count }}</td>
@@ -53,7 +55,7 @@
         {% empty %}
         <tr>
           <td colspan="5" style="text-align:center; color:var(--color-text-muted); padding:1rem;">
-            {% if q %}No se encontraron conductores con "{{ q }}".{% else %}No hay conductores registrados.{% endif %}
+              {% if q %}No se encontraron conductores con "{{ q }}".{% else %}No hay conductores registrados.{% endif %}
           </td>
         </tr>
         {% endfor %}

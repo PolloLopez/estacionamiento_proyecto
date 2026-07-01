@@ -138,6 +138,21 @@ class Usuario(AbstractUser):
     def nombre(self, valor):
         self.first_name = valor
 
+    @property
+    def apellido(self):
+        """Alias de last_name para consistencia con el sistema."""
+        return self.last_name or ""
+
+    @apellido.setter
+    def apellido(self, valor):
+        self.last_name = valor
+
+    def nombre_completo(self):
+        """Devuelve nombre y apellido, o correo si no tiene datos."""
+        partes = [self.first_name, self.last_name]
+        completo = " ".join(p for p in partes if p)
+        return completo or self.correo or f"Usuario #{self.id}"
+
     def __str__(self):
         return self.correo or f"Usuario #{self.id}"
 

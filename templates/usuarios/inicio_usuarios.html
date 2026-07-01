@@ -7,7 +7,7 @@
 
   <!-- 👤 PERFIL -->
   <div class="card">
-    <h2>👤 {{ request.user.correo }}</h2>
+    <h2>👤 {% if request.user.nombre %}{{ request.user.nombre }}{% if request.user.apellido %} {{ request.user.apellido }}{% endif %}{% else %}{{ request.user.correo }}{% endif %}</h2>
 
     <p class="info">
       💰 Saldo: ${{ usuario.saldo }}

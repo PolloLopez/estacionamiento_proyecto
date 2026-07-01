@@ -1994,7 +1994,7 @@ def gestionar_usuarios(request):
     if q:
         from django.db.models import Q as QueryQ
         usuarios = usuarios.filter(
-            QueryQ(correo__icontains=q) | QueryQ(first_name__icontains=q)
+            QueryQ(correo__icontains=q) | QueryQ(first_name__icontains=q) | QueryQ(last_name__icontains=q)
         )
 
     return render(request, "admin/gestionar_usuarios.html", {
@@ -2021,10 +2021,14 @@ def detalle_usuario_admin(request, usuario_id):
 
     # Editar datos básicos del conductor
     elif accion == "editar_datos":
-        nombre = request.POST.get("nombre", "").strip()
-        if nombre:
-            conductor.first_name = nombre
-            conductor.save(update_fields=["first_name"])
+        nombre   = request.POST.get("nombre", "").strip()
+        apellido = request.POST.get("apellido", "").strip()
+        if nombre or apellido:
+            if nombre:
+                conductor.first_name = nombre
+            if apellido:
+                conductor.last_name = apellido
+            conductor.save(update_fields=["first_name", "last_name"])
             messages.success(request, "Datos actualizados.")
 
     # Historial de infracciones de sus vehículos
