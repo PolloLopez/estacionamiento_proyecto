@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Página no encontrada</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 1.05rem;
+      background: #f0f2f0;
+      color: #111111;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #c8d4cc;
+      border-radius: 10px;
+      padding: 2.5rem 2rem;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .icono { font-size: 3.5rem; margin-bottom: 1rem; }
+
+    h1 {
+      font-size: 1.6rem;
+      color: #1a7a3c;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      color: #555555;
+      margin-bottom: 1.8rem;
+      line-height: 1.5;
+    }
+
+    .btn-grupo {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 0.55rem 1.2rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: 2px solid transparent;
+      cursor: pointer;
+      background: #1a7a3c;
+      color: #ffffff;
+      transition: background 0.15s;
+    }
+
+    .btn:hover { background: #155f2e; }
+
+    .btn-outline {
+      background: transparent;
+      border-color: #1a7a3c;
+      color: #1a7a3c;
+    }
+
+    .btn-outline:hover { background: #d4edda; }
+
+    .codigo {
+      display: inline-block;
+      margin-top: 1.5rem;
+      font-size: 0.82rem;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icono">🔍</div>
+    <h1>Página no encontrada</h1>
+    <p>
+      La dirección que buscás no existe o fue movida.<br>
+      Revisá la URL o volvé al inicio.
+    </p>
+    <div class="btn-grupo">
+      <a href="javascript:history.back()" class="btn btn-outline">← Volver</a>
+      <a href="/" class="btn">🏠 Inicio</a>
+    </div>
+    <span class="codigo">Error 404</span>
+  </div>
+</body>
+</html>
