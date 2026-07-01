@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Cobrar Infracción{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="panel">
+    <div class="panel-body">
+
+      <h1>🔍 Cobrar infracción por patente</h1>
+      <p class="text-muted" style="margin-bottom:1.5rem;">
+        Ingresá la patente del vehículo para buscar infracciones pendientes.
+      </p>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-danger{% endif %}"
+               style="margin-bottom:1rem;">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      {# Formulario de búsqueda #}
+      <form method="post" style="margin-bottom:1.5rem; display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="buscar">
+        <div>
+          <label for="patente" style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.3rem;">Patente</label>
+          <input type="text"
+                 id="patente"
+                 name="patente"
+                 value="{{ patente }}"
+                 placeholder="Ej: ABC123"
+                 maxlength="10"
+                 style="text-transform:uppercase; width:180px;"
+                 autocomplete="off"
+                 required>
+        </div>
+        <button type="submit" class="btn">🔍 Buscar</button>
+        {% if patente %}
+          <a href="{% url 'vendedores_cobrar_infraccion' %}" class="btn btn-outline">Limpiar</a>
+        {% endif %}
+      </form>
+
+      {# Resultado de búsqueda #}
+      {% if patente and vehiculo %}
+        <div class="card" style="margin-bottom:1rem; background:var(--color-bg-alt, #f8f9fa);">
+          <div style="font-size:0.85rem; color:var(--color-muted); margin-bottom:0.25rem;">Vehículo encontrado</div>
+          <div style="font-size:1.1rem; font-weight:700;">🚗 {{ vehiculo.patente }}
+            {% if vehiculo.marca or vehiculo.modelo %}
+              — {{ vehiculo.marca }} {{ vehiculo.modelo }}
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if infraccion %}
+        <div class="card" style="border-left:4px solid var(--color-danger); margin-bottom:1.5rem;">
+          <h3 style="margin-bottom:0.75rem; color:var(--color-danger);">⚠️ Infracción pendiente #{{ infraccion.id }}</h3>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem 1.5rem; margin-bottom:1rem;">
+            <div>
+              <div class="text-muted" style="font-size:0.8rem;">Patente</div>
+              <div style="font-weight:700;">{{ infraccion.vehiculo.patente }}</div>
+            </div>
+            <div>
+              <div class="text-muted" style="font-size:0.8rem;">Monto</div>
+              <div style="font-weight:700; font-size:1.2rem; color:var(--color-danger);">${{ infraccion.monto }}</div>
+            </div>
+            <div>
+              <div class="text-muted" style="font-size:0.8rem;">Fecha</div>
+              <div>{{ infraccion.creado_en|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div>
+              <div class="text-muted" style="font-size:0.8rem;">Inspector</div>
+              <div>{{ infraccion.inspector.get_full_name|default:infraccion.inspector.correo }}</div>
+            </div>
+            {% if infraccion.subcuadra %}
+            <div style="grid-column:1/-1;">
+              <div class="text-muted" style="font-size:0.8rem;">Ubicación</div>
+              <div>{{ infraccion.subcuadra }}</div>
+            </div>
+            {% endif %}
+          </div>
+
+          {# Botón cobrar con confirmación #}
+          <button class="btn"
+                  style="background:var(--color-danger); border-color:var(--color-danger);"
+                  onclick="document.getElementById('modal-cobrar').style.display='flex'">
+            💵 Cobrar en efectivo
+          </button>
+        </div>
+
+        {# Modal de confirmación #}
+        <div id="modal-cobrar"
+             style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
+                    z-index:1000; align-items:center; justify-content:center;">
+          <div class="card" style="max-width:380px; width:90%; padding:1.5rem;">
+            <h3 style="margin-bottom:0.75rem;">Confirmar cobro</h3>
+            <p style="margin-bottom:0.5rem;">
+              Infracción <strong>#{{ infraccion.id }}</strong> · Patente <strong>{{ infraccion.vehiculo.patente }}</strong>
+            </p>
+            <p style="margin-bottom:1rem;">
+              Se registrarán <strong>${{ infraccion.monto }}</strong> en efectivo en tu caja.
+            </p>
+            <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+              <button class="btn btn-outline"
+                      onclick="document.getElementById('modal-cobrar').style.display='none'">
+                Cancelar
+              </button>
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="cobrar">
+                <input type="hidden" name="infraccion_id" value="{{ infraccion.id }}">
+                <input type="hidden" name="patente" value="{{ infraccion.vehiculo.patente }}">
+                <button type="submit"
+                        class="btn"
+                        style="background:var(--color-danger); border-color:var(--color-danger);">
+                  Confirmar cobro
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
+      {% elif patente and vehiculo %}
+        {# Vehículo encontrado pero sin infracciones #}
+        <div class="card" style="text-align:center; padding:1.5rem; color:var(--color-muted);">
+          ✅ El vehículo <strong>{{ vehiculo.patente }}</strong> no tiene infracciones pendientes.
+        </div>
+      {% endif %}
+
+      <div style="margin-top:1.5rem;">
+        <a href="{% url 'panel_vendedor' %}" class="btn btn-outline">← Volver al panel</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1015,11 +1015,27 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 
 @require_login
 def mis_infracciones(request):
-    # Mostrar solo infracciones de vehículos vinculados a esta cuenta
-    # (funciona para conductores registrados Y usuarios que entraron con Google)
+    usuario = request.user
+
+    # Solo conductores tienen infracciones propias.
+    # Inspectores / admins / vendedores → redirigir a su panel.
+    if not usuario.es_conductor:
+        messages.info(request, "Esta sección es solo para conductores.")
+        return redirect_por_rol(usuario)
+
+    # Conductores no verificados: solo ven las infracciones de sus vehículos.
+    # Conductores verificados: ídem (en el futuro podríamos cruzar con el RNPA).
+    if not usuario.es_verificado and not usuario.vehiculos.exists():
+        messages.info(
+            request,
+            "No tenés vehículos registrados. "
+            "Agregá tu vehículo o verificá tu cuenta para ver tus infracciones."
+        )
+        return redirect("solicitar_verificacion")
+
     infracciones = (
         Infraccion.objects
-        .filter(vehiculo__vehiculousuario__usuario=request.user)
+        .filter(vehiculo__vehiculousuario__usuario=usuario)
         .distinct()
         .order_by("-creado_en")
     )
@@ -1029,7 +1045,7 @@ def mis_infracciones(request):
         "usuarios/historial_infracciones.html",
         {
             "infracciones": infracciones,
-            "saldo_usuario": request.user.saldo,
+            "saldo_usuario": usuario.saldo,
             "tiene_pendientes": infracciones.filter(estado="pendiente").exists(),
         }
     )
@@ -1090,6 +1106,10 @@ def gestion_infracciones(request):
     return render(request, "usuarios/historial_infracciones.html", {
         "usuario": usuario,
         "infracciones": infracciones,
+        # Pasar valores seguros para que el template no falle en comparaciones
+        "saldo_usuario": 0,
+        "tiene_pendientes": False,
+        "es_vista_gestion": True,  # el template puede ocultarlos botones de pago
     })
 
 @require_role("inspector")
@@ -1490,6 +1510,85 @@ def resumen_caja(request):
     registros = Estacionamiento.objects.filter(usuario=usuario).order_by("-hora_inicio")
 
     return render(request, 'vendedores/resumen_caja.html', {"registros": registros})
+
+
+@require_role("vendedor", "admin")
+def cobrar_infraccion_vendedor(request):
+    """
+    El kiosco/vendedor ingresa una patente, ve la infracción pendiente
+    y la cobra en efectivo. El monto queda registrado en su caja.
+
+    Nota: no valida horario de estacionamiento — el kiosco siempre puede cobrar.
+    """
+    vendedor = request.user
+    municipio = vendedor.municipio
+    infraccion = None
+    vehiculo = None
+    patente = ""
+
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+        patente = (request.POST.get("patente") or "").strip().upper()
+
+        if accion == "buscar" and patente:
+            # Buscar vehículo en el municipio (o sin municipio asignado)
+            vehiculo = Vehiculo.objects.filter(
+                patente=patente
+            ).filter(
+                Q(municipio=municipio) | Q(municipio__isnull=True)
+            ).first()
+
+            if vehiculo:
+                infraccion = Infraccion.objects.filter(
+                    vehiculo=vehiculo,
+                    municipio=municipio,
+                    estado="pendiente"
+                ).order_by("-creado_en").first()
+
+                if not infraccion:
+                    messages.info(request, f"El vehículo {patente} no tiene infracciones pendientes.")
+            else:
+                messages.warning(request, f"No se encontró el vehículo con patente {patente}.")
+
+        elif accion == "cobrar":
+            infraccion_id = request.POST.get("infraccion_id")
+            if infraccion_id:
+                try:
+                    with transaction.atomic():
+                        inf = get_object_or_404(
+                            Infraccion,
+                            id=infraccion_id,
+                            municipio=municipio,
+                            estado="pendiente",
+                        )
+                        inf.estado = "pagada"
+                        inf.fecha_pago = timezone.now()
+                        inf.save()
+
+                        MovimientoCaja.objects.create(
+                            usuario=vendedor,
+                            monto=inf.monto,
+                            tipo="ingreso",
+                            descripcion=(
+                                f"Cobro infracción #{inf.id} — "
+                                f"{inf.vehiculo.patente}"
+                            ),
+                        )
+                    messages.success(
+                        request,
+                        f"✅ Infracción #{inf.id} cobrada. "
+                        f"Se registró ${inf.monto} en tu caja."
+                    )
+                except Exception as e:
+                    messages.error(request, f"Error al cobrar: {e}")
+                return redirect("vendedores_cobrar_infraccion")
+
+    return render(request, "vendedores/cobrar_infraccion.html", {
+        "infraccion": infraccion,
+        "vehiculo": vehiculo,
+        "patente": patente,
+    })
+
 
 @require_role("inspector", "vendedor", "admin")
 def cerrar_caja(request):
@@ -2434,7 +2533,7 @@ def resolver_verificacion(request, solicitud_id):
             aprobado=True,
         )
 
-        # 🔔 Notificación en la app (se muestra con botón "Entendido")
+        # 🔔 Notificación en la app
         Notificacion.objects.create(
             destinatario=solicitud.usuario,
             mensaje="✅ ¡Tu identidad fue verificada! El municipio confirmó tu cuenta.",
@@ -2468,56 +2567,58 @@ def resolver_verificacion(request, solicitud_id):
 
     # ── Exención ──────────────────────────────────────────────────────────────
     elif accion == "aprobar_exencion":
-        # Primero debe estar verificada la identidad del conductor
-        if solicitud.estado != "aprobada":
-            messages.error(request, "Debés aprobar la identidad del conductor antes de aprobar la exención.")
-            return redirect("gestionar_verificaciones")
-
         vehiculo = solicitud.vehiculo
         if not vehiculo:
             messages.error(request, "La solicitud no tiene vehículo asociado.")
             return redirect("gestionar_verificaciones")
 
-        tipo_exencion  = request.POST.get("tipo_exencion", solicitud.tipo_exencion_solicitado)
-        exento_global  = request.POST.get("exento_global") == "on"
-        subcuadras_ids = request.POST.getlist("subcuadras")
-        notas          = request.POST.get("notas_exencion", "").strip()
+        tipo_exencion = request.POST.get("tipo_exencion", "")
+        es_global = request.POST.get("exento_global") == "on"
+        subcuadra_ids = request.POST.getlist("subcuadras")
+        notas_exencion = request.POST.get("notas_exencion", "").strip()
 
-        vehiculo.tipo_exencion  = tipo_exencion
-        vehiculo.exento_global  = exento_global
-        vehiculo.notas_exencion = (
-            notas or f"Aprobado por {request.user.correo} — solicitud #{solicitud.id}"
-        )
-        vehiculo.save(update_fields=["tipo_exencion", "exento_global", "notas_exencion"])
+        vehiculo.tipo_exencion = tipo_exencion
+        vehiculo.notas_exencion = notas_exencion
 
-        if not exento_global and subcuadras_ids:
-            municipio = request.user.municipio
-            subcuadras_validas = Subcuadra.objects.filter(
-                id__in=subcuadras_ids,
-                municipio=municipio
-            )
-            vehiculo.subcuadras_exentas.set(subcuadras_validas)
-        elif exento_global:
+        if es_global:
+            vehiculo.exento_global = True
+            vehiculo.exento_parcial = False
             vehiculo.subcuadras_exentas.clear()
+        else:
+            vehiculo.exento_global = False
+            vehiculo.exento_parcial = bool(subcuadra_ids)
+            vehiculo.subcuadras_exentas.set(subcuadra_ids)
 
-        solicitud.estado_exencion    = "aprobada"
-        solicitud.notas_exencion_admin = ""
-        solicitud.save(update_fields=["estado_exencion", "notas_exencion_admin"])
+        vehiculo.save()
 
+        solicitud.estado_exencion = "aprobada"
+        solicitud.save(update_fields=["estado_exencion"])
+
+        tipo_label = dict(TIPOS_EXENCION).get(tipo_exencion, tipo_exencion)
         messages.success(
             request,
-            f"✅ Exención aprobada para {vehiculo.patente} ({solicitud.usuario.correo})."
+            f"✅ Exención '{tipo_label}' aplicada a {vehiculo.patente}."
+            + (" Global." if es_global else f" {len(subcuadra_ids)} subcuadra(s)."),
+        )
+
+        Notificacion.objects.create(
+            destinatario=solicitud.usuario,
+            mensaje=f"✅ Tu exención fue aprobada para el vehículo {vehiculo.patente}.",
         )
 
     elif accion == "rechazar_exencion":
-        notas = request.POST.get("notas_exencion_admin", "").strip()
-        solicitud.estado_exencion    = "rechazada"
-        solicitud.notas_exencion_admin = notas
+        notas_exencion_admin = request.POST.get("notas_exencion_admin", "").strip()
+        solicitud.estado_exencion = "rechazada"
+        solicitud.notas_exencion_admin = notas_exencion_admin
         solicitud.save(update_fields=["estado_exencion", "notas_exencion_admin"])
 
-        messages.warning(
-            request,
-            f"❌ Exención rechazada para {solicitud.usuario.correo}."
+        vehiculo_patente = solicitud.vehiculo.patente if solicitud.vehiculo else "(sin vehículo)"
+        messages.warning(request, f"❌ Exención rechazada para {vehiculo_patente}.")
+
+        motivo_texto = f" Motivo: {notas_exencion_admin}" if notas_exencion_admin else ""
+        Notificacion.objects.create(
+            destinatario=solicitud.usuario,
+            mensaje=f"❌ Tu solicitud de exención fue rechazada.{motivo_texto}",
         )
 
     return redirect("gestionar_verificaciones")

@@ -68,7 +68,7 @@
               {% endif %}
             </td>
             <td style="text-align:center;">
-              {% if i.estado == "pendiente" %}
+              {% if i.estado == "pendiente" and not es_vista_gestion %}
                 {% if saldo_usuario >= i.monto %}
                   <button class="btn btn-sm"
                           style="font-size:0.82rem;"
