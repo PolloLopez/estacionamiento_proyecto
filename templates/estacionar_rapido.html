@@ -8,7 +8,7 @@ block content %}
     <div class="panel-body">
       <p>Formulario minimal para registrar un estacionamiento sin cuenta.</p>
 
-      <form method="post" action="{% url 'usuarios_estacionar_rapido' %}">
+      <form method="post" action="{% url 'usuarios_estacionar_vehiculo' %}">
         {% csrf_token %}
         <div class="form-row">
           <label>Patente</label>

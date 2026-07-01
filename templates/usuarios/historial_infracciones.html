@@ -36,7 +36,7 @@
     {% if tiene_pendientes %}
     <div class="card" style="margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
       <span style="font-size:0.95rem;">💰 Saldo disponible: <strong>${{ saldo_usuario }}</strong></span>
-      <a href="{% url 'usuarios_cargar_saldo' %}" class="btn btn-outline" style="font-size:0.85rem;">Cargar saldo</a>
+      <a href="{% url 'mp_iniciar_carga' %}" class="btn btn-outline" style="font-size:0.85rem;">Cargar saldo</a>
     </div>
     {% endif %}
 
