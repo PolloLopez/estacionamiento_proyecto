@@ -17,19 +17,14 @@
         method="post"
         action="{% url 'inspectores_registrar_infraccion' %}?patente={{ patente }}"
         enctype="multipart/form-data">
-        
+
         {% csrf_token %}
 
         <label for="patente">Patente:</label>
-
-        <!-- visible -->
         <input value="{{ patente }}" readonly class="input" />
-
-        <!-- real -->
         <input type="hidden" name="patente" value="{{ patente }}" />
 
         <label>Subcuadra</label>
-
         <select name="subcuadra_id" class="input" required>
           {% for s in subcuadras %}
             <option value="{{ s.id }}"
@@ -39,10 +34,28 @@
           {% endfor %}
         </select>
 
-        <label for="foto">Foto de la infracción:</label>
-        <input type="file" id="foto" name="foto" accept="image/*" required />
+        {# ── Foto: solo cámara del dispositivo (capture="environment" = cámara trasera) ── #}
+        <label for="foto">📷 Foto de la infracción:</label>
+        <input
+          type="file"
+          id="foto"
+          name="foto"
+          accept="image/*"
+          capture="environment"
+          required
+        />
 
-        <button type="submit" class="btn btn-danger">
+        {# Coordenadas GPS (se completan con JS antes de enviar) #}
+        <input type="hidden" id="gps_lat"  name="gps_lat"  value="" />
+        <input type="hidden" id="gps_lon"  name="gps_lon"  value="" />
+        <input type="hidden" id="gps_acc"  name="gps_acc"  value="" />
+
+        {# Estado GPS visible para el inspector #}
+        <p id="gps_estado" style="font-size:0.82rem; color:var(--color-muted); margin-top:0.25rem;">
+          📍 Obteniendo ubicación...
+        </p>
+
+        <button type="submit" id="btnGrabar" class="btn btn-danger" disabled>
           Grabar acta de infracción
         </button>
 
@@ -53,5 +66,50 @@
     </div>
   </div>
 </section>
+
+<script>
+(function () {
+  var btnGrabar  = document.getElementById("btnGrabar");
+  var estadoEl   = document.getElementById("gps_estado");
+  var latInput   = document.getElementById("gps_lat");
+  var lonInput   = document.getElementById("gps_lon");
+  var accInput   = document.getElementById("gps_acc");
+
+  function habilitarBoton() {
+    btnGrabar.disabled = false;
+  }
+
+  if (!navigator.geolocation) {
+    // El navegador no soporta geolocalización: permitir igual con advertencia
+    estadoEl.textContent = "⚠️ GPS no disponible en este dispositivo.";
+    estadoEl.style.color = "var(--color-warning, #856404)";
+    habilitarBoton();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    function (pos) {
+      var lat = pos.coords.latitude.toFixed(6);
+      var lon = pos.coords.longitude.toFixed(6);
+      var acc = Math.round(pos.coords.accuracy);
+
+      latInput.value = lat;
+      lonInput.value = lon;
+      accInput.value = acc;
+
+      estadoEl.textContent = "✅ Ubicación obtenida (" + lat + ", " + lon + " ±" + acc + "m)";
+      estadoEl.style.color = "var(--color-primary)";
+      habilitarBoton();
+    },
+    function (err) {
+      // GPS denegado o timeout: permitir continuar igual, sin coordenadas
+      estadoEl.textContent = "⚠️ No se pudo obtener la ubicación. La foto no tendrá marca de agua GPS.";
+      estadoEl.style.color = "var(--color-warning, #856404)";
+      habilitarBoton();
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+})();
+</script>
 
 {% if mensaje %} {% endif %} {% endblock %}

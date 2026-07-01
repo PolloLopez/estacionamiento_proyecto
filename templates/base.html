@@ -81,7 +81,17 @@
 
         {% endif %}
 
-        <li><a href="{% url 'logout' %}">Salir</a></li>
+        <li>
+          {# Logout como POST para prevenir ataques CSRF de logout por link #}
+          <form method="post" action="{% url 'logout' %}" style="margin:0; padding:0;">
+            {% csrf_token %}
+            <button type="submit"
+                    style="background:none; border:none; color:inherit;
+                           font:inherit; cursor:pointer; padding:0;">
+              Salir
+            </button>
+          </form>
+        </li>
 
       {% else %}
         <li><a href="{% url 'login' %}">Ingresar</a></li>

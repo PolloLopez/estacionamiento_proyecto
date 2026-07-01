@@ -482,23 +482,30 @@ def panel_admin(request):
 
 @require_role("admin")
 def dashboard_admin(request):
+    municipio = request.user.municipio
 
-    # 🚨 Infracciones por inspector
-    infracciones_por_inspector = Infraccion.objects.values(
+    # 🚨 Infracciones por inspector (filtrado por municipio)
+    infracciones_por_inspector = Infraccion.objects.filter(
+        municipio=municipio
+    ).values(
         "inspector__correo"
     ).annotate(
         total=Count("id")
     ).order_by("-total")
 
-    # 🚗 Patentes por día
-    patentes_por_dia = Vehiculo.objects.annotate(
-        fecha=TruncDate("fecha_creacion")  # o created_at
+    # 🚗 Patentes por día (filtrado por municipio)
+    patentes_por_dia = Vehiculo.objects.filter(
+        municipio=municipio
+    ).annotate(
+        fecha=TruncDate("fecha_creacion")
     ).values("fecha").annotate(
         total=Count("id")
     )
 
-    # 💰 Cobros por usuario (inspectores + kioscos)
-    cobros = MovimientoCaja.objects.values(
+    # 💰 Cobros por usuario (filtrado por municipio)
+    cobros = MovimientoCaja.objects.filter(
+        usuario__municipio=municipio
+    ).values(
         "usuario__correo"
     ).annotate(
         total=Sum("monto")
@@ -525,22 +532,28 @@ def panel_exenciones(request):
     vehiculo = None
     accion = request.POST.get("accion")
 
+    def _buscar_vehiculo(patente):
+        """Busca vehículo por patente dentro del municipio (o sin municipio asignado)."""
+        return Vehiculo.objects.filter(
+            patente=patente
+        ).filter(
+            Q(municipio=municipio) | Q(municipio__isnull=True)
+        ).first()
+
     # Si viene ?patente=XYZ desde detalle_usuario, pre-buscamos el vehículo
     patente_get = request.GET.get("patente", "").strip().upper()
     if patente_get and not accion:
-        vehiculo = Vehiculo.objects.filter(patente=patente_get).first()
+        vehiculo = _buscar_vehiculo(patente_get)
 
     # 🔎 BUSCAR
     if request.method == "POST" and accion == "buscar":
-        #patente = (input).strip().upper()
         patente = (request.POST.get('patente') or "").strip().upper()
-        vehiculo = Vehiculo.objects.filter(patente=patente).first()
+        vehiculo = _buscar_vehiculo(patente)
 
     # 💾 GUARDAR
     elif request.method == "POST" and accion == "guardar":
-        #patente = (input).strip().upper()
         patente = (request.POST.get('patente') or "").strip().upper()
-        vehiculo = Vehiculo.objects.filter(patente=patente).first()
+        vehiculo = _buscar_vehiculo(patente)
 
         if vehiculo:
             vehiculo.exento_global = request.POST.get("exento_global") == "on"
@@ -734,7 +747,13 @@ def estacionar_vehiculo(request):
         # =============================================
 
         if vehiculo_id:
-            vehiculo = Vehiculo.objects.get(id=vehiculo_id)
+            # Verificar que el vehículo pertenece a este conductor
+            # (evita manipulación del vehiculo_id por POST manual)
+            vehiculo = get_object_or_404(
+                Vehiculo,
+                id=vehiculo_id,
+                vehiculousuario__usuario=usuario
+            )
         else:
             if not patente:
                 return render(request, "usuarios/estacionar_vehiculo.html", {
@@ -1170,11 +1189,19 @@ def registrar_infraccion(request):
     # ==============================
     if request.method == "POST":
         try:
+            # Coordenadas GPS enviadas desde el frontend (JS)
+            gps_lat = request.POST.get("gps_lat", "").strip() or None
+            gps_lon = request.POST.get("gps_lon", "").strip() or None
+            gps_acc = request.POST.get("gps_acc", "").strip() or None
+
             infraccion = crear_infraccion(
                 patente=patente,
                 subcuadra_id=request.POST.get("subcuadra_id"),
                 inspector=usuario,
-                foto=request.FILES.get("foto")
+                foto=request.FILES.get("foto"),
+                gps_lat=gps_lat,
+                gps_lon=gps_lon,
+                gps_acc=gps_acc,
             )
 
             return redirect("inspectores_ticket", infraccion.id)
@@ -1400,7 +1427,12 @@ def resumen_cobros(request):
 
 @require_role("vendedor", "inspector", "admin")
 def ticket_cobro(request, est_id):
-    est = Estacionamiento.objects.get(id=est_id)
+    # Verifica municipio para que un usuario de otro municipio no acceda
+    est = get_object_or_404(
+        Estacionamiento,
+        id=est_id,
+        subcuadra__municipio=request.user.municipio
+    )
 
     return render(request, "ticket.html", {
         "patente": est.vehiculo.patente,
@@ -1784,9 +1816,18 @@ def admin_infracciones(request):
         elif accion == "cobrar" and infraccion_id:
             inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
             if inf.estado == "pendiente":
-                inf.estado = "pagada"
-                inf.save()
-                messages.success(request, f"Infracción #{inf.id} marcada como pagada.")
+                with transaction.atomic():
+                    inf.estado = "pagada"
+                    inf.fecha_pago = timezone.now()
+                    inf.save()
+                    # Registrar ingreso en caja de quien cobró (admin o vendedor)
+                    MovimientoCaja.objects.create(
+                        usuario=usuario,
+                        monto=inf.monto,
+                        tipo="ingreso",
+                        descripcion=f"Cobro en efectivo infracción #{inf.id} — {inf.vehiculo.patente}",
+                    )
+                messages.success(request, f"Infracción #{inf.id} cobrada. Se registró ${inf.monto} en tu caja.")
 
         return redirect(request.get_full_path())
 
@@ -1944,7 +1985,9 @@ def comprobante_infraccion(request, infraccion_id):
 # VIEWS LOGIN / LOGOUT
 # =========================================================
 def logout_view(request):
-    logout(request)
+    # Solo POST para prevenir logout por CSRF (links maliciosos como <img src="/logout/">)
+    if request.method == "POST":
+        logout(request)
     return redirect("login")
 
 
@@ -2190,11 +2233,13 @@ def mp_webhook(request):
     if info.get("status") != "approved":
         return HttpResponse(status=200)
 
-    # Recuperamos usuario y monto desde los metadatos
+    # Recuperamos usuario desde metadata y monto desde transaction_amount (más seguro)
     try:
         metadata = info.get("metadata", {})
         usuario_id = metadata.get("usuario_id")
-        monto = Decimal(str(metadata.get("monto", 0)))
+        # Usar transaction_amount (monto real procesado por MP) en vez del metadata
+        # (por consistencia con mp_exitoso y para resistir cambios de promociones de MP)
+        monto = Decimal(str(info.get("transaction_amount", metadata.get("monto", 0))))
         usuario = Usuario.objects.get(pk=usuario_id)
     except Exception:
         return HttpResponse(status=200)
