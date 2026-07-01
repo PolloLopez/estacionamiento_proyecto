@@ -111,7 +111,8 @@ class Usuario(AbstractUser):
     es_conductor = models.BooleanField(default=True)
     es_inspector = models.BooleanField(default=False)
     es_vendedor = models.BooleanField(default=False)
-    es_admin = models.BooleanField(default=False)
+    es_admin     = models.BooleanField(default=False)
+    es_tesorero  = models.BooleanField(default=False)
 
     # ✅ Verificación de identidad del conductor (aprobada por el admin)
     es_verificado = models.BooleanField(
@@ -160,6 +161,18 @@ class Municipio(models.Model):
     nombre = models.CharField(max_length=100, blank=True)
     apellido = models.CharField(max_length=100, blank=True)
     activo = models.BooleanField(default=True)
+
+    # Configuración de negocio
+    comision_vendedor = models.DecimalField(
+        max_digits=5, decimal_places=2, default=7,
+        verbose_name='Comisión vendedor (%)',
+        help_text='Porcentaje que retiene el vendedor de cada cobro.',
+    )
+    tolerancia_multa_minutos = models.IntegerField(
+        default=5,
+        verbose_name='Tolerancia multa (min)',
+        help_text='Minutos de gracia: si el conductor paga la multa dentro de este plazo, se cancela automáticamente.',
+    )
 
     # ── Branding por municipio ────────────────────────────────────────────────
     # El admin carga el logo y elige los colores; cada municipio tiene su propia
@@ -216,6 +229,12 @@ class Vehiculo(models.Model):
     notas_exencion = models.TextField(
         null=True, blank=True,
         verbose_name="Notas (nro de documento, certificado, etc.)"
+    )
+
+    TIPOS_VEHICULO = [('auto', 'Auto'), ('moto', 'Moto')]
+    tipo = models.CharField(
+        max_length=10, choices=TIPOS_VEHICULO, default='auto',
+        verbose_name='Tipo de vehículo',
     )
 
     def __str__(self):
@@ -285,6 +304,23 @@ class Tarifa(models.Model):
         help_text="Monto fijo cobrado por cada infracción."
     )
 
+    # Tarifa para motos (precio por hora)
+    precio_por_hora_moto = models.DecimalField(
+        max_digits=6, decimal_places=2, default=0,
+        verbose_name="Precio/hora moto",
+        help_text="Tarifa por hora para motos. 0 = igual que autos.",
+    )
+
+    # Abono mensual
+    precio_abono_auto = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        verbose_name="Precio abono mensual (auto)",
+    )
+    precio_abono_moto = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        verbose_name="Precio abono mensual (moto)",
+    )
+
     def __str__(self):
         return f"${self.precio_por_hora}/hora | infracción: ${self.monto_infraccion}"
 
@@ -334,6 +370,16 @@ class MovimientoCaja(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     cerrado = models.BooleanField(default=False)
     creado_en = models.DateTimeField(auto_now_add=True)
+    medio_pago = models.CharField(
+        max_length=20, default='efectivo',
+        choices=[('efectivo', 'Efectivo'), ('mercadopago', 'MercadoPago')],
+        verbose_name='Medio de pago',
+    )
+    comision_monto = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        verbose_name='Comisión generada',
+        help_text='Monto que retiene el vendedor como comisión en este movimiento.',
+    )
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -587,3 +633,156 @@ class SolicitudVerificacion(models.Model):
 
     def __str__(self):
         return f"{self.usuario} — {self.estado}"
+
+# 🗓️ Abono mensual de estacionamiento por vehículo
+class AbonoMensual(models.Model):
+    """
+    Habilita a un vehículo para estacionar libremente durante un mes
+    sin necesidad de registrar cada sesión.
+    El inspector ve 'abono activo' al verificar la patente.
+    """
+    MEDIOS_PAGO = [('efectivo', 'Efectivo'), ('mercadopago', 'MercadoPago')]
+
+    vehiculo    = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, related_name='abonos')
+    municipio   = models.ForeignKey(Municipio, on_delete=models.CASCADE, related_name='abonos')
+    # Primer día del mes al que corresponde el abono (ej: 2026-07-01)
+    mes         = models.DateField(verbose_name='Mes del abono')
+    monto       = models.DecimalField(max_digits=10, decimal_places=2)
+    medio_pago  = models.CharField(max_length=20, choices=MEDIOS_PAGO, default='efectivo')
+    vendedor    = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='abonos_cobrados',
+        help_text='Vendedor/kiosco que cobró el abono (null si fue digital).',
+    )
+    conductor   = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='abonos_contratados',
+        help_text='Conductor que contrató el abono (null si lo cargó el vendedor sin usuario).',
+    )
+    movimiento_caja = models.ForeignKey(
+        MovimientoCaja, on_delete=models.SET_NULL, null=True, blank=True,
+    )
+    creado_en   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('vehiculo', 'municipio', 'mes')
+        ordering = ['-mes']
+        verbose_name = 'Abono mensual'
+        verbose_name_plural = 'Abonos mensuales'
+
+    @property
+    def esta_activo(self):
+        """True si el abono corresponde al mes actual."""
+        hoy = timezone.localdate()
+        return self.mes.year == hoy.year and self.mes.month == hoy.month
+
+    def __str__(self):
+        return f"{self.vehiculo.patente} — {self.mes.strftime('%B %Y')}"
+
+
+# 📊 Rendición de cuentas del admin a Tesorería
+class Rendicion(models.Model):
+    """
+    El admin cierra un período y genera una rendición con el desglose
+    de efectivo vs. digital y las comisiones de vendedores.
+    El tesorero puede ver, observar o validar cada rendición.
+    """
+    PERIODOS = [('diario', 'Diario'), ('semanal', 'Semanal'), ('mensual', 'Mensual')]
+    ESTADOS  = [
+        ('pendiente',  'Pendiente de validación'),
+        ('validada',   'Validada por tesorería'),
+        ('observada',  'Con observaciones'),
+    ]
+
+    municipio    = models.ForeignKey(Municipio, on_delete=models.CASCADE, related_name='rendiciones')
+    admin        = models.ForeignKey(
+        Usuario, on_delete=models.PROTECT, related_name='rendiciones_generadas',
+    )
+    periodo      = models.CharField(max_length=10, choices=PERIODOS)
+    fecha_desde  = models.DateField()
+    fecha_hasta  = models.DateField()
+
+    # Totales (se calculan al generar la rendición y quedan como snapshot)
+    total_efectivo    = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_digital     = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_comisiones  = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_neto        = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text='Total a rendir = efectivo + digital - comisiones.',
+    )
+
+    estado          = models.CharField(max_length=15, choices=ESTADOS, default='pendiente')
+    notas_tesorero  = models.TextField(blank=True, verbose_name='Observaciones del tesorero')
+
+    creado_en    = models.DateTimeField(auto_now_add=True)
+    tesorero     = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='rendiciones_validadas',
+    )
+    validado_en  = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+        verbose_name = 'Rendición'
+        verbose_name_plural = 'Rendiciones'
+
+    def __str__(self):
+        return f"{self.get_periodo_display()} {self.fecha_desde} → {self.fecha_hasta} [{self.get_estado_display()}]"
+
+
+# 💰 Liquidación de comisiones a vendedores
+class LiquidacionComision(models.Model):
+    """
+    Representa el pago de comisiones acumuladas de un vendedor para un período.
+
+    Flujo:
+      1. Las comisiones se acumulan en MovimientoCaja.comision_monto al cobrar.
+      2. Al cerrar una rendición, Tesorería genera una LiquidacionComision
+         por cada vendedor del período (sum de sus comision_monto).
+      3. Tesorería marca como 'depositada' cuando transfiere el dinero al vendedor.
+      4. El vendedor certifica que recibió el monto correctamente.
+    """
+    ESTADOS = [
+        ('pendiente',   'Pendiente de depósito'),
+        ('depositada',  'Depositada por tesorería'),
+        ('certificada', 'Certificada por el vendedor'),
+    ]
+
+    vendedor     = models.ForeignKey(
+        Usuario, on_delete=models.PROTECT,
+        related_name='liquidaciones_comision',
+    )
+    municipio    = models.ForeignKey(Municipio, on_delete=models.CASCADE)
+    rendicion    = models.ForeignKey(
+        'Rendicion', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='liquidaciones',
+        help_text='Rendición que originó esta liquidación.',
+    )
+    fecha_desde  = models.DateField()
+    fecha_hasta  = models.DateField()
+    monto_total  = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        help_text='Suma de comisiones del período.',
+    )
+    estado       = models.CharField(max_length=15, choices=ESTADOS, default='pendiente')
+
+    # Tesorería deposita
+    depositada_en  = models.DateTimeField(null=True, blank=True)
+    depositada_por = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='liquidaciones_depositadas',
+    )
+    notas_tesorero = models.TextField(blank=True)
+
+    # Vendedor certifica recibo
+    certificada_en = models.DateTimeField(null=True, blank=True)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-creado_en']
+        verbose_name = 'Liquidación de comisión'
+        verbose_name_plural = 'Liquidaciones de comisión'
+
+    def __str__(self):
+        return f"{self.vendedor} — ${self.monto_total} [{self.get_estado_display()}]"

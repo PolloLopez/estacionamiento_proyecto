@@ -35,6 +35,9 @@ from .models import (
     DiaEspecial,
     SolicitudVerificacion,
     Notificacion,
+    AbonoMensual,
+    Rendicion,
+    LiquidacionComision,
     TIPOS_EXENCION,
 )
 
@@ -117,11 +120,21 @@ def inicio_usuarios(request):
     # Estado de verificación: None si no existe solicitud
     solicitud_verificacion = getattr(usuario, "solicitud_verificacion", None)
 
+    # Abonos mensuales activos del conductor para el mes en curso
+    from datetime import date
+    mes_actual = date.today().replace(day=1)
+    abonos_activos = AbonoMensual.objects.filter(
+        vehiculo__vehiculousuario__usuario=usuario,
+        municipio=usuario.municipio,
+        mes=mes_actual,
+    ).select_related("vehiculo").distinct() if usuario.municipio else []
+
     return render(request, "usuarios/inicio_usuarios.html", {
         "usuario": usuario,
         "estacionamiento_activo": estacionamiento_activo,
         "solicitud_verificacion": solicitud_verificacion,
         "notificaciones_nuevas": notificaciones_nuevas,
+        "abonos_activos": abonos_activos,
     })
 
 # =========================================================
@@ -618,14 +631,23 @@ def cargar_saldo(request, usuario_id):
 # =========================================================
 @login_required
 def agregar_vehiculo(request):
-
+    """El conductor agrega un vehículo a su cuenta."""
     if request.method == "POST":
         patente = request.POST.get("patente", "").strip().upper()
+        tipo    = request.POST.get("tipo", "auto")
+
+        if tipo not in ("auto", "moto"):
+            tipo = "auto"
 
         if not patente:
             return redirect("inicio")
 
-        vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+        vehiculo, creado = Vehiculo.objects.get_or_create(patente=patente)
+
+        # Si el vehículo es nuevo, asignar el tipo seleccionado
+        if creado:
+            vehiculo.tipo = tipo
+            vehiculo.save(update_fields=["tipo"])
 
         VehiculoUsuario.objects.get_or_create(
             usuario=request.user,
@@ -637,7 +659,7 @@ def agregar_vehiculo(request):
             + f"?patente={vehiculo.patente}"
         )
 
-    return redirect("usuarios_estacionar_vehiculo")
+    return render(request, "usuarios/agregar_vehiculo.html")
 
 
 @require_login
@@ -649,8 +671,6 @@ def eliminar_vehiculo(request, vehiculo_id):
             vehiculo_id=vehiculo_id
         ).delete()
     return redirect("usuarios_estacionar_vehiculo")
-
-    return render(request, "usuarios/agregar_vehiculo.html")
 
 
 def puede_estacionar_ahora(municipio):
@@ -932,18 +952,25 @@ def estacionar_vehiculo(request):
 
     from app_estacionamiento.models import Tarifa
     tarifa_obj = Tarifa.objects.filter(municipio=usuario.municipio).first()
-    tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else 100
+    tarifa_hora_auto = tarifa_obj.precio_por_hora if tarifa_obj else 100
+    tarifa_hora_moto = (
+        tarifa_obj.precio_por_hora_moto
+        if tarifa_obj and getattr(tarifa_obj, "precio_por_hora_moto", 0) and tarifa_obj.precio_por_hora_moto > 0
+        else tarifa_hora_auto
+    )
 
     # Patente preseleccionada (viene del flujo agregar_vehiculo)
     patente_preseleccionada = request.GET.get("patente", "").strip().upper()
 
-    # Opciones de duración recortadas al horario de cierre del municipio
-    opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora)
+    # Opciones de duración calculadas con tarifa de auto (se ajusta con JS en el template)
+    opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto)
 
     return render(request, "usuarios/estacionar_vehiculo.html", {
         "vehiculos": vehiculos,
         "usuario": usuario,
-        "tarifa_hora": tarifa_hora,
+        "tarifa_hora": tarifa_hora_auto,
+        "tarifa_hora_auto": tarifa_hora_auto,
+        "tarifa_hora_moto": tarifa_hora_moto,
         "patente_preseleccionada": patente_preseleccionada,
         "opciones_duracion": opciones_duracion,
     })
@@ -1120,19 +1147,22 @@ def mis_infracciones(request):
 @require_role("admin", "vendedor", "inspector")
 def consultar_deuda(request):
     """
-    Vista para admin/vendedor/inspector: busca todas las infracciones pendientes
-    de un vehículo por patente y permite cobrarlas.
-    No es accesible para conductores; ellos son redirigidos a cargar saldo.
+    Admin/vendedor/inspector: busca infracciones pendientes por patente y las cobra.
+    Flujo:
+      GET                  -> formulario de búsqueda
+      POST accion=confirmar -> mostrar modal de confirmación en el template
+      POST accion=cobrar    -> cobrar (con tolerancia de gracia), redirect al comprobante
     """
     municipio = request.user.municipio
     patente = (request.GET.get("patente") or "").strip().upper()
     infracciones = []
     vehiculo = None
+    infraccion_a_confirmar = None
 
     if patente:
-        from django.db.models import Q
+        from django.db.models import Q as _Q
         vehiculo = Vehiculo.objects.filter(patente=patente).filter(
-            Q(municipio=municipio) | Q(municipio__isnull=True)
+            _Q(municipio=municipio) | _Q(municipio__isnull=True)
         ).first()
         if vehiculo:
             infracciones = Infraccion.objects.filter(
@@ -1142,35 +1172,102 @@ def consultar_deuda(request):
             ).order_by("-creado_en")
 
     if request.method == "POST":
+        accion = request.POST.get("accion")
         infraccion_id = request.POST.get("infraccion_id")
-        if infraccion_id:
-            with transaction.atomic():
-                inf = get_object_or_404(
-                    Infraccion.objects.select_for_update(),
-                    id=infraccion_id,
-                    municipio=municipio,
-                    estado="pendiente",
-                )
-                inf.estado = "pagada"
-                inf.fecha_pago = timezone.now()
-                inf.save()
-                MovimientoCaja.objects.create(
-                    usuario=request.user,
-                    monto=inf.monto,
-                    tipo="ingreso",
-                    descripcion=f"Cobro deuda infracción #{inf.id} — {inf.vehiculo.patente}",
-                )
-            messages.success(
-                request,
-                f"✅ Infracción #{inf.id} cobrada. Se registró ${inf.monto} en tu caja."
-            )
-            return redirect(f"{request.path}?patente={inf.vehiculo.patente}")
+
+        # Paso 1: solicitar confirmación
+        if accion == "confirmar" and infraccion_id:
+            patente = (request.POST.get("patente") or "").strip().upper()
+            infraccion_a_confirmar = Infraccion.objects.filter(
+                id=infraccion_id, municipio=municipio, estado="pendiente"
+            ).select_related("vehiculo", "inspector").first()
+            if not infraccion_a_confirmar:
+                messages.error(request, "Infracción no encontrada o ya procesada.")
+                return redirect(f"{request.path}?patente={patente}")
+            from django.db.models import Q as _Q3
+            if not vehiculo:
+                vehiculo = Vehiculo.objects.filter(patente=patente).filter(
+                    _Q3(municipio=municipio) | _Q3(municipio__isnull=True)
+                ).first()
+            if vehiculo:
+                infracciones = Infraccion.objects.filter(
+                    vehiculo=vehiculo, municipio=municipio, estado="pendiente"
+                ).order_by("-creado_en")
+            return render(request, "usuarios/consultar_deuda.html", {
+                "patente": patente,
+                "vehiculo": vehiculo,
+                "infracciones": infracciones,
+                "infraccion_a_confirmar": infraccion_a_confirmar,
+            })
+
+        # Paso 2: ejecutar cobro
+        elif accion == "cobrar" and infraccion_id:
+            try:
+                with transaction.atomic():
+                    inf = get_object_or_404(
+                        Infraccion.objects.select_for_update(),
+                        id=infraccion_id,
+                        municipio=municipio,
+                        estado="pendiente",
+                    )
+                    # Tolerancia de gracia
+                    from datetime import timedelta as _td
+                    tolerancia_min = municipio.tolerancia_multa_minutos or 0
+                    ahora = timezone.now()
+                    anulada_por_gracia = (
+                        tolerancia_min > 0 and
+                        (ahora - inf.creado_en) <= _td(minutes=tolerancia_min)
+                    )
+                    if anulada_por_gracia:
+                        inf.estado = "anulada"
+                    else:
+                        inf.estado = "pagada"
+                        comision_pct = municipio.comision_vendedor or 0
+                        comision = round(inf.monto * comision_pct / 100, 2)
+                        MovimientoCaja.objects.create(
+                            usuario=request.user,
+                            monto=inf.monto,
+                            tipo="ingreso",
+                            medio_pago="efectivo",
+                            comision_monto=comision,
+                            descripcion=f"Cobro infracción #{inf.id} — {inf.vehiculo.patente}",
+                        )
+                    inf.fecha_pago = ahora
+                    inf.save()
+            except Exception as e:
+                messages.error(request, f"Error al procesar: {e}")
+                patente_param = request.POST.get("patente", "").strip().upper()
+                return redirect(f"{request.path}?patente={patente_param}")
+            return redirect(reverse("ticket_pago_multa", args=[inf.id]))
 
     return render(request, "usuarios/consultar_deuda.html", {
         "patente": patente,
         "vehiculo": vehiculo,
         "infracciones": infracciones,
+        "infraccion_a_confirmar": None,
     })
+
+@require_role("admin", "vendedor", "inspector")
+def ticket_pago_multa(request, infraccion_id):
+    """
+    Comprobante de pago (o anulación por gracia) de una infracción.
+    Imprime automáticamente y redirige al panel del usuario.
+    """
+    infraccion = get_object_or_404(
+        Infraccion,
+        id=infraccion_id,
+        municipio=request.user.municipio,
+    )
+    # Solo mostrar si fue procesada (pagada o anulada)
+    if infraccion.estado not in ("pagada", "anulada"):
+        messages.warning(request, "Esta infracción aún está pendiente.")
+        return redirect("consultar_deuda")
+
+    return render(request, "ticket_pago_multa.html", {
+        "infraccion": infraccion,
+        "cobrado_por": request.user,
+    })
+
 
 # =========================================================
 # VIEWS INSPECTORES
@@ -1365,10 +1462,7 @@ def ticket_infraccion(request, infraccion_id):
     infraccion = get_object_or_404(Infraccion, id=infraccion_id, municipio=request.user.municipio)
 
     return render(request, "ticket_infraccion.html", {
-        "patente": infraccion.vehiculo.patente,
-        "subcuadra": infraccion.subcuadra,
-        "fecha": infraccion.creado_en,
-        "inspector": infraccion.inspector.correo
+        "infraccion": infraccion,
     })
 
 @require_role("inspector", "vendedor", "admin")
@@ -1501,13 +1595,21 @@ def registrar_estacionamiento_vendedor(request):
     from app_estacionamiento.models import Tarifa
 
     tarifa_obj = Tarifa.objects.filter(municipio=vendedor.municipio).first()
-    tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
+    tarifa_hora_auto = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
+    tarifa_hora_moto = (
+        tarifa_obj.precio_por_hora_moto
+        if tarifa_obj and getattr(tarifa_obj, "precio_por_hora_moto", 0) and tarifa_obj.precio_por_hora_moto > 0
+        else tarifa_hora_auto
+    )
+    tarifa_hora = tarifa_hora_auto
     opciones_duracion = calcular_opciones_duracion(vendedor.municipio, tarifa_hora)
 
     def _render_form(error=None):
         return render(request, "vendedores/registrar_estacionamiento.html", {
             "error": error,
             "tarifa_hora": tarifa_hora,
+            "tarifa_hora_auto": tarifa_hora_auto,
+            "tarifa_hora_moto": tarifa_hora_moto,
             "opciones_duracion": opciones_duracion,
         })
 
@@ -1551,7 +1653,10 @@ def registrar_estacionamiento_vendedor(request):
     if not subcuadra:
         return _render_form("No hay subcuadra configurada para este municipio.")
 
-    monto = duracion * tarifa_hora
+    # Usar tarifa según tipo de vehículo
+    es_moto = getattr(vehiculo, "tipo", "auto") == "moto"
+    tarifa_cobro = tarifa_hora_moto if es_moto else tarifa_hora_auto
+    monto = duracion * tarifa_cobro
 
     with transaction.atomic():
         est = EstacionamientoFactory.crear(
@@ -1612,6 +1717,109 @@ def resumen_infracciones(request):
     })
 
 # =========================================================
+
+
+# =========================================================
+# ABONO MENSUAL — vendedor cobra abono a conductor
+# =========================================================
+@require_role("vendedor", "admin")
+def cobrar_abono(request):
+    """
+    El vendedor cobra el abono mensual de un vehiculo.
+
+    Flujo:
+    - GET/POST sin confirmar: muestra formulario de patente
+    - POST accion=confirmar: muestra resumen antes de cobrar
+    - POST accion=cobrar: registra el AbonoMensual y el MovimientoCaja
+    """
+    from datetime import date
+    vendedor  = request.user
+    municipio = vendedor.municipio
+
+    tarifa_obj = Tarifa.objects.filter(municipio=municipio).first()
+
+    error     = None
+    vehiculo  = None
+    confirmar = False
+    precio    = None
+
+    if request.method == "POST":
+        accion  = request.POST.get("accion", "buscar")
+        patente = (request.POST.get("patente") or "").strip().upper()
+
+        if not patente:
+            error = "Ingresa la patente del vehiculo."
+        else:
+            vehiculo = Vehiculo.objects.filter(patente=patente).first()
+            if not vehiculo:
+                error = f"No existe ningun vehiculo con patente {patente}."
+            else:
+                # Calcular precio segun tipo
+                es_moto    = getattr(vehiculo, "tipo", "auto") == "moto"
+                precio_moto = getattr(tarifa_obj, "precio_abono_moto", None) if tarifa_obj else None
+                precio_auto = getattr(tarifa_obj, "precio_abono_auto", None) if tarifa_obj else None
+
+                if es_moto and precio_moto and precio_moto > 0:
+                    precio = precio_moto
+                elif precio_auto and precio_auto > 0:
+                    precio = precio_auto
+                else:
+                    error = "No hay tarifa de abono configurada. Configurala en Tarifas."
+
+                if not error:
+                    hoy        = date.today()
+                    mes_actual = hoy.replace(day=1)
+
+                    # Verificar si ya tiene abono este mes
+                    ya_tiene = AbonoMensual.objects.filter(
+                        vehiculo=vehiculo,
+                        municipio=municipio,
+                        mes=mes_actual,
+                    ).exists()
+
+                    if ya_tiene:
+                        error = f"El vehiculo {patente} ya tiene abono activo para este mes."
+                    elif accion == "confirmar":
+                        confirmar = True
+                    elif accion == "cobrar":
+                        # Calcular comision
+                        comision_pct = municipio.comision_vendedor if hasattr(municipio, "comision_vendedor") else 0
+                        comision_monto = (precio * comision_pct / 100).quantize(Decimal("0.01"))
+
+                        with transaction.atomic():
+                            movimiento = MovimientoCaja.objects.create(
+                                usuario=vendedor,
+                                monto=precio,
+                                tipo="ingreso",
+                                descripcion="Abono mensual " + mes_actual.strftime("%m/%Y") + " - " + patente,
+                                medio_pago="efectivo",
+                                comision_monto=comision_monto,
+                            )
+                            AbonoMensual.objects.create(
+                                vehiculo=vehiculo,
+                                municipio=municipio,
+                                vendedor=vendedor,
+                                mes=mes_actual,
+                                monto=precio,
+                                medio_pago="efectivo",
+                                movimiento_caja=movimiento,
+                            )
+
+                        messages.success(
+                            request,
+                            f"Abono registrado para {patente} — ${precio}. "
+                            f"Comision generada: ${comision_monto}."
+                        )
+                        return redirect("cobrar_abono")
+
+    return render(request, "vendedores/cobrar_abono.html", {
+        "vehiculo":  vehiculo,
+        "precio":    precio,
+        "confirmar": confirmar,
+        "error":     error,
+        "tarifa_obj": tarifa_obj,
+    })
+
 # VIEWS VENDEDORES
 # =========================================================
 @require_role("vendedor")
@@ -1635,10 +1843,20 @@ def panel_vendedor(request):
         usuario=user, tipo="ingreso", cerrado=False
     ).aggregate(total=Sum("monto"))["total"] or 0
 
+    # Comisiones acumuladas del vendedor (total histórico)
+    # Las liquidaciones certificadas ya fueron cobradas, pero
+    # mostramos el total completo como referencia de saldo a favor.
+    comisiones_pendientes = MovimientoCaja.objects.filter(
+        usuario=user,
+        tipo="ingreso",
+        comision_monto__gt=0,
+    ).aggregate(total=Sum("comision_monto"))["total"] or 0
+
     return render(request, "vendedores/panel.html", {
         "total_hoy": total_hoy,
         "cantidad_operaciones": cantidad_operaciones,
         "a_rendir": a_rendir,
+        "comisiones_pendientes": comisiones_pendientes,
     })
 
 @require_role("vendedor", "admin")
@@ -1710,38 +1928,64 @@ def cobrar_infraccion_vendedor(request):
             else:
                 messages.warning(request, f"No se encontró el vehículo con patente {patente}.")
 
+        elif accion == "confirmar":
+            # Paso 1: mostrar modal de confirmación con todos los datos
+            infraccion_id = request.POST.get("infraccion_id")
+            patente_post = (request.POST.get("patente") or "").strip().upper()
+            if infraccion_id:
+                infraccion = Infraccion.objects.filter(
+                    id=infraccion_id, municipio=municipio, estado="pendiente"
+                ).select_related("vehiculo", "inspector").first()
+                if not infraccion:
+                    messages.error(request, "Infracción no encontrada o ya procesada.")
+                    return redirect("vendedores_cobrar_infraccion")
+                vehiculo = infraccion.vehiculo
+            return render(request, "vendedores/cobrar_infraccion.html", {
+                "infraccion": infraccion,
+                "vehiculo": vehiculo,
+                "patente": patente_post,
+                "confirmar": True,
+            })
+
         elif accion == "cobrar":
             infraccion_id = request.POST.get("infraccion_id")
             if infraccion_id:
                 try:
                     with transaction.atomic():
                         inf = get_object_or_404(
-                            Infraccion,
+                            Infraccion.objects.select_for_update(),
                             id=infraccion_id,
                             municipio=municipio,
                             estado="pendiente",
                         )
-                        inf.estado = "pagada"
-                        inf.fecha_pago = timezone.now()
-                        inf.save()
-
-                        MovimientoCaja.objects.create(
-                            usuario=vendedor,
-                            monto=inf.monto,
-                            tipo="ingreso",
-                            descripcion=(
-                                f"Cobro infracción #{inf.id} — "
-                                f"{inf.vehiculo.patente}"
-                            ),
+                        # Tolerancia de gracia
+                        from datetime import timedelta as _td3
+                        tolerancia_min = municipio.tolerancia_multa_minutos or 0
+                        ahora = timezone.now()
+                        anulada_por_gracia = (
+                            tolerancia_min > 0 and
+                            (ahora - inf.creado_en) <= _td3(minutes=tolerancia_min)
                         )
-                    messages.success(
-                        request,
-                        f"✅ Infracción #{inf.id} cobrada. "
-                        f"Se registró ${inf.monto} en tu caja."
-                    )
+                        if anulada_por_gracia:
+                            inf.estado = "anulada"
+                        else:
+                            inf.estado = "pagada"
+                            comision_pct = municipio.comision_vendedor or 0
+                            comision = round(inf.monto * comision_pct / 100, 2)
+                            MovimientoCaja.objects.create(
+                                usuario=vendedor,
+                                monto=inf.monto,
+                                tipo="ingreso",
+                                medio_pago="efectivo",
+                                comision_monto=comision,
+                                descripcion=f"Cobro infracción #{inf.id} — {inf.vehiculo.patente}",
+                            )
+                        inf.fecha_pago = ahora
+                        inf.save()
                 except Exception as e:
                     messages.error(request, f"Error al cobrar: {e}")
-                return redirect("vendedores_cobrar_infraccion")
+                    return redirect("vendedores_cobrar_infraccion")
+                return redirect(reverse("ticket_pago_multa", args=[inf.id]))
 
     return render(request, "vendedores/cobrar_infraccion.html", {
         "infraccion": infraccion,
@@ -2013,10 +2257,16 @@ def detalle_usuario_admin(request, usuario_id):
     # Agregar vehículo desde admin
     if accion == "agregar_vehiculo":
         patente = (request.POST.get("patente") or "").strip().upper()
+        tipo    = request.POST.get("tipo", "auto")
+        if tipo not in ("auto", "moto"):
+            tipo = "auto"
         if patente:
-            vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
+            vehiculo, creado = Vehiculo.objects.get_or_create(patente=patente)
+            if creado:
+                vehiculo.tipo = tipo
+                vehiculo.save(update_fields=["tipo"])
             VehiculoUsuario.objects.get_or_create(usuario=conductor, vehiculo=vehiculo)
-            messages.success(request, f"Vehículo {patente} agregado.")
+            messages.success(request, f"Vehículo {patente} ({vehiculo.get_tipo_display()}) agregado.")
             vehiculos = Vehiculo.objects.filter(vehiculousuario__usuario=conductor)
 
     # Editar datos básicos del conductor
@@ -2127,37 +2377,73 @@ def admin_infracciones(request):
 
 @require_role("admin")
 def gestionar_tarifas(request):
+    """
+    Gestiona tarifas de estacionamiento y configuración del municipio.
+
+    Permite configurar:
+    - Precio por hora (auto y moto)
+    - Monto de infracción
+    - Precios de abono mensual (auto y moto)
+    - Comisión de vendedor (%)
+    - Tolerancia de multa (minutos)
+    """
     usuario = request.user
     municipio = usuario.municipio
     from app_estacionamiento.models import Tarifa
 
     error = None
     if request.method == "POST":
-        precio_str = request.POST.get("precio_por_hora", "").strip()
-        monto_inf_str = request.POST.get("monto_infraccion", "0").strip() or "0"
+        def _decimal(campo, minimo=0):
+            val = request.POST.get(campo, "0").strip() or "0"
+            d = Decimal(val)
+            if d < minimo:
+                raise ValueError(f"El campo '{campo}' debe ser mayor o igual a {minimo}.")
+            return d
+
+        def _entero(campo, minimo=0):
+            val = request.POST.get(campo, "0").strip() or "0"
+            n = int(val)
+            if n < minimo:
+                raise ValueError(f"El campo '{campo}' debe ser >= {minimo}.")
+            return n
+
         try:
-            precio = Decimal(precio_str)
-            if precio <= 0:
-                raise ValueError("El precio por hora debe ser mayor a 0.")
-            monto_infraccion = Decimal(monto_inf_str)
-            if monto_infraccion < 0:
-                raise ValueError("El monto de infracción no puede ser negativo.")
+            precio_auto  = _decimal("precio_por_hora", minimo=Decimal("0.01"))
+            precio_moto  = _decimal("precio_por_hora_moto", minimo=0)
+            monto_inf    = _decimal("monto_infraccion", minimo=0)
+            abono_auto   = _decimal("precio_abono_auto", minimo=0)
+            abono_moto   = _decimal("precio_abono_moto", minimo=0)
+            comision     = _decimal("comision_vendedor", minimo=0)
+            tolerancia   = _entero("tolerancia_multa_minutos", minimo=0)
+
+            # Guardar tarifas
             Tarifa.objects.update_or_create(
                 municipio=municipio,
                 defaults={
-                    "precio_por_hora": precio,
-                    "monto_infraccion": monto_infraccion,
+                    "precio_por_hora":      precio_auto,
+                    "precio_por_hora_moto": precio_moto,
+                    "monto_infraccion":     monto_inf,
+                    "precio_abono_auto":    abono_auto,
+                    "precio_abono_moto":    abono_moto,
                 }
             )
-            messages.success(request, "✅ Tarifas guardadas correctamente.")
+
+            # Guardar configuración del municipio
+            municipio.comision_vendedor        = comision
+            municipio.tolerancia_multa_minutos = tolerancia
+            municipio.save(update_fields=["comision_vendedor", "tolerancia_multa_minutos"])
+
+            messages.success(request, "✅ Tarifas y configuración guardadas correctamente.")
             return redirect("gestionar_tarifas")
+
         except Exception as e:
             error = f"Error al guardar: {e}"
 
     tarifa_actual = Tarifa.objects.filter(municipio=municipio).first()
     return render(request, "admin/gestionar_tarifas.html", {
         "tarifa_actual": tarifa_actual,
-        "error": error,
+        "municipio":     municipio,
+        "error":         error,
     })
 
 @require_role("admin")
@@ -2802,3 +3088,121 @@ def resolver_verificacion(request, solicitud_id):
         )
 
     return redirect("gestionar_verificaciones")
+
+
+# =============================================================================
+# 🏦 TESORERÍA — Panel, Rendición, Liquidaciones de comisión
+# =============================================================================
+
+@require_role("tesorero")
+def panel_tesorero(request):
+    """Panel principal del tesorero: ve rendiciones y liquidaciones pendientes."""
+    municipio = request.user.municipio
+
+    rendiciones = Rendicion.objects.filter(
+        municipio=municipio
+    ).select_related("admin").order_by("-creado_en")[:50]
+
+    liquidaciones = LiquidacionComision.objects.filter(
+        municipio=municipio
+    ).select_related("vendedor").order_by("-creado_en")[:50]
+
+    pendientes_rendicion   = rendiciones.filter(estado="pendiente").count()
+    pendientes_liquidacion = liquidaciones.filter(estado="pendiente").count()
+
+    return render(request, "tesorero/panel_tesorero.html", {
+        "rendiciones": rendiciones,
+        "liquidaciones": liquidaciones,
+        "pendientes_rendicion": pendientes_rendicion,
+        "pendientes_liquidacion": pendientes_liquidacion,
+    })
+
+
+
+
+@require_role("tesorero")
+def depositar_comision(request, liquidacion_id):
+    """
+    Tesoreria marca una liquidacion como depositada
+    y registra quien la depositio y cuando.
+    """
+    municipio    = request.user.municipio
+    liquidacion  = get_object_or_404(LiquidacionComision, id=liquidacion_id, municipio=municipio)
+
+    if liquidacion.estado != "pendiente":
+        messages.warning(request, "Esta liquidacion ya fue procesada.")
+        return redirect("panel_tesorero")
+
+    if request.method == "POST":
+        notas = request.POST.get("notas_tesorero", "").strip()
+        with transaction.atomic():
+            liquidacion.estado       = "depositada"
+            liquidacion.depositada_en  = timezone.now()
+            liquidacion.depositada_por = request.user
+            liquidacion.notas_tesorero = notas
+            liquidacion.save(update_fields=[
+                "estado", "depositada_en", "depositada_por", "notas_tesorero"
+            ])
+        messages.success(request, f"Deposito registrado para {liquidacion.vendedor.nombre_completo()}.")
+        return redirect("panel_tesorero")
+
+    return render(request, "tesorero/depositar_comision.html", {
+        "liquidacion": liquidacion,
+    })
+
+
+@require_role("vendedor")
+def mis_comisiones(request):
+    """
+    El vendedor ve su historial de comisiones acumuladas y liquidaciones.
+    """
+    vendedor   = request.user
+    municipio  = vendedor.municipio
+
+    # Total historico de comisiones generadas (todos los cobros)
+    total_acumulado = MovimientoCaja.objects.filter(
+        usuario=vendedor,
+        tipo="ingreso",
+        comision_monto__gt=0,
+    ).aggregate(total=Sum("comision_monto"))["total"] or 0
+
+    # Historial de liquidaciones
+    liquidaciones = LiquidacionComision.objects.filter(
+        vendedor=vendedor,
+        municipio=municipio,
+    ).order_by("-creado_en")
+
+    return render(request, "vendedores/mis_comisiones.html", {
+        "total_acumulado": total_acumulado,
+        "liquidaciones":   liquidaciones,
+    })
+
+
+@require_role("vendedor")
+def certificar_comision(request, liquidacion_id):
+    """
+    El vendedor certifica que recibio correctamente su comision depositada.
+    Solo puede certificar liquidaciones en estado 'depositada'.
+    """
+    vendedor    = request.user
+    liquidacion = get_object_or_404(
+        LiquidacionComision,
+        id=liquidacion_id,
+        vendedor=vendedor,
+    )
+
+    if liquidacion.estado != "depositada":
+        messages.warning(request, "Esta liquidacion no esta lista para certificar.")
+        return redirect("mis_comisiones")
+
+    if request.method == "POST":
+        with transaction.atomic():
+            liquidacion.estado        = "certificada"
+            liquidacion.certificada_en = timezone.now()
+            liquidacion.save(update_fields=["estado", "certificada_en"])
+        messages.success(request, "Comision certificada correctamente.")
+        return redirect("mis_comisiones")
+
+    return render(request, "vendedores/certificar_comision.html", {
+        "liquidacion": liquidacion,
+    })

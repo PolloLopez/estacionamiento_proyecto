@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Comprobante de pago — Acta #{{ infraccion.id }}</title>
+  <style>
+    body { font-family: monospace; text-align: center; background: #fff; margin: 0; padding: 1rem; }
+    .ticket { width: 290px; margin: auto; }
+    hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+    .titulo { font-size: 1rem; font-weight: bold; }
+    .patente { font-size: 1.6rem; font-weight: 900; letter-spacing: 4px; margin: 6px 0; }
+    .monto { font-size: 1.5rem; font-weight: 900; }
+    .anulado { font-size: 1.1rem; font-weight: bold; color: #c00; }
+    p { margin: 4px 0; font-size: 0.88rem; }
+    .no-print { margin-top: 1.5rem; text-align: center; }
+    .no-print button {
+      padding: 0.6rem 1.4rem; font-size: 1rem; cursor: pointer;
+      margin: 0 0.3rem; border-radius: 6px; border: 1px solid #ccc;
+    }
+    .btn-verde { background: #1a7a3c; color: #fff; border-color: #1a7a3c; }
+    @media print { .no-print { display: none; } }
+  </style>
+</head>
+<body>
+
+  <div class="ticket">
+
+    <h3>✅ COMPROBANTE DE PAGO</h3>
+    <p>{{ infraccion.municipio.nombre }}</p>
+
+    <hr>
+
+    <p class="titulo">Acta N° {{ infraccion.id }}</p>
+
+    <hr>
+
+    <p class="patente">{{ infraccion.vehiculo.patente }}</p>
+    <p>{{ infraccion.vehiculo.get_tipo_display }}</p>
+
+    <hr>
+
+    <p><b>Fecha del acta:</b></p>
+    <p>{{ infraccion.creado_en|date:"d/m/Y" }} a las {{ infraccion.creado_en|date:"H:i" }}hs</p>
+
+    <hr>
+
+    <p><b>Fecha de pago:</b></p>
+    <p>{{ infraccion.fecha_pago|date:"d/m/Y" }} a las {{ infraccion.fecha_pago|date:"H:i" }}hs</p>
+
+    <hr>
+
+    {% if infraccion.estado == "anulada" %}
+      <p class="anulado">ANULADA POR GRACIA</p>
+      <p style="font-size:0.8rem;">(pago dentro del período de tolerancia)</p>
+      <p class="monto">$0,00</p>
+    {% else %}
+      <p><b>Motivo:</b> {{ infraccion.motivo }}</p>
+      <p class="monto">${{ infraccion.monto }}</p>
+      <p><b>Estado:</b> PAGADA ✅</p>
+    {% endif %}
+
+    <hr>
+
+    {% if cobrado_por %}
+      <p>Cobrado por:</p>
+      <p>{% if cobrado_por.nombre %}{{ cobrado_por.nombre }} {{ cobrado_por.apellido }}{% else %}{{ cobrado_por.correo }}{% endif %}</p>
+    {% endif %}
+
+    <hr>
+    <p style="font-size:0.8rem;">Conserve este comprobante.</p>
+
+  </div>
+
+  <div class="no-print">
+    <button onclick="window.print()" style="background:#555; color:#fff; border-color:#555;">
+      🖨 Imprimir comprobante
+    </button>
+    <button class="btn-verde" id="btn-volver">
+      ← Volver
+    </button>
+  </div>
+
+</body>
+<script>
+  // Botón volver: al panel del rol actual
+  document.getElementById("btn-volver").onclick = function() {
+    history.back();
+  };
+
+  // Imprimir automáticamente al cargar
+  window.onload = function() {
+    window.print();
+  };
+
+  // Después de imprimir, volver
+  window.onafterprint = function() {
+    history.back();
+  };
+</script>
+</html>

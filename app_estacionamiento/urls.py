@@ -47,6 +47,7 @@ urlpatterns = [
     path("inspectores/cerrar-caja/", views.cerrar_caja, name="inspectores_cerrar_caja"),
     path("inspectores/ticket/<int:infraccion_id>/", views.ticket_infraccion, name="inspectores_ticket"),
     path("inspectores/ticket-cobro/<int:est_id>/", views.ticket_cobro, name="inspectores_ticket_cobro"),
+    path("ticket-pago-multa/<int:infraccion_id>/", views.ticket_pago_multa, name="ticket_pago_multa"),
 
     # =========================
     # 💰 VENDEDORES
@@ -108,5 +109,27 @@ urlpatterns = [
     # =========================
     path("admin-verificaciones/", views.gestionar_verificaciones, name="gestionar_verificaciones"),
     path("admin-verificaciones/<int:solicitud_id>/resolver/", views.resolver_verificacion, name="resolver_verificacion"),
+
+    # =========================
+    # 🖨 COMPROBANTES
+    # =========================
+    path("ticket-pago-multa/<int:infraccion_id>/", views.ticket_pago_multa, name="ticket_pago_multa"),
+
+    # =========================
+    # 📅 ABONO MENSUAL
+    # =========================
+    path("vendedores/abono/", views.cobrar_abono, name="cobrar_abono"),
+
+    # =========================
+    # 💵 COMISIONES VENDEDORES
+    # =========================
+    path("vendedores/comisiones/", views.mis_comisiones, name="mis_comisiones"),
+    path("vendedores/comisiones/<int:liquidacion_id>/certificar/", views.certificar_comision, name="certificar_comision"),
+
+    # =========================
+    # 🏦 TESORERÍA
+    # =========================
+    path("tesorero/", views.panel_tesorero, name="panel_tesorero"),
+    path("tesorero/depositar/<int:liquidacion_id>/", views.depositar_comision, name="depositar_comision"),
 
 ]

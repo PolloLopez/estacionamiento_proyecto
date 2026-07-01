@@ -103,13 +103,14 @@
     <!-- RESULTADO -->
     {% if resultado %}
 
-        {% if resultado.estado.name == "PAGADO" or resultado.estado.name == "EXENTO_TOTAL" or resultado.exento_en_subcuadra_actual %}
+        {% if resultado.estado.name == "PAGADO" or resultado.estado.name == "EXENTO_TOTAL" or resultado.estado.name == "ABONO_ACTIVO" or resultado.exento_en_subcuadra_actual %}
             <div class="box-resultado box-ok">
                 <div style="font-size:2rem;">✅</div>
                 <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
                 <h3>
                     {% if resultado.estado.name == "EXENTO_TOTAL" %}Exento total
                     {% elif resultado.estado.name == "EXENTO_PARCIAL" %}Exento en esta subcuadra
+                    {% elif resultado.estado.name == "ABONO_ACTIVO" %}Abono mensual activo
                     {% else %}Pago activo{% endif %}
                 </h3>
                 {% if resultado.estado.name == "EXENTO_PARCIAL" and resultado.subcuadras_exentas %}
@@ -220,7 +221,7 @@ window.onload = () => {
         document.getElementById("warn").play();
         if (navigator.vibrate) navigator.vibrate(100);
     }
-    if (estado === "PAGADO" || estado === "EXENTO_TOTAL" || exentoEnSub === "True") {
+    if (estado === "PAGADO" || estado === "EXENTO_TOTAL" || estado === "ABONO_ACTIVO" || exentoEnSub === "True") {
         document.getElementById("ok").play();
     }
 };

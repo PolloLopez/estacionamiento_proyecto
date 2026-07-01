@@ -1,33 +1,87 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<style>
-body { font-family: monospace; text-align:center; }
-.ticket { width: 250px; margin:auto; }
-</style>
+  <meta charset="UTF-8">
+  <title>Acta #{{ infraccion.id }}</title>
+  <style>
+    body { font-family: monospace; text-align: center; background: #fff; margin: 0; padding: 1rem; }
+    .ticket { width: 280px; margin: auto; }
+    hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+    .acta-num { font-size: 1.3rem; font-weight: bold; letter-spacing: 2px; }
+    .patente { font-size: 1.6rem; font-weight: 900; letter-spacing: 4px; margin: 6px 0; }
+    .monto { font-size: 1.4rem; font-weight: 900; }
+    p { margin: 4px 0; font-size: 0.9rem; }
+    .no-print { margin-top: 1.5rem; text-align: center; }
+    .no-print button {
+      padding: 0.6rem 1.4rem; font-size: 1rem; cursor: pointer;
+      margin: 0 0.3rem; border-radius: 6px; border: 1px solid #ccc;
+    }
+    .btn-verde { background: #1a7a3c; color: #fff; border-color: #1a7a3c; }
+    @media print { .no-print { display: none; } }
+  </style>
 </head>
+<body>
 
-<body onload="window.print()">
+  <div class="ticket">
 
-<div class="ticket">
+    <h3>🚨 INFRACCIÓN DE TRÁNSITO</h3>
+    <p>{{ infraccion.municipio.nombre }}</p>
 
-<h3>🚨 INFRACCIÓN</h3>
+    <hr>
 
-<p><b>Patente:</b> {{ patente }}</p>
-<p><b>Subcuadra:</b> {{ subcuadra }}</p>
-<p><b>Fecha:</b> {{ fecha }}</p>
-<p><b>Inspector:</b> {{ inspector }}</p>
+    <p class="acta-num">Acta N° {{ infraccion.id }}</p>
 
-<hr>
+    <hr>
 
-<p>Municipalidad de {{ municipio }}</p>
+    <p class="patente">{{ infraccion.vehiculo.patente }}</p>
+    <p>{{ infraccion.vehiculo.get_tipo_display }}</p>
 
-<a href="{% url 'inspectores_verificar_vehiculo' %}" class="btn">
-  🔍 Volver a verificar 
-</a>
+    <hr>
 
-</div>
+    <p><b>Subcuadra:</b> {{ infraccion.subcuadra }}</p>
+    <p><b>Motivo:</b> {{ infraccion.motivo }}</p>
+
+    <hr>
+
+    <p><b>Fecha del acta:</b> {{ infraccion.creado_en|date:"d/m/Y" }}</p>
+    <p><b>Hora:</b> {{ infraccion.creado_en|date:"H:i" }}hs</p>
+
+    <hr>
+
+    <p class="monto">${{ infraccion.monto }}</p>
+
+    <hr>
+
+    <p><b>Inspector:</b></p>
+    <p>{% if infraccion.inspector.nombre %}{{ infraccion.inspector.nombre }} {{ infraccion.inspector.apellido }}{% else %}{{ infraccion.inspector.correo }}{% endif %}</p>
+    {% if infraccion.inspector.numero_legajo %}
+      <p>Legajo: {{ infraccion.inspector.numero_legajo }}</p>
+    {% endif %}
+
+    <hr>
+    <p style="font-size:0.8rem;">Para pagar ingresá a la app con tu patente.</p>
+
+  </div>
+
+  <div class="no-print">
+    <button onclick="window.print()" style="background:#555; color:#fff; border-color:#555;">
+      🖨 Imprimir acta
+    </button>
+    <button class="btn-verde"
+            onclick="window.location.href='{% url 'inspectores_verificar_vehiculo' %}'">
+      🔍 Verificar otro
+    </button>
+  </div>
 
 </body>
+<script>
+  // Después de cerrar el diálogo de impresión, redirige automáticamente al verificador
+  window.onafterprint = function() {
+    window.location.href = "{% url 'inspectores_verificar_vehiculo' %}";
+  };
+  // Abrir impresión automáticamente al cargar
+  window.onload = function() {
+    window.print();
+  };
+</script>
 </html>

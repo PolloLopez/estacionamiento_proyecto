@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Depositar comisión{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:500px;">
+  <h1 style="margin-bottom:1.5rem;">💸 Depositar comisión</h1>
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <p><strong>Vendedor:</strong>
+      {% if liq.vendedor.nombre %}{{ liq.vendedor.nombre }} {{ liq.vendedor.apellido }}{% else %}{{ liq.vendedor.correo }}{% endif %}
+    </p>
+    <p><strong>Período:</strong> {{ liq.fecha_desde|date:"d/m/Y" }} → {{ liq.fecha_hasta|date:"d/m/Y" }}</p>
+    <p style="font-size:1.5rem; font-weight:900; color:var(--color-primary); margin-top:0.5rem;">
+      ${{ liq.monto_total }}
+    </p>
+  </div>
+
+  <div class="card">
+    <p style="margin-bottom:1rem;" class="text-muted">
+      Al confirmar indicás que ya realizaste la transferencia o pago al vendedor.
+      El vendedor deberá certificar que lo recibió.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <div style="margin-bottom:1rem;">
+        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">Notas (opcional)</label>
+        <textarea name="notas" rows="3" placeholder="Nro de transferencia, medio de pago, etc."
+                  style="width:100%; resize:vertical;"></textarea>
+      </div>
+      <div style="display:flex; gap:0.75rem;">
+        <button type="submit" class="btn" style="flex:1;">
+          ✅ Confirmar depósito
+        </button>
+        <a href="{% url 'panel_tesorero' %}" class="btn btn-outline">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

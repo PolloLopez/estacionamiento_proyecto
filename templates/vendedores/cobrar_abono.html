@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Cobrar Abono Mensual{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="panel">
+    <div class="panel-body">
+
+      <h1>📅 Cobrar abono mensual</h1>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}"
+               style="margin-bottom:1rem;">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      {% if not confirmar %}
+
+        <!-- FORMULARIO DE BUSQUEDA -->
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="confirmar" />
+
+          <div style="margin-bottom:1rem;">
+            <label for="patente">Patente del vehículo</label>
+            <input
+              id="patente"
+              name="patente"
+              type="text"
+              maxlength="10"
+              required
+              autofocus
+              style="text-transform:uppercase;"
+              value="{{ request.POST.patente|default:'' }}"
+            />
+          </div>
+
+          {% if error %}
+            <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
+          {% endif %}
+
+          <button class="btn" type="submit">Verificar patente</button>
+          <a class="btn btn-outline" href="{% url 'panel_vendedor' %}" style="margin-left:0.5rem;">
+            ← Volver
+          </a>
+        </form>
+
+      {% else %}
+
+        <!-- CONFIRMACION DE COBRO -->
+        <div class="card" style="margin-bottom:1.5rem; border:2px solid var(--color-primary);">
+          <h3 style="margin-bottom:0.75rem;">Confirmar cobro de abono</h3>
+
+          <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Patente</td>
+              <td style="padding:0.4rem 0; font-weight:700;">{{ vehiculo.patente }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Tipo</td>
+              <td style="padding:0.4rem 0;">{{ vehiculo.get_tipo_display }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Período</td>
+              <td style="padding:0.4rem 0;">Mes actual</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Monto</td>
+              <td style="padding:0.4rem 0; font-size:1.3rem; font-weight:800; color:var(--color-primary);">
+                ${{ precio }}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Medio de pago</td>
+              <td style="padding:0.4rem 0;">💵 Efectivo</td>
+            </tr>
+          </table>
+        </div>
+
+        <form method="post" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="cobrar" />
+          <input type="hidden" name="patente" value="{{ vehiculo.patente }}" />
+          <button class="btn" type="submit" style="font-size:1.05rem;">
+            ✅ Confirmar cobro — ${{ precio }}
+          </button>
+        </form>
+
+        <form method="post" style="display:inline; margin-left:0.75rem;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="buscar" />
+          <button class="btn btn-outline" type="submit">Cancelar</button>
+        </form>
+
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

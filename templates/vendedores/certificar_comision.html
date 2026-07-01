@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Certificar recibo{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:480px;">
+  <h1 style="margin-bottom:1.5rem;">✅ Certificar recibo de comisión</h1>
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <p><strong>Período:</strong> {{ liq.fecha_desde|date:"d/m/Y" }} → {{ liq.fecha_hasta|date:"d/m/Y" }}</p>
+    {% if liq.depositada_por %}
+      <p><strong>Depositado por:</strong>
+        {% if liq.depositada_por.nombre %}{{ liq.depositada_por.nombre }} {{ liq.depositada_por.apellido }}{% else %}{{ liq.depositada_por.correo }}{% endif %}
+      </p>
+    {% endif %}
+    {% if liq.depositada_en %}
+      <p><strong>Fecha depósito:</strong> {{ liq.depositada_en|date:"d/m/Y H:i" }}hs</p>
+    {% endif %}
+    {% if liq.notas_tesorero %}
+      <p><strong>Notas:</strong> {{ liq.notas_tesorero }}</p>
+    {% endif %}
+    <p style="font-size:1.8rem; font-weight:900; color:var(--color-primary); margin-top:0.75rem; text-align:center;">
+      ${{ liq.monto_total }}
+    </p>
+  </div>
+
+  <div class="card">
+    <p style="margin-bottom:1.2rem;" class="text-muted">
+      Al confirmar, declarás que recibiste correctamente el monto indicado como comisión por tus cobros del período.
+      Esta acción no se puede deshacer.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <div style="display:flex; gap:0.75rem;">
+        <button type="submit" class="btn" style="flex:1; background:var(--color-primary);">
+          ✅ Confirmar recibo
+        </button>
+        <a href="{% url 'mis_comisiones' %}" class="btn btn-outline">Cancelar</a>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

@@ -12,6 +12,17 @@
         <input id="patente" name="patente" maxlength="10" required autofocus
                style="text-transform:uppercase" />
       </div>
+      <div class="form-row">
+        <label>Tipo de vehículo</label>
+        <div style="display:flex; gap:1.5rem; margin-top:0.4rem;">
+          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+            <input type="radio" name="tipo" value="auto" checked /> 🚗 Auto
+          </label>
+          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+            <input type="radio" name="tipo" value="moto" /> 🏍️ Moto
+          </label>
+        </div>
+      </div>
       {% if error %}
         <p class="error">{{ error }}</p>
       {% endif %}

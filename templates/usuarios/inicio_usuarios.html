@@ -89,6 +89,24 @@
 
 </div>
 
+<!-- 📅 ABONOS MENSUALES ACTIVOS -->
+{% if abonos_activos %}
+  <div class="card" style="margin-top:1rem; border-left:4px solid var(--color-success);">
+    <h3 style="margin-bottom:0.5rem;">📅 Abono mensual activo</h3>
+    {% for abono in abonos_activos %}
+      <div style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0;">
+        <span style="font-size:1.2rem;">✅</span>
+        <div>
+          <strong>{{ abono.vehiculo.patente }}</strong>
+          <span style="color:var(--color-text-muted); font-size:0.9rem;">
+            — {{ abono.vehiculo.get_tipo_display }} — acceso libre este mes
+          </span>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
 <!-- 🔔 NOTIFICACIONES DEL SISTEMA (resultado de verificación, etc.) -->
 {% if notificaciones_nuevas %}
   {% for notif in notificaciones_nuevas %}

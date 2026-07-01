@@ -41,21 +41,21 @@
       {# Resultado de búsqueda #}
       {% if patente %}
         {% if not vehiculo %}
-          <div class="card" style="text-align:center; padding:1.5rem; color:var(--color-muted);">
+          <div class="card" style="text-align:center; padding:1.5rem;">
             🚗 No se encontró ningún vehículo con patente <strong>{{ patente }}</strong>.
           </div>
 
         {% elif not infracciones %}
-          <div class="card" style="text-align:center; padding:1.5rem; color:var(--color-muted);">
+          <div class="card" style="text-align:center; padding:1.5rem;">
             ✅ El vehículo <strong>{{ vehiculo.patente }}</strong> no tiene infracciones pendientes.
           </div>
 
         {% else %}
-          <div class="card" style="margin-bottom:1rem; background:var(--color-bg-alt, #f8f9fa);">
-            <div style="font-size:0.85rem; color:var(--color-muted); margin-bottom:0.25rem;">Vehículo</div>
+          <div class="card" style="margin-bottom:1rem;">
+            <div style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.25rem;">Vehículo</div>
             <div style="font-size:1.1rem; font-weight:700;">
-              🚗 {{ vehiculo.patente }}
-              {% if vehiculo.marca or vehiculo.modelo %}— {{ vehiculo.marca }} {{ vehiculo.modelo }}{% endif %}
+              {% if vehiculo.tipo == "moto" %}🏍{% else %}🚗{% endif %}
+              {{ vehiculo.patente }} — {{ vehiculo.get_tipo_display }}
             </div>
           </div>
 
@@ -63,11 +63,11 @@
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Fecha</th>
+                  <th>Acta #</th>
+                  <th>Fecha del acta</th>
                   <th>Inspector</th>
                   <th style="text-align:right;">Monto</th>
-                  <th style="text-align:center;">Cobrar</th>
+                  <th style="text-align:center;">Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,15 +75,19 @@
                 <tr>
                   <td style="font-weight:600;">{{ inf.id }}</td>
                   <td style="font-size:0.85rem;">{{ inf.creado_en|date:"d/m/Y H:i" }}</td>
-                  <td style="font-size:0.85rem;">{{ inf.inspector.get_full_name|default:inf.inspector.correo }}</td>
+                  <td style="font-size:0.85rem;">
+                    {% if inf.inspector.nombre %}{{ inf.inspector.nombre }} {{ inf.inspector.apellido }}{% else %}{{ inf.inspector.correo }}{% endif %}
+                  </td>
                   <td style="text-align:right; font-weight:700; color:var(--color-danger);">${{ inf.monto }}</td>
                   <td style="text-align:center;">
+                    {# Paso 1: solicitar confirmación #}
                     <form method="post">
                       {% csrf_token %}
+                      <input type="hidden" name="accion" value="confirmar">
                       <input type="hidden" name="infraccion_id" value="{{ inf.id }}">
+                      <input type="hidden" name="patente" value="{{ patente }}">
                       <button type="submit" class="btn btn-sm"
-                              style="font-size:0.82rem; background:var(--color-danger); border-color:var(--color-danger);"
-                              onclick="return confirm('Cobrar infracción #{{ inf.id }} por ${{ inf.monto }}?')">
+                              style="font-size:0.82rem; background:var(--color-danger); border-color:var(--color-danger);">
                         💵 Cobrar
                       </button>
                     </form>
@@ -109,4 +113,50 @@
     </div>
   </div>
 </div>
+
+{# Modal de confirmación (aparece cuando infraccion_a_confirmar está seteada) #}
+{% if infraccion_a_confirmar %}
+<div id="modal-confirmar" style="
+  position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  display:flex; align-items:center; justify-content:center; z-index:9999;">
+  <div style="background:#fff; border-radius:14px; padding:2rem; max-width:380px; width:90%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+
+    <h2 style="margin-bottom:0.5rem;">⚠️ Confirmar cobro</h2>
+    <p class="text-muted" style="margin-bottom:1.2rem;">Revisá los datos antes de confirmar.</p>
+
+    <div style="background:var(--color-surface-2, #f5f5f5); border-radius:10px; padding:1rem; text-align:left; margin-bottom:1.2rem;">
+      <p><strong>Acta N°:</strong> {{ infraccion_a_confirmar.id }}</p>
+      <p><strong>Patente:</strong> {{ infraccion_a_confirmar.vehiculo.patente }} ({{ infraccion_a_confirmar.vehiculo.get_tipo_display }})</p>
+      <p><strong>Fecha acta:</strong> {{ infraccion_a_confirmar.creado_en|date:"d/m/Y H:i" }}hs</p>
+      <p><strong>Inspector:</strong>
+        {% if infraccion_a_confirmar.inspector.nombre %}{{ infraccion_a_confirmar.inspector.nombre }} {{ infraccion_a_confirmar.inspector.apellido }}{% else %}{{ infraccion_a_confirmar.inspector.correo }}{% endif %}
+      </p>
+      <p><strong>Motivo:</strong> {{ infraccion_a_confirmar.motivo }}</p>
+      <p style="font-size:1.3rem; font-weight:900; color:var(--color-danger); margin-top:0.5rem;">
+        ${{ infraccion_a_confirmar.monto }}
+      </p>
+    </div>
+
+    <div style="display:flex; gap:0.75rem; justify-content:center;">
+      {# Paso 2: ejecutar cobro #}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="cobrar">
+        <input type="hidden" name="infraccion_id" value="{{ infraccion_a_confirmar.id }}">
+        <input type="hidden" name="patente" value="{{ patente }}">
+        <button type="submit" class="btn"
+                style="background:var(--color-danger); border-color:var(--color-danger); font-size:1rem; padding:0.75rem 1.5rem;">
+          ✅ Confirmar cobro
+        </button>
+      </form>
+      <a href="{% url 'consultar_deuda' %}?patente={{ patente }}" class="btn btn-outline"
+         style="font-size:1rem; padding:0.75rem 1.2rem;">
+        Cancelar
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

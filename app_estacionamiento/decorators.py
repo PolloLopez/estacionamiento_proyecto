@@ -88,6 +88,12 @@ def require_role(*roles):
                     "conductor" in roles and
                     getattr(usuario, "es_conductor", False)
                 ),
+
+                # TESORERO
+                (
+                    "tesorero" in roles and
+                    getattr(usuario, "es_tesorero", False)
+                ),
             ])
 
             # ==========================================

@@ -33,7 +33,7 @@
 
     <!-- Logo: imagen si el munici pio la tiene, texto si no -->
     <a class="logo" 
-       href="{% if request.user.is_authenticated %}{% if request.user.es_admin %}{% url 'panel_admin' %}{% elif request.user.es_inspector %}{% url 'panel_inspectores' %}{% elif request.user.es_vendedor %}{% url 'panel_vendedor' %}{% else %}{% url 'inicio' %}{% endif %}{% else %}{% url 'login' %}{% endif %}">
+       href="{% if request.user.is_authenticated %}{% if request.user.es_admin %}{% url 'panel_admin' %}{% elif request.user.es_inspector %}{% url 'panel_inspectores' %}{% elif request.user.es_vendedor %}{% url 'panel_vendedor' %}{% elif request.user.es_tesorero %}{% url 'panel_tesorero' %}{% else %}{% url 'inicio' %}{% endif %}{% else %}{% url 'login' %}{% endif %}">
       {% if municipio_branding and municipio_branding.logo %}
         <img src="{{ municipio_branding.logo.url }}"
              alt="{{ municipio_branding.nombre }}"
@@ -71,6 +71,9 @@
 
         {% elif request.user.es_vendedor %}
           <li><a href="{% url 'panel_vendedor' %}">Inicio</a></li>
+
+        {% elif request.user.es_tesorero %}
+          <li><a href="{% url 'panel_tesorero' %}">Inicio</a></li>
 
         {% elif request.user.es_conductor %}
           <li><a href="{% url 'inicio' %}">Inicio</a></li>
@@ -181,11 +184,4 @@
     });
 
     // Cerrar con Escape
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") cerrarMenu();
-    });
-  })();
-  </script>
-
-</body>
-</html>
+    document.addEventListener("keydown

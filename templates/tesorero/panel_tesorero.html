@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Panel Tesorería{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+    <h1>🏦 Tesorería</h1>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-warning{% endif %}"
+           style="margin-bottom:1rem;">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {# Resumen rápido #}
+  <div class="grid grid-2" style="margin-bottom:1.5rem;">
+    <div class="card" style="text-align:center;">
+      <div class="text-muted" style="font-size:0.85rem;">Rendiciones pendientes</div>
+      <div style="font-size:2rem; font-weight:800; color:var(--color-warning);">{{ pendientes_rendicion }}</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="text-muted" style="font-size:0.85rem;">Comisiones a depositar</div>
+      <div style="font-size:2rem; font-weight:800; color:var(--color-primary);">{{ pendientes_liquidacion }}</div>
+    </div>
+  </div>
+
+  {# RENDICIONES #}
+  <h2 style="margin-bottom:0.75rem;">📋 Rendiciones</h2>
+  <div class="card" style="overflow-x:auto; margin-bottom:2rem;">
+    {% if rendiciones %}
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Período</th>
+            <th>Desde</th>
+            <th>Hasta</th>
+            <th style="text-align:right;">Efectivo</th>
+            <th style="text-align:right;">Digital</th>
+            <th style="text-align:right;">Comisiones</th>
+            <th style="text-align:right;">Neto</th>
+            <th style="text-align:center;">Estado</th>
+            <th>Admin</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rendiciones %}
+          <tr>
+            <td style="color:var(--color-text-muted); font-size:0.8rem;">{{ r.id }}</td>
+            <td>{{ r.get_periodo_display }}</td>
+            <td style="font-size:0.85rem;">{{ r.fecha_desde|date:"d/m/Y" }}</td>
+            <td style="font-size:0.85rem;">{{ r.fecha_hasta|date:"d/m/Y" }}</td>
+            <td style="text-align:right;">${{ r.total_efectivo }}</td>
+            <td style="text-align:right;">${{ r.total_digital }}</td>
+            <td style="text-align:right; color:var(--color-warning);">${{ r.total_comisiones }}</td>
+            <td style="text-align:right; font-weight:700;">${{ r.total_neto }}</td>
+            <td style="text-align:center;">
+              {% if r.estado == "pendiente" %}
+                <span style="color:var(--color-warning); font-weight:600;">⏳ Pendiente</span>
+              {% elif r.estado == "validada" %}
+                <span style="color:var(--color-primary); font-weight:600;">✅ Validada</span>
+              {% else %}
+                <span style="color:var(--color-danger); font-weight:600;">⚠️ Observada</span>
+              {% endif %}
+            </td>
+            <td style="font-size:0.85rem;">{{ r.admin.nombre_completo }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted" style="padding:1rem; text-align:center;">No hay rendiciones registradas.</p>
+    {% endif %}
+  </div>
+
+  {# LIQUIDACIONES DE COMISIÓN #}
+  <h2 style="margin-bottom:0.75rem;">💵 Comisiones de vendedores</h2>
+  <div class="card" style="overflow-x:auto;">
+    {% if liquidaciones %}
+      <table>
+        <thead>
+          <tr>
+            <th>Vendedor</th>
+            <th>Desde</th>
+            <th>Hasta</th>
+            <th style="text-align:right;">Monto</th>
+            <th style="text-align:center;">Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for liq in liquidaciones %}
+          <tr>
+            <td>
+              <strong>{% if liq.vendedor.nombre %}{{ liq.vendedor.nombre }} {{ liq.vendedor.apellido }}{% else %}{{ liq.vendedor.correo }}{% endif %}</strong>
+            </td>
+            <td style="font-size:0.85rem;">{{ liq.fecha_desde|date:"d/m/Y" }}</td>
+            <td style="font-size:0.85rem;">{{ liq.fecha_hasta|date:"d/m/Y" }}</td>
+            <td style="text-align:right; font-weight:700; color:var(--color-primary);">${{ liq.monto_total }}</td>
+            <td style="text-align:center;">
+              {% if liq.estado == "pendiente" %}
+                <span style="color:var(--color-warning); font-weight:600;">⏳ Pendiente</span>
+              {% elif liq.estado == "depositada" %}
+                <span style="color:#2563eb; font-weight:600;">🏦 Depositada</span>
+              {% else %}
+                <span style="color:var(--color-primary); font-weight:600;">✅ Certificada</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if liq.estado == "pendiente" %}
+                <a href="{% url 'depositar_comision' liq.id %}" class="btn btn-outline"
+                   style="font-size:0.82rem; padding:0.3rem 0.7rem;">
+                  💸 Marcar depositada
+                </a>
+              {% elif liq.estado == "depositada" %}
+                <span class="text-muted" style="font-size:0.82rem;">Esperando cert. del vendedor</span>
+              {% else %}
+                <span class="text-muted" style="font-size:0.82rem;">
+                  Cert. {{ liq.certificada_en|date:"d/m/Y H:i" }}
+                </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted" style="padding:1rem; text-align:center;">No hay liquidaciones registradas.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
