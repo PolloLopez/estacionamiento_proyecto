@@ -1913,20 +1913,29 @@ def admin_infracciones(request):
                 messages.success(request, f"Infracción #{inf.id} anulada.")
 
         elif accion == "cobrar" and infraccion_id:
-            inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
-            if inf.estado == "pendiente":
-                with transaction.atomic():
+            with transaction.atomic():
+                # select_for_update bloquea la fila — si dos admins cobran
+                # la misma infracción al mismo tiempo, el segundo espera y
+                # luego falla por estado != pendiente
+                inf = get_object_or_404(
+                    Infraccion.objects.select_for_update(),
+                    id=infraccion_id,
+                    municipio=municipio,
+                )
+                if inf.estado == "pendiente":
                     inf.estado = "pagada"
                     inf.fecha_pago = timezone.now()
                     inf.save()
-                    # Registrar ingreso en caja de quien cobró (admin o vendedor)
+                    # Registrar ingreso en caja de quien cobró
                     MovimientoCaja.objects.create(
                         usuario=usuario,
                         monto=inf.monto,
                         tipo="ingreso",
                         descripcion=f"Cobro en efectivo infracción #{inf.id} — {inf.vehiculo.patente}",
                     )
-                messages.success(request, f"Infracción #{inf.id} cobrada. Se registró ${inf.monto} en tu caja.")
+                    messages.success(request, f"Infracción #{inf.id} cobrada. Se registró ${inf.monto} en tu caja.")
+                else:
+                    messages.warning(request, f"La infracción #{inf.id} ya fue procesada.")
 
         return redirect(request.get_full_path())
 
