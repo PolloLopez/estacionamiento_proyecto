@@ -48,15 +48,6 @@
 
     <div class="card" style="text-align:center;">
       <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">
-        {{ estacionamientos_activos }}
-      </div>
-      <div style="color:var(--color-text-muted); font-size:0.9rem; margin-top:0.3rem;">
-        🚗 Estacionamientos activos
-      </div>
-    </div>
-
-    <div class="card" style="text-align:center;">
-      <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">
         ${{ total_cobrado }}
       </div>
       <div style="color:var(--color-text-muted); font-size:0.9rem; margin-top:0.3rem;">
@@ -70,6 +61,15 @@
       </div>
       <div style="color:var(--color-text-muted); font-size:0.9rem; margin-top:0.3rem;">
         👮 Inspectores activos
+      </div>
+    </div>
+
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">
+        {{ conductores.count }}
+      </div>
+      <div style="color:var(--color-text-muted); font-size:0.9rem; margin-top:0.3rem;">
+        👤 Conductores registrados
       </div>
     </div>
 
@@ -150,73 +150,6 @@
 
   </div>
 
-  <!-- ESTACIONAMIENTOS CON FILTRO -->
-  <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">
-      <h3>🚗 Estacionamientos</h3>
-      <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-        <a href="?rol=" class="btn {% if not rol_seleccionado %}btn-success{% else %}btn-outline{% endif %}" style="font-size:0.85rem; padding:0.4rem 0.8rem;">Todos</a>
-        <a href="?rol=inspector" class="btn {% if rol_seleccionado == 'inspector' %}btn-success{% else %}btn-outline{% endif %}" style="font-size:0.85rem; padding:0.4rem 0.8rem;">👮 Inspector</a>
-        <a href="?rol=vendedor" class="btn {% if rol_seleccionado == 'vendedor' %}btn-success{% else %}btn-outline{% endif %}" style="font-size:0.85rem; padding:0.4rem 0.8rem;">💰 Vendedor</a>
-        <a href="?rol=conductor" class="btn {% if rol_seleccionado == 'conductor' %}btn-success{% else %}btn-outline{% endif %}" style="font-size:0.85rem; padding:0.4rem 0.8rem;">🚗 Conductor</a>
-      </div>
-    </div>
-
-    {% if estacionamientos %}
-      <table>
-        <thead>
-          <tr>
-            <th>Patente</th>
-            <th>Subcuadra</th>
-            <th>Usuario</th>
-            <th>Inicio</th>
-            <th>Duración</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for e in estacionamientos %}
-          <tr>
-            <td><strong>{{ e.vehiculo.patente }}</strong></td>
-            <td>{{ e.subcuadra }}</td>
-            <td>{{ e.usuario.nombre|default:e.usuario.correo }}</td>
-            <td>{{ e.hora_inicio|date:"d/m/Y H:i" }}</td>
-            <td>{{ e.duracion_horas }}h</td>
-            <td>
-              {% if e.estado == "ACTIVO" %}
-                <span style="color:var(--color-primary); font-weight:600;">● Activo</span>
-              {% elif e.estado == "FINALIZADO" %}
-                <span style="color:var(--color-text-muted);">Finalizado</span>
-              {% else %}
-                <span>{{ e.estado }}</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-
-      {# Paginación #}
-      {% if page_obj.paginator.num_pages > 1 %}
-      <div style="display:flex; justify-content:center; gap:0.4rem; margin-top:1rem; flex-wrap:wrap;">
-        {% if page_obj.has_previous %}
-          <a href="?{% if rol_seleccionado %}rol={{ rol_seleccionado }}&{% endif %}page={{ page_obj.previous_page_number }}"
-             class="btn btn-outline" style="font-size:0.85rem; padding:0.35rem 0.8rem;">‹ Anterior</a>
-        {% endif %}
-        <span style="padding:0.35rem 0.8rem; font-size:0.85rem; color:var(--color-text-muted);">
-          Pág. {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}
-        </span>
-        {% if page_obj.has_next %}
-          <a href="?{% if rol_seleccionado %}rol={{ rol_seleccionado }}&{% endif %}page={{ page_obj.next_page_number }}"
-             class="btn btn-outline" style="font-size:0.85rem; padding:0.35rem 0.8rem;">Siguiente ›</a>
-        {% endif %}
-      </div>
-      {% endif %}
-
-    {% else %}
-      <p class="text-muted">Sin estacionamientos registrados.</p>
-    {% endif %}
-  </div>
 
 </section>
 {% endblock %}

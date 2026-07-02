@@ -430,39 +430,12 @@ def panel_admin(request):
         return redirect("login")
 
     inspectores = Usuario.objects.filter(es_inspector=True, municipio=municipio)
-    vendedores = Usuario.objects.filter(es_vendedor=True, municipio=municipio)
-    usuarios = Usuario.objects.filter(es_conductor=True, municipio=municipio)
-
-    rol = request.GET.get("rol")
-
-    estacionamientos = Estacionamiento.objects.select_related(
-        "vehiculo", "subcuadra", "usuario"
-    ).filter(subcuadra__municipio=municipio)
-
-
-    if rol == "vendedor":
-        estacionamientos = estacionamientos.filter(usuario__in=vendedores)
-    elif rol == "inspector":
-        estacionamientos = estacionamientos.filter(usuario__in=inspectores)
-    elif rol == "conductor":
-        estacionamientos = estacionamientos.filter(usuario__in=usuarios)
-
-    estacionamientos = estacionamientos.order_by("-hora_inicio")
-
-    # Paginación de estacionamientos
-    from django.core.paginator import Paginator
-    paginator_est  = Paginator(estacionamientos, 25)
-    page_est       = request.GET.get("page", 1)
-    estacionamientos_page = paginator_est.get_page(page_est)
-
-    estacionamientos_activos = Estacionamiento.objects.filter(
-        estado=Estado.ACTIVO,
-        subcuadra__municipio=municipio
-    ).count()
+    vendedores  = Usuario.objects.filter(es_vendedor=True, municipio=municipio)
+    conductores = Usuario.objects.filter(es_conductor=True, municipio=municipio)
 
     infracciones_recientes = Infraccion.objects.filter(
-        subcuadra__municipio=municipio
-    ).order_by('-creado_en')[:5]
+        municipio=municipio
+    ).order_by("-creado_en")[:5]
 
     total_cobrado = MovimientoCaja.objects.filter(
         usuario__municipio=municipio,
@@ -482,12 +455,8 @@ def panel_admin(request):
     return render(request, "admin/panel_admin.html", {
         "inspectores": inspectores,
         "vendedores": vendedores,
-        "usuarios": usuarios,
-        "estacionamientos": estacionamientos_page,
-        "page_obj": estacionamientos_page,
-        "estacionamientos_activos": estacionamientos_activos,
+        "conductores": conductores,
         "infracciones_recientes": infracciones_recientes,
-        "rol_seleccionado": rol,
         "total_cobrado": total_cobrado,
         "verificaciones_pendientes": verificaciones_pendientes,
         "rendiciones_pendientes": rendiciones_pendientes,
@@ -2085,16 +2054,8 @@ def simular_pago(request, infraccion_id):
 
 @require_role("admin")
 def inicio_admin(request):
-    usuario = request.user
-    municipio = usuario.municipio
-
-    return render(request, "admin/inicio_admin.html", {
-        "total_usuarios": Usuario.objects.filter(es_conductor=True, municipio=municipio).count(),
-        "total_inspectores": Usuario.objects.filter(es_inspector=True, municipio=municipio).count(),
-        "total_vendedores": Usuario.objects.filter(es_vendedor=True, municipio=municipio).count(),
-        "activos": Estacionamiento.objects.filter(estado=Estado.ACTIVO, subcuadra__municipio=municipio).count(),
-        "eventos_recientes": [],  # TODO: implementar log de auditoría
-    })
+    # Esta vista no se usa — redirigir al panel principal
+    return redirect("panel_admin")
 
 @require_role("admin")
 def gestionar_inspectores(request):
@@ -2309,11 +2270,11 @@ def detalle_usuario_admin(request, usuario_id):
             conductor.save(update_fields=["first_name", "last_name"])
             messages.success(request, "Datos actualizados.")
 
-    # Historial de infracciones de sus vehículos
+    # Últimas 5 infracciones de sus vehículos (preview — "Ver todas" va a admin_infracciones)
     infracciones = Infraccion.objects.filter(
         vehiculo__vehiculousuario__usuario=conductor,
         municipio=request.user.municipio,
-    ).distinct().order_by("-creado_en")[:20]
+    ).distinct().order_by("-creado_en")[:5]
 
     return render(request, "admin/detalle_usuario.html", {
         "conductor": conductor,

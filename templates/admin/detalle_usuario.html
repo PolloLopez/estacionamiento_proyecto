@@ -9,12 +9,7 @@
     <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
   </div>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-danger{% else %}alert-warning{% endif %}"
-           style="margin-bottom:1rem;">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
+  {# Los mensajes los muestra base.html — no duplicar aquí #}
 
   <div class="grid grid-2" style="margin-bottom:1rem;">
 
@@ -57,17 +52,23 @@
     <div class="card">
       <h3 style="margin-bottom:0.8rem;">🚗 Agregar vehículo</h3>
       <p class="text-muted" style="font-size:0.9rem; margin-bottom:0.75rem;">
-        Podés agregar una patente a este conductor.
-        Después podés exentarla desde el panel de exenciones.
+        Agregá una patente a este conductor y elegí el tipo.
       </p>
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="accion" value="agregar_vehiculo">
-        <div style="display:flex; gap:0.5rem; align-items:flex-end;">
-          <div style="flex:1;">
+        <div style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:2; min-width:100px;">
             <label>Patente</label>
             <input name="patente" placeholder="ABC123" required
                    style="text-transform:uppercase; letter-spacing:3px; font-weight:700;" />
+          </div>
+          <div style="flex:1; min-width:90px;">
+            <label>Tipo</label>
+            <select name="tipo" style="width:100%;">
+              <option value="auto">🚗 Auto</option>
+              <option value="moto">🏍️ Moto</option>
+            </select>
           </div>
           <button class="btn" type="submit" style="height:fit-content;">Agregar</button>
         </div>
@@ -80,39 +81,43 @@
     <h3 style="margin-bottom:0.8rem;">Vehículos registrados</h3>
 
     {% if vehiculos %}
-      <table>
-        <thead>
-          <tr>
-            <th>Patente</th>
-            <th>Exento global</th>
-            <th>Subcuadras exentas</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for v in vehiculos %}
-          <tr>
-            <td><strong>{{ v.patente }}</strong></td>
-            <td style="text-align:center;">
-              {% if v.exento_global %}
-                <span style="color:var(--color-primary); font-weight:700;">✅ Sí</span>
-              {% else %}
-                <span class="text-muted">No</span>
-              {% endif %}
-            </td>
-            <td style="text-align:center;">
-              {{ v.subcuadras_exentas.count }} subcuadra(s)
-            </td>
-            <td>
-              <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
-                 href="{% url 'exenciones' %}?patente={{ v.patente }}">
-                🚫 Gestionar exenciones
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div style="overflow-x:auto;">
+        <table style="min-width:500px;">
+          <thead>
+            <tr>
+              <th>Patente</th>
+              <th>Tipo</th>
+              <th>Exento global</th>
+              <th>Subcuadras exentas</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vehiculos %}
+            <tr>
+              <td><strong>{{ v.patente }}</strong></td>
+              <td style="font-size:0.88rem;">{{ v.get_tipo_display }}</td>
+              <td style="text-align:center;">
+                {% if v.exento_global %}
+                  <span style="color:var(--color-primary); font-weight:700;">✅ Sí</span>
+                {% else %}
+                  <span class="text-muted">No</span>
+                {% endif %}
+              </td>
+              <td style="text-align:center;">
+                {{ v.subcuadras_exentas.count }}
+              </td>
+              <td style="white-space:nowrap;">
+                <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
+                   href="{% url 'exenciones' %}?patente={{ v.patente }}">
+                  🚫 Exenciones
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     {% else %}
       <p class="text-muted">Este conductor no tiene vehículos registrados.</p>
     {% endif %}
@@ -120,7 +125,15 @@
 
   <!-- HISTORIAL DE INFRACCIONES -->
   <div class="card">
-    <h3 style="margin-bottom:0.8rem;">⚠️ Infracciones (últimas 20)</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; flex-wrap:wrap; gap:0.5rem;">
+      <h3 style="margin:0;">⚠️ Infracciones recientes</h3>
+      {% if infracciones %}
+        <a href="{% url 'admin_infracciones' %}?patente={{ vehiculos.0.patente|default:'' }}"
+           class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;">
+          Ver todas →
+        </a>
+      {% endif %}
+    </div>
     {% if infracciones %}
       <div style="overflow-x:auto;">
         <table>
