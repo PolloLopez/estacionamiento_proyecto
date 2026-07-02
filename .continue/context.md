@@ -6,6 +6,7 @@ infracciones, abonos mensuales y rendición a tesorería. Opera en múltiples mu
 una sola base de código con aislamiento completo de datos por municipio.
 
 Deploy en Railway: https://estacionamiento.up.railway.app
+Repo: https://github.com/PolloLopez/estacionamiento_proyecto.git
 
 ---
 
@@ -18,24 +19,24 @@ Sistema en testing con la municipalidad (fase piloto). Funcional end-to-end.
   → Sesión siempre persistente (ACCOUNT_SESSION_REMEMBER = True)
 - Verificación de identidad del conductor con documentación adjunta
 - Estacionamiento por horas para autos y motos
-  → Tarifa diferenciada auto/moto (precio_por_hora_moto = 0 → usa precio auto)
+  → Tarifa diferenciada auto/moto (precio_por_hora_moto = null → usa precio auto)
   → Límite horario: no se puede estacionar más horas de las que quedan hasta el cierre
   → Cierre reactivo al inicio de sesión y al verificar (sin Celery)
 - Carga de saldo vía MercadoPago
   → Webhook + back_url, idempotente por payment_id
   → Exitoso: redirige a inicio_usuarios con mensaje de confirmación
-  → Fallido/pendiente: redirige con mensaje adecuado
 - Inspector: verifica patentes en calle y genera infracciones
   → Elige tipo (🚗 Auto / 🏍️ Moto) antes de ingresar la patente
   → Si el vehículo no está registrado, se crea con el tipo elegido
-  → Si está registrado con tipo distinto, se actualiza
-  → Inspector NO puede cobrar estacionamientos (rol cobrador deshabilitado)
+  → Inspector NO puede cobrar estacionamientos ni ve caja/cobros
+  → Panel inspector: solo "Infracciones hoy" + Verificar + Mis infracciones
 - Conductor: paga infracciones online con saldo
 - Vendedor: cobra en efectivo (estacionamiento, infracciones, abonos mensuales)
   → Comisión automática calculada al cobrar (% configurable, guardada en comision_monto)
+  → Se calcula POR TRANSACCIÓN (Modelo A) — no al rendir
   → Panel de comisiones: mis_comisiones / depositar_comision / certificar_comision
 - Abono mensual: acceso libre todo el mes sin registrar sesiones
-  → Vendedor cobra, sistema verifica que no tenga abono activo para el mes
+  → Vendedor cobra; verifica que no tenga abono activo para ese mes
   → Inspector ve "Abono mensual activo" al verificar
   → No limitado por horario de cierre
 - Tesorería: panel con rendiciones y liquidaciones de comisiones
@@ -45,10 +46,11 @@ Sistema en testing con la municipalidad (fase piloto). Funcional end-to-end.
 - Cierre de caja para vendedores (cerrar + certificar con tesorero)
 - Admin: gestión completa (tarifas, horarios, inspectores, vendedores, usuarios, exenciones)
   → Cobrar infracción desde panel admin: tiene confirm JS + redirige a comprobante
+- Deploy: Procfile corre `migrate` antes de `gunicorn` — migraciones siempre aplicadas
 - Páginas de error: 500.html y 404.html standalone (sin extends base.html)
 
 ## Flujo de comisiones (vendedor)
-1. Cobro crea MovimientoCaja con comision_monto calculado (% del municipio)
+1. Cobro crea MovimientoCaja con comision_monto calculado (% del municipio) por transacción
 2. CierreCaja agrupa los movimientos al rendir
 3. LiquidacionComision: tesorero deposita → vendedor certifica
    → Views: depositar_comision (tesorero) / certificar_comision (vendedor) / mis_comisiones (vendedor)
@@ -89,13 +91,13 @@ Flujos multi-paso con accion=buscar|confirmar|cobrar en una sola URL.
 ### Services — services_*.py
 Lógica reutilizable con efectos de borde en DB:
 - services_caja.py         → generar_cierre_caja(usuario) — cierre atómico con snapshot comisión
-- services_infracciones.py → crear_infraccion(...) — valida todo, lanza ErrorInfraccion, graba foto GPS
+- services_infracciones.py → crear_infraccion(...) — valida todo, lanza ErrorInfraccion
 - services_verificacion.py → verificar_estado_vehiculo(patente, usuario, subcuadra)
 
 ### Use Cases — use_cases/
-Un módulo por caso de uso. Punto de entrada único: función ejecutar(...).
+Un módulo por caso de uso. Función ejecutar(...) como punto de entrada.
 - estacionar_vehiculo.py     — tarifa según tipo (auto/moto), verifica saldo
-- cobrar_estacionamiento.py  — ingreso en caja con comision_monto; parámetros: inspector, monto, descripcion, comision_monto
+- cobrar_estacionamiento.py  — ingreso en caja con comision_monto
 - finalizar_estacionamiento.py
 - pagar_infraccion.py        — verifica tolerancia de gracia, anula o cobra (texto: "ANULADA ✅")
 - acreditar_saldo_mp.py      — idempotente por payment_id
@@ -120,9 +122,10 @@ Roles = flags booleanos en Usuario:
   "conductor" → es_conductor
   "tesorero"  → es_tesorero
 
-Regla de cobro manual:
-  registrar_estacionamiento_vendedor → @require_role("vendedor", "admin")  [inspector excluido]
-  registrar_estacionamiento_manual   → @require_role("vendedor", "admin")  [inspector excluido]
+Regla de cobro:
+  registrar_estacionamiento_vendedor → @require_role("vendedor", "admin")
+  registrar_estacionamiento_manual   → @require_role("vendedor", "admin")
+  (inspector excluido de ambos)
 
 ---
 
@@ -140,7 +143,7 @@ Regla de cobro manual:
 
 ### Municipio y configuración
 - Municipio: comision_vendedor (Decimal %, None=0), tolerancia_multa_minutos (int)
-- Tarifa: precio_por_hora, precio_por_hora_moto (0=usar auto), monto_infraccion,
+- Tarifa: precio_por_hora, precio_por_hora_moto (null=None → usa tarifa auto), monto_infraccion,
           precio_abono_auto, precio_abono_moto
 - HorarioEstacionamiento: dia_semana (0-6) + hora_inicio/fin
 - DiaEspecial: fecha + tipo + cobro_activo bool
@@ -149,7 +152,7 @@ Regla de cobro manual:
 ### Vehículos y estacionamiento
 - Vehiculo: patente (unique), tipo ('auto'|'moto'), exento_global, subcuadras_exentas M2M
 - VehiculoUsuario: intermedia Usuario↔Vehiculo
-- Estacionamiento: duracion_min (⚠️ almacena HORAS, no minutos — no cambiar sin migration)
+- Estacionamiento: duracion_horas (campo renombrado de duracion_min — almacena horas)
     UniqueConstraint: solo un estacionamiento ACTIVO por vehículo
 - AbonoMensual: mes=primer día del mes, unique (vehiculo, municipio, mes)
     vendedor FK, conductor FK, movimiento_caja FK (null)
@@ -193,6 +196,12 @@ Pull-based al inicio de sesión.
 
 ---
 
+## Cache
+- puede_estacionar_ahora(municipio): cacheada 1 hora por clave municipio+fecha+hora
+  → cambia sola al cambiar la hora; invalida automáticamente al inicio del nuevo tramo
+
+---
+
 # Convenciones de código
 
 - Modelos: PascalCase en castellano (MovimientoCaja, CierreCaja)
@@ -201,6 +210,8 @@ Pull-based al inicio de sesión.
 - Comentarios en castellano
 - comision_pct: siempre `getattr(municipio, "comision_vendedor", None) or Decimal("0")`
   (el campo puede ser None si no está configurado)
+- precio_por_hora_moto: `tarifa_obj.precio_por_hora_moto if tarifa_obj and tarifa_obj.precio_por_hora_moto else tarifa_hora_auto`
+  (null = usar tarifa auto)
 - Lógica de negocio nunca en views — siempre en services/ o use_cases/
 - POST-Redirect-Get en todos los formularios
 - Flujos multi-paso: accion= en POST (buscar → confirmar → cobrar)
@@ -209,21 +220,21 @@ Pull-based al inicio de sesión.
 
 # URLs importantes
 
-/usuarios/                          → conductor
-/usuarios/admin-inicio/             → panel admin
-/usuarios/admin-usuarios/           → gestionar conductores
-/usuarios/admin-inspectores/        → gestionar inspectores
-/usuarios/admin-vendedores/         → gestionar vendedores
-/usuarios/inspectores/              → panel inspector
-/usuarios/inspectores/verificar/    → verificar patente (con selector tipo auto/moto)
-/usuarios/inspectores/registrar-infraccion/ → labrar acta
-/usuarios/vendedores/               → panel vendedor
-/usuarios/vendedores/abono/         → cobrar abono mensual
+/usuarios/                              → conductor
+/usuarios/admin-inicio/                 → panel admin
+/usuarios/admin-usuarios/               → gestionar conductores
+/usuarios/admin-inspectores/            → gestionar inspectores
+/usuarios/admin-vendedores/             → gestionar vendedores
+/usuarios/inspectores/                  → panel inspector
+/usuarios/inspectores/verificar/        → verificar patente (con selector tipo auto/moto)
+/usuarios/inspectores/infraccion/       → labrar acta
+/usuarios/inspectores/resumen/          → mis infracciones (inspector)
+/usuarios/vendedores/                   → panel vendedor
+/usuarios/vendedores/abono/             → cobrar abono mensual
 /usuarios/vendedores/cobrar-infraccion/ → cobrar multa en efectivo
-/usuarios/vendedores/caja/          → caja del vendedor
-/usuarios/vendedores/comisiones/    → liquidaciones de comisiones
-/usuarios/tesorero/                 → panel tesorero
-/usuarios/mp/iniciar/               → iniciar carga MercadoPago
-/usuarios/mp/exitoso/               → callback MP exitoso → redirige a inicio
-/usuarios/mis-infracciones/         → infracciones del conductor
-/usuarios/ticket-pago-multa/<id>/   → comprobante de pago de multa (admin/vendedor/inspector)
+/usuarios/vendedores/caja/              → caja del vendedor
+/usuarios/vendedores/comisiones/        → liquidaciones de comisiones
+/usuarios/tesorero/                     → panel tesorero
+/usuarios/mp/cargar/                    → iniciar carga MercadoPago
+/usuarios/mis-infracciones/             → infracciones del conductor
+/usuarios/ticket-pago-multa/<id>/       → comprobante de pago de multa

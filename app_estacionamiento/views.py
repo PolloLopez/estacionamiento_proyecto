@@ -1293,35 +1293,17 @@ def ticket_pago_multa(request, infraccion_id):
 @require_role("inspector")
 def panel_inspectores(request):
     inspector = request.user
+    hoy = timezone.localtime().date()
 
-    # Movimientos no cerrados (lo que debe rendir)
-    movimientos_abiertos = MovimientoCaja.objects.filter(
-        usuario=inspector, tipo="ingreso", cerrado=False
-    )
-    a_rendir = movimientos_abiertos.aggregate(total=Sum("monto"))["total"] or 0
-
-    # Saldo operativo total acumulado
-    total_ingresos = MovimientoCaja.objects.filter(
-        usuario=inspector, tipo="ingreso"
-    ).aggregate(total=Sum("monto"))["total"] or 0
-    total_egresos = MovimientoCaja.objects.filter(
-        usuario=inspector, tipo="egreso"
-    ).aggregate(total=Sum("monto"))["total"] or 0
-    saldo_operativo = total_ingresos - total_egresos
-
-    # Infracciones y no pagados del municipio
-    total_infracciones = Infraccion.objects.filter(
-        municipio=inspector.municipio, inspector=inspector
-    ).count()
-    no_pagados = Infraccion.objects.filter(
-        municipio=inspector.municipio, inspector=inspector, estado="pendiente"
+    # Solo estadísticas de verificación — el inspector no maneja dinero
+    infracciones_hoy = Infraccion.objects.filter(
+        municipio=inspector.municipio,
+        inspector=inspector,
+        creado_en__date=hoy,
     ).count()
 
     resumen = {
-        "saldo_operativo": saldo_operativo,
-        "a_rendir": a_rendir,
-        "infracciones": total_infracciones,
-        "no_pagados": no_pagados,
+        "infracciones_hoy": infracciones_hoy,
     }
 
     return render(request, "inspectores/panel_inspectores.html", {"resumen": resumen})

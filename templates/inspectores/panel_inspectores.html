@@ -5,15 +5,9 @@
 <section class="container">
 
   <!-- Resumen de actividad -->
-  <div class="grid grid-2" style="margin-bottom:1.2rem;">
-    <div class="card" style="text-align:center;">
-      <div class="text-muted" style="font-size:0.85rem;">Infracciones hoy</div>
-      <div style="font-size:2rem; font-weight:800;">{{ resumen.infracciones }}</div>
-    </div>
-    <div class="card" style="text-align:center;">
-      <div class="text-muted" style="font-size:0.85rem;">No pagados</div>
-      <div style="font-size:2rem; font-weight:800; color:var(--color-danger);">{{ resumen.no_pagados }}</div>
-    </div>
+  <div class="card" style="text-align:center; margin-bottom:1.2rem;">
+    <div class="text-muted" style="font-size:0.85rem;">Infracciones hoy</div>
+    <div style="font-size:2.5rem; font-weight:800;">{{ resumen.infracciones_hoy }}</div>
   </div>
 
   <!-- Acciones principales -->
@@ -25,16 +19,8 @@
         🚓 Verificar vehículo
       </a>
       <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;"
-         href="{% url 'inspectores_caja' %}">
-        🧾 Mi caja
-      </a>
-      <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;"
          href="{% url 'inspectores_resumen_infracciones' %}">
         📑 Mis infracciones
-      </a>
-      <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;"
-         href="{% url 'inspectores_resumen_cobros' %}">
-        💰 Mis cobros
       </a>
     </div>
   </div>
