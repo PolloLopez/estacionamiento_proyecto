@@ -2040,21 +2040,29 @@ def cerrar_caja(request):
             total=Sum("monto")
         )["total"] or 0
 
+        historial_cierres = CierreCaja.objects.filter(usuario=usuario).order_by("-fecha_cierre")[:10]
+
         return render(request, "inspectores/caja.html", {
             "movimientos": MovimientoCaja.objects.filter(usuario=usuario).order_by("-creado_en"),
             "movimientos_abiertos": movimientos_abiertos.count(),
             "total_a_cerrar": total_a_cerrar,
+            "historial_cierres": historial_cierres,
             "ingresos": MovimientoCaja.objects.filter(usuario=usuario, tipo="ingreso").aggregate(total=Sum("monto"))["total"] or 0,
             "egresos": MovimientoCaja.objects.filter(usuario=usuario, tipo="egreso").aggregate(total=Sum("monto"))["total"] or 0,
             "saldo": (MovimientoCaja.objects.filter(usuario=usuario, tipo="ingreso").aggregate(total=Sum("monto"))["total"] or 0)
                    - (MovimientoCaja.objects.filter(usuario=usuario, tipo="egreso").aggregate(total=Sum("monto"))["total"] or 0),
+            "periodos": CierreCaja.PERIODOS,
         })
 
-    # POST → ejecutar cierre
-    cierre = generar_cierre_caja(usuario)
+    # POST → ejecutar cierre con el período elegido
+    periodo = request.POST.get("periodo", "").strip()
+    if periodo not in ("diario", "semanal", "mensual"):
+        periodo = ""
+    cierre = generar_cierre_caja(usuario, periodo=periodo)
 
     if cierre:
-        messages.success(request, f"Caja cerrada. Total: ${cierre.total_cobrado}")
+        periodo_label = dict(CierreCaja.PERIODOS).get(cierre.periodo, "")
+        messages.success(request, f"Caja cerrada{' — ' + periodo_label if periodo_label else ''}. Total: ${cierre.total_cobrado}")
     else:
         messages.warning(request, "No había movimientos abiertos para cerrar.")
 

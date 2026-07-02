@@ -14,12 +14,7 @@
     {% endif %}
   </div>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-warning{% endif %}"
-           style="margin-bottom:1rem;">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
+  {# Los mensajes los muestra base.html — no duplicar aquí #}
 
   {# ── Resumen del período actual ──────────────────────────────── #}
   <div class="grid grid-3" style="margin-bottom:1.2rem;">
@@ -57,7 +52,7 @@
   </div>
   {% endif %}
 
-  {# ── Movimientos del período actual ────────────────────────────── #}
+  {# ── Movimientos abiertos ────────────────────────────────────── #}
   <div class="card" style="margin-bottom:1.2rem;">
     <h3 style="margin-bottom:0.8rem;">Movimientos del período</h3>
     {% if movimientos %}
@@ -92,7 +87,14 @@
                 padding:0.75rem 0; border-bottom:1px solid var(--color-border);
                 flex-wrap:wrap; gap:0.4rem;">
       <div style="font-size:0.9rem;">
-        <div>{{ cierre.fecha_cierre|date:"d/m/Y H:i" }}</div>
+        <div>
+          {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
+          {% if cierre.periodo %}
+            <span style="margin-left:0.4rem; font-size:0.8rem; color:var(--color-text-muted);">
+              — {{ cierre.get_periodo_display }}
+            </span>
+          {% endif %}
+        </div>
         <div class="text-muted" style="font-size:0.82rem;">
           {{ cierre.cantidad_movimientos }} movimiento{% if cierre.cantidad_movimientos != 1 %}s{% endif %}
         </div>
@@ -109,9 +111,7 @@
         {% if cierre.certificado %}
           <span class="badge badge-aprobada">✅ Certificado</span>
         {% else %}
-          <span class="badge badge-pendiente" title="El admin debe revisar y certificar esta rendición">
-            ⏳ Pendiente de certificación
-          </span>
+          <span class="badge badge-pendiente">⏳ Pendiente</span>
         {% endif %}
       </div>
     </div>
@@ -126,27 +126,38 @@
      style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
             z-index:9999; justify-content:center; align-items:center; padding:1rem;">
   <div style="background:var(--color-surface); border-radius:var(--radius); padding:1.5rem 2rem;
-              max-width:380px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+              max-width:400px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25);">
     <h3 style="margin-bottom:0.75rem;">¿Confirmar cierre de caja?</h3>
     <p style="font-size:1.3rem; font-weight:800; color:var(--color-primary); margin-bottom:0.5rem;">
       ${{ total_a_cerrar }}
     </p>
-    <p class="text-muted" style="font-size:0.9rem; margin-bottom:1.2rem;">
+    <p class="text-muted" style="font-size:0.9rem; margin-bottom:1rem;">
       Se cerrarán <strong>{{ movimientos_abiertos }}</strong> movimiento(s) abiertos.
       Esta acción no se puede deshacer.
     </p>
-    <div style="display:flex; gap:0.75rem;">
-      <form method="post"
-            action="{% if request.user.es_vendedor %}{% url 'vendedores_cerrar_caja' %}{% else %}{% url 'inspectores_cerrar_caja' %}{% endif %}"
-            style="flex:1;">
-        {% csrf_token %}
-        <button class="btn" type="submit" style="width:100%;">✅ Sí, cerrar</button>
-      </form>
-      <button class="btn btn-outline" type="button" style="flex:1;"
-              onclick="document.getElementById('modal-cierre').style.display='none'">
-        Cancelar
-      </button>
-    </div>
+
+    <form method="post"
+          action="{% if request.user.es_vendedor %}{% url 'vendedores_cerrar_caja' %}{% else %}{% url 'inspectores_cerrar_caja' %}{% endif %}">
+      {% csrf_token %}
+
+      <div style="margin-bottom:1rem;">
+        <label style="font-size:0.9rem; color:var(--color-text-muted);">Tipo de período</label>
+        <select name="periodo" style="width:100%; margin-top:0.3rem;">
+          <option value="">— Sin especificar —</option>
+          {% for valor, etiqueta in periodos %}
+            <option value="{{ valor }}">{{ etiqueta }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="display:flex; gap:0.75rem;">
+        <button class="btn" type="submit" style="flex:1;">✅ Sí, cerrar</button>
+        <button class="btn btn-outline" type="button" style="flex:1;"
+                onclick="document.getElementById('modal-cierre').style.display='none'">
+          Cancelar
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 

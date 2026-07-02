@@ -6,7 +6,7 @@ from app_estacionamiento.models import MovimientoCaja, CierreCaja
 from django.db import transaction
 
 
-def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None):
+def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None, periodo=""):
     """
     Genera un CierreCaja atómico para el usuario.
 
@@ -49,6 +49,7 @@ def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None):
             fecha_apertura=fecha_apertura,
             cantidad_movimientos=movimientos.count(),
             creado_por=usuario,
+            periodo=periodo,
             # Comisión
             porcentaje_ganancia_aplicado=porcentaje,
             ganancia_usuario=ganancia,

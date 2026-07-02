@@ -416,6 +416,13 @@ class CierreCaja(models.Model):
         help_text="Monto neto que le corresponde al municipio."
     )
 
+    # período declarado por el vendedor al cerrar
+    PERIODOS = [('diario', 'Diario'), ('semanal', 'Semanal'), ('mensual', 'Mensual')]
+    periodo = models.CharField(
+        max_length=10, choices=PERIODOS, blank=True, default='',
+        verbose_name='Período',
+    )
+
     # certificación por el admin
     certificado = models.BooleanField(default=False, help_text="El admin auditó y certificó este cierre.")
     certificado_en = models.DateTimeField(null=True, blank=True, help_text="Fecha en que el admin certificó el cierre.")

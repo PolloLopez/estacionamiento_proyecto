@@ -4,18 +4,6 @@
 
 ---
 
-## 🔴 Alta prioridad
-
-### 1. Selector de período al cerrar caja (vendedor)
-`/usuarios/vendedores/cerrar-caja/` — `cerrar_caja` no pide período.
-El modelo `CierreCaja` tiene campo `periodo` (diario/semanal/mensual) pero no se usa.
-Requiere: `<select>` en el form de cierre + guardarlo en el cierre.
-
-### 3. Selector de período al cerrar caja (vendedor)
-`/usuarios/vendedores/cerrar-caja/` — `cerrar_caja` no pide período.
-El modelo `CierreCaja` tiene campo `periodo` (diario/semanal/mensual) pero no se usa.
-Requiere: `<select>` en el form de cierre + guardarlo en el cierre.
-
 ---
 
 ## 🟡 Media prioridad
@@ -76,6 +64,7 @@ Hacer en un sprint dedicado — no mezclar con features.
 
 ## ✅ Resuelto
 
+- Selector de período al cerrar caja: modal con `<select>` diario/semanal/mensual, field `CierreCaja.periodo`, migration 0038, `generar_cierre_caja(periodo=...)`, historial muestra `get_periodo_display`
 - Abono mensual: selector de mes — 4 opciones (2 atrás, actual, siguiente), validación por mes elegido
 - Admin-usuarios: editar teléfono, DNI, toggle es_verificado + badge en detalle
 
