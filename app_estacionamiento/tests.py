@@ -55,7 +55,7 @@ def crear_vehiculo(patente="AAA111"):
 def crear_estacionamiento_activo(usuario, vehiculo, subcuadra, duracion=2, costo=200):
     return Estacionamiento.objects.create(
         usuario=usuario, vehiculo=vehiculo, subcuadra=subcuadra,
-        duracion_min=duracion, costo_base=costo, estado="ACTIVO",
+        duracion_horas=duracion, costo_base=costo, estado="ACTIVO",
     )
 
 
@@ -183,7 +183,7 @@ class TestRenovarEstacionamiento(TestCase):
     def test_renovar_extiende_duracion(self):
         self.client.post(self.url, {"horas_extra": "2"})
         self.est.refresh_from_db()
-        self.assertEqual(self.est.duracion_min, 4)  # 2 originales + 2 extra
+        self.assertEqual(self.est.duracion_horas, 4)  # 2 originales + 2 extra
 
     def test_renovar_descuenta_saldo(self):
         self.client.post(self.url, {"horas_extra": "1"})
@@ -198,7 +198,7 @@ class TestRenovarEstacionamiento(TestCase):
         self.client.post(self.url, {"horas_extra": "2"})  # costaría $200
         self.est.refresh_from_db()
         self.conductor.refresh_from_db()
-        self.assertEqual(self.est.duracion_min, 2)
+        self.assertEqual(self.est.duracion_horas, 2)
         self.assertEqual(self.conductor.saldo, Decimal("50"))
 
     def test_renovar_estacionamiento_ajeno_retorna_404(self):

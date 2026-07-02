@@ -15,7 +15,7 @@ class EstacionamientoFactory:
             usuario=usuario,
             vehiculo=vehiculo,
             subcuadra=subcuadra,
-            duracion_min=duracion,
+            duracion_horas=duracion,
             costo_base=costo_base,
             estado="ACTIVO"
         )

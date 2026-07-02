@@ -55,7 +55,7 @@
 
       <script>
         const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
-        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_min }}");
+        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_horas }}");
       </script>
 
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
@@ -243,29 +243,4 @@
       const minutos  = minutosRestantes % 60;
       let restanteStr = "";
       if (horas > 0)   restanteStr += horas + "h ";
-      if (minutos > 0) restanteStr += minutos + "min";
-      timerEl.innerText = "Vence a las " + horaVencStr + " (" + restanteStr.trim() + ")";
-      timerEl.style.color = "";
-    }
-
-    if (progressEl) {
-      const usado      = ahora - horaInicio;
-      const porcentaje = Math.min((usado / duracionMs) * 100, 100);
-      progressEl.style.width = porcentaje + "%";
-      if (porcentaje > 80) {
-        progressEl.style.background = "var(--color-danger)";
-      } else if (porcentaje > 50) {
-        progressEl.style.background = "#f9a825";
-      } else {
-        progressEl.style.background = "var(--color-success)";
-      }
-    }
-  }
-
-  setInterval(actualizarTimer, 1000);
-  actualizarTimer();
-
-})();
-</script>
-
-{% endblock %}
+      if (minutos > 0) restanteS

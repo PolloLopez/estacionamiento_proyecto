@@ -98,7 +98,7 @@ def inicio_usuarios(request):
     # Auto-cierre: si el tiempo pago ya venció, finalizar automáticamente
     if estacionamiento_activo:
         expiracion = estacionamiento_activo.hora_inicio + timedelta(
-            hours=estacionamiento_activo.duracion_min
+            hours=estacionamiento_activo.duracion_horas
         )
         if timezone.now() >= expiracion:
             finalizar_estacionamiento_uc(estacionamiento_activo)
@@ -678,19 +678,32 @@ def puede_estacionar_ahora(municipio):
     Verifica si el horario del municipio permite estacionar en este momento.
     Tiene en cuenta días especiales (feriados, etc.) y el horario semanal.
     Retorna (permitido: bool, mensaje_error: str|None)
+
+    Usa caché de 1 hora para no repetir queries por cada verificación.
+    La clave incluye municipio + hora exacta, así cambia sola al cambiar el tramo.
     """
+    from django.core.cache import cache
     from app_estacionamiento.models import HorarioEstacionamiento, DiaEspecial
+
     ahora       = timezone.localtime()
     hoy_fecha   = ahora.date()
     hoy_dia     = ahora.weekday()   # 0=Lunes … 6=Domingo
     hora_actual = ahora.time()
+
+    # Clave única por municipio + hora (precisión de 1 hora)
+    cache_key = f"puede_estacionar_{municipio.id}_{hoy_fecha}_{ahora.hour}"
+    resultado_cached = cache.get(cache_key)
+    if resultado_cached is not None:
+        return resultado_cached
 
     # 1. Día especial sin cobro activo → libre de estacionamiento
     dia_especial = DiaEspecial.objects.filter(
         municipio=municipio, fecha=hoy_fecha
     ).first()
     if dia_especial and not dia_especial.cobro_activo:
-        return False, f"Hoy es {dia_especial.descripcion}. No hay cobro de estacionamiento."
+        resultado = (False, f"Hoy es {dia_especial.descripcion}. No hay cobro de estacionamiento.")
+        cache.set(cache_key, resultado, timeout=3600)
+        return resultado
 
     # 2. Horario semanal configurado para este día
     horario = HorarioEstacionamiento.objects.filter(
@@ -699,17 +712,23 @@ def puede_estacionar_ahora(municipio):
 
     if horario is None:
         # Sin horario configurado para hoy → libre de restricciones
-        return True, None
+        resultado = (True, None)
+        cache.set(cache_key, resultado, timeout=3600)
+        return resultado
 
     if hora_actual < horario.hora_inicio or hora_actual > horario.hora_fin:
-        return False, (
+        resultado = (False, (
             f"El estacionamiento está habilitado de "
             f"{horario.hora_inicio.strftime('%H:%M')} a "
             f"{horario.hora_fin.strftime('%H:%M')}. "
             f"Actualmente son las {hora_actual.strftime('%H:%M')}."
-        )
+        ))
+        cache.set(cache_key, resultado, timeout=3600)
+        return resultado
 
-    return True, None
+    resultado = (True, None)
+    cache.set(cache_key, resultado, timeout=3600)
+    return resultado
 
 
 def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, duracion_actual_h=0):
@@ -955,7 +974,7 @@ def estacionar_vehiculo(request):
     tarifa_hora_auto = tarifa_obj.precio_por_hora if tarifa_obj else 100
     tarifa_hora_moto = (
         tarifa_obj.precio_por_hora_moto
-        if tarifa_obj and getattr(tarifa_obj, "precio_por_hora_moto", 0) and tarifa_obj.precio_por_hora_moto > 0
+        if tarifa_obj and tarifa_obj.precio_por_hora_moto
         else tarifa_hora_auto
     )
 
@@ -1033,8 +1052,8 @@ def renovar_estacionamiento(request, est_id):
                         error = "Saldo insuficiente."
                     else:
                         # Extender duración y cobrar
-                        estacionamiento.duracion_min = estacionamiento.duracion_min + int(horas_extra)
-                        estacionamiento.save(update_fields=["duracion_min"])
+                        estacionamiento.duracion_horas = estacionamiento.duracion_horas + int(horas_extra)
+                        estacionamiento.save(update_fields=["duracion_horas"])
 
                         usuario_db.saldo -= costo_extra
                         usuario_db.save(update_fields=["saldo"])
@@ -1058,7 +1077,7 @@ def renovar_estacionamiento(request, est_id):
         municipio=usuario.municipio,
         tarifa_hora=tarifa_hora,
         hora_inicio_est=estacionamiento.hora_inicio,
-        duracion_actual_h=float(estacionamiento.duracion_min),
+        duracion_actual_h=float(estacionamiento.duracion_horas),
     )
 
     return render(request, "usuarios/renovar_estacionamiento.html", {
@@ -1084,8 +1103,7 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 
     # GET → mostrar pantalla de confirmación con el costo estimado
     if request.method != "POST":
-        # duracion_min almacena horas (pese al nombre) — no dividir por 60
-        duracion_horas = estacionamiento.duracion_min
+        duracion_horas = estacionamiento.duracion_horas
         return render(request, "usuarios/finalizar_estacionamiento.html", {
             "estacionamiento": estacionamiento,
             "duracion_horas": duracion_horas,
@@ -1365,7 +1383,7 @@ def verificar_vehiculo(request):
                 ).first()
                 if est_vencido:
                     expiracion = est_vencido.hora_inicio + timedelta(
-                        hours=est_vencido.duracion_min
+                        hours=est_vencido.duracion_horas
                     )
                     if timezone.now() >= expiracion:
                         finalizar_estacionamiento_uc(est_vencido)
@@ -1621,7 +1639,7 @@ def registrar_estacionamiento_vendedor(request):
     tarifa_hora_auto = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
     tarifa_hora_moto = (
         tarifa_obj.precio_por_hora_moto
-        if tarifa_obj and getattr(tarifa_obj, "precio_por_hora_moto", 0) and tarifa_obj.precio_por_hora_moto > 0
+        if tarifa_obj and tarifa_obj.precio_por_hora_moto
         else tarifa_hora_auto
     )
     tarifa_hora = tarifa_hora_auto
@@ -1727,7 +1745,7 @@ def ticket_cobro(request, est_id):
 
     return render(request, "ticket.html", {
         "patente": est.vehiculo.patente,
-        "duracion": est.duracion_min,
+        "duracion": est.duracion_horas,
         "hora": est.hora_inicio,
         "monto": est.costo_base
     })
@@ -2446,7 +2464,9 @@ def gestionar_tarifas(request):
 
         try:
             precio_auto  = _decimal("precio_por_hora", minimo=Decimal("0.01"))
-            precio_moto  = _decimal("precio_por_hora_moto", minimo=0)
+            # precio_moto vacío = None → usa tarifa de auto
+            _val_moto = request.POST.get("precio_por_hora_moto", "").strip()
+            precio_moto = Decimal(_val_moto) if _val_moto else None
             monto_inf    = _decimal("monto_infraccion", minimo=0)
             abono_auto   = _decimal("precio_abono_auto", minimo=0)
             abono_moto   = _decimal("precio_abono_moto", minimo=0)

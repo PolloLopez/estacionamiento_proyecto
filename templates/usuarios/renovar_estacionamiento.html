@@ -20,7 +20,7 @@
       <div style="text-align:right;">
         <div class="text-muted" style="font-size:0.85rem;">Duración actual</div>
         <div style="font-size:1.4rem; font-weight:800; color:var(--color-primary);">
-          {{ estacionamiento.duracion_min }}h
+          {{ estacionamiento.duracion_horas }}h
         </div>
       </div>
     </div>
@@ -103,7 +103,7 @@
   const tarifaHora  = parseFloat("{{ tarifa_hora }}");
   const saldo       = parseFloat("{{ saldo }}");
   const horaInicioTs = parseInt("{{ estacionamiento.hora_inicio|date:'U' }}", 10);
-  const duracionActualH = parseFloat("{{ estacionamiento.duracion_min }}");
+  const duracionActualH = parseFloat("{{ estacionamiento.duracion_horas }}");
 
   // Mostrar hora de fin actual
   const horaFin = new Date((horaInicioTs + duracionActualH * 3600) * 1000);

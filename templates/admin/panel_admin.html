@@ -181,7 +181,7 @@
             <td>{{ e.subcuadra }}</td>
             <td>{{ e.usuario.nombre|default:e.usuario.correo }}</td>
             <td>{{ e.hora_inicio|date:"d/m/Y H:i" }}</td>
-            <td>{{ e.duracion_min }}h</td>
+            <td>{{ e.duracion_horas }}h</td>
             <td>
               {% if e.estado == "ACTIVO" %}
                 <span style="color:var(--color-primary); font-weight:600;">● Activo</span>

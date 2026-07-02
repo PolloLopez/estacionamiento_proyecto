@@ -304,11 +304,11 @@ class Tarifa(models.Model):
         help_text="Monto fijo cobrado por cada infracción."
     )
 
-    # Tarifa para motos (precio por hora)
+    # Tarifa para motos (precio por hora). null = usar tarifa de autos.
     precio_por_hora_moto = models.DecimalField(
-        max_digits=6, decimal_places=2, default=0,
+        max_digits=6, decimal_places=2, null=True, blank=True,
         verbose_name="Precio/hora moto",
-        help_text="Tarifa por hora para motos. 0 = igual que autos.",
+        help_text="Tarifa por hora para motos. Vacío = igual que autos.",
     )
 
     # Abono mensual
@@ -343,7 +343,7 @@ class Estacionamiento(models.Model):
     hora_inicio = models.DateTimeField(auto_now_add=True)
     hora_fin = models.DateTimeField(null=True, blank=True)
 
-    duracion_min = models.IntegerField(default=60)
+    duracion_horas = models.IntegerField(default=1, verbose_name="Duración (horas)")
 
     costo_base = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     costo_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
