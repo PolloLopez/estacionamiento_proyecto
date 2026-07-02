@@ -90,6 +90,30 @@
     <form method="post" id="form">
         {% csrf_token %}
         <input type="hidden" name="subcuadra_id" value="{{ subcuadra_activa.id|default:'' }}">
+
+        <!-- Selector tipo: Auto / Moto -->
+        <style>
+          .tipo-btn { display:inline-flex; align-items:center; gap:0.4rem;
+            font-size:1rem; font-weight:600; cursor:pointer;
+            padding:0.5rem 1.2rem; border:2px solid var(--color-border);
+            border-radius:var(--radius); background:transparent;
+            user-select:none; transition:border-color 0.15s, background 0.15s; }
+          .tipo-radio:checked + .tipo-btn {
+            border-color:var(--color-primary);
+            background:rgba(46,125,50,0.08); }
+        </style>
+        <div style="display:flex; justify-content:center; gap:0.6rem; margin-bottom:0.75rem;">
+          <input type="radio" id="tipo-auto" name="tipo" value="auto"
+                 class="tipo-radio" style="display:none;"
+                 {% if tipo_seleccionado != 'moto' %}checked{% endif %}>
+          <label for="tipo-auto" class="tipo-btn">🚗 Auto</label>
+
+          <input type="radio" id="tipo-moto" name="tipo" value="moto"
+                 class="tipo-radio" style="display:none;"
+                 {% if tipo_seleccionado == 'moto' %}checked{% endif %}>
+          <label for="tipo-moto" class="tipo-btn">🏍️ Moto</label>
+        </div>
+
         <input
             id="patente"
             name="patente"
@@ -107,6 +131,9 @@
             <div class="box-resultado box-ok">
                 <div style="font-size:2rem;">✅</div>
                 <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
+                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.1rem 0;">
+                  {% if tipo_seleccionado == 'moto' %}🏍️ Moto{% else %}🚗 Auto{% endif %}
+                </p>
                 <h3>
                     {% if resultado.estado.name == "EXENTO_TOTAL" %}Exento total
                     {% elif resultado.estado.name == "EXENTO_PARCIAL" %}Exento en esta subcuadra
@@ -127,6 +154,9 @@
             <div class="box-resultado box-warn">
                 <div style="font-size:2rem;">⏳</div>
                 <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
+                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.1rem 0;">
+                  {% if tipo_seleccionado == 'moto' %}🏍️ Moto{% else %}🚗 Auto{% endif %}
+                </p>
                 <h3>En plazo de tolerancia</h3>
                 <p style="font-size:0.9rem; color:var(--color-text-muted);">
                     No se puede infraccionar todavía. Revisá en unos minutos.
@@ -138,6 +168,9 @@
             <div class="box-resultado box-danger">
                 <div style="font-size:2rem;">🚨</div>
                 <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
+                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.1rem 0;">
+                  {% if tipo_seleccionado == 'moto' %}🏍️ Moto{% else %}🚗 Auto{% endif %}
+                </p>
                 <h3>
                     {% if resultado.estado.name == "EXENTO_PARCIAL" %}
                         Exento parcial — fuera de su subcuadra

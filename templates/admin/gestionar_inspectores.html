@@ -13,7 +13,7 @@
   {% if inspectores %}
   <div class="card" style="margin-bottom:1.5rem;">
     <h3 style="margin-bottom:0.8rem;">Actividad de inspectores</h3>
-    <div style="overflow-x:auto;">
+    <div>
       <table>
         <thead>
           <tr>
@@ -23,8 +23,6 @@
             <th>Teléfono</th>
             <th style="text-align:center;">Infracciones</th>
             <th style="text-align:center;">Verificaciones</th>
-            <th style="text-align:right;">Total cobrado</th>
-            <th style="text-align:center;">Rendición</th>
             <th style="text-align:center;">Estado</th>
             <th>Acciones</th>
           </tr>
@@ -43,13 +41,7 @@
             <td style="font-size:0.88rem;">{{ i.telefono|default:"—" }}</td>
             <td style="text-align:center;">{{ i.total_infracciones|default:"0" }}</td>
             <td style="text-align:center;">{{ i.total_verificaciones|default:"0" }}</td>
-            <td style="text-align:right; font-weight:600;">${{ i.total_cobrado_sum|default:"0" }}</td>
-            <td style="text-align:center; font-size:0.85rem;">
-              {{ i.periodicidad_rendicion|capfirst }}
-              {% if i.porcentaje_ganancia > 0 %}
-                <br><span class="text-muted">{{ i.porcentaje_ganancia }}%</span>
-              {% endif %}
-            </td>
+
             <td style="text-align:center;">
               {% if i.is_active %}
                 <span style="color:var(--color-primary); font-weight:600;">● Activo</span>

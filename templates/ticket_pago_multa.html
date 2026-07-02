@@ -50,8 +50,7 @@
     <hr>
 
     {% if infraccion.estado == "anulada" %}
-      <p class="anulado">ANULADA POR GRACIA</p>
-      <p style="font-size:0.8rem;">(pago dentro del período de tolerancia)</p>
+      <p class="anulado">ANULADA ✅</p>
       <p class="monto">$0,00</p>
     {% else %}
       <p><b>Motivo:</b> {{ infraccion.motivo }}</p>

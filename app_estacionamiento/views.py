@@ -1349,12 +1349,14 @@ def verificar_vehiculo(request):
     if not subcuadra_activa:
         subcuadra_activa = get_subcuadra_default(municipio)
 
+    tipo_seleccionado = "auto"
+
     if request.method == "POST":
         patente = (request.POST.get("patente") or "").upper().strip()
+        tipo_seleccionado = request.POST.get("tipo", "auto")
 
         if patente:
             # Auto-cierre de estacionamientos vencidos ANTES de verificar
-            # Así el inspector no ve un vehículo como "pagado" cuando en realidad expiró
             from app_estacionamiento.models import Vehiculo as VehiculoModel
             vehiculo_check = VehiculoModel.objects.filter(patente=patente).first()
             if vehiculo_check:
@@ -1367,6 +1369,18 @@ def verificar_vehiculo(request):
                     )
                     if timezone.now() >= expiracion:
                         finalizar_estacionamiento_uc(est_vencido)
+
+                # Actualizar tipo si el inspector lo cambió y es distinto al registrado
+                if vehiculo_check.tipo != tipo_seleccionado:
+                    vehiculo_check.tipo = tipo_seleccionado
+                    vehiculo_check.save(update_fields=["tipo"])
+            else:
+                # Vehiculo no registrado: crearlo con el tipo indicado
+                VehiculoModel.objects.create(
+                    patente=patente,
+                    municipio=municipio,
+                    tipo=tipo_seleccionado,
+                )
 
             resultado = verificar_estado_vehiculo(
                 patente,
@@ -1382,6 +1396,7 @@ def verificar_vehiculo(request):
         "modo": modo,
         "subcuadras": subcuadras,
         "subcuadra_activa": subcuadra_activa,
+        "tipo_seleccionado": tipo_seleccionado,
     })
 
 @require_role("inspector")
@@ -1508,7 +1523,7 @@ def caja_inspector(request):
 # =========================================================
 # VIEWS COMPARTIDAS INSPECTORES + VENDEDORES
 # =========================================================
-@require_role("vendedor", "inspector", "admin")
+@require_role("vendedor", "admin")
 def registrar_estacionamiento_manual(request):
     inspector = request.user
     from app_estacionamiento.models import Tarifa
@@ -1592,7 +1607,7 @@ def registrar_estacionamiento_manual(request):
 
     return redirect(reverse("inspectores_ticket_cobro", args=[est.id]))
 
-@require_role("vendedor", "inspector", "admin")
+@require_role("vendedor", "admin")
 def registrar_estacionamiento_vendedor(request):
     """
     El vendedor cobra en efectivo: registra el estacionamiento en el sistema
@@ -1666,6 +1681,10 @@ def registrar_estacionamiento_vendedor(request):
     tarifa_cobro = tarifa_hora_moto if es_moto else tarifa_hora_auto
     monto = duracion * tarifa_cobro
 
+    # Comision del vendedor sobre este cobro
+    comision_pct = getattr(vendedor.municipio, "comision_vendedor", None) or Decimal("0")
+    comision_cobro = (monto * comision_pct / 100).quantize(Decimal("0.01"))
+
     with transaction.atomic():
         est = EstacionamientoFactory.crear(
             usuario=vendedor,
@@ -1674,11 +1693,12 @@ def registrar_estacionamiento_vendedor(request):
             duracion=duracion,
             costo_base=monto,
         )
-        # Registrar el efectivo cobrado en la caja del vendedor
+        # Registrar el efectivo cobrado en la caja del vendedor con su comision
         cobrar_estacionamiento(
             inspector=vendedor,
             monto=monto,
             descripcion=f"Estacionamiento {patente}",
+            comision_monto=comision_cobro,
         )
 
     return redirect(reverse("inspectores_ticket_cobro", args=[est.id]))
@@ -1791,7 +1811,7 @@ def cobrar_abono(request):
                         confirmar = True
                     elif accion == "cobrar":
                         # Calcular comision
-                        comision_pct = municipio.comision_vendedor if hasattr(municipio, "comision_vendedor") else 0
+                        comision_pct = getattr(municipio, 'comision_vendedor', None) or Decimal('0')
                         comision_monto = (precio * comision_pct / 100).quantize(Decimal("0.01"))
 
                         with transaction.atomic():

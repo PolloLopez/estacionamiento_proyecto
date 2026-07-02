@@ -21,7 +21,7 @@ Funciona hoy:
 - Vendedor: cobra en efectivo (estacionamiento, infracciones, abonos mensuales)
 - Comisión automática para vendedores (% configurable por municipio, default 7%)
 - Tesorería: panel con rendiciones y liquidaciones de comisiones
-  - Tesorero deposita comisiones → vendedor certifica recibo
+- Tesorero deposita comisiones → vendedor certifica recibo
 - Exenciones totales y parciales por subcuadra (discapacidad, vecino frentista, jubilado, etc.)
 - Abono mensual: acceso libre todo el mes, sin registrar cada estacionamiento
 - Horarios de cobro semanales + días especiales (feriados, festivos)
@@ -187,3 +187,5 @@ vehículo. No hay tareas periódicas — es pull-based al inicio de sesión.
 - Tests cubren ~25 casos; faltan tests para: abono mensual, tolerancia multa, comisiones, tesorero
 - El commit de los cambios recientes (feat: motos, abono, tesorería) requiere
   eliminar .git/index.lock antes de hacer push desde Windows
+
+Al finalizar actualiza context.md y dame el commit descriptivo del dia. 

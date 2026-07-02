@@ -6,13 +6,6 @@
 
   <h2 style="margin-bottom:1rem;">⚠️ Mis infracciones</h2>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}"
-           style="margin-bottom:1rem;">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-
   {# Aviso de visibilidad #}
   {% if not request.user.es_verificado %}
     <div class="alert alert-warning" style="margin-bottom:1rem; display:flex; align-items:center;

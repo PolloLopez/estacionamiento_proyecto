@@ -4,48 +4,37 @@
 {% block content %}
 <section class="container">
 
-  <!-- Resumen de caja -->
+  <!-- Resumen de actividad -->
   <div class="grid grid-2" style="margin-bottom:1.2rem;">
     <div class="card" style="text-align:center;">
-      <div class="text-muted" style="font-size:0.85rem;">Saldo operativo</div>
-      <div style="font-size:1.9rem; font-weight:800; color:var(--color-primary);">
-        ${{ resumen.saldo_operativo }}
-      </div>
-    </div>
-    <div class="card" style="text-align:center;">
-      <div class="text-muted" style="font-size:0.85rem;">A rendir</div>
-      <div style="font-size:1.9rem; font-weight:800; color:var(--color-warning);">
-        ${{ resumen.a_rendir }}
-      </div>
-    </div>
-    <div class="card" style="text-align:center;">
       <div class="text-muted" style="font-size:0.85rem;">Infracciones hoy</div>
-      <div style="font-size:1.9rem; font-weight:800;">{{ resumen.infracciones }}</div>
+      <div style="font-size:2rem; font-weight:800;">{{ resumen.infracciones }}</div>
     </div>
     <div class="card" style="text-align:center;">
       <div class="text-muted" style="font-size:0.85rem;">No pagados</div>
-      <div style="font-size:1.9rem; font-weight:800; color:var(--color-danger);">{{ resumen.no_pagados }}</div>
+      <div style="font-size:2rem; font-weight:800; color:var(--color-danger);">{{ resumen.no_pagados }}</div>
     </div>
   </div>
 
   <!-- Acciones principales -->
   <div class="card">
-    <h2 style="margin-bottom:1.1rem;">👮 Acciones</h2>
-    <div class="btn-group">
-      <a class="btn" href="{% url 'inspectores_verificar_vehiculo' %}">
+    <h2 style="margin-bottom:1.2rem;">👮 Acciones</h2>
+    <div style="display:flex; flex-direction:column; gap:0.75rem;">
+      <a class="btn" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;"
+         href="{% url 'inspectores_verificar_vehiculo' %}">
         🚓 Verificar vehículo
       </a>
-      <a class="btn" href="{% url 'inspectores_registrar_estacionamiento_manual' %}">
-        📝 Cobro manual
+      <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;"
+         href="{% url 'inspectores_caja' %}">
+        🧾 Mi caja
       </a>
-      <a class="btn btn-outline" href="{% url 'inspectores_caja' %}">
-        🧾 Caja
+      <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;"
+         href="{% url 'inspectores_resumen_infracciones' %}">
+        📑 Mis infracciones
       </a>
-      <a class="btn btn-outline" href="{% url 'inspectores_resumen_cobros' %}">
-        💰 Cobros
-      </a>
-      <a class="btn btn-outline" href="{% url 'inspectores_resumen_infracciones' %}">
-        📑 Infracciones
+      <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;"
+         href="{% url 'inspectores_resumen_cobros' %}">
+        💰 Mis cobros
       </a>
     </div>
   </div>
