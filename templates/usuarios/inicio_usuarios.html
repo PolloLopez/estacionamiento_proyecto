@@ -243,4 +243,23 @@
       const minutos  = minutosRestantes % 60;
       let restanteStr = "";
       if (horas > 0)   restanteStr += horas + "h ";
-      if (minutos > 0) restanteS
+      if (minutos > 0) restanteStr += minutos + "m";
+      timerEl.innerText = "Vence " + horaVencStr + " — " + restanteStr;
+
+      // Barra de progreso
+      if (progressEl) {
+        const transcurrido = duracionMs - restante;
+        const pct = Math.min(100, (transcurrido / duracionMs) * 100);
+        progressEl.style.width = pct + "%";
+        progressEl.style.background = "var(--color-success)";
+      }
+    }
+  }
+
+  actualizarTimer();
+  setInterval(actualizarTimer, 1000);
+
+})();
+</script>
+
+{% endblock %}

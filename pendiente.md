@@ -1,53 +1,37 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-02
-
----
+Última actualización: 2026-07-02 (revisión completa contra código real)
 
 ---
 
 ## 🟡 Media prioridad
 
-### 4. Inspector: PDF de infracciones del día
-El inspector "presenta" sus infracciones del día como PDF.
+### 1. Inspector: PDF de infracciones del día
+El inspector presenta sus infracciones del día como PDF.
 Listado ordenado por número de acta: fecha, patente, tipo, subcuadra, monto, estado.
 Requiere: view + PDF generation + botón en "Mis infracciones".
 
-### 5. Google OAuth: nombre y apellido no se cargan
+### 2. Google OAuth: nombre y apellido no se cargan
 Usuario creado por Google OAuth no guarda `first_name` / `last_name` correctamente.
 Al ingresar por primera vez con Google, redirigir a `completar_perfil`.
 Requiere: adapter de allauth o signal `user_signed_up`.
-
-### 6. Subcuadras vacías al registrar infracción
-`registrar_infraccion` usa `get_subcuadra_default()` — si el municipio no tiene subcuadras
-cargadas, la view muestra error y el inspector no puede labrar acta.
-Requiere: verificar si hay subcuadras en producción o mejorar el manejo del caso vacío.
-
-### 7. /usuarios/inicio/ rompe cuando conductor está logueado
-Reportado en PENDIENTES.md (2026-06-10). Verificar si sigue ocurriendo con la versión actual.
-View: `inicio_usuarios`.
-
-### 8. Timer en inicio_usuarios muestra "calculando…" indefinido
-El JS usa `hora_inicio|date:"U"` (Unix timestamp). Si hay problema de zona horaria
-el `new Date(ts * 1000)` puede dar un fin ya pasado o incorrecto.
-Template: `templates/usuarios/inicio_usuarios.html` línea 57.
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-### 9. Inspector: foto con watermark y GPS
+### 3. Inspector: foto con watermark y GPS
 Al labrar acta el inspector saca foto desde el celular con watermark (fecha, hora, GPS, patente).
 `Infraccion` ya tiene campo `foto` (ImageField). Dejar para v2.
 
-### 10. Inspector como cobrador (paid feature)
+### 4. Inspector como cobrador (paid feature)
 Si se activa: agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `cobrar_abono`.
 
-### 11. Dividir views.py en módulos por rol
-~3256 líneas. Dividir en `views_admin.py`, `views_conductor.py`, etc.
+### 5. Dividir views.py en módulos por rol
+~3300 líneas. Dividir en `views_admin.py`, `views_conductor.py`, etc.
 Hacer en un sprint dedicado — no mezclar con features.
 
-### 12. Tests faltantes
+### 6. Tests faltantes
 - Abono mensual (cobro, verificación, conflicto mismo mes)
 - Tolerancia multa (pagar antes vs después del período de gracia)
 - Comisiones (que `comision_monto` se grabe correctamente)
@@ -55,7 +39,7 @@ Hacer en un sprint dedicado — no mezclar con features.
 - Multi-municipio (datos aislados entre municipios)
 - Flujo MP webhook (integración)
 
-### 13. Mejoras OAuth y UI
+### 7. Mejoras OAuth y UI
 - Pantalla de consentimiento Google: completar logo, descripción, dominio verificado
 - Modo alto contraste / uso en exterior con sol
 - Separar `settings_dev.py` / `settings_prod.py`
@@ -64,10 +48,12 @@ Hacer en un sprint dedicado — no mezclar con features.
 
 ## ✅ Resuelto
 
+- Timer "calculando…" indefinido: `inicio_usuarios.html` estaba truncado, faltaba `setInterval`. Corregido con el bloque JS completo.
+- Subcuadras vacías al registrar infracción: `get_subcuadra_default` usa `get_or_create("Zona Única")` — nunca falla.
+- /usuarios/inicio/ rompe con conductor: verificado en código — la view maneja `None` municipio correctamente. Sin reproducción desde 2026-06-10.
 - Selector de período al cerrar caja: modal con `<select>` diario/semanal/mensual, field `CierreCaja.periodo`, migration 0038, `generar_cierre_caja(periodo=...)`, historial muestra `get_periodo_display`
 - Abono mensual: selector de mes — 4 opciones (2 atrás, actual, siguiente), validación por mes elegido
 - Admin-usuarios: editar teléfono, DNI, toggle es_verificado + badge en detalle
-
 - Admin rendición a tesorería: view `crear_rendicion` + URL + template con cálculo en tiempo real
 - Doble alert: `cobrar_abono.html`, `resumen_caja.html`, `panel_tesorero.html`, `rendiciones.html`
 - `certificar_comision`: restaurada (estaba truncada en working copy)
@@ -82,7 +68,7 @@ Hacer en un sprint dedicado — no mezclar con features.
 - panel_admin: sin tabla de estacionamientos; stat "Conductores registrados"
 - inicio_admin: redirige a panel_admin
 - detalle_usuario: doble alert eliminado, infracciones últimas 5 + "Ver todas", responsive + tipo vehículo
-- CSRF: agregar `CSRF_TRUSTED_ORIGINS=https://estacionamiento.up.railway.app` en Railway vars
+- CSRF: `CSRF_TRUSTED_ORIGINS=https://estacionamiento.up.railway.app` en Railway vars
 - SITE_ID=2 en Railway vars (confirmado por usuario)
 - Google OAuth `redirect_uri_mismatch`: nuevo cliente OAuth + URI autorizada
 - Branding por municipio (logo + colores + nombre_sistema)
