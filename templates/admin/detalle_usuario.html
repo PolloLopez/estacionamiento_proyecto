@@ -16,34 +16,78 @@
     <!-- DATOS + EDICIÓN -->
     <div class="card">
       <h3 style="margin-bottom:0.8rem;">Datos del conductor</h3>
+
+      {# Info rápida #}
       <p><strong>Correo:</strong> {{ conductor.correo }}</p>
-      <p style="margin-top:0.5rem; font-size:1.3rem; font-weight:800; color:var(--color-primary);">
-        💰 Saldo: ${{ conductor.saldo }}
-      </p>
-      <div style="margin-top:0.8rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+      {% if conductor.telefono %}
+        <p style="margin-top:0.3rem;"><strong>Teléfono:</strong> {{ conductor.telefono }}</p>
+      {% endif %}
+      {% if conductor.numero_dni %}
+        <p style="margin-top:0.3rem;"><strong>DNI:</strong> {{ conductor.numero_dni }}</p>
+      {% endif %}
+
+      <div style="margin-top:0.5rem; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+        <p style="font-size:1.3rem; font-weight:800; color:var(--color-primary); margin:0;">
+          💰 Saldo: ${{ conductor.saldo }}
+        </p>
+        {% if conductor.es_verificado %}
+          <span style="background:var(--color-primary); color:#fff; font-size:0.78rem;
+                       font-weight:700; padding:0.2rem 0.6rem; border-radius:99px;">
+            ✅ Verificado
+          </span>
+        {% else %}
+          <span style="background:var(--color-warning); color:#fff; font-size:0.78rem;
+                       font-weight:700; padding:0.2rem 0.6rem; border-radius:99px;">
+            ⏳ Sin verificar
+          </span>
+        {% endif %}
+      </div>
+
+      <div style="margin-top:0.8rem;">
         <a href="{% url 'cargar_saldo' conductor.id %}" class="btn btn-outline" style="font-size:0.9rem;">
           + Cargar saldo
         </a>
       </div>
 
-      {# Editar nombre y apellido #}
+      {# Editar datos #}
       <form method="post" style="margin-top:1rem;">
         {% csrf_token %}
         <input type="hidden" name="accion" value="editar_datos">
-        <div style="display:flex; gap:0.5rem; margin-top:0.25rem; flex-wrap:wrap;">
-          <div style="flex:1; min-width:120px;">
+
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap;">
+          <div style="flex:1; min-width:110px;">
             <label style="font-size:0.88rem; color:var(--color-text-muted);">Nombre</label>
             <input name="nombre" value="{{ conductor.first_name }}" placeholder="Nombre"
                    style="width:100%; margin-top:0.2rem;" />
           </div>
-          <div style="flex:1; min-width:120px;">
+          <div style="flex:1; min-width:110px;">
             <label style="font-size:0.88rem; color:var(--color-text-muted);">Apellido</label>
             <input name="apellido" value="{{ conductor.last_name }}" placeholder="Apellido"
                    style="width:100%; margin-top:0.2rem;" />
           </div>
-          <div style="display:flex; align-items:flex-end;">
-            <button class="btn btn-outline" type="submit" style="font-size:0.9rem;">Guardar</button>
+        </div>
+
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap;">
+          <div style="flex:1; min-width:110px;">
+            <label style="font-size:0.88rem; color:var(--color-text-muted);">Teléfono</label>
+            <input name="telefono" value="{{ conductor.telefono }}" placeholder="Ej: 2994123456"
+                   style="width:100%; margin-top:0.2rem;" />
           </div>
+          <div style="flex:1; min-width:110px;">
+            <label style="font-size:0.88rem; color:var(--color-text-muted);">DNI</label>
+            <input name="numero_dni" value="{{ conductor.numero_dni }}" placeholder="Ej: 30123456"
+                   style="width:100%; margin-top:0.2rem;" />
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+          <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.9rem; cursor:pointer;">
+            <input type="checkbox" name="es_verificado" value="1"
+                   {% if conductor.es_verificado %}checked{% endif %}
+                   style="width:1.1rem; height:1.1rem;" />
+            Identidad verificada
+          </label>
+          <button class="btn btn-outline" type="submit" style="font-size:0.9rem;">Guardar</button>
         </div>
       </form>
     </div>

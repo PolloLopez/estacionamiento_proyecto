@@ -6,15 +6,10 @@
 
 ## 🔴 Alta prioridad
 
-### 1. Abono mensual: selector de mes
-`/usuarios/vendedores/abono/` — el vendedor debe poder elegir qué mes abonar.
-View `cobrar_abono` tiene `mes_actual = hoy.replace(day=1)` hardcodeado en líneas 1768/1774.
-Requiere: `<select>` de mes en el form + leer el POST en la view.
-
-### 2. Admin-usuarios: editar más campos del conductor
-`/usuarios/admin-usuarios/<id>/` — detalle_usuario.html solo edita nombre/apellido.
-Falta poder: ver/editar teléfono, número de DNI, toggle `es_verificado`.
-View: `detalle_usuario_admin`.
+### 1. Selector de período al cerrar caja (vendedor)
+`/usuarios/vendedores/cerrar-caja/` — `cerrar_caja` no pide período.
+El modelo `CierreCaja` tiene campo `periodo` (diario/semanal/mensual) pero no se usa.
+Requiere: `<select>` en el form de cierre + guardarlo en el cierre.
 
 ### 3. Selector de período al cerrar caja (vendedor)
 `/usuarios/vendedores/cerrar-caja/` — `cerrar_caja` no pide período.
@@ -80,6 +75,9 @@ Hacer en un sprint dedicado — no mezclar con features.
 ---
 
 ## ✅ Resuelto
+
+- Abono mensual: selector de mes — 4 opciones (2 atrás, actual, siguiente), validación por mes elegido
+- Admin-usuarios: editar teléfono, DNI, toggle es_verificado + badge en detalle
 
 - Admin rendición a tesorería: view `crear_rendicion` + URL + template con cálculo en tiempo real
 - Doble alert: `cobrar_abono.html`, `resumen_caja.html`, `panel_tesorero.html`, `rendiciones.html`

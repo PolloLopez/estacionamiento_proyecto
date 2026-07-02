@@ -2290,17 +2290,23 @@ def detalle_usuario_admin(request, usuario_id):
             messages.success(request, f"Vehículo {patente} ({vehiculo.get_tipo_display()}) agregado.")
             vehiculos = Vehiculo.objects.filter(vehiculousuario__usuario=conductor)
 
-    # Editar datos básicos del conductor
+    # Editar datos del conductor
     elif accion == "editar_datos":
-        nombre   = request.POST.get("nombre", "").strip()
-        apellido = request.POST.get("apellido", "").strip()
-        if nombre or apellido:
-            if nombre:
-                conductor.first_name = nombre
-            if apellido:
-                conductor.last_name = apellido
-            conductor.save(update_fields=["first_name", "last_name"])
-            messages.success(request, "Datos actualizados.")
+        nombre        = request.POST.get("nombre", "").strip()
+        apellido      = request.POST.get("apellido", "").strip()
+        telefono      = request.POST.get("telefono", "").strip()
+        numero_dni    = request.POST.get("numero_dni", "").strip()
+        es_verificado = request.POST.get("es_verificado") == "1"
+
+        if nombre:
+            conductor.first_name = nombre
+        if apellido:
+            conductor.last_name = apellido
+        conductor.telefono      = telefono
+        conductor.numero_dni    = numero_dni
+        conductor.es_verificado = es_verificado
+        conductor.save(update_fields=["first_name", "last_name", "telefono", "numero_dni", "es_verificado"])
+        messages.success(request, "Datos actualizados.")
 
     # Últimas 5 infracciones de sus vehículos (preview — "Ver todas" va a admin_infracciones)
     infracciones = Infraccion.objects.filter(
