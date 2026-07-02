@@ -1725,14 +1725,44 @@ def cobrar_abono(request):
     El vendedor cobra el abono mensual de un vehiculo.
 
     Flujo:
-    - GET/POST sin confirmar: muestra formulario de patente
+    - GET/POST sin confirmar: muestra formulario con patente + selector de mes
     - POST accion=confirmar: muestra resumen antes de cobrar
     - POST accion=cobrar: registra el AbonoMensual y el MovimientoCaja
     """
     from datetime import date
+
+    MESES_ES = [
+        "Enero","Febrero","Marzo","Abril","Mayo","Junio",
+        "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
+    ]
+
+    def _sumar_meses(d, n):
+        """Suma n meses a la fecha d (sin dateutil)."""
+        mes = d.month - 1 + n   # 0-indexed
+        año = d.year + mes // 12
+        mes = mes % 12 + 1
+        return date(año, mes, 1)
+
+    hoy      = date.today()
+    mes_base = hoy.replace(day=1)
+
+    # Opciones: 2 meses atrás, mes anterior, mes actual (default), mes siguiente
+    opciones_mes = [
+        (_sumar_meses(mes_base, delta).isoformat(),
+         f"{MESES_ES[_sumar_meses(mes_base, delta).month - 1]} {_sumar_meses(mes_base, delta).year}")
+        for delta in [-2, -1, 0, 1]
+    ]
+
+    # Mes seleccionado: viene del POST o por defecto el actual
+    mes_str = (request.POST.get("mes") or "").strip() if request.method == "POST" else ""
+    try:
+        mes_seleccionado = date.fromisoformat(mes_str) if mes_str else mes_base
+    except ValueError:
+        mes_seleccionado = mes_base
+    mes_label = f"{MESES_ES[mes_seleccionado.month - 1]} {mes_seleccionado.year}"
+
     vendedor  = request.user
     municipio = vendedor.municipio
-
     tarifa_obj = Tarifa.objects.filter(municipio=municipio).first()
 
     error     = None
@@ -1751,8 +1781,8 @@ def cobrar_abono(request):
             if not vehiculo:
                 error = f"No existe ningun vehiculo con patente {patente}."
             else:
-                # Calcular precio segun tipo
-                es_moto    = getattr(vehiculo, "tipo", "auto") == "moto"
+                # Calcular precio segun tipo de vehiculo
+                es_moto     = getattr(vehiculo, "tipo", "auto") == "moto"
                 precio_moto = getattr(tarifa_obj, "precio_abono_moto", None) if tarifa_obj else None
                 precio_auto = getattr(tarifa_obj, "precio_abono_auto", None) if tarifa_obj else None
 
@@ -1764,23 +1794,22 @@ def cobrar_abono(request):
                     error = "No hay tarifa de abono configurada. Configurala en Tarifas."
 
                 if not error:
-                    hoy        = date.today()
-                    mes_actual = hoy.replace(day=1)
-
-                    # Verificar si ya tiene abono este mes
+                    # Verificar si ya tiene abono en el mes seleccionado
                     ya_tiene = AbonoMensual.objects.filter(
                         vehiculo=vehiculo,
                         municipio=municipio,
-                        mes=mes_actual,
+                        mes=mes_seleccionado,
                     ).exists()
 
                     if ya_tiene:
-                        error = f"El vehiculo {patente} ya tiene abono activo para este mes."
+                        error = (
+                            f"El vehiculo {patente} ya tiene abono para "
+                            f"{mes_label}."
+                        )
                     elif accion == "confirmar":
                         confirmar = True
                     elif accion == "cobrar":
-                        # Calcular comision
-                        comision_pct = getattr(municipio, 'comision_vendedor', None) or Decimal('0')
+                        comision_pct   = getattr(municipio, "comision_vendedor", None) or Decimal("0")
                         comision_monto = (precio * comision_pct / 100).quantize(Decimal("0.01"))
 
                         with transaction.atomic():
@@ -1788,7 +1817,7 @@ def cobrar_abono(request):
                                 usuario=vendedor,
                                 monto=precio,
                                 tipo="ingreso",
-                                descripcion="Abono mensual " + mes_actual.strftime("%m/%Y") + " - " + patente,
+                                descripcion=f"Abono mensual {mes_seleccionado.strftime('%m/%Y')} - {patente}",
                                 medio_pago="efectivo",
                                 comision_monto=comision_monto,
                             )
@@ -1796,7 +1825,7 @@ def cobrar_abono(request):
                                 vehiculo=vehiculo,
                                 municipio=municipio,
                                 vendedor=vendedor,
-                                mes=mes_actual,
+                                mes=mes_seleccionado,
                                 monto=precio,
                                 medio_pago="efectivo",
                                 movimiento_caja=movimiento,
@@ -1804,17 +1833,20 @@ def cobrar_abono(request):
 
                         messages.success(
                             request,
-                            f"Abono registrado para {patente} — ${precio}. "
+                            f"Abono de {mes_label} registrado para {patente} — ${precio}. "
                             f"Comision generada: ${comision_monto}."
                         )
                         return redirect("cobrar_abono")
 
     return render(request, "vendedores/cobrar_abono.html", {
-        "vehiculo":  vehiculo,
-        "precio":    precio,
-        "confirmar": confirmar,
-        "error":     error,
-        "tarifa_obj": tarifa_obj,
+        "vehiculo":       vehiculo,
+        "precio":         precio,
+        "confirmar":      confirmar,
+        "error":          error,
+        "tarifa_obj":     tarifa_obj,
+        "opciones_mes":   opciones_mes,
+        "mes_seleccionado": mes_seleccionado.isoformat(),
+        "mes_label":      mes_label,
     })
 
 # VIEWS VENDEDORES

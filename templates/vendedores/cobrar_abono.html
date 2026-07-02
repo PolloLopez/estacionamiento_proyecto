@@ -17,18 +17,31 @@
           {% csrf_token %}
           <input type="hidden" name="accion" value="confirmar" />
 
-          <div style="margin-bottom:1rem;">
-            <label for="patente">Patente del vehículo</label>
-            <input
-              id="patente"
-              name="patente"
-              type="text"
-              maxlength="10"
-              required
-              autofocus
-              style="text-transform:uppercase;"
-              value="{{ request.POST.patente|default:'' }}"
-            />
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <div style="flex:2; min-width:140px;">
+              <label for="patente">Patente del vehículo</label>
+              <input
+                id="patente"
+                name="patente"
+                type="text"
+                maxlength="10"
+                required
+                autofocus
+                style="text-transform:uppercase; margin-top:0.3rem;"
+                value="{{ request.POST.patente|default:'' }}"
+              />
+            </div>
+            <div style="flex:1; min-width:160px;">
+              <label for="mes">Mes a abonar</label>
+              <select id="mes" name="mes" style="width:100%; margin-top:0.3rem;">
+                {% for valor, etiqueta in opciones_mes %}
+                  <option value="{{ valor }}"
+                    {% if valor == mes_seleccionado %}selected{% endif %}>
+                    {{ etiqueta }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
           </div>
 
           {% if error %}
@@ -58,7 +71,7 @@
             </tr>
             <tr>
               <td style="padding:0.4rem 0; color:var(--color-text-muted);">Período</td>
-              <td style="padding:0.4rem 0;">Mes actual</td>
+              <td style="padding:0.4rem 0; font-weight:600;">{{ mes_label }}</td>
             </tr>
             <tr>
               <td style="padding:0.4rem 0; color:var(--color-text-muted);">Monto</td>
@@ -77,6 +90,7 @@
           {% csrf_token %}
           <input type="hidden" name="accion" value="cobrar" />
           <input type="hidden" name="patente" value="{{ vehiculo.patente }}" />
+          <input type="hidden" name="mes" value="{{ mes_seleccionado }}" />
           <button class="btn" type="submit" style="font-size:1.05rem;">
             ✅ Confirmar cobro — ${{ precio }}
           </button>
