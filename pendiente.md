@@ -23,29 +23,26 @@ Agregar `<select>` de mes al formulario. View: `cobrar_abono` — `mes_actual` h
 El admin cierra un período y rinde a tesorería con desglose por tipo de pago:
 - Cuánto en efectivo
 - Cuánto por cada medio digital (sistema / tarjeta / transferencia)
-Requiere: view nueva, template, posiblemente usar modelo Rendicion existente.
-Actualmente `/usuarios/admin-rendiciones/` usa CierreCaja (vendedores), no tiene flujo de admin→tesorero.
+Modelo `Rendicion` YA EXISTE con todos los campos necesarios (fecha_desde/hasta, total_efectivo,
+total_digital, total_comisiones, total_neto, estado, notas_tesorero).
+`panel_tesorero` YA muestra las Rendicion del municipio — solo falta la view de creación.
+Requiere: view `crear_rendicion` (admin POST) + URL + template.
+`admin_rendiciones` sigue siendo CierreCaja (vendedor→admin) — correcto, no tocar.
+
+### 5. Doble alerta en resumen_caja.html y panel_tesorero.html
+Mismo patrón que el ya resuelto en detalle_usuario.html: tienen su propio `{% if messages %}`
+que duplica el de base.html.
+- `templates/vendedores/resumen_caja.html` — líneas 20-25
+- `templates/tesorero/panel_tesorero.html` — líneas 11-16
 
 ---
 
 ## 🟡 Media prioridad
 
-### 5. Vendedor caja: mostrar movimientos de infracciones
-`/usuarios/vendedores/caja/` — los movimientos de infracciones cobradas deben aparecer
-y el "Total a rendir" debe incluirlos.
-
-### 6. Tesorería: mostrar rendiciones recibidas
-Panel tesorero debe mostrar las rendiciones que le han hecho (qué recibió, cuándo, de quién).
-View: `panel_tesorero` — agregar query de CierreCaja certificados + Rendicion del municipio.
-
-### 7. Inspector: PDF de infracciones del día
+### 6. Inspector: PDF de infracciones del día
 El inspector "presenta" sus infracciones del día como PDF (no rinde dinero).
 PDF con listado ordenado por número de acta: fecha, patente, tipo, subcuadra, monto, estado.
 Requiere: view que filtra por inspector+fecha, genera PDF, botón en "Mis infracciones".
-
-### 8. admin_rendiciones: migrar a modelo Rendicion
-La view `admin_rendiciones` usa el modelo viejo `CierreCaja`.
-Hay un modelo nuevo `Rendicion` que todavía no se usa acá.
 
 ---
 
@@ -71,8 +68,15 @@ Hacer en un sprint dedicado — no mezclar con features.
 
 ---
 
-## ✅ Resuelto esta sesión
+## ✅ Resuelto esta sesión (hoy)
 
+- Admin rendición a tesorería: view `crear_rendicion` + URL + template `crear_rendicion.html`
+  Modelo `Rendicion` ya existía; panel_tesorero ya la muestra. Solo faltaba el formulario de creación.
+- Doble alert eliminado: `cobrar_abono.html`, `resumen_caja.html`, `panel_tesorero.html`, `rendiciones.html`
+- `certificar_comision` restaurada (estaba truncada en working copy por desfase mount Windows/Linux)
+- Vendedor caja: infracciones ya aparecen (`cobrar_infraccion_vendedor` crea MovimientoCaja)
+- Tesorería rendiciones: `panel_tesorero` ya muestra modelo `Rendicion` — template completo
+- admin_rendiciones: usa CierreCaja (vendedor→admin) — correcto, no necesita migración
 - `gestionar_infracciones.html` eliminado
 - `puede_estacionar_ahora()` con caché de 1 hora
 - `duracion_min` → `duracion_horas` (migration 0036)

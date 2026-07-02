@@ -2,19 +2,19 @@
 {% block title %}Rendiciones{% endblock %}
 
 {% block content %}
-<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
-  <h2 style="margin:0;">💼 Rendiciones</h2>
-  {% if conteo_pendientes > 0 %}
-    <span class="badge badge-pendiente">{{ conteo_pendientes }} sin certificar</span>
-  {% endif %}
+<div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+  <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+    <h2 style="margin:0;">💼 Rendiciones de vendedores</h2>
+    {% if conteo_pendientes > 0 %}
+      <span class="badge badge-pendiente">{{ conteo_pendientes }} sin certificar</span>
+    {% endif %}
+  </div>
+  <a href="{% url 'crear_rendicion' %}" class="btn" style="font-size:0.9rem; padding:0.5rem 1.1rem;">
+    📋 Rendir a tesorería
+  </a>
 </div>
 
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-warning{% endif %}"
-         style="margin-bottom:1rem;">{{ message }}</div>
-  {% endfor %}
-{% endif %}
+{# Los mensajes los muestra base.html — no duplicar aquí #}
 
 {# ── Filtros rápidos ─────────────────────────────────────────────── #}
 <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">

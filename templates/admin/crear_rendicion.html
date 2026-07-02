@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Nueva Rendición{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>📋 Nueva rendición a tesorería</h2>
+    <a href="{% url 'admin_rendiciones' %}" class="btn btn-outline">← Volver</a>
+  </div>
+
+  {# Los mensajes los muestra base.html — no duplicar aquí #}
+
+  <form method="post" id="form-rendicion">
+    {% csrf_token %}
+
+    <div class="grid grid-2" style="gap:1rem; margin-bottom:1rem;">
+
+      <!-- Período y fechas -->
+      <div class="card">
+        <h3 style="margin-bottom:1rem;">📅 Período</h3>
+
+        <div style="margin-bottom:0.75rem;">
+          <label>Tipo de período <span style="color:var(--color-danger);">*</span></label>
+          <select name="periodo" required style="width:100%; margin-top:0.3rem;">
+            {% for valor, etiqueta in periodos %}
+              <option value="{{ valor }}">{{ etiqueta }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <div style="flex:1; min-width:130px;">
+            <label>Desde <span style="color:var(--color-danger);">*</span></label>
+            <input type="date" name="fecha_desde" required
+                   value="{{ hoy|date:'Y-m-01' }}"
+                   style="width:100%; margin-top:0.3rem;" />
+          </div>
+          <div style="flex:1; min-width:130px;">
+            <label>Hasta <span style="color:var(--color-danger);">*</span></label>
+            <input type="date" name="fecha_hasta" required
+                   value="{{ hoy|date:'Y-m-d' }}"
+                   style="width:100%; margin-top:0.3rem;" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Montos -->
+      <div class="card">
+        <h3 style="margin-bottom:1rem;">💵 Desglose de cobros</h3>
+
+        <div style="margin-bottom:0.75rem;">
+          <label>Efectivo ($)</label>
+          <input type="number" name="total_efectivo" id="id_efectivo"
+                 min="0" step="0.01" value="0" required
+                 style="width:100%; margin-top:0.3rem;"
+                 oninput="calcularNeto()" />
+        </div>
+
+        <div style="margin-bottom:0.75rem;">
+          <label>Digital — sistema / tarjeta / transferencias ($)</label>
+          <input type="number" name="total_digital" id="id_digital"
+                 min="0" step="0.01" value="0" required
+                 style="width:100%; margin-top:0.3rem;"
+                 oninput="calcularNeto()" />
+        </div>
+
+        <div style="margin-bottom:0.75rem;">
+          <label>Comisiones de vendedores ($)</label>
+          <input type="number" name="total_comisiones" id="id_comisiones"
+                 min="0" step="0.01" value="0"
+                 style="width:100%; margin-top:0.3rem;"
+                 oninput="calcularNeto()" />
+        </div>
+
+        <!-- Total neto calculado -->
+        <div style="margin-top:1rem; padding:0.75rem; background:var(--color-bg-alt);
+                    border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.95rem; color:var(--color-text-muted);">Total neto a rendir</span>
+          <span id="id_neto" style="font-size:1.6rem; font-weight:800; color:var(--color-primary);">$0.00</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Notas opcionales -->
+    <div class="card" style="margin-bottom:1rem;">
+      <label>Notas / observaciones (opcional)</label>
+      <textarea name="notas" rows="3" placeholder="Ej: período con feriado el día 25..."
+                style="width:100%; margin-top:0.3rem; resize:vertical;"></textarea>
+    </div>
+
+    <!-- Botón submit -->
+    <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+      <a href="{% url 'admin_rendiciones' %}" class="btn btn-outline">Cancelar</a>
+      <button type="submit" class="btn" style="padding:0.7rem 2rem;">
+        ✅ Generar rendición
+      </button>
+    </div>
+
+  </form>
+
+</section>
+
+<script>
+function calcularNeto() {
+  const efectivo   = parseFloat(document.getElementById('id_efectivo').value)   || 0;
+  const digital    = parseFloat(document.getElementById('id_digital').value)    || 0;
+  const comisiones = parseFloat(document.getElementById('id_comisiones').value) || 0;
+  const neto = efectivo + digital - comisiones;
+  document.getElementById('id_neto').textContent = '$' + neto.toFixed(2);
+}
+// Calcular al cargar
+calcularNeto();
+</script>
+{% endblock %}

@@ -2880,6 +2880,59 @@ def admin_rendiciones(request):
 
 
 @require_role("admin")
+def crear_rendicion(request):
+    """
+    El admin genera una rendición a tesorería.
+    Ingresa el período, fechas y el desglose de cobros (efectivo vs. digital).
+    El total_neto se calcula automáticamente: efectivo + digital - comisiones.
+    """
+    from decimal import Decimal as _Dec
+    from datetime import date
+
+    municipio = request.user.municipio
+
+    if request.method == "POST":
+        periodo         = request.POST.get("periodo", "").strip()
+        fecha_desde_str = request.POST.get("fecha_desde", "").strip()
+        fecha_hasta_str = request.POST.get("fecha_hasta", "").strip()
+        notas           = request.POST.get("notas", "").strip()
+
+        try:
+            total_efectivo   = _Dec(request.POST.get("total_efectivo", "0") or "0")
+            total_digital    = _Dec(request.POST.get("total_digital",  "0") or "0")
+            total_comisiones = _Dec(request.POST.get("total_comisiones", "0") or "0")
+        except Exception:
+            messages.error(request, "Los montos deben ser números válidos.")
+            return redirect("crear_rendicion")
+
+        if not periodo or not fecha_desde_str or not fecha_hasta_str:
+            messages.error(request, "Completá todos los campos obligatorios.")
+            return redirect("crear_rendicion")
+
+        total_neto = total_efectivo + total_digital - total_comisiones
+
+        Rendicion.objects.create(
+            municipio        = municipio,
+            admin            = request.user,
+            periodo          = periodo,
+            fecha_desde      = fecha_desde_str,
+            fecha_hasta      = fecha_hasta_str,
+            total_efectivo   = total_efectivo,
+            total_digital    = total_digital,
+            total_comisiones = total_comisiones,
+            total_neto       = total_neto,
+            notas_tesorero   = notas,
+        )
+        messages.success(request, f"Rendición generada. Total neto a rendir: ${total_neto}")
+        return redirect("admin_rendiciones")
+
+    return render(request, "admin/crear_rendicion.html", {
+        "periodos": Rendicion.PERIODOS,
+        "hoy": date.today(),
+    })
+
+
+@require_role("admin")
 def certificar_cierre(request, cierre_id):
     """
     El admin certifica (audita) un cierre de caja.
@@ -3192,7 +3245,7 @@ def certificar_comision(request, liquidacion_id):
 
     if request.method == "POST":
         with transaction.atomic():
-            liquidacion.estado        = "certificada"
+            liquidacion.estado         = "certificada"
             liquidacion.certificada_en = timezone.now()
             liquidacion.save(update_fields=["estado", "certificada_en"])
         messages.success(request, "Comision certificada correctamente.")

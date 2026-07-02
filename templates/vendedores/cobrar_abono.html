@@ -8,12 +8,7 @@
 
       <h1>📅 Cobrar abono mensual</h1>
 
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}"
-               style="margin-bottom:1rem;">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
+      {# Los mensajes los muestra base.html — no duplicar aquí #}
 
       {% if not confirmar %}
 

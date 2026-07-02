@@ -33,9 +33,10 @@
 
 ## 🟡 FUNCIONAL — CONDUCTOR
 
+- [ ] estando logueado como usuario y querer ir al inicio: ".../usuarios/inicio/"  rompe
 - [ ] Timer en inicio muestra NaN:NaN (error de parsing de fecha en JS)
-- [ ] MercadoPago: flujo funciona pero está en **sandbox** — falta pasar a producción
-- [ ] Usuario creado por Google OAuth no tiene `es_conductor=True` → no puede estacionar ni cargar saldo
+- [ ] Descuento de saldo debe ser al "Estacionar" al finalizar, aparece pagar y finalizar
+- [ ] Usuario creado por Google OAuth no carga correctamente nombre y apellido, al ingresar por primera vez con google dirigir a completar sus datos
 
 ---
 

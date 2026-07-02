@@ -8,12 +8,7 @@
     <h1>🏦 Tesorería</h1>
   </div>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-warning{% endif %}"
-           style="margin-bottom:1rem;">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
+  {# Los mensajes los muestra base.html — no duplicar aquí #}
 
   {# Resumen rápido #}
   <div class="grid grid-2" style="margin-bottom:1.5rem;">

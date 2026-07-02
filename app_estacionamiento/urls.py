@@ -102,6 +102,7 @@ urlpatterns = [
     # 💼 RENDICIONES (ADMIN)
     # =========================
     path("admin-rendiciones/", views.admin_rendiciones, name="admin_rendiciones"),
+    path("admin-rendiciones/crear/", views.crear_rendicion, name="crear_rendicion"),
     path("admin-rendiciones/<int:cierre_id>/certificar/", views.certificar_cierre, name="certificar_cierre"),
 
     # =========================
