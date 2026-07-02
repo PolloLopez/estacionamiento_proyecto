@@ -1,90 +1,102 @@
 # Pendiente — Estacionamiento Proyecto
 
-Tareas pendientes ordenadas por prioridad. Actualizar cuando se resuelvan.
+Última actualización: 2026-07-02
 
 ---
 
 ## 🔴 Alta prioridad
 
-### 1. Doble alerta en vendedores/cobrar_abono.html
-El template todavía tiene su propio `{% if messages %}` block además del que ya está en base.html.
-Archivo: `templates/vendedores/cobrar_abono.html` — líneas 11-16
+### 1. Abono mensual: selector de mes
+`/usuarios/vendedores/abono/` — el vendedor debe poder elegir qué mes abonar.
+View `cobrar_abono` tiene `mes_actual = hoy.replace(day=1)` hardcodeado en líneas 1768/1774.
+Requiere: `<select>` de mes en el form + leer el POST en la view.
 
-### 2. Admin-usuarios: editar datos, cargar saldo, verificar
-`/usuarios/admin-usuarios/` necesita poder:
-- Cambiar es_verificado (toggle)
-- Ver telefono, numero_dni en el detalle
+### 2. Admin-usuarios: editar más campos del conductor
+`/usuarios/admin-usuarios/<id>/` — detalle_usuario.html solo edita nombre/apellido.
+Falta poder: ver/editar teléfono, número de DNI, toggle `es_verificado`.
+View: `detalle_usuario_admin`.
 
-### 3. Abono mensual: selector de mes
-`/usuarios/vendedores/abono/` — el vendedor debe poder elegir el mes a abonar.
-Agregar `<select>` de mes al formulario. View: `cobrar_abono` — `mes_actual` hardcodeado.
-
-### 4. Admin rendición a tesorería (nuevo flujo)
-El admin cierra un período y rinde a tesorería con desglose por tipo de pago:
-- Cuánto en efectivo
-- Cuánto por cada medio digital (sistema / tarjeta / transferencia)
-Modelo `Rendicion` YA EXISTE con todos los campos necesarios (fecha_desde/hasta, total_efectivo,
-total_digital, total_comisiones, total_neto, estado, notas_tesorero).
-`panel_tesorero` YA muestra las Rendicion del municipio — solo falta la view de creación.
-Requiere: view `crear_rendicion` (admin POST) + URL + template.
-`admin_rendiciones` sigue siendo CierreCaja (vendedor→admin) — correcto, no tocar.
-
-### 5. Doble alerta en resumen_caja.html y panel_tesorero.html
-Mismo patrón que el ya resuelto en detalle_usuario.html: tienen su propio `{% if messages %}`
-que duplica el de base.html.
-- `templates/vendedores/resumen_caja.html` — líneas 20-25
-- `templates/tesorero/panel_tesorero.html` — líneas 11-16
+### 3. Selector de período al cerrar caja (vendedor)
+`/usuarios/vendedores/cerrar-caja/` — `cerrar_caja` no pide período.
+El modelo `CierreCaja` tiene campo `periodo` (diario/semanal/mensual) pero no se usa.
+Requiere: `<select>` en el form de cierre + guardarlo en el cierre.
 
 ---
 
 ## 🟡 Media prioridad
 
-### 6. Inspector: PDF de infracciones del día
-El inspector "presenta" sus infracciones del día como PDF (no rinde dinero).
-PDF con listado ordenado por número de acta: fecha, patente, tipo, subcuadra, monto, estado.
-Requiere: view que filtra por inspector+fecha, genera PDF, botón en "Mis infracciones".
+### 4. Inspector: PDF de infracciones del día
+El inspector "presenta" sus infracciones del día como PDF.
+Listado ordenado por número de acta: fecha, patente, tipo, subcuadra, monto, estado.
+Requiere: view + PDF generation + botón en "Mis infracciones".
+
+### 5. Google OAuth: nombre y apellido no se cargan
+Usuario creado por Google OAuth no guarda `first_name` / `last_name` correctamente.
+Al ingresar por primera vez con Google, redirigir a `completar_perfil`.
+Requiere: adapter de allauth o signal `user_signed_up`.
+
+### 6. Subcuadras vacías al registrar infracción
+`registrar_infraccion` usa `get_subcuadra_default()` — si el municipio no tiene subcuadras
+cargadas, la view muestra error y el inspector no puede labrar acta.
+Requiere: verificar si hay subcuadras en producción o mejorar el manejo del caso vacío.
+
+### 7. /usuarios/inicio/ rompe cuando conductor está logueado
+Reportado en PENDIENTES.md (2026-06-10). Verificar si sigue ocurriendo con la versión actual.
+View: `inicio_usuarios`.
+
+### 8. Timer en inicio_usuarios muestra "calculando…" indefinido
+El JS usa `hora_inicio|date:"U"` (Unix timestamp). Si hay problema de zona horaria
+el `new Date(ts * 1000)` puede dar un fin ya pasado o incorrecto.
+Template: `templates/usuarios/inicio_usuarios.html` línea 57.
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
 ### 9. Inspector: foto con watermark y GPS
-Al labrar acta, el inspector saca foto desde el celular con watermark (fecha, hora, GPS, patente).
-Modelo Infraccion ya tiene campo foto (ImageField). Dejar para v2.
+Al labrar acta el inspector saca foto desde el celular con watermark (fecha, hora, GPS, patente).
+`Infraccion` ya tiene campo `foto` (ImageField). Dejar para v2.
 
 ### 10. Inspector como cobrador (paid feature)
-Si se activa: agregar "inspector" al decorator de registrar_estacionamiento_vendedor y cobrar_abono.
+Si se activa: agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `cobrar_abono`.
 
 ### 11. Dividir views.py en módulos por rol
-views.py tiene ~3200 líneas. Dividir en views_admin.py, views_conductor.py, etc.
+~3256 líneas. Dividir en `views_admin.py`, `views_conductor.py`, etc.
 Hacer en un sprint dedicado — no mezclar con features.
 
 ### 12. Tests faltantes
-- Test abono mensual (cobro, verificación, conflicto mismo mes)
-- Test tolerancia multa (pagar antes vs después del período)
-- Test comisiones (que comision_monto se grabe correctamente)
-- Test tesorero: depositar → vendedor certifica
-- Test multi-municipio (datos aislados)
+- Abono mensual (cobro, verificación, conflicto mismo mes)
+- Tolerancia multa (pagar antes vs después del período de gracia)
+- Comisiones (que `comision_monto` se grabe correctamente)
+- Tesorero: depositar → vendedor certifica
+- Multi-municipio (datos aislados entre municipios)
+- Flujo MP webhook (integración)
+
+### 13. Mejoras OAuth y UI
+- Pantalla de consentimiento Google: completar logo, descripción, dominio verificado
+- Modo alto contraste / uso en exterior con sol
+- Separar `settings_dev.py` / `settings_prod.py`
 
 ---
 
-## ✅ Resuelto esta sesión (hoy)
+## ✅ Resuelto
 
-- Admin rendición a tesorería: view `crear_rendicion` + URL + template `crear_rendicion.html`
-  Modelo `Rendicion` ya existía; panel_tesorero ya la muestra. Solo faltaba el formulario de creación.
-- Doble alert eliminado: `cobrar_abono.html`, `resumen_caja.html`, `panel_tesorero.html`, `rendiciones.html`
-- `certificar_comision` restaurada (estaba truncada en working copy por desfase mount Windows/Linux)
-- Vendedor caja: infracciones ya aparecen (`cobrar_infraccion_vendedor` crea MovimientoCaja)
-- Tesorería rendiciones: `panel_tesorero` ya muestra modelo `Rendicion` — template completo
-- admin_rendiciones: usa CierreCaja (vendedor→admin) — correcto, no necesita migración
+- Admin rendición a tesorería: view `crear_rendicion` + URL + template con cálculo en tiempo real
+- Doble alert: `cobrar_abono.html`, `resumen_caja.html`, `panel_tesorero.html`, `rendiciones.html`
+- `certificar_comision`: restaurada (estaba truncada en working copy)
+- Cobrar infracciones por patente: `cobrar_infraccion_vendedor` completo y crea `MovimientoCaja`
+- Tesorería rendiciones: `panel_tesorero` ya muestra `Rendicion` — template completo
 - `gestionar_infracciones.html` eliminado
 - `puede_estacionar_ahora()` con caché de 1 hora
 - `duracion_min` → `duracion_horas` (migration 0036)
 - `precio_por_hora_moto` → null=True (migration 0037)
-- Procfile: `migrate` antes de `gunicorn` — migraciones automáticas en deploy
-- Panel inspector: solo "Infracciones hoy" + Verificar + Mis infracciones
+- Procfile: `migrate --noinput` antes de `gunicorn`
+- Panel inspector: solo "Infracciones hoy" + Verificar + Mis infracciones (sin dinero)
 - panel_admin: sin tabla de estacionamientos; stat "Conductores registrados"
-- inicio_admin: redirige a panel_admin (no mostraba nada)
-- detalle_usuario: doble alert eliminado, infracciones últimas 5 + "Ver todas",
-  responsive en tabla vehículos, tipo en agregar vehículo
-- CSRF fix: agregar CSRF_TRUSTED_ORIGINS=https://estacionamiento.up.railway.app en Railway vars
+- inicio_admin: redirige a panel_admin
+- detalle_usuario: doble alert eliminado, infracciones últimas 5 + "Ver todas", responsive + tipo vehículo
+- CSRF: agregar `CSRF_TRUSTED_ORIGINS=https://estacionamiento.up.railway.app` en Railway vars
+- SITE_ID=2 en Railway vars (confirmado por usuario)
+- Google OAuth `redirect_uri_mismatch`: nuevo cliente OAuth + URI autorizada
+- Branding por municipio (logo + colores + nombre_sistema)
+- Menú hamburguesa, botones sin estilo, 403.html, NoReverseMatch caja_inspector
