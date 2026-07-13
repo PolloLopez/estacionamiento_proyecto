@@ -33,11 +33,8 @@ class RequiereMunicipioMiddleware:
         return self.get_response(request)
 
     def _debe_redirigir(self, request):
-        # Solo actúa sobre usuarios autenticados sin municipio
+        # Solo actúa sobre usuarios autenticados
         if not request.user.is_authenticated:
-            return False
-
-        if request.user.municipio_id:
             return False
 
         # Evitar loop: no redirigir si ya está en una URL exenta
@@ -46,7 +43,13 @@ class RequiereMunicipioMiddleware:
             if ruta.startswith(url_exenta):
                 return False
 
-        # Solo redirigir si hay más de un municipio.
-        # Importación tardía para evitar problemas de arranque de Django.
-        from .models import Municipio
-        return Municipio.objects.filter(activo=True).count() > 1
+        # Sin municipio y hay más de uno activo → elegir municipio
+        if not request.user.municipio_id:
+            from .models import Municipio
+            return Municipio.objects.filter(activo=True).count() > 1
+
+        # Conductor sin nombre (puede ocurrir con cuentas Google sin given_name)
+        if request.user.es_conductor and not request.user.first_name:
+            return True
+
+        return False

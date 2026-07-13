@@ -45,6 +45,7 @@ urlpatterns = [
     path("inspectores/resumen/", views.resumen_infracciones, name="inspectores_resumen_infracciones"),
     path("inspectores/caja/", views.caja_inspector, name="inspectores_caja"),
     path("inspectores/cerrar-caja/", views.cerrar_caja, name="inspectores_cerrar_caja"),
+    path("inspectores/pdf-infracciones/", views.pdf_infracciones_hoy, name="inspectores_pdf_infracciones"),
     path("inspectores/ticket/<int:infraccion_id>/", views.ticket_infraccion, name="inspectores_ticket"),
     path("inspectores/ticket-cobro/<int:est_id>/", views.ticket_cobro, name="inspectores_ticket_cobro"),
     path("ticket-pago-multa/<int:infraccion_id>/", views.ticket_pago_multa, name="ticket_pago_multa"),

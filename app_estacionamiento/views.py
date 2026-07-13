@@ -373,30 +373,69 @@ def solicitar_verificacion(request):
 @login_required
 def completar_perfil(request):
     """
-    Muestra un formulario para que el usuario seleccione su municipio.
+    Formulario de bienvenida para conductores que entran por Google OAuth.
 
-    Se usa cuando el usuario se registró via Google OAuth en un sistema
-    con múltiples municipios y aún no tiene municipio asignado.
+    Cubre dos casos que pueden ocurrir al mismo tiempo o por separado:
+    1. Sin municipio asignado (sistema multi-municipio).
+    2. Sin nombre/apellido (cuenta Google sin given_name/family_name).
 
-    Una vez que selecciona, se redirige a su panel según el rol.
+    Una vez completado, redirige al panel según el rol.
     """
+    usuario  = request.user
     municipios = Municipio.objects.filter(activo=True)
 
+    falta_municipio = not usuario.municipio_id
+    falta_nombre    = usuario.es_conductor and not usuario.first_name
+
     if request.method == "POST":
-        municipio_id = request.POST.get("municipio_id")
-        municipio = Municipio.objects.filter(id=municipio_id, activo=True).first()
+        errores = False
 
-        if not municipio:
-            messages.error(request, "Seleccioná un municipio válido.")
-            return render(request, "usuarios/completar_perfil.html", {"municipios": municipios})
+        # Validar municipio si falta
+        municipio_obj = None
+        if falta_municipio:
+            municipio_id  = request.POST.get("municipio_id")
+            municipio_obj = Municipio.objects.filter(id=municipio_id, activo=True).first()
+            if not municipio_obj:
+                messages.error(request, "Seleccioná un municipio válido.")
+                errores = True
 
-        request.user.municipio = municipio
-        request.user.save(update_fields=["municipio"])
+        # Validar nombre si falta
+        nombre   = request.POST.get("nombre", "").strip()
+        apellido = request.POST.get("apellido", "").strip()
+        if falta_nombre and not nombre:
+            messages.error(request, "El nombre es obligatorio.")
+            errores = True
 
-        messages.success(request, f"¡Bienvenido/a! Tu municipio fue configurado como {municipio.nombre}.")
-        return redirect_por_rol(request.user)
+        if errores:
+            return render(request, "usuarios/completar_perfil.html", {
+                "municipios":      municipios,
+                "falta_municipio": falta_municipio,
+                "falta_nombre":    falta_nombre,
+            })
 
-    return render(request, "usuarios/completar_perfil.html", {"municipios": municipios})
+        # Guardar campos faltantes
+        campos = []
+        if falta_municipio and municipio_obj:
+            usuario.municipio = municipio_obj
+            campos.append("municipio")
+        if falta_nombre and nombre:
+            usuario.first_name = nombre
+            campos.append("first_name")
+            if apellido:
+                usuario.last_name = apellido
+                campos.append("last_name")
+
+        if campos:
+            usuario.save(update_fields=campos)
+
+        messages.success(request, "¡Perfil completado! Ya podés usar el sistema.")
+        return redirect_por_rol(usuario)
+
+    return render(request, "usuarios/completar_perfil.html", {
+        "municipios":      municipios,
+        "falta_municipio": falta_municipio,
+        "falta_nombre":    falta_nombre,
+    })
 
 
 @require_login
@@ -1712,6 +1751,129 @@ def resumen_infracciones(request):
     return render(request, "inspectores/resumen_infracciones.html", {
         "infracciones": infracciones
     })
+
+
+@require_role("inspector", "admin")
+def pdf_infracciones_hoy(request):
+    """
+    Genera y descarga un PDF con las infracciones del inspector para el día indicado.
+    Por defecto usa hoy; acepta ?fecha=YYYY-MM-DD para días anteriores.
+    Columnas: N° acta, Hora, Patente, Subcuadra, Motivo, Monto, Estado.
+    """
+    import io
+    from datetime import date as date_type
+    from django.http import HttpResponse
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+
+    inspector = request.user
+
+    # Fecha: hoy por defecto, o la que pida el querystring
+    fecha_str = request.GET.get("fecha", "")
+    try:
+        fecha = date_type.fromisoformat(fecha_str)
+    except ValueError:
+        fecha = timezone.localtime().date()
+
+    infracciones = (
+        Infraccion.objects
+        .filter(inspector=inspector, municipio=inspector.municipio, creado_en__date=fecha)
+        .select_related("vehiculo", "subcuadra")
+        .order_by("id")
+    )
+
+    # ── Armar PDF en memoria ────────────────────────────────────────────
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=2*cm, leftMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm,
+    )
+
+    estilos = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle(
+        "titulo", parent=estilos["Title"], fontSize=14, alignment=TA_CENTER
+    )
+    estilo_sub = ParagraphStyle(
+        "sub", parent=estilos["Normal"], fontSize=9, textColor=colors.HexColor("#555555")
+    )
+
+    partes = []
+
+    # Encabezado
+    municipio_nombre = inspector.municipio.nombre if inspector.municipio else ""
+    partes.append(Paragraph(
+        f"Infracciones del día — {fecha.strftime('%d/%m/%Y')}",
+        estilo_titulo,
+    ))
+    partes.append(Spacer(1, 0.3*cm))
+    partes.append(Paragraph(
+        f"Inspector: {inspector.nombre_completo()} &nbsp;|&nbsp; Municipio: {municipio_nombre}",
+        estilo_sub,
+    ))
+    partes.append(Spacer(1, 0.6*cm))
+
+    # Tabla
+    ESTADOS = {"pendiente": "Pendiente", "pagada": "Pagada", "anulada": "Anulada"}
+    encabezado = ["Acta", "Hora", "Patente", "Subcuadra", "Motivo", "Monto", "Estado"]
+    filas = [encabezado]
+
+    for inf in infracciones:
+        hora_local = timezone.localtime(inf.creado_en).strftime("%H:%M")
+        filas.append([
+            str(inf.id),
+            hora_local,
+            inf.vehiculo.patente,
+            str(inf.subcuadra.calle) if inf.subcuadra else "—",
+            inf.motivo or "—",
+            f"${inf.monto}",
+            ESTADOS.get(inf.estado, inf.estado.capitalize()),
+        ])
+
+    if len(filas) == 1:
+        partes.append(Paragraph("Sin infracciones registradas para esta fecha.", estilos["Normal"]))
+    else:
+        anchos = [1.5*cm, 1.5*cm, 2.2*cm, 3.5*cm, 4.5*cm, 1.8*cm, 2.2*cm]
+        tabla = Table(filas, colWidths=anchos, repeatRows=1)
+        tabla.setStyle(TableStyle([
+            # Encabezado
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, 0), 9),
+            # Filas
+            ("FONTSIZE",      (0, 1), (-1, -1), 8),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            # Bordes
+            ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
+            # Alineación
+            ("ALIGN",         (5, 0), (5, -1), "RIGHT"),   # Monto
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        partes.append(tabla)
+
+    # Totales
+    total = len(filas) - 1
+    partes.append(Spacer(1, 0.5*cm))
+    partes.append(Paragraph(
+        f"Total: <b>{total}</b> infracción{'es' if total != 1 else ''}",
+        estilos["Normal"],
+    ))
+
+    doc.build(partes)
+    buffer.seek(0)
+
+    nombre_archivo = f"infracciones_{fecha.strftime('%Y%m%d')}_{inspector.id}.pdf"
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
+
 
 # =========================================================
 
@@ -3198,20 +3360,18 @@ def panel_tesorero(request):
     ).select_related("admin").order_by("-creado_en")[:50]
 
     liquidaciones = LiquidacionComision.objects.filter(
-        municipio=municipio
+        municipio=municipio,
     ).select_related("vendedor").order_by("-creado_en")[:50]
 
     pendientes_rendicion   = rendiciones.filter(estado="pendiente").count()
     pendientes_liquidacion = liquidaciones.filter(estado="pendiente").count()
 
     return render(request, "tesorero/panel_tesorero.html", {
-        "rendiciones": rendiciones,
-        "liquidaciones": liquidaciones,
-        "pendientes_rendicion": pendientes_rendicion,
-        "pendientes_liquidacion": pendientes_liquidacion,
+        "rendiciones":             rendiciones,
+        "liquidaciones":           liquidaciones,
+        "pendientes_rendicion":    pendientes_rendicion,
+        "pendientes_liquidacion":  pendientes_liquidacion,
     })
-
-
 
 
 @require_role("tesorero")

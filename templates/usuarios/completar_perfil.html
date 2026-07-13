@@ -8,12 +8,30 @@
     <div style="font-size:2.2rem; margin-bottom:0.5rem;">🏙️</div>
     <h2 style="margin-bottom:0.3rem;">Un paso más</h2>
     <p style="color:var(--color-text-muted); font-size:0.95rem; margin-bottom:1.5rem;">
-      Seleccioná el municipio al que pertenecés para continuar.
+      Completá los datos que faltan para continuar.
     </p>
 
     <form method="post" style="text-align:left;">
       {% csrf_token %}
 
+      {# ── Nombre y apellido (solo si faltan) ─────────────────── #}
+      {% if falta_nombre %}
+      <div class="form-row">
+        <label for="nombre">Nombre <span style="color:#c0392b;">*</span></label>
+        <input id="nombre" name="nombre" type="text" required
+               placeholder="Tu nombre"
+               value="{{ request.POST.nombre|default:'' }}">
+      </div>
+      <div class="form-row">
+        <label for="apellido">Apellido</label>
+        <input id="apellido" name="apellido" type="text"
+               placeholder="Tu apellido (opcional)"
+               value="{{ request.POST.apellido|default:'' }}">
+      </div>
+      {% endif %}
+
+      {# ── Municipio (solo si falta) ───────────────────────────── #}
+      {% if falta_municipio %}
       <div class="form-row">
         <label for="municipio_id">Municipio <span style="color:#c0392b;">*</span></label>
         <select id="municipio_id" name="municipio_id" required>
@@ -23,9 +41,10 @@
           {% endfor %}
         </select>
       </div>
+      {% endif %}
 
       <button type="submit" class="btn" style="width:100%; margin-top:0.5rem;">
-        Confirmar municipio
+        Confirmar y continuar
       </button>
     </form>
 

@@ -6,15 +6,6 @@
 
 ## 🟡 Media prioridad
 
-### 1. Inspector: PDF de infracciones del día
-El inspector presenta sus infracciones del día como PDF.
-Listado ordenado por número de acta: fecha, patente, tipo, subcuadra, monto, estado.
-Requiere: view + PDF generation + botón en "Mis infracciones".
-
-### 2. Google OAuth: nombre y apellido no se cargan
-Usuario creado por Google OAuth no guarda `first_name` / `last_name` correctamente.
-Al ingresar por primera vez con Google, redirigir a `completar_perfil`.
-Requiere: adapter de allauth o signal `user_signed_up`.
 
 ---
 
@@ -48,6 +39,8 @@ Hacer en un sprint dedicado — no mezclar con features.
 
 ## ✅ Resuelto
 
+- Inspector PDF del día: `pdf_infracciones_hoy` con reportlab — descarga PDF con acta/hora/patente/subcuadra/motivo/monto/estado; soporta `?fecha=YYYY-MM-DD`; botón "📄 PDF del día" en panel inspector
+- Google OAuth nombre/apellido: middleware detecta `first_name` vacío en conductores y redirige a `completar_perfil`; el form acepta nombre/apellido + municipio de forma independiente según lo que falte
 - Timer "calculando…" indefinido: `inicio_usuarios.html` estaba truncado, faltaba `setInterval`. Corregido con el bloque JS completo.
 - Subcuadras vacías al registrar infracción: `get_subcuadra_default` usa `get_or_create("Zona Única")` — nunca falla.
 - /usuarios/inicio/ rompe con conductor: verificado en código — la view maneja `None` municipio correctamente. Sin reproducción desde 2026-06-10.
