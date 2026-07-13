@@ -6,10 +6,6 @@
 
 ## 🟡 Media prioridad
 
-### 5. Limpiar imports huérfanos en views.py
-El facade `views.py` aún tiene el bloque de imports del legacy (servicios, utils, factories, etc.)
-que ya no sirven desde que todo se movió a submódulos.
-Antes de limpiar, confirmar que nada externo los use.
 
 ### 6. Tests faltantes (coverage incompleto)
 - Tolerancia multa (pagar antes vs después del período de gracia) — `pagar_infraccion` use case
@@ -72,6 +68,9 @@ Creada la carpeta `services/` con módulos por dominio:
 
 `utils.py` quedó en 32 líneas (solo `get_subcuadra_default`).
 Los archivos `services_*.py` viejos son shims de 4 líneas para compatibilidad hacia atrás.
+
+### views.py — limpieza de imports legacy ✅
+157 → 98 líneas. Eliminados: models, utils, factories, services_*, use_cases, decorators, forms, django internals. Puro facade.
 
 ### TRAMA Sprint 3 — Consolidar use_cases/ con services/ ✅
 - `services/horarios.py` → nueva `obtener_tarifa_hora(tarifa_obj, vehiculo)` (centraliza selección auto/moto)

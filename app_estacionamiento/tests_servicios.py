@@ -420,3 +420,96 @@ class TestFlujoCertificacionComision(TestCase):
         self.liquidacion.refresh_from_db()
         # Sigue en depositada, no regresa a pendiente ni avanza a certificada
         self.assertEqual(self.liquidacion.estado, "depositada")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Tolerancia de gracia en pago de infracciones
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestToleranciaMulta(TestCase):
+    """
+    El municipio puede configurar un período de gracia (tolerancia_multa_minutos).
+    Si el conductor paga dentro de ese plazo, la infracción se anula sin cobrar.
+    Pasado el plazo, se cobra normalmente descontando saldo.
+
+    Técnica: se mockea timezone.now() en el use_case para simular distintos momentos
+    de pago. creado_en de la infracción se fija con .update() para evitar auto_now_add.
+    """
+
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone as tz
+
+        self.municipio = Municipio.objects.create(
+            nombre="TestMuni",
+            tolerancia_multa_minutos=5,  # 5 minutos de gracia
+        )
+        self.inspector  = crear_inspector(self.municipio)
+        self.subcuadra  = crear_subcuadra(self.municipio)
+        self.vehiculo   = crear_vehiculo(self.municipio)
+        self.conductor  = crear_conductor(self.municipio, saldo=2000)
+
+        # Fijamos creado_en en el pasado para poder controlar el delta
+        self.tiempo_creacion = tz.now()
+        inf = crear_infraccion(
+            self.municipio, self.inspector, self.vehiculo, self.subcuadra, monto=500
+        )
+        # auto_now_add no se puede pisar con save(); usamos update() para bypass
+        Infraccion.objects.filter(pk=inf.pk).update(creado_en=self.tiempo_creacion)
+        self.infraccion = Infraccion.objects.get(pk=inf.pk)
+
+    def _pagar_con_tiempo(self, delta_minutos):
+        """Ejecuta pagar_infraccion simulando que 'ahora' es creado_en + delta."""
+        from datetime import timedelta
+        from unittest.mock import patch
+        from app_estacionamiento.use_cases.pagar_infraccion import ejecutar
+
+        momento_pago = self.tiempo_creacion + timedelta(minutes=delta_minutos)
+        with patch("app_estacionamiento.use_cases.pagar_infraccion.timezone") as mock_tz:
+            mock_tz.now.return_value = momento_pago
+            return ejecutar(self.conductor, self.infraccion)
+
+    def test_pago_dentro_tolerancia_anula_infraccion(self):
+        """Pagar a los 3 min (< 5 min de gracia) anula la infracción sin cobrar."""
+        resultado = self._pagar_con_tiempo(delta_minutos=3)
+        self.assertEqual(resultado.estado, "anulada")
+        self.assertTrue(resultado.anulada_por_gracia)
+
+    def test_pago_dentro_tolerancia_no_descuenta_saldo(self):
+        """Si se anula por gracia, el saldo del conductor no se toca."""
+        saldo_antes = self.conductor.saldo
+        self._pagar_con_tiempo(delta_minutos=2)
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.saldo, saldo_antes)
+
+    def test_pago_exactamente_en_limite_anula(self):
+        """Pagar exactamente a los 5 min todavía está dentro del plazo (<=)."""
+        resultado = self._pagar_con_tiempo(delta_minutos=5)
+        self.assertEqual(resultado.estado, "anulada")
+
+    def test_pago_fuera_tolerancia_cobra_normal(self):
+        """Pagar a los 10 min (> 5 min de gracia) descuenta saldo y marca pagada."""
+        saldo_antes = self.conductor.saldo
+        resultado = self._pagar_con_tiempo(delta_minutos=10)
+        self.assertEqual(resultado.estado, "pagada")
+        self.assertFalse(resultado.anulada_por_gracia)
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.saldo, saldo_antes - Decimal("500"))
+
+    def test_tolerancia_cero_siempre_cobra(self):
+        """Con tolerancia=0 no hay gracia: pagar al instante igual cobra."""
+        self.municipio.tolerancia_multa_minutos = 0
+        self.municipio.save()
+        saldo_antes = self.conductor.saldo
+        resultado = self._pagar_con_tiempo(delta_minutos=0)
+        self.assertEqual(resultado.estado, "pagada")
+        self.conductor.refresh_from_db()
+        self.assertLess(self.conductor.saldo, saldo_antes)
+
+    def test_pago_doble_lanza_excepcion(self):
+        """Intentar pagar una infracción ya pagada lanza Exception."""
+        self._pagar_con_tiempo(delta_minutos=10)  # primer pago OK
+        # Recargar para obtener estado actualizado
+        self.infraccion.refresh_from_db()
+        from app_estacionamiento.use_cases.pagar_infraccion import ejecutar
+        with self.assertRaises(Exception):
+            ejecutar(self.conductor, self.infraccion)
