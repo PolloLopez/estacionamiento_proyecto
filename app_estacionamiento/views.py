@@ -11,6 +11,15 @@
 #   views_tesorero.py, views_auth.py, views_mp.py
 
 # ─── Re-exportaciones por módulo ─────────────────────────────────────────────
+from .views_auth import (
+    home,
+    redirect_por_rol,
+    inicio,
+    login_view,
+    registro_view,
+    completar_perfil,
+    logout_view,
+)
 from .views_inspector import (
     panel_inspectores,
     verificar_vehiculo,
@@ -181,82 +190,6 @@ def marcar_notificacion_leida(request, notif_id):
     return redirect("inicio_usuarios")
 
 
-def home(request):
-    if not request.user.is_authenticated:
-        return redirect("login")
-
-    return redirect("inicio")
-
-def redirect_por_rol(usuario):
-
-    if usuario.es_admin:
-        return redirect("panel_admin")
-
-    elif usuario.es_inspector:
-        return redirect("panel_inspectores")
-
-    elif usuario.es_vendedor:
-        return redirect("panel_vendedor")
-
-    elif usuario.es_conductor:
-        return redirect("inicio_usuarios")  # ✅ CORRECTO
-
-    return redirect("login")
-
-@login_required
-def inicio(request):
-
-    return redirect_por_rol(request.user)
-
-def login_view(request):
-    if request.method == "POST":
-        correo = request.POST.get("correo")
-        password = request.POST.get("password")
-
-        usuario = authenticate(request, username=correo, password=password)
-
-        if usuario is not None:
-            login(request, usuario)
-
-            # 🔥 REDIRECCIÓN POR ROL (CLAVE)
-            return redirect_por_rol(usuario)
-
-        return render(request, "usuarios/login.html", {
-            "form": {"errors": True}
-        })
-
-    return render(request, "usuarios/login.html")
-
-def registro_view(request):
-    if request.method == "POST":
-        form = RegistroUsuarioForm(request.POST)
-
-        if form.is_valid():
-            usuario = form.save(commit=False)
-
-            # 🏛️ Municipio: tomar del POST si hay más de uno, sino el primero
-            municipio_id = request.POST.get("municipio_id")
-            if municipio_id:
-                usuario.municipio = Municipio.objects.filter(id=municipio_id).first()
-            else:
-                usuario.municipio = Municipio.objects.first()
-
-            usuario.save()
-
-            # 🔐 Login automático
-            login(request, usuario)
-
-            # 🔥 REDIRECCIÓN POR ROL
-            return redirect_por_rol(usuario)
-
-    else:
-        form = RegistroUsuarioForm()
-
-    return render(request, "usuarios/registro.html", {
-            "form": form,
-            "municipios": Municipio.objects.filter(activo=True),
-        })
-
 @require_role("conductor")
 def solicitar_verificacion(request):
     """
@@ -394,74 +327,6 @@ def solicitar_verificacion(request):
     return render(request, "usuarios/solicitar_verificacion.html", {
         "solicitud": solicitud,
         "vehiculos": vehiculos_usuario,
-    })
-
-
-@login_required
-def completar_perfil(request):
-    """
-    Formulario de bienvenida para conductores que entran por Google OAuth.
-
-    Cubre dos casos que pueden ocurrir al mismo tiempo o por separado:
-    1. Sin municipio asignado (sistema multi-municipio).
-    2. Sin nombre/apellido (cuenta Google sin given_name/family_name).
-
-    Una vez completado, redirige al panel según el rol.
-    """
-    usuario  = request.user
-    municipios = Municipio.objects.filter(activo=True)
-
-    falta_municipio = not usuario.municipio_id
-    falta_nombre    = usuario.es_conductor and not usuario.first_name
-
-    if request.method == "POST":
-        errores = False
-
-        # Validar municipio si falta
-        municipio_obj = None
-        if falta_municipio:
-            municipio_id  = request.POST.get("municipio_id")
-            municipio_obj = Municipio.objects.filter(id=municipio_id, activo=True).first()
-            if not municipio_obj:
-                messages.error(request, "Seleccioná un municipio válido.")
-                errores = True
-
-        # Validar nombre si falta
-        nombre   = request.POST.get("nombre", "").strip()
-        apellido = request.POST.get("apellido", "").strip()
-        if falta_nombre and not nombre:
-            messages.error(request, "El nombre es obligatorio.")
-            errores = True
-
-        if errores:
-            return render(request, "usuarios/completar_perfil.html", {
-                "municipios":      municipios,
-                "falta_municipio": falta_municipio,
-                "falta_nombre":    falta_nombre,
-            })
-
-        # Guardar campos faltantes
-        campos = []
-        if falta_municipio and municipio_obj:
-            usuario.municipio = municipio_obj
-            campos.append("municipio")
-        if falta_nombre and nombre:
-            usuario.first_name = nombre
-            campos.append("first_name")
-            if apellido:
-                usuario.last_name = apellido
-                campos.append("last_name")
-
-        if campos:
-            usuario.save(update_fields=campos)
-
-        messages.success(request, "¡Perfil completado! Ya podés usar el sistema.")
-        return redirect_por_rol(usuario)
-
-    return render(request, "usuarios/completar_perfil.html", {
-        "municipios":      municipios,
-        "falta_municipio": falta_municipio,
-        "falta_nombre":    falta_nombre,
     })
 
 
@@ -2419,15 +2284,6 @@ def comprobante_infraccion(request, infraccion_id):
 # VIEWS LOGIN / LOGOUT
 # =========================================================
 # =========================================================
-# VIEWS LOGIN / LOGOUT
-# =========================================================
-def logout_view(request):
-    # Solo POST para prevenir logout por CSRF (links maliciosos como <img src="/logout/">)
-    if request.method == "POST":
-        logout(request)
-    return redirect("login")
-
-
 # =========================================================
 # VIEWS MERCADOPAGO - CARGA DE SALDO
 # =========================================================
