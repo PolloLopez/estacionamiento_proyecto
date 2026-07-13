@@ -3,6 +3,7 @@
 Lógica de negocio relacionada con cierres de caja y movimientos.
 
 Responsabilidades:
+- Registrar un cobro efectivo en la caja del cobrador (vendedor/admin)
 - Generar el cierre de caja de un inspector/vendedor (con comisión)
 """
 
@@ -13,6 +14,38 @@ from django.db.models import Sum
 from django.utils import timezone
 
 from app_estacionamiento.models import CierreCaja, MovimientoCaja
+
+
+def registrar_cobro_efectivo(cobrador, monto: Decimal, descripcion: str = "", comision_monto: Decimal = Decimal("0")):
+    """
+    Registra un cobro en efectivo del cobrador (vendedor o admin).
+
+    - Suma el monto al saldo_operativo del cobrador (select_for_update).
+    - Crea el MovimientoCaja de tipo 'ingreso' con su comisión.
+
+    Parámetros:
+        cobrador:       instancia de Usuario (vendedor o admin)
+        monto:          Decimal, total cobrado
+        descripcion:    texto libre para el MovimientoCaja
+        comision_monto: Decimal, porción que retiene el cobrador
+
+    Retorna:
+        El MovimientoCaja creado.
+    """
+    from app_estacionamiento.models import Usuario
+
+    with transaction.atomic():
+        cobrador_locked = Usuario.objects.select_for_update().get(id=cobrador.id)
+        cobrador_locked.saldo_operativo += monto
+        cobrador_locked.save(update_fields=["saldo_operativo"])
+        return MovimientoCaja.objects.create(
+            usuario=cobrador_locked,
+            monto=monto,
+            tipo="ingreso",
+            medio_pago="efectivo",
+            comision_monto=comision_monto,
+            descripcion=descripcion,
+        )
 
 
 def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None, periodo=""):

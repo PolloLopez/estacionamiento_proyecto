@@ -52,3 +52,32 @@ def cargar_saldo_conductor(admin, conductor, monto: Decimal):
         )
 
     return conductor
+
+def debitar_saldo_conductor(conductor, monto: Decimal, descripcion: str = ""):
+    """
+    Descuenta saldo al conductor y registra el egreso en caja.
+
+    IMPORTANTE: debe llamarse desde dentro de un bloque transaction.atomic()
+    con el conductor ya bloqueado con select_for_update(). No abre su propia
+    transacción para no romper el lock del llamador.
+
+    Parámetros:
+        conductor: instancia de Usuario ya bloqueada (select_for_update)
+        monto:     Decimal a descontar
+        descripcion: texto para el MovimientoCaja
+
+    Lanza:
+        ValueError si el saldo es insuficiente.
+    """
+    if conductor.saldo < monto:
+        raise ValueError(
+            f"Saldo insuficiente. Disponible: {conductor.saldo}, requerido: {monto}."
+        )
+    conductor.saldo -= monto
+    conductor.save(update_fields=["saldo"])
+    MovimientoCaja.objects.create(
+        usuario=conductor,
+        monto=monto,
+        tipo="egreso",
+        descripcion=descripcion,
+    )

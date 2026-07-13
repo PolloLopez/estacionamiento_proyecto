@@ -12,6 +12,7 @@ Antes vivían en utils.py.
 """
 
 from datetime import timedelta
+from decimal import Decimal
 
 from django.utils import timezone
 
@@ -21,6 +22,30 @@ from app_estacionamiento.models import (
     HorarioEstacionamiento,
 )
 
+
+TARIFA_HORA_FALLBACK = Decimal("100")
+
+
+def obtener_tarifa_hora(tarifa_obj, vehiculo, fallback=None):
+    """
+    Devuelve el precio por hora según el tipo de vehículo.
+
+    Lógica:
+    - Moto con precio_por_hora_moto configurado y > 0 → usa precio_moto
+    - Caso contrario → usa precio_por_hora del tarifa_obj
+    - Sin tarifa_obj → fallback (default: TARIFA_HORA_FALLBACK = $100)
+
+    Centraliza la selección de tarifa que antes se repetía en use_cases y views.
+    """
+    if fallback is None:
+        fallback = TARIFA_HORA_FALLBACK
+    if not tarifa_obj:
+        return fallback
+    es_moto     = getattr(vehiculo, "tipo", "auto") == "moto"
+    precio_moto = getattr(tarifa_obj, "precio_por_hora_moto", None)
+    if es_moto and precio_moto and precio_moto > 0:
+        return precio_moto
+    return tarifa_obj.precio_por_hora
 
 def puede_estacionar_ahora(municipio):
     """
