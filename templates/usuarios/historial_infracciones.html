@@ -71,18 +71,37 @@
                           onclick="document.getElementById('modal-pagar-{{ i.id }}').style.display='flex'">
                     💳 Pagar con saldo
                   </button>
-                  {# Modal de confirmación #}
+                  {# Modal de confirmación — contenido varía según tolerancia #}
                   <div id="modal-pagar-{{ i.id }}"
                        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
                               z-index:1000; align-items:center; justify-content:center;">
-                    <div class="card" style="max-width:380px; width:90%; padding:1.5rem;">
-                      <h3 style="margin-bottom:0.75rem;">Confirmar pago</h3>
-                      <p style="margin-bottom:0.5rem;">
-                        Infracción <strong>#{{ i.id }}</strong> · Patente <strong>{{ i.vehiculo.patente }}</strong>
-                      </p>
-                      <p style="margin-bottom:1rem;">
-                        Se descontarán <strong>${{ i.monto }}</strong> de tu saldo.
-                      </p>
+                    <div class="card" style="max-width:400px; width:90%; padding:1.5rem;">
+
+                      {% if i.id in ids_dentro_tolerancia %}
+                        {# Dentro del período de gracia: se anulará sin cobrar #}
+                        <h3 style="margin-bottom:0.75rem;">✅ Período de gracia</h3>
+                        <p style="margin-bottom:0.5rem;">
+                          Infracción <strong>#{{ i.id }}</strong> · Patente <strong>{{ i.vehiculo.patente }}</strong>
+                        </p>
+                        <p style="margin-bottom:1rem; color:var(--color-primary);">
+                          Estás dentro del período de gracia
+                          ({{ tolerancia_min }} min desde que fue labrada).
+                          <strong>La infracción se anulará sin costo.</strong>
+                        </p>
+                      {% else %}
+                        {# Fuera del período de gracia: se cobra el monto completo #}
+                        <h3 style="margin-bottom:0.75rem;">⚠️ Pago fuera de término</h3>
+                        <p style="margin-bottom:0.5rem;">
+                          Infracción <strong>#{{ i.id }}</strong> · Patente <strong>{{ i.vehiculo.patente }}</strong>
+                        </p>
+                        <div style="background:var(--color-danger-light, #fff3cd);
+                                    border:1px solid var(--color-danger, #e5a000);
+                                    border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
+                          <strong>Estás pagando fuera del período de gracia{% if tolerancia_min %} ({{ tolerancia_min }} min){% endif %}.</strong><br>
+                          Se descontarán <strong>${{ i.monto }}</strong> de tu saldo.
+                        </div>
+                      {% endif %}
+
                       <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
                         <button class="btn btn-outline"
                                 onclick="document.getElementById('modal-pagar-{{ i.id }}').style.display='none'">
@@ -90,9 +109,17 @@
                         </button>
                         <form method="post" action="{% url 'pagar_infraccion' i.id %}">
                           {% csrf_token %}
-                          <button type="submit" class="btn">Confirmar pago</button>
+                          {% if i.id in ids_dentro_tolerancia %}
+                            <button type="submit" class="btn">Anular sin costo</button>
+                          {% else %}
+                            <button type="submit" class="btn btn-danger"
+                                    style="background:var(--color-danger, #c0392b); color:#fff;">
+                              Pagar ${{ i.monto }}
+                            </button>
+                          {% endif %}
                         </form>
                       </div>
+
                     </div>
                   </div>
                 {% else %}

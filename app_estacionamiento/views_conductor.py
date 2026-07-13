@@ -304,10 +304,24 @@ def mis_infracciones(request):
         .order_by("-creado_en")
     )
 
+    # Calcular tolerancia de gracia para mostrar aviso en el modal de pago
+    tolerancia_min = getattr(usuario.municipio, "tolerancia_multa_minutos", 0) or 0
+    ahora = timezone.now()
+    # Set con IDs de infracciones pendientes que aún están dentro del período de gracia
+    ids_dentro_tolerancia = set()
+    if tolerancia_min > 0:
+        for inf in infracciones:
+            if inf.estado == "pendiente":
+                elapsed = ahora - inf.creado_en
+                if elapsed <= timedelta(minutes=tolerancia_min):
+                    ids_dentro_tolerancia.add(inf.id)
+
     return render(request, "usuarios/historial_infracciones.html", {
-        "infracciones":    infracciones,
-        "saldo_usuario":   usuario.saldo,
-        "tiene_pendientes": infracciones.filter(estado="pendiente").exists(),
+        "infracciones":         infracciones,
+        "saldo_usuario":        usuario.saldo,
+        "tiene_pendientes":     infracciones.filter(estado="pendiente").exists(),
+        "tolerancia_min":       tolerancia_min,
+        "ids_dentro_tolerancia": ids_dentro_tolerancia,
     })
 
 
