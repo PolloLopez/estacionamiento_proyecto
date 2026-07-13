@@ -1,4 +1,27 @@
 # ESTACIONAMIENTO_APP/app_estacionamiento/views.py
+#
+# FACHADA — este archivo importa desde los módulos por rol.
+# No definir vistas aquí; agregarlas en el módulo correspondiente.
+#
+# Módulos activos:
+#   views_inspector.py  → panel, verificar, infracciones, caja (lectura)
+#
+# Próximos módulos (pendiente):
+#   views_vendedor.py, views_conductor.py, views_admin.py,
+#   views_tesorero.py, views_auth.py, views_mp.py
+
+# ─── Re-exportaciones por módulo ─────────────────────────────────────────────
+from .views_inspector import (
+    panel_inspectores,
+    verificar_vehiculo,
+    registrar_infraccion,
+    ticket_infraccion,
+    gestion_infracciones,
+    resumen_infracciones,
+    pdf_infracciones_hoy,
+    caja_inspector,
+)
+# ─────────────────────────────────────────────────────────────────────────────
 
 import logging
 logger = logging.getLogger(__name__)
@@ -1296,239 +1319,6 @@ def ticket_pago_multa(request, infraccion_id):
 
 
 # =========================================================
-# VIEWS INSPECTORES
-# =========================================================
-@require_role("inspector")
-def panel_inspectores(request):
-    inspector = request.user
-    hoy = timezone.localtime().date()
-
-    # Solo estadísticas de verificación — el inspector no maneja dinero
-    infracciones_hoy = Infraccion.objects.filter(
-        municipio=inspector.municipio,
-        inspector=inspector,
-        creado_en__date=hoy,
-    ).count()
-
-    resumen = {
-        "infracciones_hoy": infracciones_hoy,
-    }
-
-    return render(request, "inspectores/panel_inspectores.html", {"resumen": resumen})
-
-@require_role("inspector", "admin")
-def gestion_infracciones(request):
-
-    usuario = request.user
-
-    infracciones = Infraccion.objects.filter(
-        municipio=usuario.municipio
-    ).select_related("vehiculo", "inspector").order_by("-creado_en")
-
-    return render(request, "usuarios/historial_infracciones.html", {
-        "usuario": usuario,
-        "infracciones": infracciones,
-        # Pasar valores seguros para que el template no falle en comparaciones
-        "saldo_usuario": 0,
-        "tiene_pendientes": False,
-        "es_vista_gestion": True,  # el template puede ocultarlos botones de pago
-    })
-
-@require_role("inspector")
-def verificar_vehiculo(request):
-    resultado = None
-    historial = request.session.get("historial", [])
-    municipio = request.user.municipio
-
-    modo = request.GET.get("modo", "desktop")
-
-    # Subcuadras disponibles (el inspector elige en cuál está patrullando)
-    subcuadras = Subcuadra.objects.filter(municipio=municipio).exclude(calle="Zona Única")
-
-    # Recordar subcuadra seleccionada en sesión
-    subcuadra_id = request.POST.get("subcuadra_id") or request.session.get("subcuadra_inspector_id")
-    subcuadra_activa = None
-    if subcuadra_id:
-        try:
-            subcuadra_activa = Subcuadra.objects.get(id=subcuadra_id, municipio=municipio)
-            request.session["subcuadra_inspector_id"] = subcuadra_activa.id
-        except Subcuadra.DoesNotExist:
-            pass
-    if not subcuadra_activa:
-        subcuadra_activa = get_subcuadra_default(municipio)
-
-    tipo_seleccionado = "auto"
-
-    if request.method == "POST":
-        patente = (request.POST.get("patente") or "").upper().strip()
-        tipo_seleccionado = request.POST.get("tipo", "auto")
-
-        if patente:
-            # Auto-cierre de estacionamientos vencidos ANTES de verificar
-            from app_estacionamiento.models import Vehiculo as VehiculoModel
-            vehiculo_check = VehiculoModel.objects.filter(patente=patente).first()
-            if vehiculo_check:
-                est_vencido = Estacionamiento.objects.filter(
-                    vehiculo=vehiculo_check, estado="ACTIVO"
-                ).first()
-                if est_vencido:
-                    expiracion = est_vencido.hora_inicio + timedelta(
-                        hours=est_vencido.duracion_horas
-                    )
-                    if timezone.now() >= expiracion:
-                        finalizar_estacionamiento_uc(est_vencido)
-
-                # Actualizar tipo si el inspector lo cambió y es distinto al registrado
-                if vehiculo_check.tipo != tipo_seleccionado:
-                    vehiculo_check.tipo = tipo_seleccionado
-                    vehiculo_check.save(update_fields=["tipo"])
-            else:
-                # Vehiculo no registrado: crearlo con el tipo indicado
-                VehiculoModel.objects.create(
-                    patente=patente,
-                    municipio=municipio,
-                    tipo=tipo_seleccionado,
-                )
-
-            resultado = verificar_estado_vehiculo(
-                patente,
-                request.user,
-                subcuadra_activa
-            )
-            historial.insert(0, patente)
-            request.session["historial"] = historial[:5]
-
-    return render(request, "inspectores/verificar.html", {
-        "resultado": resultado,
-        "historial": historial,
-        "modo": modo,
-        "subcuadras": subcuadras,
-        "subcuadra_activa": subcuadra_activa,
-        "tipo_seleccionado": tipo_seleccionado,
-    })
-
-@require_role("inspector")
-def registrar_infraccion(request):
-    usuario = request.user
-    municipio = getattr(usuario, "municipio", None)
-    if not municipio:
-       return redirect("login")
-    mensaje = None
-
-    patente = request.GET.get("patente") or request.POST.get("patente")
-
-    if not patente:
-        return redirect("inspectores_verificar_vehiculo")
-
-    vehiculo, _ = Vehiculo.objects.get_or_create(
-        patente=patente,
-        defaults={"municipio": usuario.municipio}
-    )
-
-    subcuadra = get_subcuadra_default(request.user.municipio)
-
-    if not subcuadra:
-        messages.error(
-            request,
-            "No existe subcuadra configurada."
-        )
-        return redirect("panel_inspectores")
-
-    ultima_infraccion = Infraccion.objects.filter(inspector=usuario).order_by("-creado_en").first()
-    subcuadra_default = (ultima_infraccion.subcuadra_id if ultima_infraccion else None)
-    infracciones_recientes = Infraccion.objects.filter( vehiculo=vehiculo).order_by("-id")[:3]
-
-    # 🚀 NUEVO: validación previa (clave para UX real)
-    resultado = verificar_estado_vehiculo(patente, request.user, subcuadra)
-
-    # ==============================
-    # POST → usar service
-    # ==============================
-    if request.method == "POST":
-        try:
-            # Coordenadas GPS enviadas desde el frontend (JS)
-            gps_lat = request.POST.get("gps_lat", "").strip() or None
-            gps_lon = request.POST.get("gps_lon", "").strip() or None
-            gps_acc = request.POST.get("gps_acc", "").strip() or None
-
-            infraccion = crear_infraccion(
-                patente=patente,
-                subcuadra_id=request.POST.get("subcuadra_id"),
-                inspector=usuario,
-                foto=request.FILES.get("foto"),
-                gps_lat=gps_lat,
-                gps_lon=gps_lon,
-                gps_acc=gps_acc,
-            )
-
-            return redirect("inspectores_ticket", infraccion.id)
-
-        except ErrorInfraccion as e:
-            mensaje = str(e)
-
-    # Todas las subcuadras del municipio para que el inspector pueda elegir
-    subcuadras = Subcuadra.objects.filter(municipio=municipio).exclude(calle="Zona Única")
-
-    return render(request, "inspectores/registrar_infraccion.html", {
-        "mensaje": mensaje,
-        "vehiculo": vehiculo,
-        "patente": patente,
-        "subcuadra": subcuadra,
-        "subcuadras": subcuadras,
-        "infracciones_recientes": infracciones_recientes,
-        "subcuadra_default": subcuadra_default,
-        "resultado": resultado,
-    })
-
-@require_role("inspector")
-def ticket_infraccion(request, infraccion_id):
-    infraccion = get_object_or_404(Infraccion, id=infraccion_id, municipio=request.user.municipio)
-
-    return render(request, "ticket_infraccion.html", {
-        "infraccion": infraccion,
-    })
-
-@require_role("inspector", "vendedor", "admin")
-def caja_inspector(request):
-    """
-    Vista de caja compartida para inspectores y vendedores.
-    Muestra movimientos del período actual, permite cerrar caja,
-    y muestra el historial de cierres anteriores con su estado de certificación.
-    """
-    usuario = request.user
-    municipio = getattr(usuario, "municipio", None)
-    if not municipio:
-        return redirect("login")
-
-    movimientos = MovimientoCaja.objects.filter(
-        usuario=usuario
-    ).order_by("-creado_en")
-
-    total_ingresos = movimientos.filter(tipo="ingreso").aggregate(
-        total=Sum("monto"))["total"] or 0
-    total_egresos = movimientos.filter(tipo="egreso").aggregate(
-        total=Sum("monto"))["total"] or 0
-
-    movimientos_pendientes = movimientos.filter(tipo="ingreso", cerrado=False)
-    total_a_cerrar = movimientos_pendientes.aggregate(
-        total=Sum("monto"))["total"] or 0
-
-    # Historial de cierres anteriores de este usuario
-    historial_cierres = CierreCaja.objects.filter(
-        usuario=usuario
-    ).select_related("certificado_por").order_by("-fecha_cierre")[:20]
-
-    return render(request, "inspectores/caja.html", {
-        "movimientos": movimientos,
-        "ingresos": total_ingresos,
-        "egresos": total_egresos,
-        "saldo": total_ingresos - total_egresos,
-        "movimientos_abiertos": movimientos_pendientes.count(),
-        "total_a_cerrar": total_a_cerrar,
-        "historial_cierres": historial_cierres,
-    })
-
-# =========================================================
 # VIEWS COMPARTIDAS INSPECTORES + VENDEDORES
 # =========================================================
 @require_role("vendedor", "admin")
@@ -1739,144 +1529,6 @@ def ticket_cobro(request, est_id):
         "hora": est.hora_inicio,
         "monto": est.costo_base
     })
-
-@require_role("inspector", "admin")
-def resumen_infracciones(request):
-    usuario = request.user
-
-    infracciones = Infraccion.objects.filter(
-        municipio=usuario.municipio
-    ).select_related("vehiculo", "subcuadra", "inspector").order_by("-creado_en")
-
-    return render(request, "inspectores/resumen_infracciones.html", {
-        "infracciones": infracciones
-    })
-
-
-@require_role("inspector", "admin")
-def pdf_infracciones_hoy(request):
-    """
-    Genera y descarga un PDF con las infracciones del inspector para el día indicado.
-    Por defecto usa hoy; acepta ?fecha=YYYY-MM-DD para días anteriores.
-    Columnas: N° acta, Hora, Patente, Subcuadra, Motivo, Monto, Estado.
-    """
-    import io
-    from datetime import date as date_type
-    from django.http import HttpResponse
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
-    from reportlab.lib.units import cm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
-
-    inspector = request.user
-
-    # Fecha: hoy por defecto, o la que pida el querystring
-    fecha_str = request.GET.get("fecha", "")
-    try:
-        fecha = date_type.fromisoformat(fecha_str)
-    except ValueError:
-        fecha = timezone.localtime().date()
-
-    infracciones = (
-        Infraccion.objects
-        .filter(inspector=inspector, municipio=inspector.municipio, creado_en__date=fecha)
-        .select_related("vehiculo", "subcuadra")
-        .order_by("id")
-    )
-
-    # ── Armar PDF en memoria ────────────────────────────────────────────
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        rightMargin=2*cm, leftMargin=2*cm,
-        topMargin=2*cm, bottomMargin=2*cm,
-    )
-
-    estilos = getSampleStyleSheet()
-    estilo_titulo = ParagraphStyle(
-        "titulo", parent=estilos["Title"], fontSize=14, alignment=TA_CENTER
-    )
-    estilo_sub = ParagraphStyle(
-        "sub", parent=estilos["Normal"], fontSize=9, textColor=colors.HexColor("#555555")
-    )
-
-    partes = []
-
-    # Encabezado
-    municipio_nombre = inspector.municipio.nombre if inspector.municipio else ""
-    partes.append(Paragraph(
-        f"Infracciones del día — {fecha.strftime('%d/%m/%Y')}",
-        estilo_titulo,
-    ))
-    partes.append(Spacer(1, 0.3*cm))
-    partes.append(Paragraph(
-        f"Inspector: {inspector.nombre_completo()} &nbsp;|&nbsp; Municipio: {municipio_nombre}",
-        estilo_sub,
-    ))
-    partes.append(Spacer(1, 0.6*cm))
-
-    # Tabla
-    ESTADOS = {"pendiente": "Pendiente", "pagada": "Pagada", "anulada": "Anulada"}
-    encabezado = ["Acta", "Hora", "Patente", "Subcuadra", "Motivo", "Monto", "Estado"]
-    filas = [encabezado]
-
-    for inf in infracciones:
-        hora_local = timezone.localtime(inf.creado_en).strftime("%H:%M")
-        filas.append([
-            str(inf.id),
-            hora_local,
-            inf.vehiculo.patente,
-            str(inf.subcuadra.calle) if inf.subcuadra else "—",
-            inf.motivo or "—",
-            f"${inf.monto}",
-            ESTADOS.get(inf.estado, inf.estado.capitalize()),
-        ])
-
-    if len(filas) == 1:
-        partes.append(Paragraph("Sin infracciones registradas para esta fecha.", estilos["Normal"]))
-    else:
-        anchos = [1.5*cm, 1.5*cm, 2.2*cm, 3.5*cm, 4.5*cm, 1.8*cm, 2.2*cm]
-        tabla = Table(filas, colWidths=anchos, repeatRows=1)
-        tabla.setStyle(TableStyle([
-            # Encabezado
-            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
-            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
-            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE",      (0, 0), (-1, 0), 9),
-            # Filas
-            ("FONTSIZE",      (0, 1), (-1, -1), 8),
-            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
-            # Bordes
-            ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
-            # Alineación
-            ("ALIGN",         (5, 0), (5, -1), "RIGHT"),   # Monto
-            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING",    (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ]))
-        partes.append(tabla)
-
-    # Totales
-    total = len(filas) - 1
-    partes.append(Spacer(1, 0.5*cm))
-    partes.append(Paragraph(
-        f"Total: <b>{total}</b> infracción{'es' if total != 1 else ''}",
-        estilos["Normal"],
-    ))
-
-    doc.build(partes)
-    buffer.seek(0)
-
-    nombre_archivo = f"infracciones_{fecha.strftime('%Y%m%d')}_{inspector.id}.pdf"
-    response = HttpResponse(buffer, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
-    return response
-
-
-# =========================================================
-
 
 # =========================================================
 # ABONO MENSUAL — vendedor cobra abono a conductor
