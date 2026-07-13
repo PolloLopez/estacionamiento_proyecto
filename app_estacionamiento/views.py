@@ -21,6 +21,10 @@ from .views_inspector import (
     pdf_infracciones_hoy,
     caja_inspector,
 )
+from .views_tesorero import (
+    panel_tesorero,
+    depositar_comision,
+)
 # ─────────────────────────────────────────────────────────────────────────────
 
 import logging
@@ -1296,7 +1300,7 @@ def consultar_deuda(request):
         "infraccion_a_confirmar": None,
     })
 
-@require_role("admin", "vendedor", "inspector")
+@require_role("admin", "vendedor")
 def ticket_pago_multa(request, infraccion_id):
     """
     Comprobante de pago (o anulación por gracia) de una infracción.
@@ -1501,7 +1505,7 @@ def registrar_estacionamiento_vendedor(request):
 
     return redirect(reverse("inspectores_ticket_cobro", args=[est.id]))
 
-@require_role("inspector", "vendedor", "admin")
+@require_role("vendedor", "admin")
 def resumen_cobros(request):
     usuario = request.user
 
@@ -1514,7 +1518,7 @@ def resumen_cobros(request):
         "cobros": cobros
     })
 
-@require_role("vendedor", "inspector", "admin")
+@require_role("vendedor", "admin")
 def ticket_cobro(request, est_id):
     # Verifica municipio para que un usuario de otro municipio no acceda
     est = get_object_or_404(
@@ -1837,7 +1841,7 @@ def cobrar_infraccion_vendedor(request):
     })
 
 
-@require_role("inspector", "vendedor", "admin")
+@require_role("vendedor", "admin")
 def cerrar_caja(request):
     usuario = request.user
 
@@ -1868,7 +1872,7 @@ def cerrar_caja(request):
             "periodos": CierreCaja.PERIODOS,
         })
 
-    # POST → ejecutar cierre con el período elegido
+    # POST → ejecutar cierre (solo vendedor/admin — inspector no maneja caja)
     periodo = request.POST.get("periodo", "").strip()
     valores_validos = [v for v, _ in CierreCaja.PERIODOS]
     if periodo and periodo not in valores_validos:
@@ -3010,59 +3014,6 @@ def resolver_verificacion(request, solicitud_id):
 # 🏦 TESORERÍA — Panel, Rendición, Liquidaciones de comisión
 # =============================================================================
 
-@require_role("tesorero")
-def panel_tesorero(request):
-    """Panel principal del tesorero: ve rendiciones y liquidaciones pendientes."""
-    municipio = request.user.municipio
-
-    rendiciones = Rendicion.objects.filter(
-        municipio=municipio
-    ).select_related("admin").order_by("-creado_en")[:50]
-
-    liquidaciones = LiquidacionComision.objects.filter(
-        municipio=municipio,
-    ).select_related("vendedor").order_by("-creado_en")[:50]
-
-    pendientes_rendicion   = rendiciones.filter(estado="pendiente").count()
-    pendientes_liquidacion = liquidaciones.filter(estado="pendiente").count()
-
-    return render(request, "tesorero/panel_tesorero.html", {
-        "rendiciones":             rendiciones,
-        "liquidaciones":           liquidaciones,
-        "pendientes_rendicion":    pendientes_rendicion,
-        "pendientes_liquidacion":  pendientes_liquidacion,
-    })
-
-
-@require_role("tesorero")
-def depositar_comision(request, liquidacion_id):
-    """
-    Tesoreria marca una liquidacion como depositada
-    y registra quien la depositio y cuando.
-    """
-    municipio    = request.user.municipio
-    liquidacion  = get_object_or_404(LiquidacionComision, id=liquidacion_id, municipio=municipio)
-
-    if liquidacion.estado != "pendiente":
-        messages.warning(request, "Esta liquidacion ya fue procesada.")
-        return redirect("panel_tesorero")
-
-    if request.method == "POST":
-        notas = request.POST.get("notas_tesorero", "").strip()
-        with transaction.atomic():
-            liquidacion.estado       = "depositada"
-            liquidacion.depositada_en  = timezone.now()
-            liquidacion.depositada_por = request.user
-            liquidacion.notas_tesorero = notas
-            liquidacion.save(update_fields=[
-                "estado", "depositada_en", "depositada_por", "notas_tesorero"
-            ])
-        messages.success(request, f"Deposito registrado para {liquidacion.vendedor.nombre_completo()}.")
-        return redirect("panel_tesorero")
-
-    return render(request, "tesorero/depositar_comision.html", {
-        "liquidacion": liquidacion,
-    })
 
 
 @require_role("vendedor")

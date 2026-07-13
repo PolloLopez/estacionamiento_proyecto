@@ -76,7 +76,6 @@
         {% elif request.user.es_inspector %}
           <li><a href="{% url 'panel_inspectores' %}">Inicio</a></li>
           <li><a href="{% url 'inspectores_verificar_vehiculo' %}">Verificar</a></li>
-          <li><a href="{% url 'inspectores_caja' %}">Caja</a></li>
 
         {% elif request.user.es_vendedor %}
           <li><a href="{% url 'panel_vendedor' %}">Inicio</a></li>

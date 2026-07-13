@@ -388,15 +388,17 @@ def pdf_infracciones_hoy(request):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Caja del inspector (solo lectura — sin cobros)
+# Caja — solo vendedor y admin (inspector no maneja dinero)
 # ─────────────────────────────────────────────────────────────────────────────
+# Nota TRAMA: esta vista se moverá a views_vendedor.py en el próximo módulo.
+# Queda aquí temporalmente porque aún no existe views_vendedor.py.
 
-@require_role("inspector", "vendedor", "admin")
+@require_role("vendedor", "admin")
 def caja_inspector(request):
     """
-    Muestra al inspector (o vendedor/admin) el resumen de sus movimientos de caja.
-    El inspector puede ver su historial pero no realiza cobros directos.
-    El cierre de caja se gestiona desde views_vendedor.cerrar_caja.
+    Resumen de caja para vendedor y admin.
+    El inspector NO tiene acceso — no maneja dinero.
+    Si en el futuro se necesita caja para inspector, reutilizar la lógica del vendedor.
     """
     usuario = request.user
     municipio = getattr(usuario, "municipio", None)
