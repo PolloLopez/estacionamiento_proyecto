@@ -21,7 +21,6 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
@@ -29,6 +28,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .decorators import require_role
+from .services.infracciones import cobrar_infraccion_efectivo
+from .services.saldo import cargar_saldo_conductor
 from .models import (
     CierreCaja,
     DiaEspecial,
@@ -227,22 +228,10 @@ def cargar_saldo(request, usuario_id):
     usuario = get_object_or_404(Usuario, id=usuario_id, municipio=admin.municipio)
 
     if request.method == "POST":
-        monto = request.POST.get("monto")
+        monto_str = request.POST.get("monto", "")
         try:
-            monto = Decimal(monto)
-            if monto <= 0:
-                raise ValueError()
-
-            with transaction.atomic():
-                usuario.saldo += monto
-                usuario.save()
-                MovimientoCaja.objects.create(
-                    usuario=admin,
-                    monto=monto,
-                    tipo="ingreso",
-                    descripcion=f"Carga de saldo para {usuario.correo} por {admin.correo}",
-                )
-
+            monto = Decimal(monto_str)
+            cargar_saldo_conductor(admin=admin, conductor=usuario, monto=monto)
             messages.success(request, f"Saldo de ${monto} cargado correctamente.")
             return redirect("panel_admin")
 
@@ -566,28 +555,12 @@ def admin_infracciones(request):
                 messages.success(request, f"Infracción #{inf.id} anulada.")
 
         elif accion == "cobrar" and infraccion_id:
+            inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
             try:
-                with transaction.atomic():
-                    inf = get_object_or_404(
-                        Infraccion.objects.select_for_update(),
-                        id=infraccion_id, municipio=municipio,
-                    )
-                    if inf.estado != "pendiente":
-                        messages.warning(request, f"La infracción #{inf.id} ya fue procesada.")
-                        return redirect(request.get_full_path())
-                    inf.estado    = "pagada"
-                    inf.fecha_pago = timezone.now()
-                    inf.save()
-                    comision_pct = municipio.comision_vendedor or 0
-                    comision     = round(inf.monto * comision_pct / 100, 2)
-                    MovimientoCaja.objects.create(
-                        usuario=usuario,
-                        monto=inf.monto,
-                        tipo="ingreso",
-                        medio_pago="efectivo",
-                        comision_monto=comision,
-                        descripcion=f"Cobro en efectivo infracción #{inf.id} — {inf.vehiculo.patente}",
-                    )
+                inf = cobrar_infraccion_efectivo(infraccion=inf, cobrador=usuario)
+            except ValueError as e:
+                messages.warning(request, str(e))
+                return redirect(request.get_full_path())
             except Exception as e:
                 messages.error(request, f"Error al cobrar: {e}")
                 return redirect(request.get_full_path())

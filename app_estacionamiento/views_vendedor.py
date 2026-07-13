@@ -38,7 +38,8 @@ from .models import (
 )
 from .services_caja import generar_cierre_caja
 from .use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
-from .utils import calcular_opciones_duracion, get_subcuadra_default, puede_estacionar_ahora
+from .services.horarios import calcular_opciones_duracion, puede_estacionar_ahora
+from .utils import get_subcuadra_default
 
 
 # ─────────────────────────────────────────────────────────────────────────────

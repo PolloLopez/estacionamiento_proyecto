@@ -44,12 +44,12 @@ from .models import (
 from .use_cases.estacionar_vehiculo import ejecutar_estacionamiento
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
 from .use_cases.pagar_infraccion import ejecutar as pagar_infraccion_uc
-from .utils import (
+from .services.horarios import (
     calcular_opciones_duracion,
     cerrar_estacionamientos_vencidos_por_horario,
-    get_subcuadra_default,
     puede_estacionar_ahora,
 )
+from .utils import get_subcuadra_default
 from .views_auth import redirect_por_rol
 
 
