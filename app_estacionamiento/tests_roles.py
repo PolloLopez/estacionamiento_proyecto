@@ -170,7 +170,8 @@ class FlujoConductorCompletoTest(BaseRolesTest):
         ).count()
         self.assertEqual(activos, 1)
 
-    def test_conductor_sin_saldo_redirige_a_deuda(self):
+    def test_conductor_sin_saldo_redirige_a_carga_mp(self):
+        """Sin saldo el sistema redirige a cargar saldo via MercadoPago, no a deuda."""
         self.conductor.saldo = 0
         self.conductor.save()
 
@@ -179,4 +180,4 @@ class FlujoConductorCompletoTest(BaseRolesTest):
             reverse("usuarios_estacionar_vehiculo"),
             {"patente": "SIN001", "duracion": "1"}
         )
-        self.assertRedirects(response, reverse("consultar_deuda"))
+        self.assertRedirects(response, reverse("mp_iniciar_carga"))
