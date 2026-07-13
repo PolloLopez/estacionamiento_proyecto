@@ -13,6 +13,7 @@ Cada template puede usar:
 
 def municipio_branding(request):
     """Detecta el municipio del usuario logueado y lo pone en el contexto."""
+    from django.conf import settings
     from app_estacionamiento.models import Municipio
 
     municipio = None
@@ -25,4 +26,7 @@ def municipio_branding(request):
     if municipio is None:
         municipio = Municipio.objects.filter(activo=True).first()
 
-    return {"municipio_branding": municipio}
+    return {
+        "municipio_branding": municipio,
+        "modo_desarrollo":    settings.DEBUG,  # True en local, False en Railway
+    }

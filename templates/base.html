@@ -28,6 +28,15 @@
 
 <body>
 
+  {% if modo_desarrollo %}
+  <!-- Banner visible solo en desarrollo local (DEBUG=True) -->
+  <div style="background:#e67e22; color:#fff; text-align:center;
+              font-size:0.82rem; font-weight:700; padding:0.3rem 1rem;
+              letter-spacing:0.05em; position:sticky; top:0; z-index:10000;">
+    ⚠️ MODO DESARROLLO — datos locales, no es producción
+  </div>
+  {% endif %}
+
   <!-- ═══ NAVBAR ══════════════════════════════════════════════ -->
   <nav class="navbar">
 

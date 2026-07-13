@@ -2218,8 +2218,16 @@ def cerrar_caja(request):
 
     # POST → ejecutar cierre con el período elegido
     periodo = request.POST.get("periodo", "").strip()
-    if periodo not in ("diario", "semanal", "mensual"):
-        periodo = ""
+    valores_validos = [v for v, _ in CierreCaja.PERIODOS]
+    if periodo and periodo not in valores_validos:
+        # Valor enviado no corresponde a ninguna opción — request manipulado
+        messages.error(request, "Período no válido.")
+        if getattr(usuario, "es_inspector", False):
+            return redirect("inspectores_caja")
+        elif getattr(usuario, "es_vendedor", False):
+            return redirect("panel_vendedor")
+        else:
+            return redirect("inicio_admin")
     cierre = generar_cierre_caja(usuario, periodo=periodo)
 
     if cierre:

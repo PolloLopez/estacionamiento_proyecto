@@ -31,7 +31,8 @@ class BaseRolesTest(TestCase):
         )
         self.conductor = Usuario.objects.create_user(
             correo="conductor@test.com", password="123456",
-            municipio=self.municipio, es_conductor=True, saldo=1000
+            municipio=self.municipio, es_conductor=True, saldo=1000,
+            first_name="Test",  # evita redirección del middleware (conductor sin nombre)
         )
 
 

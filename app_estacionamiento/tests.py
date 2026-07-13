@@ -349,3 +349,207 @@ class TestMontoInfraccion(TestCase):
         tarifa = Tarifa.objects.get(municipio=self.municipio)
         self.assertEqual(tarifa.monto_infraccion, Decimal("4500"))
         self.assertEqual(tarifa.precio_por_hora, Decimal("200"))
+
+
+# ═════════════════════════════════════════════
+# 7. PERÍODO EN CIERRE DE CAJA (feature 2026-07-13)
+# ═════════════════════════════════════════════
+
+class TestCierreCajaPeriodo(TestCase):
+    """
+    El cierre de caja ahora acepta un período (diario/semanal/mensual).
+    Se verifica que el campo se guarda y se muestra en el historial.
+    """
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.vendedor  = crear_vendedor(self.municipio, porcentaje=0)
+        MovimientoCaja.objects.create(
+            usuario=self.vendedor, monto=Decimal("100"), tipo="ingreso"
+        )
+        self.client = Client()
+        self.client.force_login(self.vendedor)
+
+    def test_cierre_guarda_periodo_diario(self):
+        cierre = generar_cierre_caja(self.vendedor, periodo="diario")
+        self.assertEqual(cierre.periodo, "diario")
+
+    def test_cierre_guarda_periodo_mensual(self):
+        MovimientoCaja.objects.create(
+            usuario=self.vendedor, monto=Decimal("200"), tipo="ingreso"
+        )
+        cierre = generar_cierre_caja(self.vendedor, periodo="mensual")
+        self.assertEqual(cierre.periodo, "mensual")
+
+    def test_cierre_sin_periodo_queda_vacio(self):
+        """Si no se especifica período, el campo queda vacío (opcional)."""
+        cierre = generar_cierre_caja(self.vendedor)
+        self.assertEqual(cierre.periodo, "")
+
+    def test_cerrar_caja_view_post_con_periodo(self):
+        """POST al endpoint de cierre con periodo=semanal guarda el valor."""
+        from app_estacionamiento.models import CierreCaja
+        response = self.client.post(
+            reverse("vendedores_cerrar_caja"),
+            {"periodo": "semanal"},
+        )
+        self.assertIn(response.status_code, [200, 302])
+        cierre = CierreCaja.objects.filter(usuario=self.vendedor).first()
+        self.assertIsNotNone(cierre)
+        self.assertEqual(cierre.periodo, "semanal")
+
+    def test_cerrar_caja_view_periodo_invalido_no_cierra(self):
+        """POST con un valor de período inválido no debe crear cierre."""
+        from app_estacionamiento.models import CierreCaja
+        self.client.post(
+            reverse("vendedores_cerrar_caja"),
+            {"periodo": "inventado"},
+        )
+        self.assertEqual(CierreCaja.objects.filter(usuario=self.vendedor).count(), 0)
+
+
+# ═════════════════════════════════════════════
+# 8. OAUTH — completar_perfil con nombre faltante (feature 2026-07-13)
+# ═════════════════════════════════════════════
+
+class TestCompletarPerfilOAuth(TestCase):
+    """
+    Conductor sin first_name (caso Google OAuth sin given_name)
+    debe ser redirigido a completar_perfil y poder completar sus datos.
+    """
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        # Conductor sin nombre — simula cuenta Google vacía
+        self.conductor = Usuario.objects.create_user(
+            correo="sin_nombre@gmail.com",
+            password="pass1234",
+            municipio=self.municipio,
+            es_conductor=True,
+            first_name="",   # sin nombre
+            last_name="",
+        )
+        self.client = Client()
+        self.client.force_login(self.conductor)
+
+    def test_middleware_redirige_conductor_sin_nombre(self):
+        """Acceder a cualquier URL redirige a completar_perfil si no hay nombre."""
+        response = self.client.get(reverse("inicio_usuarios"))
+        self.assertRedirects(response, reverse("completar_perfil"))
+
+    def test_completar_perfil_get_muestra_campo_nombre(self):
+        """El GET de completar_perfil muestra falta_nombre=True."""
+        response = self.client.get(reverse("completar_perfil"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["falta_nombre"])
+        self.assertFalse(response.context["falta_municipio"])
+
+    def test_completar_perfil_post_guarda_nombre(self):
+        """POST con nombre y apellido los guarda en el usuario."""
+        self.client.post(reverse("completar_perfil"), {
+            "nombre": "María",
+            "apellido": "González",
+        })
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.first_name, "María")
+        self.assertEqual(self.conductor.last_name, "González")
+
+    def test_completar_perfil_post_sin_nombre_no_guarda(self):
+        """POST sin nombre muestra error y no modifica el usuario."""
+        self.client.post(reverse("completar_perfil"), {"nombre": "", "apellido": ""})
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.first_name, "")
+
+    def test_conductor_con_nombre_no_es_redirigido(self):
+        """Un conductor con nombre accede normalmente sin redirección."""
+        self.conductor.first_name = "Carlos"
+        self.conductor.save()
+        response = self.client.get(reverse("inicio_usuarios"))
+        self.assertNotEqual(response.status_code, 302)
+
+    def test_admin_sin_nombre_no_es_redirigido(self):
+        """El middleware solo aplica a conductores, no a admins sin nombre."""
+        admin = Usuario.objects.create_user(
+            correo="admin_sinnombre@test.com",
+            password="pass1234",
+            municipio=self.municipio,
+            es_admin=True, es_conductor=False,
+            first_name="",
+        )
+        client_admin = Client()
+        client_admin.force_login(admin)
+        response = client_admin.get(reverse("panel_admin"))
+        self.assertEqual(response.status_code, 200)
+
+
+# ═════════════════════════════════════════════
+# 9. PDF INFRACCIONES INSPECTOR (feature 2026-07-13)
+# ═════════════════════════════════════════════
+
+class TestPdfInfraccionesInspector(TestCase):
+    """
+    El endpoint /inspectores/pdf-infracciones/ descarga un PDF
+    con las infracciones del inspector para el día actual.
+    """
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.inspector = Usuario.objects.create_user(
+            correo="inspector_pdf@test.com",
+            password="pass1234",
+            municipio=self.municipio,
+            es_inspector=True, es_conductor=False,
+        )
+        self.subcuadra = crear_subcuadra(self.municipio)
+        self.vehiculo  = crear_vehiculo("PDF001")
+        self.client = Client()
+        self.client.force_login(self.inspector)
+        self.url = reverse("inspectores_pdf_infracciones")
+
+    def test_pdf_responde_200(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_pdf_content_type_es_pdf(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+
+    def test_pdf_disposition_es_attachment(self):
+        response = self.client.get(self.url)
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertIn(".pdf", response["Content-Disposition"])
+
+    def test_pdf_sin_infracciones_igual_responde_200(self):
+        """Sin infracciones el PDF igual se genera (con mensaje vacío)."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_pdf_con_infracciones_genera_contenido(self):
+        """Con infracciones el PDF tiene más bytes que uno vacío."""
+        resp_vacio = self.client.get(self.url)
+        bytes_vacio = len(resp_vacio.content)
+
+        Infraccion.objects.create(
+            vehiculo=self.vehiculo,
+            inspector=self.inspector,
+            subcuadra=self.subcuadra,
+            municipio=self.municipio,
+            motivo="Sin ticket",
+            monto=Decimal("3000"),
+        )
+        resp_con_datos = self.client.get(self.url)
+        self.assertGreater(len(resp_con_datos.content), bytes_vacio)
+
+    def test_pdf_conductor_no_puede_acceder(self):
+        """Un conductor no tiene acceso al PDF de inspector."""
+        conductor = crear_conductor(self.municipio, "cond_pdf@test.com")
+        client_cond = Client()
+        client_cond.force_login(conductor)
+        response = client_cond.get(self.url)
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_pdf_acepta_fecha_por_querystring(self):
+        """El parámetro ?fecha=YYYY-MM-DD devuelve PDF sin error."""
+        response = self.client.get(self.url + "?fecha=2026-01-15")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("20260115", response["Content-Disposition"])
