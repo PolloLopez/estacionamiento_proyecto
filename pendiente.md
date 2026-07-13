@@ -11,10 +11,10 @@
 Dividir en un sprint dedicado — no mezclar con features:
 - `views_admin.py`
 - `views_conductor.py`
-- `views_inspector.py`
-- `views_vendedor.py`
-- `views_tesorero.py`
-- `views_auth.py` (completar_perfil, login helpers)
+- `views_vendedor.py` - ✅
+- `views_inspector.py`- ✅
+- `views_tesorero.py` - ✅
+- `views_auth.py` (completar_perfil, login helpers) - ✅
 
 Mantener `views.py` como punto de entrada que importe todo, para no romper `urls.py`.
 

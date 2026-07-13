@@ -14,16 +14,13 @@ No incluye cobros ni liquidaciones (eso es responsabilidad del vendedor).
 from datetime import timedelta
 
 from django.contrib import messages
-from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .decorators import require_role
 from .models import (
-    CierreCaja,
     Estacionamiento,
     Infraccion,
-    MovimientoCaja,
     Subcuadra,
     Vehiculo,
 )
@@ -385,44 +382,3 @@ def pdf_infracciones_hoy(request):
     response = HttpResponse(buffer, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Caja — solo vendedor y admin (inspector no maneja dinero)
-# ─────────────────────────────────────────────────────────────────────────────
-# Nota TRAMA: esta vista se moverá a views_vendedor.py en el próximo módulo.
-# Queda aquí temporalmente porque aún no existe views_vendedor.py.
-
-@require_role("vendedor", "admin")
-def caja_inspector(request):
-    """
-    Resumen de caja para vendedor y admin.
-    El inspector NO tiene acceso — no maneja dinero.
-    Si en el futuro se necesita caja para inspector, reutilizar la lógica del vendedor.
-    """
-    usuario = request.user
-    municipio = getattr(usuario, "municipio", None)
-    if not municipio:
-        return redirect("login")
-
-    movimientos = MovimientoCaja.objects.filter(usuario=usuario).order_by("-creado_en")
-
-    total_ingresos = movimientos.filter(tipo="ingreso").aggregate(total=Sum("monto"))["total"] or 0
-    total_egresos  = movimientos.filter(tipo="egreso").aggregate(total=Sum("monto"))["total"] or 0
-
-    movimientos_pendientes = movimientos.filter(tipo="ingreso", cerrado=False)
-    total_a_cerrar = movimientos_pendientes.aggregate(total=Sum("monto"))["total"] or 0
-
-    historial_cierres = CierreCaja.objects.filter(
-        usuario=usuario
-    ).select_related("certificado_por").order_by("-fecha_cierre")[:20]
-
-    return render(request, "inspectores/caja.html", {
-        "movimientos": movimientos,
-        "ingresos": total_ingresos,
-        "egresos": total_egresos,
-        "saldo": total_ingresos - total_egresos,
-        "movimientos_abiertos": movimientos_pendientes.count(),
-        "total_a_cerrar": total_a_cerrar,
-        "historial_cierres": historial_cierres,
-    })
