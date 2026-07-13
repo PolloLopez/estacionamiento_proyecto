@@ -6,30 +6,14 @@
 
 ## 🟡 Media prioridad
 
----
-
-## 🟡 Media prioridad
-
-### 4. Sprint 3 — Limpiar use_cases/ y consolidar
-Los use_cases ya migrados siguen con lógica inline que podría delegarse a services/:
-- `use_cases/estacionar_vehiculo.py` — tiene validaciones que duplican services/horarios
-- `use_cases/pagar_infraccion.py` — podría usar services/saldo
-- `use_cases/cobrar_estacionamiento.py` — podría usar services/caja
-
 ### 5. Limpiar imports huérfanos en views.py
 El facade `views.py` aún tiene el bloque de imports del legacy (servicios, utils, factories, etc.)
 que ya no sirven desde que todo se movió a submódulos.
 Antes de limpiar, confirmar que nada externo los use.
 
 ### 6. Tests faltantes (coverage incompleto)
-- Abono mensual (cobro, verificación, conflicto mismo mes)
-- Tolerancia multa (pagar antes vs después del período de gracia)
-- Comisiones (`comision_monto` se grabe correctamente)
-- Tesorero: depositar → vendedor certifica
-- Multi-municipio (datos aislados)
+- Tolerancia multa (pagar antes vs después del período de gracia) — `pagar_infraccion` use case
 - Flujo MP webhook (integración)
-- `cobrar_infraccion_efectivo()` en services/infracciones
-- `cargar_saldo_conductor()` en services/saldo
 
 ---
 
@@ -88,6 +72,19 @@ Creada la carpeta `services/` con módulos por dominio:
 
 `utils.py` quedó en 32 líneas (solo `get_subcuadra_default`).
 Los archivos `services_*.py` viejos son shims de 4 líneas para compatibilidad hacia atrás.
+
+### TRAMA Sprint 3 — Consolidar use_cases/ con services/ ✅
+- `services/horarios.py` → nueva `obtener_tarifa_hora(tarifa_obj, vehiculo)` (centraliza selección auto/moto)
+- `services/saldo.py` → nueva `debitar_saldo_conductor(conductor, monto, descripcion)` (sin transacción propia)
+- `services/caja.py` → nueva `registrar_cobro_efectivo(cobrador, monto, descripcion, comision_monto)`
+- `use_cases/estacionar_vehiculo.py` 93→76 líneas
+- `use_cases/pagar_infraccion.py` 73→64 líneas
+- `use_cases/cobrar_estacionamiento.py` 37→23 líneas
+- `test_roles.py` (duplicado viejo) eliminado — `tests_roles.py` lo cubre completo
+
+### Tests faltantes cubiertos (tests_servicios.py) ✅
+20 tests en 5 clases: `cobrar_infraccion_efectivo`, `cargar_saldo_conductor`,
+abono mensual, comisiones, multi-municipio, tesorero→depositar→certificar.
 
 ### Otros ✅
 - `test_conductor_sin_saldo_redirige_a_carga_mp`: test corregido (assertions a `mp_iniciar_carga`)
