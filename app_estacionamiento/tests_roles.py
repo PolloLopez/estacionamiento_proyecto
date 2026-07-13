@@ -1,10 +1,12 @@
 # app_estacionamiento/tests_roles.py
 # Tests de permisos por rol y flujo completo del conductor
 
+from decimal import Decimal
+
 from django.test import TestCase
 from django.urls import reverse
 from app_estacionamiento.models import (
-    Usuario, Municipio, Subcuadra, Estacionamiento
+    Usuario, Municipio, Subcuadra, Estacionamiento, Tarifa
 )
 
 
@@ -15,6 +17,12 @@ class BaseRolesTest(TestCase):
 
         self.subcuadra = Subcuadra.objects.create(
             calle="San Martín", altura=100, municipio=self.municipio
+        )
+
+        # Tarifa necesaria para calcular costo de estacionamiento
+        Tarifa.objects.create(
+            municipio=self.municipio,
+            precio_por_hora=Decimal("10"),
         )
 
         self.admin = Usuario.objects.create_user(

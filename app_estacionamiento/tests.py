@@ -41,6 +41,7 @@ def crear_conductor(municipio, correo="conductor@test.com", saldo=500):
     u = Usuario.objects.create_user(
         correo=correo, password="pass1234",
         municipio=municipio, es_conductor=True,
+        first_name="Test",  # evita redirección del middleware (conductor sin nombre)
     )
     u.saldo = Decimal(str(saldo))
     u.save()

@@ -10,7 +10,7 @@ from app_estacionamiento.domain.saldo_policy import SaldoPolicy
 from app_estacionamiento.use_cases.registrar_movimiento import ejecutar as registrar_movimiento
 
 TARIFA_BASE_FALLBACK = Decimal("100")
-REDIRECT_OK = "inicio"
+REDIRECT_OK = "inicio_usuarios"
 REDIRECT_SIN_SALDO = "mp_iniciar_carga"
 
 
