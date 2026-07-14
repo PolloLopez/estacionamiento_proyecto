@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Pagar abono mensual{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              flex-wrap:wrap; gap:0.5rem; margin-bottom:1.5rem;">
+    <h2 style="margin:0;">📅 Pagar abono mensual</h2>
+    <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline">← Volver</a>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-warning" style="margin-bottom:1rem;">{{ error }}</div>
+  {% endif %}
+
+  {% if confirmar and vehiculo and precio %}
+
+    {# ── Pantalla de confirmación ── #}
+    <div class="card" style="max-width:460px;">
+      <h3 style="margin-bottom:1rem;">Confirmar abono</h3>
+
+      <table style="width:100%; font-size:0.95rem; margin-bottom:1.25rem; border-collapse:collapse;">
+        <tr>
+          <td style="padding:0.3rem 0.75rem 0.3rem 0; color:var(--color-muted);">Vehículo</td>
+          <td><strong>{{ vehiculo.patente }}</strong> — {{ vehiculo.get_tipo_display }}</td>
+        </tr>
+        <tr>
+          <td style="padding:0.3rem 0.75rem 0.3rem 0; color:var(--color-muted);">Mes</td>
+          <td><strong>{{ mes_label }}</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:0.3rem 0.75rem 0.3rem 0; color:var(--color-muted);">Precio</td>
+          <td><strong>${{ precio }}</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:0.3rem 0.75rem 0.3rem 0; color:var(--color-muted);">Tu saldo</td>
+          <td>
+            <strong
+              {% if saldo_usuario < precio %}style="color:var(--color-danger, #c0392b);"{% endif %}>
+              ${{ saldo_usuario }}
+            </strong>
+            {% if saldo_usuario < precio %}
+              <span style="font-size:0.85rem; color:var(--color-danger, #c0392b);"> — saldo insuficiente</span>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+
+      {% if saldo_usuario >= precio %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="cobrar">
+          <input type="hidden" name="vehiculo_id" value="{{ vehiculo.id }}">
+          <input type="hidden" name="mes" value="{{ mes_seleccionado }}">
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <a href="{% url 'conductor_pagar_abono' %}" class="btn btn-outline">Cancelar</a>
+            <button type="submit" class="btn">Confirmar — pagar ${{ precio }}</button>
+          </div>
+        </form>
+      {% else %}
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <a href="{% url 'conductor_pagar_abono' %}" class="btn btn-outline">Volver</a>
+          <a href="{% url 'mp_iniciar_carga' %}" class="btn">Cargar saldo</a>
+        </div>
+      {% endif %}
+    </div>
+
+  {% else %}
+
+    {# ── Formulario de selección ── #}
+    <div class="card" style="max-width:460px;">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="confirmar">
+
+        <div style="margin-bottom:1rem;">
+          <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Vehículo</label>
+          {% if vehiculos %}
+            <select name="vehiculo_id" required style="width:100%;">
+              <option value="">— Seleccioná —</option>
+              {% for v in vehiculos %}
+                <option value="{{ v.id }}"
+                  {% if vehiculo and vehiculo.id == v.id %}selected{% endif %}>
+                  {{ v.patente }} — {{ v.get_tipo_display }}
+                </option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <p class="text-muted" style="margin:0;">No tenés vehículos registrados.</p>
+          {% endif %}
+        </div>
+
+        <div style="margin-bottom:1.25rem;">
+          <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Mes</label>
+          <select name="mes" style="width:100%;">
+            {% for valor, etiqueta in opciones_mes %}
+              <option value="{{ valor }}"
+                {% if mes_seleccionado == valor %}selected{% endif %}>
+                {{ etiqueta }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div style="font-size:0.88rem; color:var(--color-muted); margin-bottom:1rem;">
+          💰 Saldo disponible: <strong>${{ saldo_usuario }}</strong>
+        </div>
+
+        {% if vehiculos %}
+          <button type="submit" class="btn" style="width:100%;">Ver precio y confirmar</button>
+        {% endif %}
+      </form>
+    </div>
+
+  {% endif %}
+
+</section>
+{% endblock %}

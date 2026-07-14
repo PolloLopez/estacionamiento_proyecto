@@ -76,7 +76,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 
 **services/ (Sprint 2 — TRAMA):**
 - `services/horarios.py` — `puede_estacionar_ahora()`, `calcular_opciones_duracion()`, `obtener_tarifa_hora()`, `cerrar_estacionamientos_vencidos_por_horario()`
-- `services/infracciones.py` — `crear_infraccion()`, `cobrar_infraccion_efectivo()`
+- `services/infracciones.py` — `crear_infraccion()`, `cobrar_infraccion_efectivo()`, `calcular_estado_tolerancia()` (con `MARGEN_TOLERANCIA_SEGUNDOS = 60`)
 - `services/saldo.py` — `cargar_saldo_conductor()`, `debitar_saldo_conductor()`
 - `services/caja.py` — `generar_cierre_caja()`, `registrar_cobro_efectivo()`
 - `services/verificacion.py` — `verificar_estado_vehiculo()`
@@ -113,7 +113,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `Infraccion` | Estado: `pendiente` / `pagada` / `anulada`. `monto`, `motivo`, `foto`, `fecha_pago`, `creado_en`. |
 | `MovimientoCaja` | Registro contable de cada cobro. `tipo`: `ingreso`/`egreso`. `medio_pago`: `efectivo`/`mercadopago`. `comision_monto`. |
 | `CierreCaja` | Cierre de turno de inspector/vendedor. Incluye `ganancia_usuario` y `monto_municipio`. |
-| `AbonoMensual` | Habilita estacionamiento libre por un mes. `mes` (primer día del mes), `vehiculo`, `municipio`, `vendedor`. |
+| `AbonoMensual` | Habilita estacionamiento libre por un mes. `mes` (primer día del mes), `vehiculo`, `municipio`, `vendedor` (null si lo paga el conductor). `medio_pago`: `efectivo` / `mercadopago` / `saldo`. |
 | `Tarifa` | `precio_por_hora`, `precio_por_hora_moto`, `precio_abono_auto`, `precio_abono_moto`. |
 | `HorarioEstacionamiento` | Horario semanal por día (`dia_semana` 0-6). `hora_inicio`, `hora_fin`. |
 | `DiaEspecial` | Feriados o días sin cobro. `fecha`, `cobro_activo`. |
@@ -127,11 +127,11 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 
 ## Roles y reglas de negocio
 
-**Tolerancia de gracia:** si el conductor paga una infracción dentro de `municipio.tolerancia_multa_minutos` desde que fue labrada, se anula automáticamente sin cobrar. Pasado ese plazo, se descuenta el monto del saldo.
+**Tolerancia de gracia:** si el conductor (o el vendedor) resuelve una infracción dentro de `municipio.tolerancia_multa_minutos` desde que fue labrada, se anula automáticamente sin cobrar. El chequeo ocurre en dos momentos: al estacionar el vehículo (use case `estacionar_vehiculo`) y al pagar explícitamente desde "Mis infracciones" o "Cobrar infracción" (vendedor). Pasado el plazo, se cobra el monto (saldo digital o efectivo). Centralizado en `calcular_estado_tolerancia()` de `services/infracciones.py`; incluye margen de 60 segundos para evitar cobrar por diferencias mínimas.
 
 **Exenciones:** exento global → nunca paga. Exento parcial → libre en sus subcuadras exentas, paga en el resto. El inspector ve el estado al verificar la patente.
 
-**Abono mensual:** una vez cobrado para un mes/vehículo/municipio, no se puede cobrar de nuevo (unique constraint). El inspector lo ve al verificar la patente.
+**Abono mensual:** una vez cobrado para un mes/vehículo/municipio, no se puede cobrar de nuevo (unique constraint). El inspector lo ve al verificar la patente. Puede cobrarlo el vendedor (en efectivo, con comisión), el admin (sin comisión, 100% a tesorería) o el propio conductor (con saldo digital, `vendedor=null`).
 
 **Comisión vendedor:** se calcula `monto * comision_vendedor% / 100` al cobrar y se guarda en `MovimientoCaja.comision_monto`. Se acumula hasta que el tesorero genera una `LiquidacionComision`.
 

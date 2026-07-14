@@ -63,7 +63,7 @@ from .views_conductor import (
     renovar_estacionamiento,
     finalizar_estacionamiento,
     mis_infracciones,
-    simular_pago,
+    pagar_abono_conductor,
 )
 from .views_admin import (
     panel_admin,
@@ -95,4 +95,4 @@ from .views_mp import (
     mp_pendiente,
     mp_webhook,
 )
-# ─────────────────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────

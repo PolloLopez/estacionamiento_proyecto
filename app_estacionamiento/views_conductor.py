@@ -688,19 +688,138 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Utilidades de desarrollo
+# ──────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Abono mensual con saldo digital
 # ─────────────────────────────────────────────────────────────────────────────
 
-@require_login
-def simular_pago(request, infraccion_id):
+@require_role("conductor")
+def pagar_abono_conductor(request):
     """
-    Solo disponible en DEBUG=True. Marca una infracción como pagada sin pasar
-    por MercadoPago. Devuelve 404 en producción para evitar bypasses.
-    """
-    if not settings.DEBUG:
-        from django.http import Http404
-        raise Http404("No disponible en producción.")
+    El conductor paga el abono mensual descontando de su saldo digital.
 
-    infraccion = get_object_or_404(Infraccion, id=infraccion_id)
-    infraccion.estado = "pagada"
-    infraccion.save()
-    return redirect("inspectores_ticket", infraccion.id)
+    Flujo:
+    - GET: formulario con selector de vehiculo y mes
+    - POST accion=confirmar: muestra resumen con precio y saldo disponible
+    - POST accion=cobrar: debita saldo y crea AbonoMensual
+    """
+    from datetime import date
+    from app_estacionamiento.models import AbonoMensual, Tarifa, Vehiculo
+    from app_estacionamiento.services.saldo import debitar_saldo_conductor
+
+    MESES_ES = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+    ]
+
+    def _sumar_meses(d, n):
+        mes = d.month - 1 + n
+        anio = d.year + mes // 12
+        mes  = mes % 12 + 1
+        return date(anio, mes, 1)
+
+    usuario   = request.user
+    municipio = usuario.municipio
+    tarifa_obj = Tarifa.objects.filter(municipio=municipio).first()
+
+    hoy      = date.today()
+    mes_base = hoy.replace(day=1)
+    opciones_mes = [
+        (
+            _sumar_meses(mes_base, delta).isoformat(),
+            f"{MESES_ES[_sumar_meses(mes_base, delta).month - 1]} {_sumar_meses(mes_base, delta).year}",
+        )
+        for delta in [-1, 0, 1]
+    ]
+
+    vehiculos = Vehiculo.objects.filter(
+        vehiculousuario__usuario=usuario
+    ).distinct()
+
+    error     = None
+    confirmar = False
+    vehiculo  = None
+    precio    = None
+    mes_label = ""
+
+    mes_str = (request.POST.get("mes") or "").strip() if request.method == "POST" else ""
+    try:
+        mes_seleccionado = date.fromisoformat(mes_str) if mes_str else mes_base
+    except ValueError:
+        mes_seleccionado = mes_base
+    mes_label = f"{MESES_ES[mes_seleccionado.month - 1]} {mes_seleccionado.year}"
+
+    if request.method == "POST":
+        accion      = request.POST.get("accion", "confirmar")
+        vehiculo_id = request.POST.get("vehiculo_id", "").strip()
+
+        if not vehiculo_id:
+            error = "Selecciona un vehiculo."
+        else:
+            vehiculo = Vehiculo.objects.filter(
+                id=vehiculo_id, vehiculousuario__usuario=usuario
+            ).first()
+            if not vehiculo:
+                error = "Vehiculo no encontrado."
+            else:
+                es_moto     = getattr(vehiculo, "tipo", "auto") == "moto"
+                precio_moto = getattr(tarifa_obj, "precio_abono_moto", None) if tarifa_obj else None
+                precio_auto = getattr(tarifa_obj, "precio_abono_auto", None) if tarifa_obj else None
+
+                if es_moto and precio_moto and precio_moto > 0:
+                    precio = precio_moto
+                elif precio_auto and precio_auto > 0:
+                    precio = precio_auto
+                else:
+                    error = "No hay tarifa de abono configurada. Consulta al admin."
+
+                if not error:
+                    ya_tiene = AbonoMensual.objects.filter(
+                        vehiculo=vehiculo, municipio=municipio, mes=mes_seleccionado,
+                    ).exists()
+
+                    if ya_tiene:
+                        error = f"El vehiculo ya tiene abono para {mes_label}."
+                    elif accion == "confirmar":
+                        confirmar = True
+                    elif accion == "cobrar":
+                        if usuario.saldo < precio:
+                            error = f"Saldo insuficiente. Disponible: ${usuario.saldo}, requerido: ${precio}."
+                        else:
+                            with transaction.atomic():
+                                conductor_locked = Usuario.objects.select_for_update().get(id=usuario.id)
+                                if conductor_locked.saldo < precio:
+                                    error = "Saldo insuficiente."
+                                else:
+                                    debitar_saldo_conductor(
+                                        conductor=conductor_locked,
+                                        monto=precio,
+                                        descripcion=f"Abono mensual {mes_seleccionado.strftime('%m/%Y')} - {vehiculo.patente}",
+                                    )
+                                    AbonoMensual.objects.create(
+                                        vehiculo=vehiculo,
+                                        municipio=municipio,
+                                        vendedor=None,
+                                        mes=mes_seleccionado,
+                                        monto=precio,
+                                        medio_pago="saldo",
+                                    )
+                            if not error:
+                                messages.success(
+                                    request,
+                                    f"Abono de {mes_label} registrado para {vehiculo.patente} — ${precio}.",
+                                )
+                                return redirect("inicio_usuarios")
+
+    return render(request, "usuarios/pagar_abono.html", {
+        "vehiculos":        vehiculos,
+        "vehiculo":         vehiculo,
+        "opciones_mes":     opciones_mes,
+        "mes_seleccionado": mes_seleccionado.isoformat(),
+        "mes_label":        mes_label,
+        "precio":           precio,
+        "confirmar":        confirmar,
+        "error":            error,
+        "saldo_usuario":    usuario.saldo,
+    })

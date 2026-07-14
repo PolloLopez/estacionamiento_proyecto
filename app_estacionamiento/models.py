@@ -648,7 +648,7 @@ class AbonoMensual(models.Model):
     sin necesidad de registrar cada sesión.
     El inspector ve 'abono activo' al verificar la patente.
     """
-    MEDIOS_PAGO = [('efectivo', 'Efectivo'), ('mercadopago', 'MercadoPago')]
+    MEDIOS_PAGO = [('efectivo', 'Efectivo'), ('mercadopago', 'MercadoPago'), ('saldo', 'Saldo digital')]
 
     vehiculo    = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, related_name='abonos')
     municipio   = models.ForeignKey(Municipio, on_delete=models.CASCADE, related_name='abonos')

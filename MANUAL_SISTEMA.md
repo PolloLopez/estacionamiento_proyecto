@@ -229,6 +229,9 @@ En "📋 Infracciones" → busco la infracción → botón "Anular" (solo si est
 **¿Cómo cargo saldo a un conductor?**
 Desde "Conductores" → "Ver" conductor → "Cargar saldo manualmente".
 
+**¿Cómo cobro un abono mensual?**
+Panel Admin → "📅 Abonos". Ingresá la patente, elegí el vehículo, seleccioná el mes y el monto. El cobro queda registrado sin comisión: el 100% se rinde a tesorería. Si el conductor prefiere pagarlo él mismo con su saldo digital, puede hacerlo desde su propio panel de inicio.
+
 **¿Cómo cambio la tarifa por hora?**
 Panel Admin → "💲 Tarifas" → ingreso el nuevo precio → guardar.
 
@@ -284,6 +287,9 @@ El admin te lo indica cuando procesó tu exención. Podés ver el estado de tus 
 
 **Me aparece "Infracción anulada automáticamente". ¿Qué significa?**
 Tu vehículo tenía una infracción pendiente, pero registraste el estacionamiento dentro del período de gracia que configura el municipio. La infracción se canceló automáticamente sin costo.
+
+**¿Cómo pago el abono mensual?**
+Desde tu panel de inicio → "📅 Pagar abono". Elegís el vehículo y el mes (podés pagar el mes anterior, el actual o el siguiente). El sistema te muestra el precio y tu saldo disponible. Si tenés saldo suficiente, confirmás y se descuenta automáticamente. Si no tenés saldo, podés cargar con MercadoPago primero.
 
 **¿Qué hago si no tengo cuenta de email?**
 Podés entrar con tu cuenta de Google directamente.

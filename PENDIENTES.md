@@ -1,35 +1,45 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-13
+Última actualización: 2026-07-14
 
 ---
 
 ## 🟡 Media prioridad
 
-### 5. Prueba de navegador — modal tolerancia ⏸️ pendiente hasta nuevo deploy
+### 5. Configurar email en Railway (recuperación de contraseña)
+En local los emails aparecen en la consola (backend `console`). En Railway hay que setear 3 variables:
+```
+EMAIL_HOST_USER=tumail@gmail.com
+EMAIL_HOST_PASSWORD=xxxx xxxx xxxx xxxx   ← contraseña de app de Google (no la contraseña normal)
+DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
+```
+La contraseña de app se genera en: Google Account → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones.
+**Disparador**: cuando se reactive el deploy en Railway.
+
+### 6. Prueba de navegador — modal tolerancia ⏸️ pendiente hasta nuevo deploy
 Testear manualmente el modal diferenciado en `mis_infracciones`.
 Ver pasos en `testeo.md` → sección "Test manual — Tolerancia de gracia" (Casos A, B, C, D).
 **Bloqueado por**: Railway trial expirado. Hacer cuando se reactive o migre el deploy.
 
-### 6. Tests faltantes (coverage incompleto)
+### 7. Tests faltantes (coverage incompleto)
 - Flujo MP webhook (integración)
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-### 7. Evaluar migración a Digital Ocean
+### 8. Evaluar migración a Digital Ocean
 Railway conveniente pero con limitaciones de costo/control a largo plazo.
 **Disparador**: cuando el sistema tenga usuarios reales pagando.
 
-### 8. Inspector: foto con watermark y GPS (v2)
+### 9. Inspector: foto con watermark y GPS (v2)
 `Infraccion` ya tiene campo `foto` (ImageField). La marca de agua GPS ya está implementada
 en `services/infracciones.py::_agregar_marca_de_agua_gps`. Falta integrar en el flujo mobile.
 
-### 9. Inspector como cobrador (paid feature)
+### 10. Inspector como cobrador (paid feature)
 Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `cobrar_abono`.
 
-### 10. Mejoras OAuth y UI
+### 11. Mejoras OAuth y UI
 - Pantalla de consentimiento Google: completar logo, descripción, dominio verificado
 - Modo alto contraste / uso en exterior con sol
 - Separar `settings_dev.py` / `settings_prod.py`
@@ -107,6 +117,20 @@ Técnica: `Infraccion.objects.update(creado_en=...)` + `patch("...pagar_infracci
 ### Tests faltantes cubiertos (tests_servicios.py) ✅
 20 tests en 5 clases: `cobrar_infraccion_efectivo`, `cargar_saldo_conductor`,
 abono mensual, comisiones, multi-municipio, tesorero→depositar→certificar.
+
+### Abono mensual — conductor paga con saldo + admin sin comisión ✅
+- `AbonoMensual.MEDIOS_PAGO` ahora incluye `'saldo'` + migración 0039.
+- Nueva view `pagar_abono_conductor` (GET: selección vehículo/mes, POST confirmar/cobrar con `select_for_update`).
+- Admin cobra abono a través de `cobrar_abono` con `comision_monto = Decimal("0")` → 100% a tesorería.
+- Conductor accede desde panel de inicio (botón "📅 Pagar abono" siempre visible).
+- Panel admin: nuevo botón "📅 Abonos" en cabecera → `cobrar_abono`.
+
+### Infracciones — conductor las paga desde la app ✅
+- `mis_infracciones` muestra modal diferenciado: dentro de tolerancia → botón "Anular sin costo";
+  fuera → aviso amarillo + "Pagar $X".
+- `pagar_infraccion` use case decide en servidor si anula (gracia) o cobra (descuenta saldo).
+- Al estacionar: infracción pendiente detectada → dentro de gracia → anula + mensaje verde;
+  fuera de gracia → estacionamiento igual + notificación con 3 timestamps + link a Mis infracciones.
 
 ### Otros ✅
 - `test_conductor_sin_saldo_redirige_a_carga_mp`: test corregido (assertions a `mp_iniciar_carga`)

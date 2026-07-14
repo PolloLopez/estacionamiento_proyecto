@@ -474,8 +474,12 @@ def cobrar_abono(request):
                     elif accion == "confirmar":
                         confirmar = True
                     elif accion == "cobrar":
-                        comision_pct   = getattr(municipio, "comision_vendedor", None) or Decimal("0")
-                        comision_monto = (precio * comision_pct / 100).quantize(Decimal("0.01"))
+                        # El admin rinde el 100% a tesoreria - sin comision propia
+                        if vendedor.es_admin:
+                            comision_monto = Decimal("0")
+                        else:
+                            comision_pct   = getattr(municipio, "comision_vendedor", None) or Decimal("0")
+                            comision_monto = (precio * comision_pct / 100).quantize(Decimal("0.01"))
 
                         with transaction.atomic():
                             movimiento = MovimientoCaja.objects.create(
@@ -811,7 +815,7 @@ def certificar_comision(request, liquidacion_id):
     )
 
     if liquidacion.estado != "depositada":
-        messages.warning(request, "Esta liquidación no está lista para certificar.")
+        messages.warning(request, "Esta liquidacion no esta lista para certificar.")
         return redirect("mis_comisiones")
 
     if request.method == "POST":
@@ -819,7 +823,7 @@ def certificar_comision(request, liquidacion_id):
             liquidacion.estado         = "certificada"
             liquidacion.certificada_en = timezone.now()
             liquidacion.save(update_fields=["estado", "certificada_en"])
-        messages.success(request, "Comisión certificada correctamente.")
+        messages.success(request, "Comision certificada correctamente.")
         return redirect("mis_comisiones")
 
     return render(request, "vendedores/certificar_comision.html", {

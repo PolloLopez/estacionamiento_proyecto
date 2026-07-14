@@ -90,12 +90,17 @@
 </div>
 
 <!-- 📅 ABONOS MENSUALES ACTIVOS -->
-{% if abonos_activos %}
-  <div class="card" style="margin-top:1rem; border-left:4px solid var(--color-success);">
-    <h3 style="margin-bottom:0.5rem;">📅 Abono mensual activo</h3>
+<div class="card" style="margin-top:1rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem;">
+    <h3 style="margin:0;">📅 Abono mensual</h3>
+    <a href="{% url 'conductor_pagar_abono' %}" class="btn btn-outline"
+       style="font-size:0.85rem; padding:0.3rem 0.8rem;">+ Pagar abono</a>
+  </div>
+  {% if abonos_activos %}
     {% for abono in abonos_activos %}
-      <div style="display:flex; align-items:center; gap:0.75rem; padding:0.4rem 0;">
-        <span style="font-size:1.2rem;">✅</span>
+      <div style="display:flex; align-items:center; gap:0.75rem; padding:0.35rem 0;">
+        <span style="font-size:1.1rem;">✅</span>
         <div>
           <strong>{{ abono.vehiculo.patente }}</strong>
           <span style="color:var(--color-text-muted); font-size:0.9rem;">
@@ -104,8 +109,10 @@
         </div>
       </div>
     {% endfor %}
-  </div>
-{% endif %}
+  {% else %}
+    <p class="text-muted" style="margin:0; font-size:0.9rem;">No tenés abono activo este mes.</p>
+  {% endif %}
+</div>
 
 <!-- ⚠️ INFRACCIÓN PENDIENTE DETECTADA AL ESTACIONAR -->
 {% if notif_infraccion %}
@@ -280,9 +287,8 @@
       // Barra de progreso
       if (progressEl) {
         const transcurrido = duracionMs - restante;
-        const pct = Math.min(100, (transcurrido / duracionMs) * 100);
+        const pct = Math.min(100, Math.round(transcurrido / duracionMs * 100));
         progressEl.style.width = pct + "%";
-        progressEl.style.background = "var(--color-success)";
       }
     }
   }
@@ -293,4 +299,5 @@
 })();
 </script>
 
+</section>
 {% endblock %}
