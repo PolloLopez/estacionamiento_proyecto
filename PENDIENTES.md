@@ -6,9 +6,12 @@
 
 ## 🟡 Media prioridad
 
+### 5. Prueba de navegador — modal tolerancia ⏸️ pendiente hasta nuevo deploy
+Testear manualmente el modal diferenciado en `mis_infracciones`.
+Ver pasos en `testeo.md` → sección "Test manual — Tolerancia de gracia" (Casos A, B, C, D).
+**Bloqueado por**: Railway trial expirado. Hacer cuando se reactive o migre el deploy.
 
 ### 6. Tests faltantes (coverage incompleto)
-- Tolerancia multa (pagar antes vs después del período de gracia) — `pagar_infraccion` use case
 - Flujo MP webhook (integración)
 
 ---
@@ -68,6 +71,26 @@ Creada la carpeta `services/` con módulos por dominio:
 
 `utils.py` quedó en 32 líneas (solo `get_subcuadra_default`).
 Los archivos `services_*.py` viejos son shims de 4 líneas para compatibilidad hacia atrás.
+
+### Tolerancia al estacionar — integración completa ✅
+- `services/infracciones.py` → nueva `calcular_estado_tolerancia()` con `MARGEN_TOLERANCIA_SEGUNDOS = 60`
+  (evita cobrar por diferencias de pocos segundos). Centraliza la lógica usada en 3 lugares.
+- `use_cases/estacionar_vehiculo.py` → antes de crear el Estacionamiento, busca infracción
+  pendiente del vehículo: dentro de tolerancia → anula; fuera → deja pendiente + retorna timestamps.
+- `views_conductor.py` → guarda timestamps en `request.session`, `inicio_usuarios` los muestra
+  como card con los 3 timestamps y link a "Mis infracciones".
+- `views_vendedor.py` → mismo chequeo en `registrar_estacionamiento_vendedor` (avisa por messages).
+- `cobrar_infraccion_vendedor` → reemplazó lógica inline por `calcular_estado_tolerancia`.
+- `use_cases/pagar_infraccion.py` → también usa `calcular_estado_tolerancia` (refactor).
+
+### feat: aviso fuera de término al pagar infracción ✅
+`mis_infracciones` calcula `ids_dentro_tolerancia` al renderizar.
+Modal diferenciado: dentro de gracia → "Anular sin costo" (verde); fuera → aviso amarillo + botón rojo "Pagar $X".
+El use case `pagar_infraccion_uc` decide en el servidor si anula o cobra.
+
+### Tests tolerancia de gracia (6 tests en TestToleranciaMulta) ✅
+Cubre: dentro, exactamente en el límite, fuera, tolerancia=0, doble pago.
+Técnica: `Infraccion.objects.update(creado_en=...)` + `patch("...pagar_infraccion.timezone")`.
 
 ### views.py — limpieza de imports legacy ✅
 157 → 98 líneas. Eliminados: models, utils, factories, services_*, use_cases, decorators, forms, django internals. Puro facade.

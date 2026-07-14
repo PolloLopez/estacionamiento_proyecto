@@ -39,6 +39,7 @@ from .models import (
 from .services_caja import generar_cierre_caja
 from .use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
 from .services.horarios import calcular_opciones_duracion, puede_estacionar_ahora
+from .services.infracciones import calcular_estado_tolerancia
 from .utils import get_subcuadra_default
 
 
@@ -232,6 +233,37 @@ def registrar_estacionamiento_vendedor(request):
     comision_cobro = (monto * comision_pct / 100).quantize(Decimal("0.01"))
 
     with transaction.atomic():
+        # ── Chequeo de infraccion pendiente ──────────────────────────────────
+        # Si el vehiculo tiene una infraccion pendiente, aplicar tolerancia de gracia.
+        from django.utils import timezone as _tz
+        ahora = _tz.now()
+        infraccion_pendiente = Infraccion.objects.filter(
+            vehiculo=vehiculo,
+            municipio=vendedor.municipio,
+            estado="pendiente",
+        ).order_by("-creado_en").first()
+
+        infraccion_anulada = False
+        infraccion_fuera   = None
+
+        if infraccion_pendiente and vendedor.municipio:
+            estado_tol = calcular_estado_tolerancia(
+                infraccion_pendiente, vendedor.municipio, ahora=ahora
+            )
+            if estado_tol["dentro_tolerancia"]:
+                infraccion_pendiente.estado     = "anulada"
+                infraccion_pendiente.fecha_pago = ahora
+                infraccion_pendiente.save()
+                infraccion_anulada = True
+            else:
+                infraccion_fuera = {
+                    "infraccion_id":     infraccion_pendiente.id,
+                    "monto":             infraccion_pendiente.monto,
+                    "tolerancia_min":    estado_tol["tolerancia_min"],
+                    "hora_verificacion": estado_tol["hora_verificacion"],
+                    "hora_fin_gracia":   estado_tol["hora_fin_gracia"],
+                }
+
         est = EstacionamientoFactory.crear(
             usuario=vendedor,
             vehiculo=vehiculo,
@@ -244,6 +276,20 @@ def registrar_estacionamiento_vendedor(request):
             monto=monto,
             descripcion=f"Estacionamiento {patente}",
             comision_monto=comision_cobro,
+        )
+
+    if infraccion_anulada:
+        messages.success(
+            request,
+            f"✅ Infracción del vehículo {patente} anulada automáticamente "
+            f"(dentro del período de gracia)."
+        )
+    elif infraccion_fuera:
+        messages.warning(
+            request,
+            f"⚠️ El vehículo {patente} tiene una infracción pendiente de "
+            f"${infraccion_fuera['monto']}. El período de gracia venció. "
+            f"El conductor puede pagarla desde la app."
         )
 
     return redirect(reverse("inspectores_ticket_cobro", args=[est.id]))
@@ -311,17 +357,16 @@ def cobrar_infraccion_vendedor(request):
                             Infraccion.objects.select_for_update(),
                             id=infraccion_id, municipio=municipio, estado="pendiente",
                         )
-                        from datetime import timedelta as _td
-                        tolerancia_min = municipio.tolerancia_multa_minutos or 0
-                        ahora = timezone.now()
-                        anulada_por_gracia = (
-                            tolerancia_min > 0 and
-                            (ahora - inf.creado_en) <= _td(minutes=tolerancia_min)
+                        ahora      = timezone.now()
+                        estado_tol = calcular_estado_tolerancia(
+                            inf, municipio, ahora=ahora
                         )
-                        if anulada_por_gracia:
+                        if estado_tol["dentro_tolerancia"]:
+                            # Dentro de la gracia: anular sin cobrar
                             inf.estado = "anulada"
                         else:
-                            inf.estado = "pagada"
+                            # Fuera de la gracia: cobrar en efectivo
+                            inf.estado   = "pagada"
                             comision_pct = municipio.comision_vendedor or 0
                             comision     = round(inf.monto * comision_pct / 100, 2)
                             MovimientoCaja.objects.create(
@@ -330,7 +375,7 @@ def cobrar_infraccion_vendedor(request):
                                 tipo="ingreso",
                                 medio_pago="efectivo",
                                 comision_monto=comision,
-                                descripcion=f"Cobro infracción #{inf.id} — {inf.vehiculo.patente}",
+                                descripcion=f"Cobro infraccion #{inf.id} — {inf.vehiculo.patente}",
                             )
                         inf.fecha_pago = ahora
                         inf.save()

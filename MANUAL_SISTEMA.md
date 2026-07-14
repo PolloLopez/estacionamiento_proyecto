@@ -93,15 +93,55 @@ Inspector escanea vehículo con exención:
 2. Ingresa patente (teclado o escáner)
 3. Sistema evalúa:
    - ¿Exento total? → ✅ libre
-   - ¿Pago activo? → ✅ OK
+   - ¿Pago activo o abono mensual vigente? → ✅ OK
    - ¿Exento parcial en esta subcuadra? → ✅ libre
    - ¿Exento parcial fuera de su subcuadra? → 🚨 INFRACCIONAR
    - ¿Tolerancia (15 min desde última verificación)? → ⏳ esperar
    - ¿Impago / No registrado? → 🚨 INFRACCIONAR
-4. Si infracción: inspector confirma subcuadra y puede sacar foto
+4. Si infracción: inspector confirma subcuadra y puede sacar foto (con watermark GPS)
 5. Se genera Infraccion (estado=pendiente)
-6. Conductor recibe notificación
-7. Conductor puede pagar la infracción desde su panel
+6. Conductor puede resolver la infracción de dos formas (ver abajo)
+```
+
+### Flujo de resolución de infracción — conductor estaciona
+
+```
+Conductor registra estacionamiento para ese vehículo
+  → Sistema detecta infracción pendiente del vehículo
+
+  ┌─ Dentro del período de gracia (configurado en Admin → Municipio) ──────────┐
+  │  Infracción se ANULA automáticamente sin cobrar nada                       │
+  │  Conductor ve mensaje verde: "Infracción anulada por período de gracia"    │
+  └────────────────────────────────────────────────────────────────────────────┘
+
+  ┌─ Fuera del período de gracia ──────────────────────────────────────────────┐
+  │  Estacionamiento se registra normalmente (se cobra el estacionamiento)     │
+  │  Infracción queda PENDIENTE de pago                                        │
+  │  Conductor ve notificación con 3 timestamps:                               │
+  │    🔍 Hora en que fue verificado por el inspector                          │
+  │    ⏱  Hora en que venció el período de gracia                             │
+  │    🚗 Hora en que registró el estacionamiento                              │
+  │  Botón "Ir a pagar la infracción ($X)" → redirige a Mis Infracciones      │
+  └────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Flujo de resolución de infracción — vendedor cobra por patente
+
+```
+Conductor va al kiosco del vendedor a pagar la infracción en efectivo
+
+Vendedor → "Cobrar infracción" → ingresa patente → ve la infracción pendiente
+  → Confirma el cobro
+
+  ┌─ Dentro del período de gracia ─────────────────────────────────────────────┐
+  │  Infracción se ANULA sin cobrar (el conductor no paga nada)                │
+  └────────────────────────────────────────────────────────────────────────────┘
+
+  ┌─ Fuera del período de gracia ──────────────────────────────────────────────┐
+  │  Vendedor cobra el monto en efectivo al conductor                          │
+  │  Sistema registra MovimientoCaja (ingreso, medio_pago=efectivo)            │
+  │  Infracción pasa a estado PAGADA                                           │
+  └────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Flujo de rendición de caja (inspector/vendedor → admin)
@@ -234,13 +274,16 @@ Desde tu panel de inicio → "Recargar saldo" → elegís el monto → te rediri
 Podés seguir estacionado, pero si un inspector pasa, te puede infraccionar. Tenés 15 minutos de tolerancia desde que vence el tiempo pagado.
 
 **Me avisaron que tengo una infracción. ¿Cómo la pago?**
-Desde tu panel → "Mis infracciones". Ves el detalle y podés pagarla desde ahí.
+Desde tu panel → "Mis infracciones". Ves el detalle y podés pagarla con tu saldo. Si no tenés saldo, podés ir a un kiosco vendedor y pagar en efectivo.
+
+**¿Qué pasa si registro un estacionamiento y tenía una infracción pendiente?**
+El sistema lo detecta automáticamente. Si estás dentro del período de gracia configurado por el municipio, la infracción se anula sin cobrar y ves un mensaje verde. Si ya venció el período de gracia, el estacionamiento igual se registra pero ves una notificación con los horarios exactos y un link para ir a pagar la infracción.
 
 **¿Cómo sé si mi vehículo está exento?**
 El admin te lo indica cuando procesó tu exención. Podés ver el estado de tus vehículos en el perfil.
 
-**Me dice que pagué a tiempo y se canceló la infracción. ¿Qué significa?**
-Un inspector escaneó tu patente, pero pagaste el estacionamiento antes de que pasaran los 15 minutos de tolerancia. La infracción fue automáticamente cancelada.
+**Me aparece "Infracción anulada automáticamente". ¿Qué significa?**
+Tu vehículo tenía una infracción pendiente, pero registraste el estacionamiento dentro del período de gracia que configura el municipio. La infracción se canceló automáticamente sin costo.
 
 **¿Qué hago si no tengo cuenta de email?**
 Podés entrar con tu cuenta de Google directamente.
@@ -250,13 +293,16 @@ Podés entrar con tu cuenta de Google directamente.
 ### FAQ — Vendedor
 
 **¿Cómo registro un estacionamiento?**
-Panel Vendedor → "Registrar estacionamiento" → ingresás la patente → la duración → el sistema genera el cobro y el ticket.
+Panel Vendedor → "Registrar estacionamiento" → ingresás la patente → la duración → el sistema genera el cobro y el ticket. Si el vehículo tenía una infracción pendiente, el sistema te avisa automáticamente (anulada si está en gracia, pendiente si no).
+
+**¿Cómo cobro una infracción por patente?**
+Panel Vendedor → "Cobrar infracción" → ingresás la patente → ves la infracción pendiente → confirmás el cobro. El sistema aplica automáticamente la tolerancia de gracia: si el conductor llega dentro del período, la infracción se anula sin cobrar; si no, cobrás el monto en efectivo y queda registrado en tu caja.
 
 **¿Cómo veo mi resumen de caja?**
 Panel Vendedor → "Resumen de caja". Mostrá los movimientos del período.
 
 **¿Cómo hago la rendición al admin?**
-Igual que el inspector: cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja". El admin lo verifica de su lado.
+Cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja". El admin lo verifica de su lado.
 
 ---
 

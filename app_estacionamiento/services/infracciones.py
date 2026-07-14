@@ -246,3 +246,52 @@ def cobrar_infraccion_efectivo(infraccion, cobrador):
         )
 
     return inf
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tolerancia de gracia — helper compartido
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Margen para evitar cobrar infracciones por pocos segundos de diferencia
+MARGEN_TOLERANCIA_SEGUNDOS = 60
+
+
+def calcular_estado_tolerancia(infraccion, municipio, ahora=None):
+    """
+    Determina si una infracción está dentro del período de gracia.
+
+    Incluye MARGEN_TOLERANCIA_SEGUNDOS para evitar cobrar por diferencias
+    de pocos segundos (por ejemplo: el conductor llega 2 segundos tarde).
+
+    Parámetros:
+        infraccion: instancia de Infraccion (debe tener creado_en)
+        municipio:  instancia de Municipio (debe tener tolerancia_multa_minutos)
+        ahora:      datetime con timezone (default: timezone.now())
+
+    Retorna dict con:
+        dentro_tolerancia (bool)  — True si aún está dentro del período de gracia
+        tolerancia_min    (int)   — minutos configurados en el municipio
+        hora_verificacion (datetime) — cuándo se labró la infracción
+        hora_fin_gracia   (datetime) — cuándo vence el período de gracia
+    """
+    if ahora is None:
+        ahora = timezone.now()
+
+    tolerancia_min  = getattr(municipio, "tolerancia_multa_minutos", 0) or 0
+    hora_fin_gracia = infraccion.creado_en + timedelta(minutes=tolerancia_min)
+
+    if tolerancia_min <= 0:
+        dentro = False
+    else:
+        elapsed = ahora - infraccion.creado_en
+        dentro  = elapsed <= timedelta(
+            minutes=tolerancia_min,
+            seconds=MARGEN_TOLERANCIA_SEGUNDOS,
+        )
+
+    return {
+        "dentro_tolerancia": dentro,
+        "tolerancia_min":    tolerancia_min,
+        "hora_verificacion": infraccion.creado_en,
+        "hora_fin_gracia":   hora_fin_gracia,
+    }

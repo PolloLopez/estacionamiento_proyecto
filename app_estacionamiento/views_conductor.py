@@ -104,12 +104,21 @@ def inicio_usuarios(request):
         mes=mes_actual,
     ).select_related("vehiculo").distinct() if usuario.municipio else []
 
+    # Notificacion de infraccion pendiente (generada al estacionar fuera de tolerancia)
+    notif_infraccion = request.session.pop("notif_infraccion_pendiente", None)
+    if notif_infraccion:
+        from django.utils.dateparse import parse_datetime
+        notif_infraccion["hora_verificacion"]    = parse_datetime(notif_infraccion["hora_verificacion"])
+        notif_infraccion["hora_fin_gracia"]      = parse_datetime(notif_infraccion["hora_fin_gracia"])
+        notif_infraccion["hora_estacionamiento"] = parse_datetime(notif_infraccion["hora_estacionamiento"])
+
     return render(request, "usuarios/inicio_usuarios.html", {
         "usuario":               usuario,
         "estacionamiento_activo": estacionamiento_activo,
         "solicitud_verificacion": solicitud_verificacion,
         "notificaciones_nuevas": notificaciones_nuevas,
         "abonos_activos":        abonos_activos,
+        "notif_infraccion":      notif_infraccion,
     })
 
 
@@ -509,17 +518,27 @@ def estacionar_vehiculo(request):
         if not result["ok"]:
             return redirect(reverse(result["redirect"]))
 
-        # Aviso si el inspector escaneó el vehículo recientemente (dentro de 15 min)
-        escaneado_recientemente = VerificacionInspector.objects.filter(
-            vehiculo=vehiculo,
-            fecha__gte=timezone.now() - timedelta(minutes=15),
-        ).exists()
-        if escaneado_recientemente:
-            messages.info(
-                request,
-                "⚠️ Tu vehículo fue escaneado por un inspector. "
-                "Como pagaste a tiempo, la infracción quedó cancelada."
-            )
+        # ── Notificacion de infraccion detectada al estacionar ───────────────
+        info_inf = result.get("info_infraccion")
+        if info_inf:
+            if info_inf["anulada"]:
+                # Infraccion anulada por estar dentro de la tolerancia de gracia
+                messages.success(
+                    request,
+                    f"✅ Infracción anulada automáticamente — pagaste dentro del período "
+                    f"de gracia ({info_inf['tolerancia_min']} min)."
+                )
+            else:
+                # Infraccion fuera de tolerancia: guardar en sesion para mostrar notificacion
+                # con los 3 timestamps en el panel de inicio
+                request.session["notif_infraccion_pendiente"] = {
+                    "infraccion_id":        info_inf["infraccion_id"],
+                    "monto":                str(info_inf["monto"]),
+                    "tolerancia_min":       info_inf["tolerancia_min"],
+                    "hora_verificacion":    info_inf["hora_verificacion"].isoformat(),
+                    "hora_fin_gracia":      info_inf["hora_fin_gracia"].isoformat(),
+                    "hora_estacionamiento": info_inf["hora_estacionamiento"].isoformat(),
+                }
 
         return redirect(reverse(result["redirect"]))
 

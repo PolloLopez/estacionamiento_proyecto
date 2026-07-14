@@ -107,6 +107,37 @@
   </div>
 {% endif %}
 
+<!-- ⚠️ INFRACCIÓN PENDIENTE DETECTADA AL ESTACIONAR -->
+{% if notif_infraccion %}
+<div class="card" style="margin-bottom:1rem; border-left:4px solid var(--color-danger, #c0392b); padding:1.25rem;">
+  <h4 style="margin-bottom:0.75rem; color:var(--color-danger, #c0392b);">
+    ⚠️ Tenés una infracción pendiente
+  </h4>
+  <p style="margin-bottom:0.75rem;">
+    Tu vehículo tenía una infracción pendiente de <strong>${{ notif_infraccion.monto }}</strong>
+    cuando registraste el estacionamiento. El período de gracia ya venció.
+  </p>
+  <table style="font-size:0.88rem; margin-bottom:1rem; border-collapse:collapse;">
+    <tr>
+      <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">🔍 Verificado por inspector</td>
+      <td><strong>{{ notif_infraccion.hora_verificacion|date:"d/m/Y H:i:s" }}</strong></td>
+    </tr>
+    <tr>
+      <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">⏱ Fin período de gracia{% if notif_infraccion.tolerancia_min %} ({{ notif_infraccion.tolerancia_min }} min){% endif %}</td>
+      <td><strong>{{ notif_infraccion.hora_fin_gracia|date:"d/m/Y H:i:s" }}</strong></td>
+    </tr>
+    <tr>
+      <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">🚗 Estacionamiento registrado</td>
+      <td><strong>{{ notif_infraccion.hora_estacionamiento|date:"d/m/Y H:i:s" }}</strong></td>
+    </tr>
+  </table>
+  <a href="{% url 'mis_infracciones' %}" class="btn btn-sm"
+     style="background:var(--color-danger, #c0392b); color:#fff; font-size:0.9rem;">
+    Ir a pagar la infracción (${{ notif_infraccion.monto }})
+  </a>
+</div>
+{% endif %}
+
 <!-- 🔔 NOTIFICACIONES DEL SISTEMA (resultado de verificación, etc.) -->
 {% if notificaciones_nuevas %}
   {% for notif in notificaciones_nuevas %}
