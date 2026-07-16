@@ -3,7 +3,7 @@ Django==5.2.8
 asgiref==3.11.0
 
 # Autenticacion social
-django-allauth[socialaccount]==65.3.0
+django-allauth[socialaccount]==65.17.0
 
 # MercadoPago
 mercadopago==2.2.3
