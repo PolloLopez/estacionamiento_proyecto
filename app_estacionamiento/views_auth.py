@@ -31,6 +31,8 @@ def redirect_por_rol(usuario):
     """
     if usuario.es_admin:
         return redirect("panel_admin")
+    elif usuario.es_tesorero:
+        return redirect("panel_tesorero")
     elif usuario.es_inspector:
         return redirect("panel_inspectores")
     elif usuario.es_vendedor:
