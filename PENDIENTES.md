@@ -6,6 +6,14 @@
 
 ## 🟡 Media prioridad
 
+### 1. Transferencia de saldo entre usuarios
+El conductor puede transferir saldo a otro conductor. El receptor tiene **24 horas** para aceptar; si no responde, el monto se reintegra automáticamente al emisor.
+Pendiente de diseño:
+- Nuevo modelo `TransferenciaSaldo` (emisor, receptor, monto, estado: `pendiente`/`aceptada`/`rechazada`/`expirada`, creado_en).
+- Vista de envío (buscar receptor por correo o DNI).
+- Vista de recepción/rechazo (notificación en el panel del receptor).
+- Lógica de expiración: verificar en login o con tarea periódica (Celery o chequeo reactivo).
+
 ### 5. Prueba demo completa antes de presentación municipal
 - Conductor con $500 saldo
 - Vehículo con infracción pendiente fuera de tolerancia (demo 3 timestamps)
@@ -34,6 +42,11 @@ Ver pasos en `testeo.md` → sección "Test manual — Tolerancia de gracia" (Ca
 
 ## 🟢 Baja prioridad / Futuras versiones
 
+### PWA / App móvil sin Play Store
+Hacer la app instalable desde el navegador (Android/iOS) sin publicar en tiendas.
+Requiere: `manifest.json` (nombre, íconos, colores) + service worker básico (offline fallback).
+Relativamente poco trabajo, mejora mucho la percepción del municipio.
+
 ### 9. Evaluar migración a Digital Ocean
 Railway conveniente pero con limitaciones de costo/control a largo plazo.
 **Disparador**: cuando el sistema tenga usuarios reales pagando.
@@ -53,6 +66,17 @@ Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `
 ---
 
 ## ✅ Resuelto
+
+### feat: mejoras post-presentación municipal (commit e79eb22, 2026-07-16) ✅
+7 mejoras aplicadas tras la presentación al municipio:
+- **Registro de conductor**: `RegistroUsuarioForm` ahora pide `nombre` + `apellido` → evita el redirect de middleware a `completar_perfil` que impedía estacionar inmediatamente.
+- **Nombres en title case**: `.title()` al guardar `first_name`/`last_name` en registro, `completar_perfil` y edición desde admin.
+- **Sanitización de patentes**: nueva `sanitizar_patente()` en `utils.py` (solo alfanumérico, mayúsculas). Aplicada en todas las vistas + handler JS `oninput` en 11 templates.
+- **Mínimo 1 hora**: eliminada la opción de 30 min. `calcular_opciones_duracion()` arranca en `n=2`.
+- **Reintegro < 30 min**: si el conductor finaliza antes de `UMBRAL_REINTEGRO_MINUTOS = 30` min, devuelve 100% del `costo_base` al saldo + registra `MovimientoCaja(tipo="ingreso")`.
+- **Admin cargar saldo**: reescrito `cargar_saldo.html` con formato correcto; corregido bug que mostraba el correo del admin en vez del conductor.
+- **MercadoPago nombre "Pollo Lopez"**: corregido directamente en el portal de MP a "estacionamientoUrbano" (sin cambio de código).
+- 106 tests pasando.
 
 ### Alta prioridad — tests pre-existentes ✅
 58 tests pasando (16 roles + 42 generales). Fixes aplicados:

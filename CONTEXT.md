@@ -92,9 +92,9 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 **Shims de compatibilidad:** `services_caja.py`, `services_infracciones.py`, `services_verificacion.py`
 — 4 líneas cada uno, re-exportan desde `services/` para no romper imports viejos.
 
-**utils.py** — 32 líneas, solo `get_subcuadra_default()`.
+**utils.py** — `get_subcuadra_default()` + `sanitizar_patente()` (elimina todo lo que no sea alfanumérico y convierte a mayúsculas).
 
-**middleware.py** — redirige conductores sin `first_name` a `completar_perfil` (flujo OAuth).
+**middleware.py** — redirige conductores sin `first_name` a `completar_perfil` (flujo OAuth y registro email).
 
 **factories.py** — `EstacionamientoFactory.crear()` centraliza creación con estado inicial.
 
@@ -135,9 +135,15 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 
 **Comisión vendedor:** se calcula `monto * comision_vendedor% / 100` al cobrar y se guarda en `MovimientoCaja.comision_monto`. Se acumula hasta que el tesorero genera una `LiquidacionComision`.
 
+**Duración mínima de estacionamiento:** 1 hora. La opción de 30 minutos fue eliminada. `calcular_opciones_duracion()` en `services/horarios.py` arranca desde `n=2` (1.0h).
+
+**Reintegro por cancelación temprana:** si el conductor finaliza el estacionamiento antes de `UMBRAL_REINTEGRO_MINUTOS = 30` minutos, se devuelve el 100% del `costo_base` a su saldo y el `costo_final` queda en 0. El reintegro se registra como `MovimientoCaja(tipo="ingreso")`. Lógica centralizada en `use_cases/finalizar_estacionamiento.py`.
+
+**Patentes sanitizadas:** `sanitizar_patente(patente)` en `utils.py` elimina todo lo que no sea alfanumérico y convierte a mayúsculas. Se aplica en todas las vistas que reciben patente (inspector, vendedor, conductor, admin) y en todos los templates vía handler JS `oninput`.
+
 **Saldo doble-check:** antes de estacionar se verifica saldo optimista (sin lock) y luego dentro de `select_for_update()` para evitar race conditions.
 
-**Login:** `correo` como username. Google OAuth disponible. Conductores sin `first_name` son redirigidos a `completar_perfil` por el middleware.
+**Login:** `correo` como username. Google OAuth disponible. Conductores sin `first_name` son redirigidos a `completar_perfil` por el middleware. El formulario de registro (`RegistroUsuarioForm`) pide `nombre` y `apellido` desde el inicio para evitar este redirect.
 
 **Rendición a tesorería:** el admin genera una `Rendicion` con desglose de efectivo/digital/comisiones. La vista `crear_rendicion` pre-completa `fecha_desde` con el día siguiente a la última rendición del admin. El tesorero puede marcarla como `validada` (recibida) u `observada` (con notas). El admin ve sus propias rendiciones y su estado en la página de rendiciones. El vendedor ve sus cierres de caja pendientes de certificación en su panel.
 
