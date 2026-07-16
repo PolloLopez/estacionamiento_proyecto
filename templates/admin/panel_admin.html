@@ -44,6 +44,25 @@
     </div>
   </div>
 
+  <!-- ACCIONES RÁPIDAS -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:0.85rem;">⚡ Acciones rápidas</h3>
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+      <a href="{% url 'vendedores_registrar_estacionamiento' %}" class="btn">
+        🚗 Registrar estacionamiento
+      </a>
+      <a href="{% url 'cobrar_abono' %}" class="btn">
+        📅 Cobrar abono mensual
+      </a>
+      <a href="{% url 'cobrar_infraccion_vendedor' %}" class="btn btn-outline">
+        ⚠️ Cobrar infracción
+      </a>
+      <a href="{% url 'crear_rendicion' %}" class="btn btn-outline">
+        📋 Nueva rendición
+      </a>
+    </div>
+  </div>
+
   <!-- STATS -->
   <div class="grid grid-3" style="margin-bottom:1.5rem;">
 
