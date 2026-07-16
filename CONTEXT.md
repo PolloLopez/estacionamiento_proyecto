@@ -1,8 +1,8 @@
 # CONTEXT.md — Sistema de Estacionamiento Medido
-
+https://github.com/leandrolopezalbini/estacionamiento.git
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-07-14
+Última actualización estructural: 2026-07-16
 
 ---
 
@@ -23,7 +23,7 @@ Repo: https://github.com/PolloLopez/estacionamiento_proyecto
 
 | Entorno | Plataforma | URL |
 |---------|-----------|-----|
-| Producción | Railway (pendiente reactivar) | — |
+| Producción | Railway (Hobby plan, $5/mes) | https://estacionamiento.up.railway.app |
 | Local | `python manage.py runserver` | http://localhost:8000 |
 
 Variables de entorno requeridas:
@@ -52,7 +52,7 @@ Git flow: `develop` → trabajo activo · `main` → Railway auto-deploy.
 | PDF | reportlab | PDF de infracciones del día |
 | Frontend | HTML + CSS propio | Sin frameworks JS |
 | Deploy | Railway + gunicorn + WhiteNoise | PaaS simple |
-| Tests | Django TestCase | 95+ tests, sin pytest |
+| Tests | Django TestCase | 106 tests, sin pytest |
 
 ---
 
@@ -71,7 +71,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 - `views_inspector.py` — panel, verificar patente, infracciones, PDF
 - `views_vendedor.py` — cobros, abono mensual, caja, comisiones
 - `views_admin.py` — gestión completa del municipio
-- `views_tesorero.py` — rendiciones, depositar comisiones
+- `views_tesorero.py` — panel tesorero, validar/observar rendiciones del admin, depositar comisiones de vendedores
 - `views_mp.py` — integración MercadoPago (carga de saldo)
 
 **services/ (Sprint 2 — TRAMA):**
@@ -119,7 +119,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `DiaEspecial` | Feriados o días sin cobro. `fecha`, `cobro_activo`. |
 | `VerificacionInspector` | Resultado de verificar una patente. Estado del vehículo en el momento. |
 | `SolicitudVerificacion` | El conductor pide verificación de identidad al admin. |
-| `Rendicion` | El admin cierra un período y genera totales para el tesorero. Estado: `pendiente`/`validada`/`observada`. |
+| `Rendicion` | El admin cierra un período y genera totales (efectivo/digital/comisiones/neto) para el tesorero. Estado: `pendiente`/`validada`/`observada`. El tesorero registra quién validó y cuándo (`tesorero`, `validado_en`). |
 | `LiquidacionComision` | Pago de comisiones acumuladas a un vendedor. Flujo: `pendiente` → `depositada` (tesorero) → `certificada` (vendedor). |
 | `Notificacion` | Notificaciones internas al conductor. |
 
@@ -131,12 +131,14 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 
 **Exenciones:** exento global → nunca paga. Exento parcial → libre en sus subcuadras exentas, paga en el resto. El inspector ve el estado al verificar la patente.
 
-**Abono mensual:** una vez cobrado para un mes/vehículo/municipio, no se puede cobrar de nuevo (unique constraint). El inspector lo ve al verificar la patente. Puede cobrarlo el vendedor (en efectivo, con comisión), el admin (sin comisión, 100% a tesorería) o el propio conductor (con saldo digital, `vendedor=null`).
+**Abono mensual:** una vez cobrado para un mes/vehículo/municipio, no se puede cobrar de nuevo (unique constraint). El inspector lo ve al verificar la patente. Puede cobrarlo el vendedor (en efectivo, con comisión), el admin (sin comisión, 100% a tesorería) o el propio conductor (con saldo digital, `vendedor=null`). El vehículo se crea automáticamente si no existe (`get_or_create`) — no requiere registro previo.
 
 **Comisión vendedor:** se calcula `monto * comision_vendedor% / 100` al cobrar y se guarda en `MovimientoCaja.comision_monto`. Se acumula hasta que el tesorero genera una `LiquidacionComision`.
 
 **Saldo doble-check:** antes de estacionar se verifica saldo optimista (sin lock) y luego dentro de `select_for_update()` para evitar race conditions.
 
 **Login:** `correo` como username. Google OAuth disponible. Conductores sin `first_name` son redirigidos a `completar_perfil` por el middleware.
+
+**Rendición a tesorería:** el admin genera una `Rendicion` con desglose de efectivo/digital/comisiones. La vista `crear_rendicion` pre-completa `fecha_desde` con el día siguiente a la última rendición del admin. El tesorero puede marcarla como `validada` (recibida) u `observada` (con notas). El admin ve sus propias rendiciones y su estado en la página de rendiciones. El vendedor ve sus cierres de caja pendientes de certificación en su panel.
 
 **Multi-municipio:** cada municipio tiene su propia tarifa, horario, inspectores y vendedores. Los datos no se cruzan entre municipios.

@@ -266,14 +266,18 @@ class TestAbonoMensual(TestCase):
         mov = MovimientoCaja.objects.filter(usuario=self.vendedor, tipo="ingreso").first()
         self.assertEqual(mov.comision_monto, Decimal("50.00"))
 
-    def test_patente_inexistente_no_crea_abono(self):
-        """Buscar una patente que no existe no crea ningún AbonoMensual."""
+    def test_patente_nueva_crea_vehiculo_y_abono(self):
+        """
+        Una patente no registrada previamente genera el vehículo on-the-fly
+        y registra el abono. Cambio de comportamiento: antes bloqueaba,
+        ahora el abono no requiere registro previo del vehículo.
+        """
         self.client.post(self.url, {
             "accion": "cobrar",
             "patente": "ZZZZZZ",
             "mes": self.mes_actual,
         })
-        self.assertEqual(AbonoMensual.objects.count(), 0)
+        self.assertEqual(AbonoMensual.objects.filter(vehiculo__patente="ZZZZZZ").count(), 1)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

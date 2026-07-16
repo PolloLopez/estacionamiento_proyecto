@@ -1,12 +1,18 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-14
+Última actualización: 2026-07-16
 
 ---
 
 ## 🟡 Media prioridad
 
-### 5. Configurar email en Railway (recuperación de contraseña)
+### 5. Prueba demo completa antes de presentación municipal
+- Conductor con $500 saldo
+- Vehículo con infracción pendiente fuera de tolerancia (demo 3 timestamps)
+- Kiosco con movimientos pendientes (cierre de caja sin certificar)
+- Municipio: `nombre_sistema = "EstacionAR"`, tolerancia = 5 min, tarifa visible
+
+### 6. Configurar email en Railway (recuperación de contraseña)
 En local los emails aparecen en la consola (backend `console`). En Railway hay que setear 3 variables:
 ```
 EMAIL_HOST_USER=tumail@gmail.com
@@ -16,30 +22,30 @@ DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
 La contraseña de app se genera en: Google Account → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones.
 **Disparador**: cuando se reactive el deploy en Railway.
 
-### 6. Prueba de navegador — modal tolerancia ⏸️ pendiente hasta nuevo deploy
+### 7. Prueba de navegador — modal tolerancia ⏸️
 Testear manualmente el modal diferenciado en `mis_infracciones`.
 Ver pasos en `testeo.md` → sección "Test manual — Tolerancia de gracia" (Casos A, B, C, D).
 **Bloqueado por**: Railway trial expirado. Hacer cuando se reactive o migre el deploy.
 
-### 7. Tests faltantes (coverage incompleto)
+### 8. Tests faltantes (coverage incompleto)
 - Flujo MP webhook (integración)
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-### 8. Evaluar migración a Digital Ocean
+### 9. Evaluar migración a Digital Ocean
 Railway conveniente pero con limitaciones de costo/control a largo plazo.
 **Disparador**: cuando el sistema tenga usuarios reales pagando.
 
-### 9. Inspector: foto con watermark y GPS (v2)
+### 10. Inspector: foto con watermark y GPS (v2)
 `Infraccion` ya tiene campo `foto` (ImageField). La marca de agua GPS ya está implementada
 en `services/infracciones.py::_agregar_marca_de_agua_gps`. Falta integrar en el flujo mobile.
 
-### 10. Inspector como cobrador (paid feature)
+### 11. Inspector como cobrador (paid feature)
 Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `cobrar_abono`.
 
-### 11. Mejoras OAuth y UI
+### 12. Mejoras OAuth y UI
 - Pantalla de consentimiento Google: completar logo, descripción, dominio verificado
 - Modo alto contraste / uso en exterior con sol
 - Separar `settings_dev.py` / `settings_prod.py`
@@ -131,6 +137,18 @@ abono mensual, comisiones, multi-municipio, tesorero→depositar→certificar.
 - `pagar_infraccion` use case decide en servidor si anula (gracia) o cobra (descuenta saldo).
 - Al estacionar: infracción pendiente detectada → dentro de gracia → anula + mensaje verde;
   fuera de gracia → estacionamiento igual + notificación con 3 timestamps + link a Mis infracciones.
+
+### Rol Tesorero — flujo completo ✅
+- `redirect_por_rol` incluye `es_tesorero` → redirige al `panel_tesorero` al login
+- `panel_tesorero`: muestra rendiciones del admin + liquidaciones de vendedores, con conteos de pendientes
+- `validar_rendicion`: tesorero marca una rendición como `validada` (recibida) u `observada`, con notas opcionales y registro de quién/cuándo
+- `crear_rendicion` (admin): `fecha_desde` se pre-completa automáticamente con el día siguiente a la última rendición del admin
+- `admin_rendiciones`: nueva sección "Mis rendiciones a tesorería" con estado de validación
+- `panel_vendedor`: aviso de cierres de caja pendientes de certificación por el admin
+- `cobrar_abono`: ahora acepta cualquier patente, crea el vehículo on-the-fly si no existe (`get_or_create`)
+- 17 tests nuevos en `tests_tesorero.py` — 106 tests en total, todos OK
+- `allauth` actualizado de `65.3.0` → `65.17.0` (resolvía SystemCheckError en Railway)
+- Deploy Railway activo: https://estacionamiento.up.railway.app
 
 ### Otros ✅
 - `test_conductor_sin_saldo_redirige_a_carga_mp`: test corregido (assertions a `mp_iniciar_carga`)
