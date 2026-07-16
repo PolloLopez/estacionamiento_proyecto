@@ -30,6 +30,7 @@ from django.utils import timezone
 from .decorators import require_role
 from .services.infracciones import cobrar_infraccion_efectivo
 from .services.saldo import cargar_saldo_conductor
+from .utils import sanitizar_patente
 from .models import (
     CierreCaja,
     DiaEspecial,
@@ -181,17 +182,17 @@ def panel_exenciones(request):
         ).first()
 
     # Pre-carga desde detalle_usuario con ?patente=
-    patente_get = request.GET.get("patente", "").strip().upper()
+    patente_get = sanitizar_patente(request.GET.get("patente", ""))
     if patente_get and not accion:
         vehiculo = _buscar_vehiculo(patente_get)
 
     if request.method == "POST":
         if accion == "buscar":
-            patente  = (request.POST.get("patente") or "").strip().upper()
+            patente  = sanitizar_patente(request.POST.get("patente") or "")
             vehiculo = _buscar_vehiculo(patente)
 
         elif accion == "guardar":
-            patente  = (request.POST.get("patente") or "").strip().upper()
+            patente  = sanitizar_patente(request.POST.get("patente") or "")
             vehiculo = _buscar_vehiculo(patente)
 
             if vehiculo:
@@ -462,7 +463,7 @@ def detalle_usuario_admin(request, usuario_id):
     accion    = request.POST.get("accion") if request.method == "POST" else None
 
     if accion == "agregar_vehiculo":
-        patente = (request.POST.get("patente") or "").strip().upper()
+        patente = sanitizar_patente(request.POST.get("patente") or "")
         tipo    = request.POST.get("tipo", "auto")
         if tipo not in ("auto", "moto"):
             tipo = "auto"
@@ -485,9 +486,9 @@ def detalle_usuario_admin(request, usuario_id):
         es_verificado = request.POST.get("es_verificado") == "1"
 
         if nombre:
-            conductor.first_name = nombre
+            conductor.first_name = nombre.title()
         if apellido:
-            conductor.last_name = apellido
+            conductor.last_name = apellido.title()
         conductor.telefono      = telefono
         conductor.numero_dni    = numero_dni
         conductor.es_verificado = es_verificado
@@ -526,7 +527,7 @@ def admin_infracciones(request):
         "vehiculo", "inspector", "subcuadra"
     ).order_by("-creado_en")
 
-    patente      = request.GET.get("patente", "").strip().upper()
+    patente      = sanitizar_patente(request.GET.get("patente", ""))
     inspector_id = request.GET.get("inspector", "").strip()
     estado       = request.GET.get("estado", "").strip()
     fecha_desde  = request.GET.get("fecha_desde", "").strip()

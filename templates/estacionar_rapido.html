@@ -12,7 +12,7 @@ block content %}
         {% csrf_token %}
         <div class="form-row">
           <label>Patente</label>
-          <input name="patente" required />
+          <input name="patente" required oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
         </div>
         <div class="form-row">
           <label>Tipo</label>

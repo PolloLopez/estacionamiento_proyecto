@@ -153,14 +153,12 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
         minutos_disponibles = 8 * 60
 
     opciones = []
-    for n in range(1, 17):      # 30 min × 1..16 → hasta 8 horas
+    for n in range(2, 17):      # mínimo 1 hora (n=2 → 1.0h); hasta 8 horas
         horas   = n * 0.5
         minutos = int(horas * 60)
         if minutos > minutos_disponibles:
             break
-        if horas < 1:
-            label = "30 min"
-        elif horas == 1.0:
+        if horas == 1.0:
             label = "1 hora"
         elif horas % 1 == 0:
             label = f"{int(horas)} horas"

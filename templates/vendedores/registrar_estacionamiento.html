@@ -20,6 +20,7 @@
           <label style="font-weight:600; display:block; margin-bottom:0.4rem;">Patente del vehículo</label>
           <input
             name="patente"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
             id="patente-input"
             placeholder="ABC123"
             required

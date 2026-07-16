@@ -25,6 +25,7 @@
       <div style="flex:1; min-width:160px;">
         <label>Patente</label>
         <input type="text" name="patente" class="input-patente"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
                style="font-size:1.5rem; letter-spacing:4px; text-transform:uppercase; padding:0.6rem 1rem;"
                placeholder="ABC123" required
                value="{% if vehiculo %}{{ vehiculo.patente }}{% endif %}">

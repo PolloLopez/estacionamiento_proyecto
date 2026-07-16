@@ -27,7 +27,7 @@ from .models import (
 from .services_infracciones import ErrorInfraccion, crear_infraccion
 from .services_verificacion import verificar_estado_vehiculo
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
-from .utils import get_subcuadra_default
+from .utils import get_subcuadra_default, sanitizar_patente
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ def verificar_vehiculo(request):
     tipo_seleccionado = "auto"
 
     if request.method == "POST":
-        patente = (request.POST.get("patente") or "").upper().strip()
+        patente = sanitizar_patente(request.POST.get("patente") or "")
         tipo_seleccionado = request.POST.get("tipo", "auto")
 
         if patente:

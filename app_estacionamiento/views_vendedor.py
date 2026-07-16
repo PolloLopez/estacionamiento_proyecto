@@ -40,7 +40,7 @@ from .services_caja import generar_cierre_caja
 from .use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
 from .services.horarios import calcular_opciones_duracion, puede_estacionar_ahora
 from .services.infracciones import calcular_estado_tolerancia
-from .utils import get_subcuadra_default
+from .utils import get_subcuadra_default, sanitizar_patente
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ def registrar_estacionamiento_manual(request):
     if request.method != "POST":
         return _render_form()
 
-    patente      = (request.POST.get("patente") or "").strip().upper()
+    patente      = sanitizar_patente(request.POST.get("patente") or "")
     duracion_raw = request.POST.get("duracion")
 
     if not patente:
@@ -197,7 +197,7 @@ def registrar_estacionamiento_vendedor(request):
     if request.method != "POST":
         return _render_form()
 
-    patente      = (request.POST.get("patente") or "").strip().upper()
+    patente      = sanitizar_patente(request.POST.get("patente") or "")
     duracion_raw = request.POST.get("duracion")
 
     if not patente:
@@ -320,7 +320,7 @@ def cobrar_infraccion_vendedor(request):
 
     if request.method == "POST":
         accion  = request.POST.get("accion")
-        patente = (request.POST.get("patente") or "").strip().upper()
+        patente = sanitizar_patente(request.POST.get("patente") or "")
 
         if accion == "buscar" and patente:
             vehiculo = Vehiculo.objects.filter(patente=patente).filter(
@@ -338,7 +338,7 @@ def cobrar_infraccion_vendedor(request):
 
         elif accion == "confirmar":
             infraccion_id = request.POST.get("infraccion_id")
-            patente_post  = (request.POST.get("patente") or "").strip().upper()
+            patente_post  = sanitizar_patente(request.POST.get("patente") or "")
             if infraccion_id:
                 infraccion = Infraccion.objects.filter(
                     id=infraccion_id, municipio=municipio, estado="pendiente"
@@ -450,7 +450,7 @@ def cobrar_abono(request):
 
     if request.method == "POST":
         accion  = request.POST.get("accion", "buscar")
-        patente = (request.POST.get("patente") or "").strip().upper()
+        patente = sanitizar_patente(request.POST.get("patente") or "")
 
         if not patente:
             error = "Ingresá la patente del vehículo."
@@ -547,7 +547,7 @@ def consultar_deuda(request):
     from django.db.models import Q as _Q
 
     municipio = request.user.municipio
-    patente   = (request.GET.get("patente") or "").strip().upper()
+    patente   = sanitizar_patente(request.GET.get("patente") or "")
     infracciones         = []
     vehiculo             = None
     infraccion_a_confirmar = None
@@ -566,7 +566,7 @@ def consultar_deuda(request):
         infraccion_id = request.POST.get("infraccion_id")
 
         if accion == "confirmar" and infraccion_id:
-            patente = (request.POST.get("patente") or "").strip().upper()
+            patente = sanitizar_patente(request.POST.get("patente") or "")
             infraccion_a_confirmar = Infraccion.objects.filter(
                 id=infraccion_id, municipio=municipio, estado="pendiente"
             ).select_related("vehiculo", "inspector").first()
@@ -620,7 +620,7 @@ def consultar_deuda(request):
                     inf.save()
             except Exception as e:
                 messages.error(request, f"Error al procesar: {e}")
-                patente_param = request.POST.get("patente", "").strip().upper()
+                patente_param = sanitizar_patente(request.POST.get("patente", ""))
                 return redirect(f"{request.path}?patente={patente_param}")
             return redirect(reverse("ticket_pago_multa", args=[inf.id]))
 

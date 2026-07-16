@@ -136,7 +136,8 @@
           <div style="flex:1; min-width:150px;">
             <label style="font-size:0.85rem;">Patente</label>
             <input name="patente" placeholder="ABC123" required
-                   style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:1.1rem;" />
+                   style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:1.1rem;"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
           </div>
           <button type="submit" class="btn btn-outline" style="font-size:0.9rem;">Agregar</button>
         </form>

@@ -8,6 +8,8 @@ accesos simples a DB que no dependen de configuración del municipio.
 La lógica de negocio de horarios vive en: services/horarios.py
 """
 
+import re
+
 from app_estacionamiento.models import Subcuadra
 
 # Re-exportaciones para compatibilidad con imports existentes.
@@ -17,6 +19,15 @@ from .services.horarios import (  # noqa: F401
     calcular_opciones_duracion,
     cerrar_estacionamientos_vencidos_por_horario,
 )
+
+
+def sanitizar_patente(patente: str) -> str:
+    """
+    Convierte la patente a mayúsculas y elimina todo lo que no sea alfanumérico.
+    Ejemplo: "abc 123-x" → "ABC123X"
+    Se aplica en todos los puntos donde se recibe una patente del usuario.
+    """
+    return re.sub(r"[^A-Z0-9]", "", patente.upper())
 
 
 def get_subcuadra_default(municipio):

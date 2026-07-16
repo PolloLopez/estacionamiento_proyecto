@@ -187,10 +187,10 @@ def completar_perfil(request):
             usuario.municipio = municipio_obj
             campos.append("municipio")
         if falta_nombre and nombre:
-            usuario.first_name = nombre
+            usuario.first_name = nombre.strip().title()
             campos.append("first_name")
             if apellido:
-                usuario.last_name = apellido
+                usuario.last_name = apellido.strip().title()
                 campos.append("last_name")
 
         if campos:

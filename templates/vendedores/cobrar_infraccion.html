@@ -35,6 +35,7 @@
             <input type="text"
                    id="patente"
                    name="patente"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
                    value="{{ patente }}"
                    placeholder="Ej: ABC123"
                    maxlength="10"

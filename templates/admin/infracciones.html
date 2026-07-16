@@ -16,6 +16,7 @@
       <div>
         <label>Patente</label>
         <input name="patente" value="{{ filtros.patente }}" placeholder="ABC123"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
                style="width:110px; text-transform:uppercase; letter-spacing:2px; font-weight:700;" />
       </div>
 

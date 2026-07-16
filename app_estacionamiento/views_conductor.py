@@ -49,7 +49,7 @@ from .services.horarios import (
     cerrar_estacionamientos_vencidos_por_horario,
     puede_estacionar_ahora,
 )
-from .utils import get_subcuadra_default
+from .utils import get_subcuadra_default, sanitizar_patente
 from .views_auth import redirect_por_rol
 
 
@@ -369,7 +369,7 @@ def agregar_vehiculo(request):
     Redirige a estacionar para que pueda usarlo de inmediato.
     """
     if request.method == "POST":
-        patente = request.POST.get("patente", "").strip().upper()
+        patente = sanitizar_patente(request.POST.get("patente", ""))
         tipo    = request.POST.get("tipo", "auto")
 
         if tipo not in ("auto", "moto"):
@@ -438,7 +438,7 @@ def estacionar_vehiculo(request):
     ).distinct()
 
     if request.method == "POST":
-        patente    = (request.POST.get("patente") or "").strip().upper()
+        patente    = sanitizar_patente(request.POST.get("patente") or "")
         vehiculo_id = request.POST.get("vehiculo_id")
         duracion   = request.POST.get("duracion") or request.POST.get("horas")
 
@@ -499,11 +499,13 @@ def estacionar_vehiculo(request):
         # ── Duración ─────────────────────────────────────────────────────────
         try:
             duracion = Decimal(duracion)
-            if duracion <= 0:
+            # Mínimo 1 hora — las opciones del selector ya lo reflejan,
+            # pero validamos también en el servidor por si viene manipulado.
+            if duracion < 1:
                 raise ValueError()
         except Exception:
             return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error":    "Duración inválida",
+                "error":    "La duración mínima es 1 hora.",
                 "warning":  warning,
                 "vehiculos": vehiculos,
                 "usuario":  usuario,
@@ -551,7 +553,7 @@ def estacionar_vehiculo(request):
         else tarifa_hora_auto
     )
 
-    patente_preseleccionada = request.GET.get("patente", "").strip().upper()
+    patente_preseleccionada = sanitizar_patente(request.GET.get("patente", ""))
     opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto)
 
     return render(request, "usuarios/estacionar_vehiculo.html", {
@@ -679,7 +681,15 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     resultado = finalizar_estacionamiento_uc(estacionamiento)
 
     if resultado["ok"]:
-        messages.success(request, f"Estacionamiento finalizado. Costo: ${resultado['costo']}")
+        if resultado.get("reintegro"):
+            # Finalizó antes de los 30 minutos → saldo devuelto
+            messages.success(
+                request,
+                f"✅ Estacionamiento finalizado en {resultado['minutos_transcurridos']} min. "
+                f"¡Saldo reintegrado al 100%!"
+            )
+        else:
+            messages.success(request, f"Estacionamiento finalizado. Costo: ${resultado['costo']}")
     else:
         messages.error(request, resultado.get("error", "Error al finalizar"))
 

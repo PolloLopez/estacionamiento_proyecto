@@ -21,6 +21,32 @@
     <form method="post" novalidate>
       {% csrf_token %}
 
+      {# Nombre y Apellido #}
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <div class="form-row" style="flex:1; min-width:120px;">
+          <label for="id_nombre">Nombre <span style="color:#c0392b;">*</span></label>
+          <input type="text"
+                 id="id_nombre"
+                 name="nombre"
+                 value="{{ form.nombre.value|default:'' }}"
+                 required
+                 autocomplete="given-name"
+                 placeholder="Tu nombre">
+          {% if form.nombre.errors %}
+            <span style="color:#c0392b; font-size:0.85rem;">{{ form.nombre.errors|join:", " }}</span>
+          {% endif %}
+        </div>
+        <div class="form-row" style="flex:1; min-width:120px;">
+          <label for="id_apellido">Apellido</label>
+          <input type="text"
+                 id="id_apellido"
+                 name="apellido"
+                 value="{{ form.apellido.value|default:'' }}"
+                 autocomplete="family-name"
+                 placeholder="Tu apellido">
+        </div>
+      </div>
+
       {# Campo correo #}
       <div class="form-row">
         <label for="id_correo">Correo electrónico</label>

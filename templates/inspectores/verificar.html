@@ -117,6 +117,7 @@
         <input
             id="patente"
             name="patente"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
             class="input-patente"
             placeholder="AAA111"
             autocomplete="off"

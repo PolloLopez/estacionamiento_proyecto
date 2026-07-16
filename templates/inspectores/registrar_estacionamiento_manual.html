@@ -24,6 +24,7 @@
         <div class="form-row" style="margin-bottom:1rem;">
           <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Patente</label>
           <input name="patente"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
                  class="input"
                  style="text-transform:uppercase; letter-spacing:2px; font-size:1.1rem; font-weight:700; width:100%;"
                  placeholder="Ej: ABC123"

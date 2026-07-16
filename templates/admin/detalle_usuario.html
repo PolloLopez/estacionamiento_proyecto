@@ -105,6 +105,7 @@
           <div style="flex:2; min-width:100px;">
             <label>Patente</label>
             <input name="patente" placeholder="ABC123" required
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
                    style="text-transform:uppercase; letter-spacing:3px; font-weight:700;" />
           </div>
           <div style="flex:1; min-width:90px;">
