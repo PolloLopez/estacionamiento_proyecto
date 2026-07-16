@@ -449,63 +449,68 @@ def cobrar_abono(request):
         if not patente:
             error = "Ingresá la patente del vehículo."
         else:
-            vehiculo = Vehiculo.objects.filter(patente=patente).first()
-            if not vehiculo:
-                error = f"No existe ningún vehículo con patente {patente}."
+            # Crear el vehículo si no existe — el abono no requiere registro previo
+            vehiculo, _ = Vehiculo.objects.get_or_create(
+                patente=patente,
+                defaults={"municipio": municipio},
+            )
+            if not vehiculo.municipio:
+                vehiculo.municipio = municipio
+                vehiculo.save(update_fields=["municipio"])
+
+            es_moto     = getattr(vehiculo, "tipo", "auto") == "moto"
+            precio_moto = getattr(tarifa_obj, "precio_abono_moto", None) if tarifa_obj else None
+            precio_auto = getattr(tarifa_obj, "precio_abono_auto", None) if tarifa_obj else None
+
+            if es_moto and precio_moto and precio_moto > 0:
+                precio = precio_moto
+            elif precio_auto and precio_auto > 0:
+                precio = precio_auto
             else:
-                es_moto     = getattr(vehiculo, "tipo", "auto") == "moto"
-                precio_moto = getattr(tarifa_obj, "precio_abono_moto", None) if tarifa_obj else None
-                precio_auto = getattr(tarifa_obj, "precio_abono_auto", None) if tarifa_obj else None
+                error = "No hay tarifa de abono configurada. Configurala en Tarifas."
 
-                if es_moto and precio_moto and precio_moto > 0:
-                    precio = precio_moto
-                elif precio_auto and precio_auto > 0:
-                    precio = precio_auto
-                else:
-                    error = "No hay tarifa de abono configurada. Configurala en Tarifas."
+            if not error:
+                ya_tiene = AbonoMensual.objects.filter(
+                    vehiculo=vehiculo, municipio=municipio, mes=mes_seleccionado,
+                ).exists()
 
-                if not error:
-                    ya_tiene = AbonoMensual.objects.filter(
-                        vehiculo=vehiculo, municipio=municipio, mes=mes_seleccionado,
-                    ).exists()
+                if ya_tiene:
+                    error = f"El vehículo {patente} ya tiene abono para {mes_label}."
+                elif accion == "confirmar":
+                    confirmar = True
+                elif accion == "cobrar":
+                    # El admin rinde el 100% a tesoreria - sin comision propia
+                    if vendedor.es_admin:
+                        comision_monto = Decimal("0")
+                    else:
+                        comision_pct   = getattr(municipio, "comision_vendedor", None) or Decimal("0")
+                        comision_monto = (precio * comision_pct / 100).quantize(Decimal("0.01"))
 
-                    if ya_tiene:
-                        error = f"El vehículo {patente} ya tiene abono para {mes_label}."
-                    elif accion == "confirmar":
-                        confirmar = True
-                    elif accion == "cobrar":
-                        # El admin rinde el 100% a tesoreria - sin comision propia
-                        if vendedor.es_admin:
-                            comision_monto = Decimal("0")
-                        else:
-                            comision_pct   = getattr(municipio, "comision_vendedor", None) or Decimal("0")
-                            comision_monto = (precio * comision_pct / 100).quantize(Decimal("0.01"))
-
-                        with transaction.atomic():
-                            movimiento = MovimientoCaja.objects.create(
-                                usuario=vendedor,
-                                monto=precio,
-                                tipo="ingreso",
-                                descripcion=f"Abono mensual {mes_seleccionado.strftime('%m/%Y')} - {patente}",
-                                medio_pago="efectivo",
-                                comision_monto=comision_monto,
-                            )
-                            AbonoMensual.objects.create(
-                                vehiculo=vehiculo,
-                                municipio=municipio,
-                                vendedor=vendedor,
-                                mes=mes_seleccionado,
-                                monto=precio,
-                                medio_pago="efectivo",
-                                movimiento_caja=movimiento,
-                            )
-
-                        messages.success(
-                            request,
-                            f"Abono de {mes_label} registrado para {patente} — ${precio}. "
-                            f"Comisión generada: ${comision_monto}.",
+                    with transaction.atomic():
+                        movimiento = MovimientoCaja.objects.create(
+                            usuario=vendedor,
+                            monto=precio,
+                            tipo="ingreso",
+                            descripcion=f"Abono mensual {mes_seleccionado.strftime('%m/%Y')} - {patente}",
+                            medio_pago="efectivo",
+                            comision_monto=comision_monto,
                         )
-                        return redirect("cobrar_abono")
+                        AbonoMensual.objects.create(
+                            vehiculo=vehiculo,
+                            municipio=municipio,
+                            vendedor=vendedor,
+                            mes=mes_seleccionado,
+                            monto=precio,
+                            medio_pago="efectivo",
+                            movimiento_caja=movimiento,
+                        )
+
+                    messages.success(
+                        request,
+                        f"Abono de {mes_label} registrado para {patente} — ${precio}. "
+                        f"Comisión generada: ${comision_monto}.",
+                    )
+                    return redirect("cobrar_abono")
 
     return render(request, "vendedores/cobrar_abono.html", {
         "vehiculo":         vehiculo,
