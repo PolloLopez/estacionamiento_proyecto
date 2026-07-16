@@ -26,16 +26,15 @@ def panel_tesorero(request):
     """
     municipio = request.user.municipio
 
-    rendiciones = Rendicion.objects.filter(
-        municipio=municipio
-    ).select_related("admin").order_by("-creado_en")[:50]
+    qs_rendiciones = Rendicion.objects.filter(municipio=municipio).select_related("admin")
+    qs_liquidaciones = LiquidacionComision.objects.filter(municipio=municipio).select_related("vendedor")
 
-    liquidaciones = LiquidacionComision.objects.filter(
-        municipio=municipio,
-    ).select_related("vendedor").order_by("-creado_en")[:50]
+    # Contar pendientes antes de aplicar el slice (no se puede filtrar sobre queryset sliceado)
+    pendientes_rendicion   = qs_rendiciones.filter(estado="pendiente").count()
+    pendientes_liquidacion = qs_liquidaciones.filter(estado="pendiente").count()
 
-    pendientes_rendicion   = rendiciones.filter(estado="pendiente").count()
-    pendientes_liquidacion = liquidaciones.filter(estado="pendiente").count()
+    rendiciones   = qs_rendiciones.order_by("-creado_en")[:50]
+    liquidaciones = qs_liquidaciones.order_by("-creado_en")[:50]
 
     return render(request, "tesorero/panel_tesorero.html", {
         "rendiciones":            rendiciones,
