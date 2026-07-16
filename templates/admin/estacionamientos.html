@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Historial de estacionamientos — Admin{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+    <h1 style="font-size:1.6rem;">🅿️ Historial de estacionamientos</h1>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline">← Volver</a>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <form method="get" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+      <div>
+        <label style="font-size:0.85rem; color:var(--color-text-muted);">Patente</label>
+        <input type="text" name="patente" value="{{ filtros.patente }}"
+               placeholder="ABC123"
+               oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
+               style="display:block; margin-top:0.25rem;">
+      </div>
+      <div>
+        <label style="font-size:0.85rem; color:var(--color-text-muted);">Estado</label>
+        <select name="estado" style="display:block; margin-top:0.25rem;">
+          <option value="">Todos</option>
+          <option value="ACTIVO" {% if filtros.estado == "ACTIVO" %}selected{% endif %}>Activo</option>
+          <option value="FINALIZADO" {% if filtros.estado == "FINALIZADO" %}selected{% endif %}>Finalizado</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:0.85rem; color:var(--color-text-muted);">Desde</label>
+        <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" style="display:block; margin-top:0.25rem;">
+      </div>
+      <div>
+        <label style="font-size:0.85rem; color:var(--color-text-muted);">Hasta</label>
+        <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" style="display:block; margin-top:0.25rem;">
+      </div>
+      <button type="submit" class="btn">Filtrar</button>
+      <a href="{% url 'admin_estacionamientos' %}" class="btn btn-outline">Limpiar</a>
+    </form>
+  </div>
+
+  <!-- TABLA -->
+  <div class="card">
+    {% if estacionamientos %}
+      <p style="margin-bottom:0.75rem; color:var(--color-text-muted); font-size:0.9rem;">
+        {{ estacionamientos.paginator.count }} registro{{ estacionamientos.paginator.count|pluralize }} encontrado{{ estacionamientos.paginator.count|pluralize }}
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Patente</th>
+            <th>Conductor</th>
+            <th>Inicio</th>
+            <th>Fin</th>
+            <th>Duración</th>
+            <th>Costo</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for est in estacionamientos %}
+          <tr>
+            <td><strong>{{ est.vehiculo.patente }}</strong></td>
+            <td>{{ est.usuario.nombre_completo|default:est.usuario.correo }}</td>
+            <td>{{ est.hora_inicio|date:"d/m/Y H:i" }}</td>
+            <td>
+              {% if est.hora_fin %}
+                {{ est.hora_fin|date:"d/m/Y H:i" }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if est.duracion_horas == 1.0 %}
+                1 hora
+              {% elif est.duracion_horas %}
+                {{ est.duracion_horas }}h
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if est.costo_final is not None %}
+                ${{ est.costo_final }}
+              {% else %}
+                ${{ est.costo_base }}
+              {% endif %}
+            </td>
+            <td>
+              {% if est.estado == "ACTIVO" %}
+                <span style="color:#16a34a; font-weight:600;">Activo</span>
+              {% else %}
+                <span class="text-muted">Finalizado</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- PAGINACIÓN -->
+      {% if estacionamientos.has_other_pages %}
+      <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+        {% if estacionamientos.has_previous %}
+          <a href="?page={{ estacionamientos.previous_page_number }}&patente={{ filtros.patente }}&estado={{ filtros.estado }}&fecha_desde={{ filtros.fecha_desde }}&fecha_hasta={{ filtros.fecha_hasta }}" class="btn btn-outline" style="padding:0.4rem 0.8rem;">← Anterior</a>
+        {% endif %}
+        <span style="padding:0.4rem 0.8rem; color:var(--color-text-muted);">
+          Pág. {{ estacionamientos.number }} / {{ estacionamientos.paginator.num_pages }}
+        </span>
+        {% if estacionamientos.has_next %}
+          <a href="?page={{ estacionamientos.next_page_number }}&patente={{ filtros.patente }}&estado={{ filtros.estado }}&fecha_desde={{ filtros.fecha_desde }}&fecha_hasta={{ filtros.fecha_hasta }}" class="btn btn-outline" style="padding:0.4rem 0.8rem;">Siguiente →</a>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    {% else %}
+      <p class="text-muted">No hay estacionamientos registrados con esos filtros.</p>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}

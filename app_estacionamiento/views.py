@@ -88,6 +88,8 @@ from .views_admin import (
     certificar_cierre,
     gestionar_verificaciones,
     resolver_verificacion,
+    admin_vehiculos,
+    admin_estacionamientos,
 )
 from .views_mp import (
     mp_iniciar_carga,

@@ -34,6 +34,7 @@ from .utils import sanitizar_patente
 from .models import (
     CierreCaja,
     DiaEspecial,
+    Estacionamiento,
     HorarioEstacionamiento,
     Infraccion,
     MovimientoCaja,
@@ -1044,3 +1045,85 @@ def resolver_verificacion(request, solicitud_id):
         )
 
     return redirect("gestionar_verificaciones")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Vehículos del municipio
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def admin_vehiculos(request):
+    """
+    Lista todos los vehículos registrados en el municipio.
+    Permite filtrar por patente y tipo.
+    """
+    municipio = request.user.municipio
+    patente   = sanitizar_patente(request.GET.get("patente", ""))
+    tipo      = request.GET.get("tipo", "").strip()
+
+    vehiculos = (
+        Vehiculo.objects
+        .filter(municipio=municipio)
+        .prefetch_related("vehiculousuario_set__usuario")
+        .order_by("patente")
+    )
+
+    if patente:
+        vehiculos = vehiculos.filter(patente__icontains=patente)
+    if tipo:
+        vehiculos = vehiculos.filter(tipo=tipo)
+
+    paginator = Paginator(vehiculos, 50)
+    page      = request.GET.get("page", 1)
+    vehiculos_pag = paginator.get_page(page)
+
+    return render(request, "admin/vehiculos.html", {
+        "vehiculos": vehiculos_pag,
+        "filtros": {"patente": patente, "tipo": tipo},
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Historial de estacionamientos del municipio
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def admin_estacionamientos(request):
+    """
+    Historial de estacionamientos del municipio con filtros básicos.
+    Útil para auditoría y para verificar el funcionamiento del sistema.
+    """
+    municipio   = request.user.municipio
+    patente     = sanitizar_patente(request.GET.get("patente", ""))
+    estado      = request.GET.get("estado", "").strip()
+    fecha_desde = request.GET.get("fecha_desde", "").strip()
+    fecha_hasta = request.GET.get("fecha_hasta", "").strip()
+
+    estacionamientos = (
+        Estacionamiento.objects
+        .filter(subcuadra__municipio=municipio)
+        .select_related("vehiculo", "usuario", "subcuadra")
+        .order_by("-hora_inicio")
+    )
+
+    if patente:
+        estacionamientos = estacionamientos.filter(vehiculo__patente__icontains=patente)
+    if estado:
+        estacionamientos = estacionamientos.filter(estado=estado)
+    if fecha_desde:
+        estacionamientos = estacionamientos.filter(hora_inicio__date__gte=fecha_desde)
+    if fecha_hasta:
+        estacionamientos = estacionamientos.filter(hora_inicio__date__lte=fecha_hasta)
+
+    paginator = Paginator(estacionamientos, 50)
+    page      = request.GET.get("page", 1)
+    estacionamientos_pag = paginator.get_page(page)
+
+    return render(request, "admin/estacionamientos.html", {
+        "estacionamientos": estacionamientos_pag,
+        "filtros": {
+            "patente":     patente,
+            "estado":      estado,
+            "fecha_desde": fecha_desde,
+            "fecha_hasta": fecha_hasta,
+        },
+    })

@@ -112,6 +112,8 @@ urlpatterns = [
     # =========================
     path("admin-verificaciones/", views.gestionar_verificaciones, name="gestionar_verificaciones"),
     path("admin-verificaciones/<int:solicitud_id>/resolver/", views.resolver_verificacion, name="resolver_verificacion"),
+    path("admin-vehiculos/", views.admin_vehiculos, name="admin_vehiculos"),
+    path("admin-estacionamientos/", views.admin_estacionamientos, name="admin_estacionamientos"),
 
     # =========================
     # 🖨 COMPROBANTES

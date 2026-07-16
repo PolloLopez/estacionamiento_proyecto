@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Vehículos — Admin{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+    <h1 style="font-size:1.6rem;">🚗 Vehículos del municipio</h1>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline">← Volver</a>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <form method="get" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+      <div>
+        <label style="font-size:0.85rem; color:var(--color-text-muted);">Patente</label>
+        <input type="text" name="patente" value="{{ filtros.patente }}"
+               placeholder="ABC123"
+               oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
+               style="display:block; margin-top:0.25rem;">
+      </div>
+      <div>
+        <label style="font-size:0.85rem; color:var(--color-text-muted);">Tipo</label>
+        <select name="tipo" style="display:block; margin-top:0.25rem;">
+          <option value="">Todos</option>
+          <option value="auto" {% if filtros.tipo == "auto" %}selected{% endif %}>Auto</option>
+          <option value="moto" {% if filtros.tipo == "moto" %}selected{% endif %}>Moto</option>
+        </select>
+      </div>
+      <button type="submit" class="btn">Filtrar</button>
+      <a href="{% url 'admin_vehiculos' %}" class="btn btn-outline">Limpiar</a>
+    </form>
+  </div>
+
+  <!-- TABLA -->
+  <div class="card">
+    {% if vehiculos %}
+      <p style="margin-bottom:0.75rem; color:var(--color-text-muted); font-size:0.9rem;">
+        {{ vehiculos.paginator.count }} vehículo{{ vehiculos.paginator.count|pluralize }} encontrado{{ vehiculos.paginator.count|pluralize }}
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>Patente</th>
+            <th>Tipo</th>
+            <th>Conductor/es</th>
+            <th>Exención</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in vehiculos %}
+          <tr>
+            <td><strong>{{ v.patente }}</strong></td>
+            <td>{{ v.get_tipo_display }}</td>
+            <td>
+              {% for vu in v.vehiculousuario_set.all %}
+                <span>{{ vu.usuario.nombre_completo|default:vu.usuario.correo }}</span>{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                <span class="text-muted">—</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% if v.exento_global %}
+                <span style="color:var(--color-primary); font-weight:600;">Global</span>
+              {% elif v.exento_parcial %}
+                <span style="color:#f59e0b;">Parcial</span>
+              {% else %}
+                <span class="text-muted">No</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- PAGINACIÓN -->
+      {% if vehiculos.has_other_pages %}
+      <div style="display:flex; gap:0.5rem; justify-content:center; margin-top:1rem; flex-wrap:wrap;">
+        {% if vehiculos.has_previous %}
+          <a href="?page={{ vehiculos.previous_page_number }}&patente={{ filtros.patente }}&tipo={{ filtros.tipo }}" class="btn btn-outline" style="padding:0.4rem 0.8rem;">← Anterior</a>
+        {% endif %}
+        <span style="padding:0.4rem 0.8rem; color:var(--color-text-muted);">
+          Pág. {{ vehiculos.number }} / {{ vehiculos.paginator.num_pages }}
+        </span>
+        {% if vehiculos.has_next %}
+          <a href="?page={{ vehiculos.next_page_number }}&patente={{ filtros.patente }}&tipo={{ filtros.tipo }}" class="btn btn-outline" style="padding:0.4rem 0.8rem;">Siguiente →</a>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    {% else %}
+      <p class="text-muted">No hay vehículos registrados con esos filtros.</p>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}
