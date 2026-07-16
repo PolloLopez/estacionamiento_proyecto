@@ -45,10 +45,10 @@
        href="{% if request.user.is_authenticated %}{% if request.user.es_admin %}{% url 'panel_admin' %}{% elif request.user.es_inspector %}{% url 'panel_inspectores' %}{% elif request.user.es_vendedor %}{% url 'panel_vendedor' %}{% elif request.user.es_tesorero %}{% url 'panel_tesorero' %}{% else %}{% url 'inicio' %}{% endif %}{% else %}{% url 'login' %}{% endif %}">
       {% if municipio_branding and municipio_branding.logo %}
         <img src="{{ municipio_branding.logo.url }}"
-             alt="{{ municipio_branding.nombre }}"
+             alt="{{ municipio_branding.nombre_sistema|default:municipio_branding.nombre }}"
              style="height:38px; width:auto;">
       {% else %}
-        🅿️ <span>Estacionamiento</span>
+        🅿️ <span>{{ municipio_branding.nombre_sistema|default:"EstacionAR" }}</span>
       {% endif %}
     </a>
 
