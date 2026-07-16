@@ -133,6 +133,7 @@ urlpatterns = [
     # 🏦 TESORERÍA
     # =========================
     path("tesorero/", views.panel_tesorero, name="panel_tesorero"),
+    path("tesorero/rendicion/<int:rendicion_id>/validar/", views.validar_rendicion, name="validar_rendicion"),
     path("tesorero/depositar/<int:liquidacion_id>/", views.depositar_comision, name="depositar_comision"),
 
 ]

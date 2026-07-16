@@ -70,11 +70,17 @@ def panel_vendedor(request):
         usuario=user, tipo="ingreso", comision_monto__gt=0,
     ).aggregate(total=Sum("comision_monto"))["total"] or 0
 
+    # Cierres de caja que el admin todavía no certificó
+    cierres_sin_certificar = CierreCaja.objects.filter(
+        usuario=user, certificado=False
+    ).order_by("-fecha_cierre")[:10]
+
     return render(request, "vendedores/panel.html", {
-        "total_hoy":            total_hoy,
-        "cantidad_operaciones": cantidad_operaciones,
-        "a_rendir":             a_rendir,
+        "total_hoy":             total_hoy,
+        "cantidad_operaciones":  cantidad_operaciones,
+        "a_rendir":              a_rendir,
         "comisiones_pendientes": comisiones_pendientes,
+        "cierres_sin_certificar": cierres_sin_certificar,
     })
 
 

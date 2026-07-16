@@ -33,7 +33,7 @@
           <div style="flex:1; min-width:130px;">
             <label>Desde <span style="color:var(--color-danger);">*</span></label>
             <input type="date" name="fecha_desde" required
-                   value="{{ hoy|date:'Y-m-01' }}"
+                   value="{{ fecha_desde_sugerida|date:'Y-m-d' }}"
                    style="width:100%; margin-top:0.3rem;" />
           </div>
           <div style="flex:1; min-width:130px;">

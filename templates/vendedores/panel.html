@@ -40,6 +40,23 @@
 
       </div>
 
+      {% if cierres_sin_certificar %}
+      <div style="margin-top:1.2rem; background:var(--color-warning-bg, #fff8e1);
+                  border:1px solid var(--color-warning); border-radius:8px; padding:0.85rem 1rem;">
+        <div style="font-weight:700; margin-bottom:0.5rem; color:var(--color-warning);">
+          ⏳ Cierres pendientes de certificación ({{ cierres_sin_certificar|length }})
+        </div>
+        {% for c in cierres_sin_certificar %}
+        <div style="font-size:0.88rem; color:var(--color-text-muted); margin-bottom:0.2rem;">
+          {{ c.fecha_cierre|date:"d/m/Y H:i" }} — ${{ c.total_cobrado }}
+        </div>
+        {% endfor %}
+        <div style="font-size:0.82rem; margin-top:0.4rem; color:var(--color-text-muted);">
+          El admin los verá en Rendiciones para certificarlos.
+        </div>
+      </div>
+      {% endif %}
+
       <div style="margin-top:1.2rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
         <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}">
           ➕ Registrar estacionamiento

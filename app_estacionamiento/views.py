@@ -33,6 +33,7 @@ from .views_inspector import (
 )
 from .views_tesorero import (
     panel_tesorero,
+    validar_rendicion,
     depositar_comision,
 )
 from .views_vendedor import (

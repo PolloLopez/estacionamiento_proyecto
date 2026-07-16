@@ -782,6 +782,11 @@ def admin_rendiciones(request):
         cierrecaja__isnull=False,
     ).filter(Q(es_inspector=True) | Q(es_vendedor=True)).distinct().order_by("first_name", "correo")
 
+    # Rendiciones propias del admin a tesorería (para que vea cuáles están pendientes de validación)
+    mis_rendiciones = Rendicion.objects.filter(
+        admin=request.user
+    ).order_by("-fecha_hasta")[:20]
+
     return render(request, "admin/rendiciones.html", {
         "cierres":            page_obj,
         "filtro":             filtro,
@@ -791,6 +796,7 @@ def admin_rendiciones(request):
         "fecha_hasta":        fecha_hasta,
         "usuarios_con_cierres": usuarios_con_cierres,
         "page_obj":           page_obj,
+        "mis_rendiciones":    mis_rendiciones,
     })
 
 
@@ -837,9 +843,15 @@ def crear_rendicion(request):
         messages.success(request, f"Rendición generada. Total neto a rendir: ${total_neto}")
         return redirect("admin_rendiciones")
 
+    # Sugerir fecha_desde = día siguiente a la última rendición del admin
+    ultima = Rendicion.objects.filter(admin=request.user).order_by("-fecha_hasta").first()
+    from datetime import timedelta
+    fecha_desde_sugerida = (ultima.fecha_hasta + timedelta(days=1)) if ultima else date.today().replace(day=1)
+
     return render(request, "admin/crear_rendicion.html", {
-        "periodos": Rendicion.PERIODOS,
-        "hoy":      date.today(),
+        "periodos":            Rendicion.PERIODOS,
+        "hoy":                 date.today(),
+        "fecha_desde_sugerida": fecha_desde_sugerida,
     })
 
 

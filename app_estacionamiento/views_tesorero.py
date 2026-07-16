@@ -45,6 +45,38 @@ def panel_tesorero(request):
 
 
 @require_role("tesorero")
+def validar_rendicion(request, rendicion_id):
+    """
+    El tesorero marca una rendición como validada (recibida) u observada.
+    Solo acepta POST. Actualiza estado, registra quién validó y cuándo.
+    """
+    municipio = request.user.municipio
+    rendicion = get_object_or_404(Rendicion, id=rendicion_id, municipio=municipio)
+
+    if rendicion.estado != "pendiente":
+        messages.warning(request, "Esta rendición ya fue procesada.")
+        return redirect("panel_tesorero")
+
+    if request.method != "POST":
+        return redirect("panel_tesorero")
+
+    accion = request.POST.get("accion", "validar")
+    notas  = request.POST.get("notas_tesorero", "").strip()
+
+    estado_nuevo = "validada" if accion == "validar" else "observada"
+    with transaction.atomic():
+        rendicion.estado          = estado_nuevo
+        rendicion.tesorero        = request.user
+        rendicion.validado_en     = timezone.now()
+        rendicion.notas_tesorero  = notas
+        rendicion.save(update_fields=["estado", "tesorero", "validado_en", "notas_tesorero"])
+
+    label = "validada ✅" if estado_nuevo == "validada" else "observada ⚠️"
+    messages.success(request, f"Rendición #{rendicion.id} marcada como {label}.")
+    return redirect("panel_tesorero")
+
+
+@require_role("tesorero")
 def depositar_comision(request, liquidacion_id):
     """
     Registra el depósito de una liquidación de comisión al vendedor.
