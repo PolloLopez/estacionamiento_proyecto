@@ -18,6 +18,8 @@
       <a href="{% url 'gestionar_tarifas' %}" class="btn btn-outline">💲 Tarifas</a>
       <a href="{% url 'gestionar_horarios' %}" class="btn btn-outline">🕐 Horarios</a>
       <a href="{% url 'cobrar_abono' %}" class="btn btn-outline">📅 Abonos</a>
+      <a href="{% url 'vendedores_cobrar_infraccion' %}" class="btn btn-outline">⚠️ Cobrar infracción</a>
+      <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline">💳 Cargar saldo</a>
       <a href="{% url 'gestionar_dias_especiales' %}" class="btn btn-outline">📅 Días especiales</a>
       <a href="{% url 'gestionar_verificaciones' %}" class="btn btn-outline"
          style="position:relative;">
@@ -52,12 +54,6 @@
     <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
       <a href="{% url 'vendedores_registrar_estacionamiento' %}" class="btn">
         🚗 Registrar estacionamiento
-      </a>
-      <a href="{% url 'cobrar_abono' %}" class="btn">
-        📅 Cobrar abono mensual
-      </a>
-      <a href="{% url 'vendedores_cobrar_infraccion' %}" class="btn btn-outline">
-        ⚠️ Cobrar infracción
       </a>
       <a href="{% url 'crear_rendicion' %}" class="btn btn-outline">
         📋 Nueva rendición
