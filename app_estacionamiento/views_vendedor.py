@@ -513,10 +513,14 @@ def cobrar_abono(request):
 
                     messages.success(
                         request,
-                        f"Abono de {mes_label} registrado para {patente} — ${precio}. "
-                        f"Comisión generada: ${comision_monto}.",
+                        "Abono de " + mes_label + " registrado para " + patente
+                        + " — $" + str(precio) + "."
+                        + (f" Comisión: ${comision_monto}." if comision_monto else ""),
                     )
                     return redirect("cobrar_abono")
+
+    from django.urls import reverse as _reverse
+    volver_url = _reverse("panel_admin") if request.user.es_admin else _reverse("panel_vendedor")
 
     return render(request, "vendedores/cobrar_abono.html", {
         "vehiculo":         vehiculo,
@@ -527,6 +531,7 @@ def cobrar_abono(request):
         "opciones_mes":     opciones_mes,
         "mes_seleccionado": mes_seleccionado.isoformat(),
         "mes_label":        mes_label,
+        "volver_url":       volver_url,
     })
 
 

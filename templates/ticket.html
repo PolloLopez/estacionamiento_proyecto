@@ -1,73 +1,162 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Ticket</title>
-
+  <title>Ticket de estacionamiento</title>
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: monospace;
-      text-align: center;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      min-height: 100vh;
     }
 
     .ticket {
-      width: 250px;
-      margin: auto;
+      background: #fff;
+      width: 320px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+      overflow: hidden;
     }
 
-    hr {
+    .ticket-header {
+      background: #1b5e20;
+      color: #fff;
+      text-align: center;
+      padding: 1.25rem 1rem;
+    }
+
+    .ticket-header h2 {
+      font-size: 1.1rem;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .ticket-header p {
+      font-size: 0.82rem;
+      opacity: 0.8;
+    }
+
+    .ticket-body {
+      padding: 1.25rem 1.5rem;
+    }
+
+    .ticket-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.93rem;
+    }
+
+    .ticket-row:last-child { border-bottom: none; }
+
+    .ticket-row .label { color: #777; }
+    .ticket-row .value { font-weight: 600; text-align: right; }
+
+    .ticket-monto {
+      background: #f0faf2;
+      text-align: center;
+      padding: 1rem;
+      border-top: 2px dashed #c8e6c9;
+    }
+
+    .ticket-monto .monto-label {
+      font-size: 0.8rem;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .ticket-monto .monto-valor {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #1b5e20;
+    }
+
+    .ticket-footer {
+      text-align: center;
+      padding: 0.75rem 1rem;
+      font-size: 0.78rem;
+      color: #999;
+      border-top: 1px solid #eee;
+    }
+
+    .acciones {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-size: 0.93rem;
+      font-weight: 600;
+      cursor: pointer;
       border: none;
-      border-top: 1px dashed black;
-      margin: 10px 0;
+      text-decoration: none;
+    }
+
+    .btn-primary { background: #1b5e20; color: #fff; }
+    .btn-outline { background: #fff; color: #333; border: 1.5px solid #ccc; }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .ticket { box-shadow: none; border-radius: 0; width: 100%; }
+      .acciones { display: none; }
     }
   </style>
-  <style>@media print { .no-print { display:none; } }</style>
 </head>
-<body onload="window.print()">
+<body>
 
   <div class="ticket">
 
-    <h3>ESTACIONAMIENTO</h3>
-    <p>Municipio</p>
+    <div class="ticket-header">
+      <h2>🅿️ ESTACIONAMIENTO</h2>
+      <p>Comprobante de pago</p>
+    </div>
 
-    <hr>
+    <div class="ticket-body">
+      <div class="ticket-row">
+        <span class="label">Patente</span>
+        <span class="value" style="font-size:1.1rem; letter-spacing:0.05em;">{{ patente }}</span>
+      </div>
+      <div class="ticket-row">
+        <span class="label">Duración</span>
+        <span class="value">
+          {% if duracion == 1.0 %}1 hora
+          {% elif duracion %}{{ duracion }} hs
+          {% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="ticket-row">
+        <span class="label">Inicio</span>
+        <span class="value">{{ hora|date:"d/m/Y H:i" }}</span>
+      </div>
+    </div>
 
-    <p><b>Patente:</b> {{ patente }}</p>
-    <p><b>Duración:</b> {{ duracion }} hs</p>
-    <p><b>Inicio:</b> {{ hora }}</p>
-    <p><b>Monto:</b> ${{ monto }}</p>
+    <div class="ticket-monto">
+      <div class="monto-label">Total cobrado</div>
+      <div class="monto-valor">${{ monto }}</div>
+    </div>
 
-    <hr>
-
-    <p>Gracias por su pago</p>
+    <div class="ticket-footer">
+      Gracias por su pago · EstacionAR
+    </div>
 
   </div>
 
-  <div style="margin-top:1.5rem; text-align:center;" class="no-print">
-    <button onclick="window.print()" style="margin-right:0.5rem; padding:0.5rem 1rem;
-            font-size:0.95rem; cursor:pointer;">🖨 Imprimir</button>
-    <button onclick="history.back()" style="padding:0.5rem 1rem;
-            font-size:0.95rem; cursor:pointer;">← Volver</button>
+  <div class="acciones">
+    <button onclick="window.print()" class="btn btn-primary">🖨 Imprimir</button>
+    <button onclick="history.back()" class="btn btn-outline">← Volver</button>
   </div>
 
 </body>
-<script>
-function imprimirTicket() {
-  const contenido = `
-    <h3>Estacionamiento</h3>
-    <p>Patente: {{ patente }}</p>
-    <p>Duración: {{ duracion }} hs</p>
-    <p>Fecha: ${new Date().toLocaleString()}</p>
-  `;
-
-  const w = window.open("", "", "width=300,height=400");
-  w.document.write(contenido);
-  w.document.close();
-  w.print();
-
-    window.onload = () => {
-    window.print();
-  };
-}
-</script>
 </html>

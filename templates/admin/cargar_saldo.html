@@ -2,8 +2,67 @@
 {% block title %}Cargar saldo — {{ usuario.correo }}{% endblock %}
 
 {% block content %}
-<section class="container" style="max-width:480px;">
+<section class="container" style="max-width:520px;">
 
+{% if comprobante %}
+
+  <!-- COMPROBANTE IMPRIMIBLE -->
+  <div id="comprobante" style="background:#fff; border:1px solid var(--color-border);
+       border-radius:12px; padding:2rem; text-align:center; margin-bottom:1.5rem;">
+
+    <div style="font-size:2rem; margin-bottom:0.5rem;">✅</div>
+    <h2 style="font-size:1.3rem; margin-bottom:0.25rem;">Saldo acreditado</h2>
+    <p style="color:var(--color-text-muted); font-size:0.88rem; margin-bottom:1.5rem;">
+      {{ comprobante.fecha|date:"d/m/Y H:i" }}
+    </p>
+
+    <div style="border-top:1px dashed var(--color-border); border-bottom:1px dashed var(--color-border);
+                padding:1rem 0; margin-bottom:1.5rem;">
+      <table style="width:100%; font-size:0.95rem; border-collapse:collapse;">
+        <tr>
+          <td style="padding:0.4rem 0; color:var(--color-text-muted); text-align:left;">Conductor</td>
+          <td style="padding:0.4rem 0; font-weight:600; text-align:right;">
+            {% if usuario.first_name %}{{ usuario.first_name }} {{ usuario.last_name }}{% else %}{{ usuario.correo }}{% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0.4rem 0; color:var(--color-text-muted); text-align:left;">Correo</td>
+          <td style="padding:0.4rem 0; text-align:right;">{{ usuario.correo }}</td>
+        </tr>
+        <tr>
+          <td style="padding:0.4rem 0; color:var(--color-text-muted); text-align:left;">Monto acreditado</td>
+          <td style="padding:0.4rem 0; font-size:1.4rem; font-weight:800;
+                     color:var(--color-primary); text-align:right;">
+            ${{ comprobante.monto }}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0.4rem 0; color:var(--color-text-muted); text-align:left;">Nuevo saldo</td>
+          <td style="padding:0.4rem 0; font-weight:700; text-align:right;">
+            ${{ comprobante.saldo_nuevo }}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0.4rem 0; color:var(--color-text-muted); text-align:left;">Registrado por</td>
+          <td style="padding:0.4rem 0; text-align:right;">{{ comprobante.admin.correo }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <p style="font-size:0.82rem; color:var(--color-text-muted);">
+      EstacionAR · Sistema de estacionamiento medido
+    </p>
+  </div>
+
+  <div style="display:flex; gap:0.75rem; justify-content:center;" class="no-print">
+    <button onclick="window.print()" class="btn">🖨 Imprimir comprobante</button>
+    <a href="{% url 'detalle_usuario_admin' usuario.id %}" class="btn btn-outline">← Volver al conductor</a>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline">Panel admin</a>
+  </div>
+
+{% else %}
+
+  <!-- FORMULARIO -->
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
     <h2 style="font-size:1.4rem; margin:0;">💰 Cargar saldo</h2>
     <a href="{% url 'detalle_usuario_admin' usuario.id %}" class="btn btn-outline"
@@ -31,14 +90,8 @@
       {% csrf_token %}
       <div class="form-row">
         <label for="monto">Monto a acreditar ($)</label>
-        <input id="monto"
-               name="monto"
-               type="number"
-               step="0.01"
-               min="1"
-               required
-               placeholder="Ej: 500"
-               style="font-size:1.1rem;">
+        <input id="monto" name="monto" type="number" step="0.01" min="1"
+               required placeholder="Ej: 500" style="font-size:1.1rem;">
       </div>
       <button type="submit" class="btn" style="width:100%; margin-top:0.5rem;">
         Acreditar saldo
@@ -46,5 +99,17 @@
     </form>
   </div>
 
+{% endif %}
+
 </section>
+
+<style>
+@media print {
+  .no-print { display: none !important; }
+  nav, footer, .navbar { display: none !important; }
+  body { background: white; }
+  #comprobante { border: none; box-shadow: none; }
+}
+</style>
+
 {% endblock %}

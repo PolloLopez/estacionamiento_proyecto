@@ -247,21 +247,31 @@ def cargar_saldo(request, usuario_id):
     admin   = request.user
     usuario = get_object_or_404(Usuario, id=usuario_id, municipio=admin.municipio)
 
+    comprobante = None
+
     if request.method == "POST":
         monto_str = request.POST.get("monto", "")
         try:
             monto = Decimal(monto_str)
             cargar_saldo_conductor(admin=admin, conductor=usuario, monto=monto)
-            messages.success(request, f"Saldo de ${monto} cargado correctamente.")
-            return redirect("panel_admin")
-
+            # Refresca el usuario para obtener el saldo actualizado
+            usuario.refresh_from_db()
+            comprobante = {
+                "monto":      monto,
+                "saldo_nuevo": usuario.saldo,
+                "fecha":      timezone.localtime(),
+                "admin":      admin,
+            }
         except (ValueError, Exception):
             return render(request, "admin/cargar_saldo.html", {
                 "usuario": usuario,
                 "error": "Monto inválido",
             })
 
-    return render(request, "admin/cargar_saldo.html", {"usuario": usuario})
+    return render(request, "admin/cargar_saldo.html", {
+        "usuario":     usuario,
+        "comprobante": comprobante,
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
