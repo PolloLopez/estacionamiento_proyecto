@@ -2,114 +2,188 @@
 {% block title %}Registrar Infracción{% endblock %}
 {% block content %}
 
-<section class="container">
-  <div class="card">
-    <h2>Registrar infracción</h2>
-    <div class="panel-body">
-      {% if mensaje %}
-      <div class="alert {{ tipo_mensaje|default:'error' }}">
-        {{ mensaje }}
-      </div>
-      {% endif %}
+<style>
+  .inf-wrap {
+    max-width: 520px;
+    margin: 0 auto;
+    padding-top: 0.5rem;
+  }
+  .inf-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .inf-header h2 { margin: 0; font-size: 1.4rem; }
 
-      <form
-        id="infraccionForm"
-        method="post"
+  .inf-patente {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: 6px;
+    text-align: center;
+    background: var(--color-surface-2);
+    border: 2px solid var(--color-border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    color: var(--color-text);
+  }
+
+  .inf-field { margin-bottom: 1rem; }
+  .inf-field label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin-bottom: 0.4rem;
+  }
+  .inf-field select,
+  .inf-field input[type="file"] {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1.5px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 0.97rem;
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .gps-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    margin-top: 0.5rem;
+    background: #f0fff4;
+    color: #1b5e20;
+    border: 1px solid #c8e6c9;
+  }
+  .gps-chip.esperando { background: #fffde7; color: #795548; border-color: #ffe0b2; }
+  .gps-chip.error     { background: #fff3e0; color: #e65100; border-color: #ffccbc; }
+
+  .btn-grabar {
+    width: 100%;
+    font-size: 1.15rem;
+    padding: 0.9rem;
+    border-radius: 10px;
+    margin-top: 0.5rem;
+    font-weight: 700;
+  }
+</style>
+
+<div class="inf-wrap">
+
+  <div class="inf-header">
+    <h2>🚨 Registrar infracción</h2>
+    <a href="{% url 'panel_inspectores' %}" class="btn btn-outline" style="font-size:0.88rem;">
+      ← Inicio
+    </a>
+  </div>
+
+  {% if mensaje %}
+  <div style="background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
+              padding:0.75rem 1rem; border-radius:8px; margin-bottom:1rem; font-weight:600;">
+    {{ mensaje }}
+  </div>
+  {% endif %}
+
+  <form id="infraccionForm" method="post"
         action="{% url 'inspectores_registrar_infraccion' %}?patente={{ patente }}"
         enctype="multipart/form-data">
+    {% csrf_token %}
 
-        {% csrf_token %}
+    <!-- Patente (solo lectura, visible grande) -->
+    <div class="inf-patente">{{ patente }}</div>
+    <input type="hidden" name="patente" value="{{ patente }}" />
 
-        <label for="patente">Patente:</label>
-        <input value="{{ patente }}" readonly class="input" />
-        <input type="hidden" name="patente" value="{{ patente }}" />
-
-        <label>Subcuadra</label>
-        <select name="subcuadra_id" class="input" required>
-          {% for s in subcuadras %}
-            <option value="{{ s.id }}"
-              {% if s.id == subcuadra_default %}selected{% endif %}>
-              {{ s }}
-            </option>
-          {% endfor %}
-        </select>
-
-        {# ── Foto: solo cámara del dispositivo (capture="environment" = cámara trasera) ── #}
-        <label for="foto">📷 Foto de la infracción:</label>
-        <input
-          type="file"
-          id="foto"
-          name="foto"
-          accept="image/*"
-          capture="environment"
-          required
-        />
-
-        {# Coordenadas GPS (se completan con JS antes de enviar) #}
-        <input type="hidden" id="gps_lat"  name="gps_lat"  value="" />
-        <input type="hidden" id="gps_lon"  name="gps_lon"  value="" />
-        <input type="hidden" id="gps_acc"  name="gps_acc"  value="" />
-
-        {# Estado GPS visible para el inspector #}
-        <p id="gps_estado" style="font-size:0.82rem; color:var(--color-muted); margin-top:0.25rem;">
-          📍 Obteniendo ubicación...
-        </p>
-
-        <button type="submit" id="btnGrabar" class="btn btn-danger" disabled>
-          Grabar acta de infracción
-        </button>
-
-        <a href="{% url 'panel_inspectores' %}" class="btn link">
-          🏠 Volver al inicio
-        </a>
-      </form>
+    <!-- Subcuadra -->
+    <div class="inf-field">
+      <label>📍 Subcuadra</label>
+      <select name="subcuadra_id" required>
+        {% for s in subcuadras %}
+          <option value="{{ s.id }}"
+            {% if s.id == subcuadra_default %}selected{% endif %}>
+            {{ s }}
+          </option>
+        {% endfor %}
+      </select>
     </div>
-  </div>
-</section>
+
+    <!-- Foto -->
+    <div class="inf-field">
+      <label>📸 FOTO</label>
+      <input type="file" id="foto" name="foto"
+             accept="image/*" capture="environment" required />
+    </div>
+
+    <!-- GPS: coordenadas visibles -->
+    <div style="margin-bottom:1rem;">
+      <span id="gps_chip" class="gps-chip esperando">
+        <span id="gps_icono">⏳</span>
+        <span id="gps_texto">Obteniendo ubicación...</span>
+      </span>
+    </div>
+
+    <!-- Campos ocultos GPS -->
+    <input type="hidden" id="gps_lat" name="gps_lat" value="" />
+    <input type="hidden" id="gps_lon" name="gps_lon" value="" />
+    <input type="hidden" id="gps_acc" name="gps_acc" value="" />
+
+    <button type="submit" id="btnGrabar" class="btn btn-danger btn-grabar" disabled>
+      🚨 Grabar acta de infracción
+    </button>
+
+  </form>
+
+</div>
 
 <script>
 (function () {
-  var btnGrabar  = document.getElementById("btnGrabar");
-  var estadoEl   = document.getElementById("gps_estado");
-  var latInput   = document.getElementById("gps_lat");
-  var lonInput   = document.getElementById("gps_lon");
-  var accInput   = document.getElementById("gps_acc");
+  var btn     = document.getElementById("btnGrabar");
+  var chip    = document.getElementById("gps_chip");
+  var icono   = document.getElementById("gps_icono");
+  var texto   = document.getElementById("gps_texto");
+  var latEl   = document.getElementById("gps_lat");
+  var lonEl   = document.getElementById("gps_lon");
+  var accEl   = document.getElementById("gps_acc");
 
-  function habilitarBoton() {
-    btnGrabar.disabled = false;
-  }
+  function habilitar() { btn.disabled = false; }
 
   if (!navigator.geolocation) {
-    // El navegador no soporta geolocalización: permitir igual con advertencia
-    estadoEl.textContent = "⚠️ GPS no disponible en este dispositivo.";
-    estadoEl.style.color = "var(--color-warning, #856404)";
-    habilitarBoton();
+    chip.className = "gps-chip error";
+    icono.textContent = "⚠️";
+    texto.textContent = "GPS no disponible";
+    habilitar();
     return;
   }
 
   navigator.geolocation.getCurrentPosition(
     function (pos) {
-      var lat = pos.coords.latitude.toFixed(6);
-      var lon = pos.coords.longitude.toFixed(6);
+      var lat = pos.coords.latitude.toFixed(5);
+      var lon = pos.coords.longitude.toFixed(5);
       var acc = Math.round(pos.coords.accuracy);
-
-      latInput.value = lat;
-      lonInput.value = lon;
-      accInput.value = acc;
-
-      estadoEl.textContent = "✅ Ubicación obtenida (" + lat + ", " + lon + " ±" + acc + "m)";
-      estadoEl.style.color = "var(--color-primary)";
-      habilitarBoton();
+      latEl.value = lat;
+      lonEl.value = lon;
+      accEl.value = acc;
+      chip.className = "gps-chip";
+      icono.textContent = "📍";
+      texto.textContent = lat + ", " + lon + " ±" + acc + "m";
+      habilitar();
     },
-    function (err) {
-      // GPS denegado o timeout: permitir continuar igual, sin coordenadas
-      estadoEl.textContent = "⚠️ No se pudo obtener la ubicación. La foto no tendrá marca de agua GPS.";
-      estadoEl.style.color = "var(--color-warning, #856404)";
-      habilitarBoton();
+    function () {
+      chip.className = "gps-chip error";
+      icono.textContent = "⚠️";
+      texto.textContent = "Sin ubicación — foto sin marca GPS";
+      habilitar();
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
-})();
+}());
 </script>
 
-{% if mensaje %} {% endif %} {% endblock %}
+{% endblock %}

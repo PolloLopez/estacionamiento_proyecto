@@ -54,37 +54,11 @@
 
 <div class="pantalla {% if modo == 'calle' %}modo-calle{% endif %}">
 
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+    <div style="margin-bottom:0.5rem;">
       <h2 style="margin:0;">🚓 INSPECTOR</h2>
-      {% if modo == 'calle' %}
-        <a href="{% url 'inspectores_verificar_vehiculo' %}" class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.7rem;">🖥 Normal</a>
-      {% else %}
-        <a href="{% url 'inspectores_verificar_vehiculo' %}?modo=calle" class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.7rem;">📱 Modo calle</a>
-      {% endif %}
     </div>
 
-    <!-- SELECTOR DE SUBCUADRA (persiste en sesión) -->
-    {% if subcuadras %}
-    <div class="subcuadra-selector">
-      <form method="post" id="form-subcuadra">
-        {% csrf_token %}
-        <input type="hidden" name="patente" value="">
-        <label style="font-size:0.88rem; font-weight:600; color:var(--color-text-muted);">
-          📍 Estoy en:
-        </label>
-        <select name="subcuadra_id" onchange="this.form.submit()"
-                style="font-size:1rem; padding:0.4rem 0.6rem; border-radius:8px; margin-left:0.4rem;">
-          <option value="">Zona Única</option>
-          {% for s in subcuadras %}
-            <option value="{{ s.id }}"
-              {% if subcuadra_activa and subcuadra_activa.id == s.id %}selected{% endif %}>
-              {{ s }}
-            </option>
-          {% endfor %}
-        </select>
-      </form>
-    </div>
-    {% endif %}
+
 
     <!-- FORM PRINCIPAL: ingresar patente -->
     <form method="post" id="form">
@@ -117,7 +91,7 @@
         <input
             id="patente"
             name="patente"
-                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
+            oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
             class="input-patente"
             placeholder="AAA111"
             autocomplete="off"
@@ -221,6 +195,15 @@
 <script>
 const input = document.getElementById("patente");
 const form = document.getElementById("form");
+
+// Cambiar placeholder según tipo de vehículo
+function actualizarPlaceholder() {
+    const esMoto = document.getElementById("tipo-moto").checked;
+    input.placeholder = esMoto ? "123-ABC" : "AAA111";
+}
+document.getElementById("tipo-auto").addEventListener("change", actualizarPlaceholder);
+document.getElementById("tipo-moto").addEventListener("change", actualizarPlaceholder);
+actualizarPlaceholder();
 
 input.addEventListener("input", () => {
     input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'');

@@ -4,6 +4,13 @@
 
 ---
 
+## 🔴 Alta prioridad
+
+### Geoposición en infracción: foto con watermark GPS
+Las coordenadas ya se capturan en el formulario (campos `gps_lat`, `gps_lon`, `gps_acc`).
+Pendiente: estampar las coordenadas como watermark sobre la foto en `services/infracciones.py::_agregar_marca_de_agua_gps`.
+El campo `foto` de `Infraccion` ya existe y el código del watermark está en el servicio — falta integrarlo al flujo POST de `registrar_infraccion`.
+
 ## 🟡 Media prioridad
 
 ### 1. Transferencia de saldo entre usuarios
