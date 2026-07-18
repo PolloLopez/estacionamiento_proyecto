@@ -1,15 +1,34 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-16
+Última actualización: 2026-07-18
 
 ---
 
 ## 🔴 Alta prioridad
 
-### Geoposición en infracción: foto con watermark GPS
-Las coordenadas ya se capturan en el formulario (campos `gps_lat`, `gps_lon`, `gps_acc`).
-Pendiente: estampar las coordenadas como watermark sobre la foto en `services/infracciones.py::_agregar_marca_de_agua_gps`.
-El campo `foto` de `Infraccion` ya existe y el código del watermark está en el servicio — falta integrarlo al flujo POST de `registrar_infraccion`.
+### Media storage persistente (Cloudinary)
+Las fotos de infracciones se guardan en disco local (`media/`). Railway tiene **filesystem efímero**: los archivos se borran al hacer redeploy o restart del contenedor.
+
+Solución: Cloudinary (gratis hasta 25 GB, CDN, integración directa con Django).
+
+Pasos:
+1. Crear cuenta en https://cloudinary.com (plan free)
+2. `pip install cloudinary django-cloudinary-storage`
+3. Agregar a `requirements.txt`
+4. En `settings.py`:
+   ```python
+   INSTALLED_APPS += ["cloudinary_storage", "cloudinary"]
+   CLOUDINARY_STORAGE = {
+       "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME"),
+       "API_KEY":    env("CLOUDINARY_API_KEY"),
+       "API_SECRET": env("CLOUDINARY_API_SECRET"),
+   }
+   DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+   ```
+5. Agregar 3 variables en Railway: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+6. Las fotos existentes en `media/` quedan orphaned — no hace falta migrarlas.
+
+**Afecta**: `Infraccion.foto`, `Municipio.logo`, cualquier otro `ImageField`.
 
 ## 🟡 Media prioridad
 
@@ -58,10 +77,6 @@ Relativamente poco trabajo, mejora mucho la percepción del municipio.
 Railway conveniente pero con limitaciones de costo/control a largo plazo.
 **Disparador**: cuando el sistema tenga usuarios reales pagando.
 
-### 10. Inspector: foto con watermark y GPS (v2)
-`Infraccion` ya tiene campo `foto` (ImageField). La marca de agua GPS ya está implementada
-en `services/infracciones.py::_agregar_marca_de_agua_gps`. Falta integrar en el flujo mobile.
-
 ### 11. Inspector como cobrador (paid feature)
 Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `cobrar_abono`.
 
@@ -73,6 +88,15 @@ Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `
 ---
 
 ## ✅ Resuelto
+
+### Geoposición en infracción: watermark GPS ✅
+- `services/infracciones.py::_agregar_marca_de_agua_gps` implementado: overlay oscuro semitransparente en la franja inferior, texto con patente, inspector, coordenadas GPS y fecha/hora.
+- `crear_infraccion()` llama al helper automáticamente cuando `foto and gps_lat and gps_lon`.
+- `views_inspector.py::registrar_infraccion` lee `gps_lat/gps_lon/gps_acc` del POST y los pasa al service.
+- Template `registrar_infraccion.html`: JS captura GPS con `navigator.geolocation`, chip visual de estado (verde/amarillo/rojo), campos ocultos se llenan automáticamente, botón deshabilitado hasta obtener ubicación (o fallo).
+- Pillow 12.0.0 en `requirements.txt` → disponible en Railway.
+- Tests: `TestWatermarkGPS` en `tests_servicios.py` (3 tests: overlay oscuro, sin GPS no explota, integración con `crear_infraccion`).
+- Correr con: `python manage.py test app_estacionamiento.tests_servicios.TestWatermarkGPS --verbosity=2`
 
 ### feat: mejoras post-presentación municipal (commit e79eb22, 2026-07-16) ✅
 7 mejoras aplicadas tras la presentación al municipio:

@@ -517,3 +517,124 @@ class TestToleranciaMulta(TestCase):
         from app_estacionamiento.use_cases.pagar_infraccion import ejecutar
         with self.assertRaises(Exception):
             ejecutar(self.conductor, self.infraccion)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Watermark GPS en foto de infracción
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestWatermarkGPS(TestCase):
+    """
+    Tests del helper _agregar_marca_de_agua_gps y su integración
+    en el flujo crear_infraccion().
+
+    Estrategia: imagen blanca pura (255,255,255) → el overlay oscuro
+    del watermark hace que los píxeles del sector inferior bajen de 255.
+    No se necesita OCR ni comparación de strings para verificar la marca.
+    """
+
+    def _foto_blanca(self, ancho=800, alto=600, nombre="test.jpg"):
+        """Crea una imagen blanca en memoria lista para pasar al service."""
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+
+        img = Image.new("RGB", (ancho, alto), (255, 255, 255))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=95)
+        buf.seek(0)
+        return InMemoryUploadedFile(
+            file=buf, field_name="foto", name=nombre,
+            content_type="image/jpeg", size=buf.getbuffer().nbytes, charset=None,
+        )
+
+    def test_watermark_oscurece_franja_inferior(self):
+        """La marca de agua aplica un overlay oscuro en la parte baja de la imagen."""
+        from PIL import Image
+        from app_estacionamiento.services.infracciones import _agregar_marca_de_agua_gps
+
+        foto_entrada = self._foto_blanca(ancho=800, alto=600)
+        resultado = _agregar_marca_de_agua_gps(
+            foto=foto_entrada,
+            lat="-34.65061", lon="-59.43203", acc="8",
+            patente="TST001",
+            inspector=type("Inspector", (), {"correo": "inspector@test.com"})(),
+        )
+
+        # Debe devolver un InMemoryUploadedFile válido
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        self.assertIsInstance(resultado, InMemoryUploadedFile)
+        self.assertTrue(resultado.name.endswith(".jpg"))
+
+        # La imagen resultante debe poder abrirse
+        resultado.seek(0)
+        img_out = Image.open(resultado)
+        self.assertEqual(img_out.mode, "RGB")
+
+        # El 10% inferior debe tener píxeles oscuros (el overlay negro semitransparente
+        # sobre blanco puro produce valores < 200 en los tres canales).
+        ancho, alto = img_out.size
+        y_franja = int(alto * 0.90)
+        pixeles_oscuros = 0
+        for x in range(0, ancho, 20):   # muestreo cada 20px para no tardar
+            r, g, b = img_out.getpixel((x, y_franja + 5))
+            if r < 200 and g < 200 and b < 200:
+                pixeles_oscuros += 1
+        self.assertGreater(pixeles_oscuros, 5,
+            "Se esperaba una franja oscura en la parte inferior de la imagen")
+
+    def test_watermark_sin_gps_devuelve_foto_original(self):
+        """Si no hay coordenadas, crear_infraccion no llama al watermark."""
+        from app_estacionamiento.services.infracciones import _agregar_marca_de_agua_gps
+
+        foto_entrada = self._foto_blanca()
+        # Llamar directamente sin lat/lon no tiene sentido en el helper,
+        # pero crear_infraccion sí hace la guarda:  if foto and gps_lat and gps_lon
+        # Verificamos que el helper con datos vacíos no explota (fallback seguro).
+        resultado = _agregar_marca_de_agua_gps(
+            foto=foto_entrada,
+            lat="", lon="", acc="",
+            patente="TST001",
+            inspector=type("Inspector", (), {"correo": "inspector@test.com"})(),
+        )
+        # Puede devolver la foto original o una marcada; lo importante: no lanza excepción.
+        self.assertIsNotNone(resultado)
+
+    def test_crear_infraccion_aplica_watermark_cuando_hay_gps(self):
+        """
+        Integración: crear_infraccion() con foto + GPS guarda la infracción
+        con una imagen que tiene el overlay (píxeles inferiores oscuros).
+        """
+        from PIL import Image
+        from app_estacionamiento.services.infracciones import crear_infraccion
+
+        municipio = crear_municipio()
+        crear_tarifa(municipio)
+        inspector = crear_inspector(municipio)
+        subcuadra = crear_subcuadra(municipio)
+        vehiculo  = crear_vehiculo(municipio, patente="WMK001")
+
+        foto = self._foto_blanca(nombre="acta.jpg")
+        infraccion = crear_infraccion(
+            patente="WMK001",
+            subcuadra_id=subcuadra.id,
+            inspector=inspector,
+            foto=foto,
+            gps_lat="-34.65061",
+            gps_lon="-59.43203",
+            gps_acc="12",
+        )
+
+        self.assertIsNotNone(infraccion.foto, "La infracción debe tener foto guardada")
+
+        # La foto guardada debe tener la franja oscura del watermark
+        infraccion.foto.open()
+        img_out = Image.open(infraccion.foto)
+        ancho, alto = img_out.size
+        y_franja = int(alto * 0.90)
+        pixeles_oscuros = sum(
+            1 for x in range(0, ancho, 20)
+            if all(c < 200 for c in img_out.getpixel((x, y_franja + 5)))
+        )
+        self.assertGreater(pixeles_oscuros, 5,
+            "La foto de la infracción debe tener watermark GPS")

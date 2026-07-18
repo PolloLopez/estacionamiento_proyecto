@@ -89,7 +89,7 @@ Inspector escanea vehículo con exención:
 ### Flujo de verificación e infracción
 
 ```
-1. Inspector abre "Verificar vehículo" → elige subcuadra donde patrulla
+1. Inspector abre "Verificar vehículo"
 2. Ingresa patente (teclado o escáner)
 3. Sistema evalúa:
    - ¿Exento total? → ✅ libre
@@ -98,8 +98,9 @@ Inspector escanea vehículo con exención:
    - ¿Exento parcial fuera de su subcuadra? → 🚨 INFRACCIONAR
    - ¿Tolerancia (15 min desde última verificación)? → ⏳ esperar
    - ¿Impago / No registrado? → 🚨 INFRACCIONAR
-4. Si infracción: inspector confirma subcuadra y puede sacar foto (con watermark GPS)
-5. Se genera Infraccion (estado=pendiente)
+4. Si infracción: inspector confirma, puede sacar foto
+   (el sistema captura las coordenadas GPS automáticamente)
+5. Se genera Infraccion (estado=pendiente) con geoposición registrada
 6. Conductor puede resolver la infracción de dos formas (ver abajo)
 ```
 
@@ -177,7 +178,9 @@ El sistema consulta:
   2. Si no hay → ¿el horario semanal está activo para hoy? → usa hora_inicio/hora_fin
   3. Si no hay horario para hoy → cobro libre
 
-(Cierre automático de estacionamientos al vencer horario: mejora futura)
+El sistema cierra automáticamente los estacionamientos activos cuando vence el
+horario configurado, aplicando reintegro proporcional si el conductor pagó
+por más tiempo del que quedaba disponible.
 ```
 
 ---
@@ -221,16 +224,22 @@ Panel Admin → "🕐 Horarios". Marco cada día como activo/inactivo y defino l
 Panel Admin → "🕐 Horarios" → "📌 Días especiales" → "Agregar día especial". Pongo la fecha, tipo (feriado/festivo/duelo) y descripción. Por defecto queda como libre de cobro.
 
 **¿Cómo veo las infracciones?**
-Panel Admin → "📋 Infracciones". Puedo filtrar por patente, inspector, estado y fecha. Puedo anular infracciones pendientes.
+Panel Admin → barra lateral de Gestión → "📋 Infracciones". Puedo filtrar por patente, inspector, estado y fecha. Puedo anular infracciones pendientes.
 
 **¿Cómo anulo una infracción?**
 En "📋 Infracciones" → busco la infracción → botón "Anular" (solo si está pendiente).
 
 **¿Cómo cargo saldo a un conductor?**
-Desde "Conductores" → "Ver" conductor → "Cargar saldo manualmente".
+En ⚡ Acciones rápidas → "💳 Cargar saldo" → busco al conductor → ingreso el monto → confirmo. El sistema muestra un comprobante con el monto, nuevo saldo, fecha/hora y quién lo registró, listo para imprimir.
+
+**¿Cómo veo el historial de estacionamientos?**
+Panel Admin → "🅿️ Estacionamientos" en Acciones rápidas. Puedo filtrar por patente, estado y rango de fechas.
+
+**¿Cómo veo todos los vehículos registrados?**
+Panel Admin → Gestión → "🚗 Vehículos". Puedo filtrar por patente y tipo (auto/moto). Muestra el conductor asignado y si tiene exención.
 
 **¿Cómo cobro un abono mensual?**
-Panel Admin → "📅 Abonos". Ingresá la patente, elegí el vehículo, seleccioná el mes y el monto. El cobro queda registrado sin comisión: el 100% se rinde a tesorería. Si el conductor prefiere pagarlo él mismo con su saldo digital, puede hacerlo desde su propio panel de inicio.
+Panel Admin → "📅 Cobrar abono" en Acciones rápidas. Ingresá la patente, elegí el vehículo, seleccioná el mes y el monto. El cobro queda registrado al 100% en tesorería (sin comisión para el admin).
 
 **¿Cómo cambio la tarifa por hora?**
 Panel Admin → "💲 Tarifas" → ingreso el nuevo precio → guardar.
@@ -243,10 +252,13 @@ Panel Admin → "👮 Inspectores" → click en el inspector → sección "Confi
 ### FAQ — Inspector
 
 **¿Cómo verifico un vehículo?**
-Desde mi panel → "🚓 Verificar vehículo". Primero elijo en qué subcuadra estoy patrullando (selector arriba). Ingreso la patente. El sistema me muestra el estado.
+Desde mi panel → "🚓 Verificar vehículo". Ingreso la patente directamente. El sistema me muestra el estado.
 
-**¿Puedo infraccionar en modo calle?**
-Sí. En la pantalla de verificar hay un botón "📱 Modo calle" que agranda la interfaz para usar con el celular al sol.
+**¿Tengo que seleccionar subcuadra antes de verificar?**
+No. Ingresás la patente directamente y el sistema evalúa el estado del vehículo.
+
+**¿Cómo registro una infracción?**
+Si el resultado es 🚨 INFRACCIONAR, aparece el formulario de infracción. Sacás la foto (el sistema captura las coordenadas GPS automáticamente), confirmás y se genera el acta.
 
 **¿Qué pasa si el vehículo tiene exención parcial?**
 Si está en una de sus subcuadras exentas → aparece ✅ OK. Si está fuera de ellas → aparece 🚨 INFRACCIONAR — el vehículo igual debe pagar en esa zona.
@@ -338,8 +350,8 @@ Cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja".
 
 1. Inspector inicia sesión
 2. Panel Inspector → "🚓 Verificar vehículo"
-3. Selecciona la subcuadra donde va a patrullar
-4. Comienza a escanear patentes
+3. Ingresa la patente del vehículo a verificar
+4. El sistema muestra el estado directamente
 
 ### Fin de turno — cierre de caja
 
@@ -357,6 +369,15 @@ Cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja".
 5. Descripción: nombre del feriado
 6. ¿Cobrar ese día?: desmarcado (libre de cobro)
 7. Guardar
+
+### Carga de saldo con comprobante
+
+1. Panel Admin → ⚡ Acciones rápidas → "💳 Cargar saldo"
+2. Buscar al conductor por correo o nombre
+3. Click en "Ver" → "Cargar saldo manualmente"
+4. Ingresar el monto → Confirmar
+5. El sistema muestra el comprobante con nombre del conductor, monto, nuevo saldo, fecha/hora y quién lo registró
+6. Click en "🖨 Imprimir comprobante" para imprimir o guardar como PDF
 
 ---
 
@@ -398,12 +419,80 @@ Desde Django Admin → Municipios → editar municipio:
 
 ## 7. Mejoras Futuras (roadmap)
 
-- **Cierre automático de estacionamientos** al vencer el horario + reintegro proporcional
+- **Geoposición en foto de infracción:** watermark GPS sobre la foto (coordenadas ya se capturan, falta estamparlas en la imagen)
+- **Transferencia de saldo entre conductores** con ventana de aceptación de 24 horas
+- **PWA / App instalable** sin publicar en tiendas (manifest.json + service worker)
 - **Adjunto de documentos** en exenciones (foto de cédula, certificado de discapacidad, etc.)
-- **Verificación documental** por parte del admin antes de aprobar la exención
 - **Notificaciones push** al conductor cuando se acerca el vencimiento
 - **Dashboard de métricas** para admin (recaudación por día, inspector más activo, etc.)
-- **App móvil** para inspectores (PWA o nativa)
 - **Integración con padrón municipal** para verificar vecinos frentistas automáticamente
 - **Renovación de exenciones** con fecha de vencimiento y aviso al admin
 - **MercadoPago producción** (migrar de sandbox a credenciales productivas)
+- **Configurar email en Railway** (recuperación de contraseña en producción)
+
+
+Para enviar por whatsapp:
+🛠️ ADMINISTRADOR — EstacionAR
+Panel Admin → ⚡ Acciones rápidas:
+🚗 Registrar estacionamiento
+💳 Cargar saldo (genera comprobante para imprimir)
+📅 Cobrar abono mensual
+⚠️ Cobrar infracción
+🅿️ Ver historial de estacionamientos
+Gestión lateral:
+🚗 Vehículos — ver todos los autos/motos registrados, filtrar por patente o tipo
+📋 Infracciones — filtrar, anular
+👤 Conductores, 👮 Inspectores, 💰 Vendedores
+💲 Tarifas, 🕐 Horarios, 📌 Días especiales
+Para cargar saldo con comprobante:
+Acciones rápidas → 💳 Cargar saldo → buscar conductor → ingresar monto → confirmar → 🖨 Imprimir comprobante
+Para cobrar abono mensual:
+Acciones rápidas → 📅 Cobrar abono → ingresar patente → elegir mes → confirmar (100% va a tesorería, sin comisión)
+Para exentar un vehículo:
+Conductores → Ver → Gestionar exenciones → elegir tipo → anotar nro de documento → guardar
+Para cargar un feriado:
+Horarios → Días especiales → Agregar → fecha + tipo "Feriado nacional" → dejar desmarcado "cobrar ese día"
+
+🚓 INSPECTOR — EstacionAR
+Para verificar un vehículo:
+
+Entrá a tu panel → "Verificar vehículo"
+Ingresá la patente directamente (no hace falta elegir subcuadra)
+El sistema te muestra el estado: ✅ OK / 🚨 INFRACCIONAR / ⏳ En tolerancia
+
+Para autos: la patente tiene formato AAA111
+Para motos: la patente tiene formato 123-ABC
+Si el resultado es 🚨 INFRACCIONAR:
+Aparece el formulario. Sacá la foto (el GPS se captura solo), completá los datos y confirmá. Se genera el acta automáticamente.
+Tolerancia: si el vehículo fue verificado hace menos de 15 minutos no podés infraccionar. Volvé en unos minutos.
+Exentos parciales: si el vehículo tiene exención en OTRA subcuadra, en la tuya igual hay que infraccionar. El sistema te lo indica.
+Al terminar el turno:
+Panel → 🧾 Caja → ver movimientos → "Confirmar cierre de caja"
+
+💰 VENDEDOR — EstacionAR
+Para registrar un estacionamiento:
+Panel → "Registrar estacionamiento" → patente → duración → confirmar → se genera el ticket
+Para cobrar una infracción:
+Panel → "Cobrar infracción" → patente → ver detalle → confirmar cobro
+⚠️ Si el conductor llega dentro del período de gracia, la infracción se ANULA sin cobrar.
+Para cobrar un abono mensual:
+Panel → "Cobrar abono" → patente → elegir mes → confirmar
+(Genera comisión para vos según el porcentaje configurado)
+Para ver tu caja:
+Panel → "Resumen de caja"
+Para hacer la rendición:
+Cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja". El admin lo verifica de su lado.
+
+🚗 CONDUCTOR — EstacionAR
+Para estacionar:
+Ingresá al sistema → "Estacionar" → elegí tu auto → elegí duración (1, 2 o 3 horas) → se descuenta del saldo
+Para cargar saldo:
+Panel de inicio → "Recargar saldo" → elegí el monto → MercadoPago
+Para pagar el abono mensual:
+Panel de inicio → "📅 Pagar abono" → elegí vehículo y mes → confirmar (se descuenta del saldo)
+Para ver y pagar infracciones:
+Panel → "Mis infracciones" → podés pagar con tu saldo digital
+También podés ir a un kiosco vendedor a pagar en efectivo.
+Si registrás un estacionamiento y tenías una infracción pendiente:
+— Dentro del período de gracia → la infracción se ANULA sola, sin costo ✅
+— Fuera del período → el estacionamiento igual se registra, pero aparece un aviso con los horarios exactos y un botón para ir a pagar la infracción
