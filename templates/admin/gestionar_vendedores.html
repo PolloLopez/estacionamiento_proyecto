@@ -35,6 +35,8 @@
             <td>${{ v.saldo }}</td>
             <td>
               <a class="btn btn-outline" style="font-size:0.85rem; padding:0.35rem 0.75rem;"
+                 href="{% url 'admin_historial_vendedor' v.id %}">Historial</a>
+              <a class="btn btn-outline" style="font-size:0.85rem; padding:0.35rem 0.75rem;"
                  href="{% url 'admin_editar_vendedor' v.id %}">Editar</a>
             </td>
           </tr>

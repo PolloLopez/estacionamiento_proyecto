@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Historial — {{ vendedor.nombre|default:vendedor.correo }}{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="panel">
+    <div class="panel-body">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+        <div>
+          <h1 style="margin-bottom:0.2rem;">
+            💰 {{ vendedor.nombre|default:"Vendedor" }} {{ vendedor.apellido|default:"" }}
+          </h1>
+          <span class="text-muted" style="font-size:0.9rem;">{{ vendedor.correo }}</span>
+        </div>
+        <div style="display:flex; gap:0.5rem;">
+          <a href="{% url 'admin_editar_vendedor' vendedor.id %}" class="btn btn-outline">✏️ Editar</a>
+          <a href="{% url 'gestionar_vendedores' %}" class="btn btn-outline">← Vendedores</a>
+        </div>
+      </div>
+
+      <!-- FILTROS -->
+      <div class="card" style="margin-bottom:1.25rem;">
+        <form method="get" style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+          <div>
+            <label style="font-size:0.85rem;">Desde</label>
+            <input type="date" name="desde" value="{{ desde }}" style="width:160px;" />
+          </div>
+          <div>
+            <label style="font-size:0.85rem;">Hasta</label>
+            <input type="date" name="hasta" value="{{ hasta }}" style="width:160px;" />
+          </div>
+          <button type="submit" class="btn">Filtrar</button>
+          {% if desde or hasta %}
+            <a href="{% url 'admin_historial_vendedor' vendedor.id %}" class="btn btn-outline">Limpiar</a>
+          {% endif %}
+        </form>
+      </div>
+
+      <!-- TOTALES -->
+      <div class="grid grid-4" style="margin-bottom:1.25rem;">
+        <div class="card" style="text-align:center;">
+          <div style="font-size:1.6rem; font-weight:800; color:var(--color-success, #27ae60);">
+            ${{ total_ingresos }}
+          </div>
+          <div class="text-muted" style="font-size:0.85rem;">Ingresos</div>
+        </div>
+        <div class="card" style="text-align:center;">
+          <div style="font-size:1.6rem; font-weight:800; color:var(--color-danger);">
+            ${{ total_egresos }}
+          </div>
+          <div class="text-muted" style="font-size:0.85rem;">Egresos</div>
+        </div>
+        <div class="card" style="text-align:center;">
+          <div style="font-size:1.6rem; font-weight:800; color:var(--color-warning, #e67e22);">
+            ${{ total_comisiones }}
+          </div>
+          <div class="text-muted" style="font-size:0.85rem;">Comisiones</div>
+        </div>
+        <div class="card" style="text-align:center;">
+          <div style="font-size:1.6rem; font-weight:800; color:var(--color-primary);">
+            ${{ neto_municipio }}
+          </div>
+          <div class="text-muted" style="font-size:0.85rem;">Neto municipio</div>
+        </div>
+      </div>
+
+      <!-- TABLA DE MOVIMIENTOS -->
+      <div class="card">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Descripción</th>
+                <th>Medio de pago</th>
+                <th style="text-align:right;">Monto</th>
+                <th style="text-align:right;">Comisión</th>
+                <th style="text-align:center;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in movimientos %}
+              <tr>
+                <td style="font-size:0.88rem; white-space:nowrap;">{{ m.creado_en|date:"d/m/Y H:i" }}</td>
+                <td>
+                  {% if m.tipo == "ingreso" %}
+                    <span style="color:var(--color-success, #27ae60); font-weight:600;">↑ Ingreso</span>
+                  {% else %}
+                    <span style="color:var(--color-danger); font-weight:600;">↓ Egreso</span>
+                  {% endif %}
+                </td>
+                <td style="font-size:0.88rem;">{{ m.descripcion|default:"—" }}</td>
+                <td style="font-size:0.85rem;">{{ m.get_medio_pago_display }}</td>
+                <td style="text-align:right; font-weight:600;">${{ m.monto }}</td>
+                <td style="text-align:right; color:var(--color-text-muted);">
+                  {% if m.comision_monto %}${{ m.comision_monto }}{% else %}—{% endif %}
+                </td>
+                <td style="text-align:center; font-size:0.82rem;">
+                  {% if m.cerrado %}
+                    <span style="color:var(--color-text-muted);">Cerrado</span>
+                  {% else %}
+                    <span style="color:var(--color-warning, #e67e22);">Abierto</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7" style="text-align:center; color:var(--color-text-muted); padding:1.5rem;">
+                  No hay movimientos en el período seleccionado.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

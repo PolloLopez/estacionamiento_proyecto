@@ -89,6 +89,7 @@ urlpatterns = [
     path("admin-inspectores/crear/", views.gestionar_inspectores, name="admin_crear_inspector"),
     path("admin-vendedores/", views.gestionar_vendedores, name="gestionar_vendedores"),
     path("admin-vendedores/<int:vendedor_id>/editar/", views.editar_vendedor, name="admin_editar_vendedor"),
+    path("admin-vendedores/<int:vendedor_id>/historial/", views.historial_vendedor, name="admin_historial_vendedor"),
     path("admin-vendedores/crear/", views.gestionar_vendedores, name="admin_crear_vendedor"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
     path("admin-usuarios/", views.gestionar_usuarios, name="gestionar_usuarios"),

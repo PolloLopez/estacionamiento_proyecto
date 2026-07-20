@@ -381,6 +381,66 @@ def editar_inspector(request, inspector_id):
 # Gestión de vendedores
 # ─────────────────────────────────────────────────────────────────────────────
 
+
+
+@require_role("admin")
+def historial_vendedor(request, vendedor_id):
+    """Historial de movimientos de caja de un vendedor/kiosco.
+
+    Muestra todos los MovimientoCaja del vendedor con filtros opcionales
+    por fecha. Incluye totales del período filtrado.
+    """
+    vendedor  = get_object_or_404(
+        Usuario, id=vendedor_id, es_vendedor=True, municipio=request.user.municipio
+    )
+    movimientos = MovimientoCaja.objects.filter(
+        usuario=vendedor
+    ).order_by("-creado_en")
+
+    # Filtros opcionales por fecha
+    desde = request.GET.get("desde", "").strip()
+    hasta = request.GET.get("hasta", "").strip()
+
+    if desde:
+        try:
+            from datetime import datetime
+            movimientos = movimientos.filter(
+                creado_en__date__gte=datetime.strptime(desde, "%Y-%m-%d").date()
+            )
+        except ValueError:
+            desde = ""
+    if hasta:
+        try:
+            from datetime import datetime
+            movimientos = movimientos.filter(
+                creado_en__date__lte=datetime.strptime(hasta, "%Y-%m-%d").date()
+            )
+        except ValueError:
+            hasta = ""
+
+    # Totales del período filtrado
+    from django.db.models import Sum
+    totales = movimientos.aggregate(
+        total_ingresos=Sum("monto", filter=Q(tipo="ingreso")),
+        total_egresos=Sum("monto",  filter=Q(tipo="egreso")),
+        total_comisiones=Sum("comision_monto"),
+    )
+    total_ingresos   = totales["total_ingresos"]  or 0
+    total_egresos    = totales["total_egresos"]   or 0
+    total_comisiones = totales["total_comisiones"] or 0
+    neto_municipio   = total_ingresos - total_egresos - total_comisiones
+
+    return render(request, "admin/historial_vendedor.html", {
+        "vendedor":        vendedor,
+        "movimientos":     movimientos,
+        "desde":           desde,
+        "hasta":           hasta,
+        "total_ingresos":  total_ingresos,
+        "total_egresos":   total_egresos,
+        "total_comisiones": total_comisiones,
+        "neto_municipio":  neto_municipio,
+    })
+
 @require_role("admin")
 def gestionar_vendedores(request):
     """Lista, crea y configura vendedores (kioscos) del municipio."""
