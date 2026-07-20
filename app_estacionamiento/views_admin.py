@@ -462,6 +462,53 @@ def editar_vendedor(request, vendedor_id):
 # Gestión de conductores
 # ─────────────────────────────────────────────────────────────────────────────
 
+
+
+@require_role("admin")
+def crear_conductor(request):
+    """El admin da de alta un conductor manualmente (registro presencial).
+
+    Una vez creado, redirige al detalle para agregar vehículos y exenciones.
+    """
+    admin     = request.user
+    municipio = admin.municipio
+    error     = None
+
+    if request.method == "POST":
+        nombre   = request.POST.get("nombre", "").strip().title()
+        apellido = request.POST.get("apellido", "").strip().title()
+        correo   = request.POST.get("correo", "").strip().lower()
+        password = request.POST.get("password", "").strip()
+
+        if not all([nombre, apellido, correo, password]):
+            error = "Todos los campos son obligatorios."
+        elif len(password) < 6:
+            error = "La contraseña debe tener al menos 6 caracteres."
+        elif Usuario.objects.filter(correo=correo).exists():
+            error = f"Ya existe un usuario con el correo {correo}."
+        else:
+            conductor = Usuario.objects.create_user(
+                correo=correo,
+                password=password,
+                first_name=nombre,
+                last_name=apellido,
+                municipio=municipio,
+                es_conductor=True,
+                es_admin=False,
+                es_inspector=False,
+                es_vendedor=False,
+            )
+            messages.success(
+                request,
+                f"Conductor {nombre} {apellido} creado. "
+                "Podés agregarle vehículo y exención desde acá."
+            )
+            return redirect("detalle_usuario_admin", usuario_id=conductor.id)
+
+    return render(request, "admin/crear_conductor.html", {
+        "error": error,
+    })
+
 @require_role("admin")
 def gestionar_usuarios(request):
     """Lista de conductores del municipio con búsqueda por correo o nombre."""

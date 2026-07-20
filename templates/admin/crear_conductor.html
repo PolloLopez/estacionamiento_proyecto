@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Nuevo conductor{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="panel">
+    <div class="panel-body">
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap; gap:0.5rem;">
+        <h1>➕ Nuevo conductor</h1>
+        <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline">← Volver</a>
+      </div>
+
+      <p class="text-muted" style="margin-bottom:1.5rem;">
+        Registrá un conductor que viene en persona. Después de crear la cuenta podrás agregar su vehículo y exención.
+      </p>
+
+      {% if error %}
+        <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" style="max-width:480px;">
+        {% csrf_token %}
+
+        <div class="grid grid-2" style="margin-bottom:0.75rem;">
+          <div>
+            <label for="nombre">Nombre</label>
+            <input id="nombre" name="nombre" type="text" required autofocus
+                   value="{{ request.POST.nombre|default:'' }}"
+                   placeholder="Juan" />
+          </div>
+          <div>
+            <label for="apellido">Apellido</label>
+            <input id="apellido" name="apellido" type="text" required
+                   value="{{ request.POST.apellido|default:'' }}"
+                   placeholder="García" />
+          </div>
+        </div>
+
+        <div style="margin-bottom:0.75rem;">
+          <label for="correo">Correo electrónico</label>
+          <input id="correo" name="correo" type="email" required
+                 value="{{ request.POST.correo|default:'' }}"
+                 placeholder="juan@gmail.com"
+                 style="text-transform:lowercase;" />
+        </div>
+
+        <div style="margin-bottom:1.25rem;">
+          <label for="password">Contraseña provisional</label>
+          <input id="password" name="password" type="text" required
+                 placeholder="Mínimo 6 caracteres"
+                 autocomplete="new-password" />
+          <p class="text-muted" style="font-size:0.82rem; margin-top:0.2rem;">
+            El conductor podrá cambiarla desde su panel.
+          </p>
+        </div>
+
+        <button type="submit" class="btn">Crear conductor</button>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

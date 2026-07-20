@@ -92,6 +92,7 @@ urlpatterns = [
     path("admin-vendedores/crear/", views.gestionar_vendedores, name="admin_crear_vendedor"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
     path("admin-usuarios/", views.gestionar_usuarios, name="gestionar_usuarios"),
+    path("admin-crear-conductor/", views.crear_conductor, name="crear_conductor"),
     path("admin-usuarios/<int:usuario_id>/", views.detalle_usuario_admin, name="detalle_usuario_admin"),
     path("admin-infracciones/", views.admin_infracciones, name="admin_infracciones"),
     path("admin-infracciones/<int:infraccion_id>/comprobante/", views.comprobante_infraccion, name="comprobante_infraccion"),
