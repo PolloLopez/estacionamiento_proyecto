@@ -1439,9 +1439,11 @@ def estadisticas_inspectores(request):
         except (Usuario.DoesNotExist, ValueError):
             pass
 
+    # first_name/last_name son las columnas reales en BD
+    # (nombre/apellido son @property Python, no columnas — no se pueden usar en order_by)
     inspectores = Usuario.objects.filter(
         municipio=municipio, es_inspector=True
-    ).order_by("nombre", "apellido")
+    ).order_by("first_name", "last_name")
 
     # ── Queryset base ─────────────────────────────────────────────────────────
     verif_qs = VerificacionInspector.objects.filter(

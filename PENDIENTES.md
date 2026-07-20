@@ -53,7 +53,14 @@ DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
 ```
 **Disparador**: cuando se reactive el deploy en Railway.
 
-### 3. Tests faltantes
+### 3. Exportación de reportes a Excel/PDF
+Descarga directa desde las vistas existentes:
+— **Inspectores**: botón "Descargar Excel" en `/admin-inspectores/estadisticas/` con las métricas del período.
+— **Infracciones**: botón "Descargar PDF" en `admin-infracciones/` con el listado filtrado.
+— **Rendiciones**: exportar cierre de caja a PDF para tesorería.
+— Implementable con `openpyxl` (instalar) y `reportlab` (ya instalado).
+
+### 4. Tests faltantes
 - Flujo MP webhook (integración)
 - `TestWatermarkGPS` pasando en Railway (verificar con Cloudinary activo)
 
@@ -136,11 +143,7 @@ El conductor puede impugnar una infracción desde la app, adjuntando evidencia (
 — Notificación al conductor con la resolución.
 
 ### Exportación de reportes a Excel/PDF
-El admin puede descargar en un click las estadísticas del período:
-— Reporte de inspectores (ya tenemos la vista, agregar botón de descarga).
-— Reporte de rendiciones para tesorería.
-— Historial de infracciones filtrado.
-— Implementable con `openpyxl` (ya disponible) y `reportlab` (ya instalado para PDF de inspector).
+_(movida a 🟡 Media prioridad — funcionalidad base, no premium)_
 
 ### Dashboard en TV (pantalla municipal en tiempo real)
 Vista de solo lectura sin login, pensada para una pantalla grande en la municipalidad.
