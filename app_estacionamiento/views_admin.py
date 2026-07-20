@@ -105,9 +105,14 @@ def panel_admin(request):
         municipio=municipio
     ).order_by("-creado_en")[:20]
 
-    total_cobrado = MovimientoCaja.objects.filter(
-        usuario__municipio=municipio, tipo="ingreso"
+    # Sin rendir: movimientos abiertos + cierres no certificados
+    abiertos = MovimientoCaja.objects.filter(
+        usuario__municipio=municipio, tipo="ingreso", cerrado=False
     ).aggregate(total=Sum("monto"))["total"] or 0
+    en_cierre_sin_certificar = CierreCaja.objects.filter(
+        usuario__municipio=municipio, certificado=False
+    ).aggregate(total=Sum("monto_municipio"))["total"] or 0
+    sin_rendir = abiertos + en_cierre_sin_certificar
 
     verificaciones_pendientes = SolicitudVerificacion.objects.filter(
         estado="pendiente", usuario__municipio=municipio
@@ -139,7 +144,7 @@ def panel_admin(request):
         "vendedores":                vendedores,
         "conductores":               conductores,
         "infracciones_recientes":    infracciones_recientes,
-        "total_cobrado":             total_cobrado,
+        "sin_rendir":                sin_rendir,
         "verificaciones_pendientes": verificaciones_pendientes,
         "rendiciones_pendientes":    rendiciones_pendientes,
         "sidebar_gestion":           sidebar_gestion,
