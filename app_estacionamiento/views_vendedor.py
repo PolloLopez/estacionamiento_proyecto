@@ -513,13 +513,23 @@ def cobrar_abono(request):
                             movimiento_caja=movimiento,
                         )
 
-                    messages.success(
-                        request,
-                        "Abono de " + mes_label + " registrado para " + patente
-                        + " — $" + str(precio) + "."
-                        + (f" Comisión: ${comision_monto}." if comision_monto else ""),
-                    )
-                    return redirect("cobrar_abono")
+                    # Armar comprobante en vez de redirigir
+                    comprobante = {
+                        "patente":   patente,
+                        "vehiculo":  vehiculo,
+                        "mes_label": mes_label,
+                        "monto":     precio,
+                        "cobrador":  vendedor,
+                        "municipio": municipio,
+                        "fecha":     timezone.localtime(),
+                    }
+                    from django.urls import reverse as _reverse
+                    volver_url = _reverse("panel_admin") if request.user.es_admin else _reverse("panel_vendedor")
+                    return render(request, "admin/cobrar_abono.html", {
+                        "comprobante":    comprobante,
+                        "opciones_mes":   opciones_mes,
+                        "volver_url":     volver_url,
+                    })
 
     from django.urls import reverse as _reverse
     volver_url = _reverse("panel_admin") if request.user.es_admin else _reverse("panel_vendedor")

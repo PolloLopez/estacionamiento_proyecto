@@ -53,59 +53,38 @@ Falta: **subcuadra** donde se labró el acta.
 ### Bug: foto en infracción — verificar flujo completo
 Algunas infracciones se guardaron sin foto. La foto tiene que mostrar:
 coordenadas GPS + subcuadra + timestamp.
-— Una vez implementado el "detalle de infracción" en admin (ver 🟡) y Cloudinary,
-  verificar manualmente que la foto llega correcta a la BD.
+— Una vez implementado Cloudinary, verificar manualmente que la foto llega correcta a la BD.
 — Si el problema persiste, agregar log en `crear_infraccion()` para registrar si `foto` llega None.
 
 ---
 
 ## 🟡 Media prioridad
 
-### 1. Modal "detalle de infracción" en admin-infracciones
-En `/usuarios/admin-infracciones/` al hacer click en cualquier infracción (tabla o
-infracciones_recientes del panel), abrir un modal con:
-- Todos los datos del acta: patente, vehículo, inspector, subcuadra, fecha, monto, estado
-- **Foto del acta** (si existe)
-- Botón **Cobrar** (si pendiente) → registra cobro en efectivo
-- Botón **Anular** (si pendiente) → pide motivo (campo texto requerido)
-
-Modelo: agregar campo `motivo_anulacion = models.TextField(blank=True)` a `Infraccion` + migración.
-
-También: en `{% for inf in infracciones_recientes %}` del panel admin → click lleva al modal.
-
-### 2. Admin: cobrar-infraccion — mostrar TODAS las infracciones pendientes
-`/usuarios/vendedores/cobrar-infraccion/` actualmente muestra solo la última infracción pendiente.
-Cambiar para mostrar **todas** las pendientes de esa patente (puede tener varias).
-Aplica también a la vista equivalente del admin.
-
-### 3. Panel admin: métrica "Sin rendir a tesorería"
+### 1. Panel admin: métrica "Sin rendir a tesorería"
 Reemplazar `${{ total_cobrado }}` (suma histórica total) por el monto acumulado
 **sin rendir a tesorería** del municipio.
 Cálculo: suma de `MovimientoCaja.monto` donde `tipo="ingreso"` y el `CierreCaja`
 asociado aún no fue certificado (o donde no hay cierre de caja todavía).
 Incluir también rendiciones de puntos de venta que ya rindieron.
 
-### 4. Alta de conductor desde admin
+### 2. Alta de conductor desde admin
 Desde `/usuarios/admin-usuarios/` agregar botón "➕ Nuevo conductor".
 Form: nombre, apellido, correo, contraseña provisional.
 Después de crear → ir al detalle del conductor para agregar vehículo y exención.
 Permite al admin registrar conductores que vienen en persona sin que se registren solos.
 
-### 5. Admin-inspectores: eliminar campos de comisión
-Los inspectores de este municipio no realizan cobros.
-Eliminar del form de edición de inspector:
-- `id="periodicidad_rendicion"` (selector de periodicidad)
-- `id="porcentaje_ganancia"` (campo % de comisión)
+### 3. Cobrar abono: comprobante imprimible
+Después de confirmar el cobro de un abono (✅ Confirmar cobro — ${{ precio }}),
+mostrar comprobante para imprimir/entregar. Similar al comprobante de cargar_saldo.
+Debe incluir: patente, vehículo, mes, monto, quién cobró, fecha/hora, municipio.
 
-Evaluar si conviene hacerlo configurable por municipio o directamente eliminar del modelo.
-
-### 6. Admin-vendedores: historial de operaciones del punto de venta
+### 4. Admin-vendedores: historial de operaciones del punto de venta
 Click en nombre del vendedor → nueva vista con:
 - Todos los `MovimientoCaja` del vendedor (fecha, tipo, descripción, monto, comisión)
 - Posibilidad de editar/anular movimientos individuales (con motivo)
 - Totales del período
 
-### 7. Admin-rendiciones: separar en dos secciones
+### 5. Admin-rendiciones: separar en dos secciones
 `/usuarios/admin-rendiciones/` debe mostrar claramente separadas:
 - **Rendiciones a Tesorería** (del admin al tesorero): historial, estados, observaciones
 - **Comisiones a Puntos de Venta** (del municipio a los vendedores): pendientes de depósito,
@@ -115,18 +94,7 @@ Flujo ya implementado en el modelo (`LiquidacionComision`):
   `pendiente` → tesorería marca como `depositada` → vendedor certifica como `certificada`.
 La UI de separación es lo que falta.
 
-### 8. Cobrar abono: comprobante imprimible
-Después de confirmar el cobro de un abono (✅ Confirmar cobro — ${{ precio }}),
-mostrar comprobante para imprimir/entregar. Similar al comprobante de cargar_saldo.
-Debe incluir: patente, vehículo, mes, monto, quién cobró, fecha/hora, municipio.
-
-### 9. Mover cobrar_abono.html a templates/admin/ + quitar de vendedores
-- Mover `templates/vendedores/cobrar_abono.html` → `templates/admin/cobrar_abono.html`
-- Actualizar la view `cobrar_abono` para que use el nuevo template
-- Quitar el botón `{% url 'cobrar_abono' %}` del panel de vendedor (`panel.html`)
-- El "Volver" del template siempre va a `panel_admin` (no es accesible para vendedores)
-
-### 10. Admin-exenciones: flujo completo + listado global
+### 6. Admin-exenciones: flujo completo + listado global
 **Agregar exención a patente nueva:**
 Si la patente ingresada no existe en el sistema:
   1. Crear/buscar conductor por DNI o correo
@@ -139,7 +107,7 @@ Mostrar tabla de TODAS las patentes con exención activa:
 - Patente, tipo de vehículo, conductor, tipo de exención (Global/Parcial), subcuadras exentas (si parcial)
 Filtros: tipo de exención, estado.
 
-### 11. Transferencia de saldo entre usuarios
+### 7. Transferencia de saldo entre usuarios
 El conductor puede transferir saldo a otro conductor. El receptor tiene **24 horas** para aceptar;
 si no responde, el monto se reintegra automáticamente al emisor.
 Pendiente de diseño:
@@ -148,7 +116,7 @@ Pendiente de diseño:
 - Vista de recepción/rechazo (notificación en el panel del receptor).
 - Lógica de expiración: verificar en login o con tarea periódica (Celery o chequeo reactivo).
 
-### 12. Configurar email en Railway (recuperación de contraseña)
+### 8. Configurar email en Railway (recuperación de contraseña)
 En local los emails aparecen en la consola (backend `console`). En Railway hay que setear 3 variables:
 ```
 EMAIL_HOST_USER=tumail@gmail.com
@@ -157,7 +125,7 @@ DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
 ```
 **Disparador**: cuando se reactive el deploy en Railway.
 
-### 13. Tests faltantes
+### 9. Tests faltantes
 - Flujo MP webhook (integración)
 - `TestWatermarkGPS` pasando en Railway (verificar con Cloudinary activo)
 
@@ -170,7 +138,7 @@ DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
 - Campos para enviar el resumen por mail a personas del Staff
 - Nuevo rol `Staff`: solo reciben mails del sistema, pero también son usuarios.
   Algunos comparten correo con su cuenta de sistema → manejar como alias o campo separado.
-- Implementar envío de mails desde Django (depende de ítem 12)
+- Implementar envío de mails desde Django (depende de ítem 8)
 
 ### Flujo tesorería → vendedor: verificar UI completa
 El modelo `LiquidacionComision` ya tiene el flujo modelado:
@@ -203,6 +171,20 @@ Eliminar o redirigir.
 ---
 
 ## ✅ Resuelto
+
+### feat: mejoras UI admin y vendedor (commit 2861f48, 2026-07-20) ✅
+- **cobrar-infraccion**: muestra TODAS las infracciones pendientes por patente (no solo la última).
+  View: queryset completo. Template: loop con card por infracción, botón Cobrar individual.
+- **gestionar_inspectores**: eliminados `periodicidad_rendicion` y `porcentaje_ganancia` del form de crear inspector.
+- **cobrar_abono**: template movido a `templates/admin/cobrar_abono.html`, view actualizado, botón quitado del panel vendedor.
+- **gestionar_vendedores**: tabla con datos completos (negocio, propietario, teléfono, horario).
+- **panel_admin**: infracciones_recientes muestra 20 en vez de 5.
+
+### Modal "detalle de infracción" + motivo_anulacion (commit anterior, 2026-07-20) ✅
+- Campo `motivo_anulacion = models.TextField(blank=True, default="")` en `Infraccion` + migración 0040.
+- Vista `admin_infracciones`: acciones Cobrar y Anular por POST (con validación de motivo vacío).
+- Template `infracciones.html`: modal JS con foto, todos los datos, botones Cobrar/Anular por infracción.
+- Panel admin: infracciones_recientes clickeables → abren modal con `?detalle=ID`.
 
 ### Geoposición en infracción: watermark GPS ✅
 - `services/infracciones.py::_agregar_marca_de_agua_gps`: overlay oscuro + texto con patente, inspector, GPS, fecha/hora.

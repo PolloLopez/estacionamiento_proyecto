@@ -6,7 +6,66 @@
   <div class="panel">
     <div class="panel-body">
 
-      <h1>📅 Cobrar abono mensual</h1>
+      {% if comprobante %}
+        {# COMPROBANTE DE COBRO DE ABONO #}
+        <h1>&#128197; Comprobante de abono mensual</h1>
+
+        <div id="comprobante" style="background:#fff; border:1px solid var(--color-border);
+             border-radius:12px; padding:1.5rem; max-width:480px; margin:0 auto 1.5rem;">
+
+          <div style="text-align:center; margin-bottom:1rem;">
+            {% if comprobante.municipio.logo %}
+              <img src="{{ comprobante.municipio.logo.url }}" alt="Logo municipio"
+                   style="max-height:60px; margin-bottom:0.5rem;"><br>
+            {% endif %}
+            <strong style="font-size:1.1rem;">{{ comprobante.municipio.nombre }}</strong><br>
+            <span style="font-size:0.85rem; color:var(--color-text-muted);">Comprobante de abono mensual</span>
+          </div>
+
+          <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Patente</td>
+              <td style="padding:0.4rem 0; font-weight:700; text-align:right;">{{ comprobante.patente }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Tipo de vehículo</td>
+              <td style="padding:0.4rem 0; text-align:right;">{{ comprobante.vehiculo.get_tipo_display }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Período</td>
+              <td style="padding:0.4rem 0; font-weight:600; text-align:right;">{{ comprobante.mes_label }}</td>
+            </tr>
+            <tr style="border-top:1px solid var(--color-border);">
+              <td style="padding:0.75rem 0 0.4rem; font-weight:600;">Monto cobrado</td>
+              <td style="padding:0.75rem 0 0.4rem; font-size:1.4rem; font-weight:900;
+                         color:var(--color-primary); text-align:right;">${{ comprobante.monto }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Registrado por</td>
+              <td style="padding:0.4rem 0; text-align:right;">
+                {% if comprobante.cobrador.nombre %}
+                  {{ comprobante.cobrador.nombre }} {{ comprobante.cobrador.apellido }}
+                {% else %}
+                  {{ comprobante.cobrador.correo }}
+                {% endif %}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Fecha y hora</td>
+              <td style="padding:0.4rem 0; text-align:right;">{{ comprobante.fecha|date:"d/m/Y H:i" }}hs</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap;" class="no-print">
+          <button onclick="window.print()" class="btn">&#128424; Imprimir comprobante</button>
+          <a href="{% url 'cobrar_abono' %}" class="btn btn-outline">&#128257; Nuevo cobro</a>
+          <a href="{{ volver_url }}" class="btn btn-outline">&#8592; Volver al panel</a>
+        </div>
+
+      {% else %}
+
+      <h1>&#128197; Cobrar abono mensual</h1>
 
       {# Los mensajes los muestra base.html — no duplicar aquí #}
 
@@ -104,4 +163,17 @@
     </div>
   </div>
 </div>
+
+{% endif %}{# /comprobante #}
+
+{% block extra_styles %}
+<style>
+@media print {
+  .no-print { display: none !important; }
+  nav, footer, .sidebar { display: none !important; }
+  #comprobante { border: none; box-shadow: none; }
+}
+</style>
+{% endblock %}
+
 {% endblock %}
