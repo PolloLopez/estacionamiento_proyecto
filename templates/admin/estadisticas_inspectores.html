@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Estadísticas de Inspectores{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>📊 Estadísticas de inspectores</h2>
+    <a href="{% url 'gestionar_inspectores' %}" class="btn btn-outline" style="font-size:0.9rem;">← Inspectores</a>
+  </div>
+
+  <!-- ── FILTROS ─────────────────────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <form method="get" style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+
+      <div>
+        <label style="font-size:0.8rem; font-weight:700; text-transform:uppercase; color:var(--color-text-muted);">Inspector</label>
+        <select name="inspector_id" style="padding:0.5rem 0.75rem; border-radius:8px; border:1.5px solid var(--color-border); background:var(--color-surface); min-width:180px;">
+          <option value="">— Todos —</option>
+          {% for insp in inspectores %}
+            <option value="{{ insp.id }}" {% if inspector_sel.id == insp.id %}selected{% endif %}>
+              {{ insp.nombre_completo }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size:0.8rem; font-weight:700; text-transform:uppercase; color:var(--color-text-muted);">Desde</label>
+        <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}"
+               style="padding:0.5rem 0.75rem; border-radius:8px; border:1.5px solid var(--color-border); background:var(--color-surface);">
+      </div>
+
+      <div>
+        <label style="font-size:0.8rem; font-weight:700; text-transform:uppercase; color:var(--color-text-muted);">Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}"
+               style="padding:0.5rem 0.75rem; border-radius:8px; border:1.5px solid var(--color-border); background:var(--color-surface);">
+      </div>
+
+      <button type="submit" class="btn">Filtrar</button>
+
+      {% if inspector_sel or request.GET.desde or request.GET.hasta %}
+        <a href="{% url 'estadisticas_inspectores' %}" class="btn btn-outline">Limpiar</a>
+      {% endif %}
+    </form>
+
+    {% if inspector_sel %}
+    <div style="margin-top:0.75rem; padding:0.5rem 0.75rem; background:var(--color-surface-2); border-radius:8px; font-size:0.88rem;">
+      Mostrando: <strong>{{ inspector_sel.nombre_completo }}</strong> —
+      {{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}
+    </div>
+    {% else %}
+    <div style="margin-top:0.75rem; padding:0.5rem 0.75rem; background:var(--color-surface-2); border-radius:8px; font-size:0.88rem;">
+      Todos los inspectores — {{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── CARDS DE TOTALES ────────────────────────────────────────────────── -->
+  <div class="grid grid-4" style="gap:1rem; margin-bottom:1.5rem;">
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2rem; font-weight:800; color:var(--color-primary);">{{ total_verificaciones }}</div>
+      <div style="font-size:0.82rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.05em;">Verificaciones</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2rem; font-weight:800; color:var(--color-danger);">{{ total_infracciones }}</div>
+      <div style="font-size:0.82rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.05em;">Infracciones</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2rem; font-weight:800; color:var(--color-warning, #e67e22);">{{ tasa_infraccion }}%</div>
+      <div style="font-size:0.82rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.05em;">Tasa de infracción</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:2rem; font-weight:800; color:var(--color-text-muted);">{{ total_anuladas }}</div>
+      <div style="font-size:0.82rem; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.05em;">Anuladas</div>
+    </div>
+  </div>
+
+  <!-- ── COMPARATIVA POR INSPECTOR ──────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
+    <h3 style="margin-bottom:1rem;">👥 Comparativa por inspector</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Inspector</th>
+          <th style="text-align:center;">Verificaciones</th>
+          <th style="text-align:center;">Infracciones</th>
+          <th style="text-align:center;">Tasa</th>
+          <th style="text-align:center;">Anuladas</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for insp in comparativa %}
+        <tr {% if inspector_sel.id == insp.id %}style="background:var(--color-surface-2);"{% endif %}>
+          <td>
+            <strong>{{ insp.nombre_completo }}</strong>
+            {% if inspector_sel.id == insp.id %}<span style="font-size:0.75rem; color:var(--color-primary); margin-left:0.4rem;">← seleccionado</span>{% endif %}
+          </td>
+          <td style="text-align:center; font-weight:700;">{{ insp.total_verificaciones }}</td>
+          <td style="text-align:center; font-weight:700; color:{% if insp.total_infracciones > 0 %}var(--color-danger){% else %}var(--color-text-muted){% endif %};">
+            {{ insp.total_infracciones }}
+          </td>
+          <td style="text-align:center;">
+            {% if insp.total_verificaciones %}
+              {% widthratio insp.total_infracciones insp.total_verificaciones 100 %}%
+            {% else %}—{% endif %}
+          </td>
+          <td style="text-align:center; color:var(--color-text-muted);">
+            {% if insp.infracciones_anuladas %}{{ insp.infracciones_anuladas }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'estadisticas_inspectores' %}?inspector_id={{ insp.id }}&desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}"
+               class="btn btn-outline" style="font-size:0.8rem; padding:0.3rem 0.6rem;">
+              Ver detalle
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center; color:var(--color-text-muted); padding:1.5rem;">
+            No hay inspectores registrados en este municipio.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── DETALLE DEL INSPECTOR SELECCIONADO ─────────────────────────────── -->
+  {% if inspector_sel %}
+
+  <div class="grid grid-2" style="gap:1rem; margin-bottom:1.5rem;">
+
+    <!-- Distribución horaria -->
+    <div class="card">
+      <h4 style="margin-bottom:1rem;">🕐 Verificaciones por hora</h4>
+      {% if total_verificaciones %}
+      <div style="display:flex; align-items:flex-end; gap:3px; height:80px;">
+        {% for d in distribucion_horaria %}
+          {% if d.cantidad > 0 %}
+            {% widthratio d.cantidad max_hora 80 as altura_px %}
+          {% else %}
+            {% with altura_px=2 %}{% endwith %}
+          {% endif %}
+          <div style="display:flex; flex-direction:column; align-items:center; flex:1;">
+            <div title="{{ d.hora }}:00 — {{ d.cantidad }} verif."
+                 style="width:100%; background:{% if d.cantidad > 0 %}var(--color-primary){% else %}var(--color-border){% endif %};
+                        border-radius:3px 3px 0 0; min-height:2px;
+                        height:{% if d.cantidad > 0 %}{% widthratio d.cantidad max_hora 76 %}px{% else %}2px{% endif %};">
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--color-text-muted); margin-top:4px; padding:0 2px;">
+        <span>6h</span><span>9h</span><span>12h</span><span>15h</span><span>18h</span><span>21h</span>
+      </div>
+      <div style="margin-top:0.75rem; font-size:0.85rem;">
+        {% for d in distribucion_horaria %}
+          {% if d.cantidad > 0 %}
+          <span style="display:inline-block; margin:2px 4px; font-size:0.8rem;">
+            <strong>{{ d.hora }}h</strong>: {{ d.cantidad }}
+          </span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted" style="text-align:center; padding:1rem;">Sin datos en el período.</p>
+      {% endif %}
+    </div>
+
+    <!-- Subcuadras patrulladas -->
+    <div class="card">
+      <h4 style="margin-bottom:1rem;">📍 Subcuadras patrulladas</h4>
+      {% if subcuadras_stats %}
+      <table style="font-size:0.9rem;">
+        <thead>
+          <tr>
+            <th>Subcuadra</th>
+            <th style="text-align:right;">Verificaciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in subcuadras_stats %}
+          <tr>
+            <td>{{ s.subcuadra__calle }} {{ s.subcuadra__altura }}</td>
+            <td style="text-align:right; font-weight:700;">{{ s.cantidad }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-muted" style="text-align:center; padding:1rem;">Sin datos en el período.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Actividad diaria -->
+  {% if por_dia %}
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h4 style="margin-bottom:0.75rem;">📅 Actividad diaria</h4>
+    <div style="overflow-x:auto;">
+      <table style="font-size:0.85rem; min-width:500px;">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th style="text-align:right;">Verificaciones</th>
+            <th style="width:60%;">Barra</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in por_dia %}
+          <tr>
+            <td>{{ d.dia|date:"d/m/Y (D)" }}</td>
+            <td style="text-align:right; font-weight:700;">{{ d.verificaciones }}</td>
+            <td>
+              <div style="background:var(--color-primary); height:14px; border-radius:4px;
+                          width:{% widthratio d.verificaciones 30 100 %}%; min-width:4px; max-width:100%;">
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}{# fin inspector_sel #}
+
+</section>
+{% endblock %}

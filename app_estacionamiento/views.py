@@ -92,6 +92,7 @@ from .views_admin import (
     admin_estacionamientos,
     historial_vendedor,
     crear_conductor,
+    estadisticas_inspectores,
 )
 from .views_mp import (
     mp_iniciar_carga,

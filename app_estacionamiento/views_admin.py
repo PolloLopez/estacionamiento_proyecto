@@ -1390,3 +1390,153 @@ def admin_estacionamientos(request):
             "fecha_hasta": fecha_hasta,
         },
     })
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Estadísticas de inspectores
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def estadisticas_inspectores(request):
+    """
+    Estadísticas de actividad de los inspectores del municipio.
+
+    Sin filtro de inspector → comparativa de todos.
+    Con ?inspector_id=X → detalle del inspector seleccionado.
+    Filtros de fecha: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD (default: mes actual).
+
+    TODO (mejora futura, venta): agregar campo Municipio.estadisticas_activo
+    y chequear aquí para permitir ocultar la vista desde Django Admin.
+    """
+    from datetime import date as date_type
+    from django.db.models import Count, Q, Sum
+    from django.db.models.functions import ExtractHour, TruncDay
+    from .models import VerificacionInspector
+
+    municipio = request.user.municipio
+    hoy = timezone.localtime().date()
+
+    # ── Filtros ──────────────────────────────────────────────────────────────
+    desde_str = request.GET.get("desde", "")
+    hasta_str = request.GET.get("hasta", "")
+    inspector_id = request.GET.get("inspector_id", "")
+
+    try:
+        desde = date_type.fromisoformat(desde_str)
+    except ValueError:
+        desde = hoy.replace(day=1)  # primer día del mes actual
+
+    try:
+        hasta = date_type.fromisoformat(hasta_str)
+    except ValueError:
+        hasta = hoy
+
+    inspector_sel = None
+    if inspector_id:
+        try:
+            inspector_sel = Usuario.objects.get(
+                id=int(inspector_id), municipio=municipio, es_inspector=True
+            )
+        except (Usuario.DoesNotExist, ValueError):
+            pass
+
+    inspectores = Usuario.objects.filter(
+        municipio=municipio, es_inspector=True
+    ).order_by("nombre", "apellido")
+
+    # ── Queryset base ─────────────────────────────────────────────────────────
+    verif_qs = VerificacionInspector.objects.filter(
+        inspector__municipio=municipio,
+        fecha__date__gte=desde,
+        fecha__date__lte=hasta,
+    )
+    inf_qs = Infraccion.objects.filter(
+        municipio=municipio,
+        creado_en__date__gte=desde,
+        creado_en__date__lte=hasta,
+    )
+
+    if inspector_sel:
+        verif_qs = verif_qs.filter(inspector=inspector_sel)
+        inf_qs = inf_qs.filter(inspector=inspector_sel)
+
+    # ── Comparativa por inspector ─────────────────────────────────────────────
+    rango_q = Q(
+        verificacioninspector__fecha__date__gte=desde,
+        verificacioninspector__fecha__date__lte=hasta,
+    )
+    rango_inf_q = Q(
+        infraccion__creado_en__date__gte=desde,
+        infraccion__creado_en__date__lte=hasta,
+        infraccion__municipio=municipio,
+    )
+    comparativa = inspectores.annotate(
+        total_verificaciones=Count(
+            "verificacioninspector", filter=rango_q
+        ),
+        total_infracciones=Count(
+            "infraccion",
+            filter=rango_inf_q & ~Q(infraccion__estado="anulada"),
+        ),
+        infracciones_anuladas=Count(
+            "infraccion",
+            filter=rango_inf_q & Q(infraccion__estado="anulada"),
+        ),
+    )
+
+    # ── Totales del período (solo el inspector seleccionado, o todos) ─────────
+    totales = verif_qs.aggregate(total=Count("id"))
+    total_verificaciones = totales["total"] or 0
+    total_infracciones = inf_qs.exclude(estado="anulada").count()
+    total_anuladas = inf_qs.filter(estado="anulada").count()
+    tasa_infraccion = (
+        round(total_infracciones / total_verificaciones * 100, 1)
+        if total_verificaciones else 0
+    )
+
+    # ── Distribución por hora del día ─────────────────────────────────────────
+    por_hora = list(
+        verif_qs.annotate(hora=ExtractHour("fecha"))
+        .values("hora")
+        .annotate(cantidad=Count("id"))
+        .order_by("hora")
+    )
+    # Rellenar horas sin datos con 0 para el gráfico
+    hora_map = {h["hora"]: h["cantidad"] for h in por_hora}
+    distribucion_horaria = [
+        {"hora": h, "cantidad": hora_map.get(h, 0)}
+        for h in range(6, 22)  # 6:00 a 21:00
+    ]
+    max_hora = max((d["cantidad"] for d in distribucion_horaria), default=1) or 1
+
+    # ── Subcuadras patrulladas ─────────────────────────────────────────────────
+    subcuadras_stats = (
+        verif_qs
+        .values("subcuadra__calle", "subcuadra__altura", "subcuadra__id")
+        .annotate(cantidad=Count("id"))
+        .order_by("-cantidad")[:10]
+    )
+
+    # ── Actividad por día (para sparkline de texto) ───────────────────────────
+    por_dia = (
+        verif_qs
+        .annotate(dia=TruncDay("fecha"))
+        .values("dia")
+        .annotate(verificaciones=Count("id"))
+        .order_by("dia")
+    )
+
+    return render(request, "admin/estadisticas_inspectores.html", {
+        "inspectores": inspectores,
+        "inspector_sel": inspector_sel,
+        "desde": desde,
+        "hasta": hasta,
+        "comparativa": comparativa,
+        "total_verificaciones": total_verificaciones,
+        "total_infracciones": total_infracciones,
+        "total_anuladas": total_anuladas,
+        "tasa_infraccion": tasa_infraccion,
+        "distribucion_horaria": distribucion_horaria,
+        "max_hora": max_hora,
+        "subcuadras_stats": subcuadras_stats,
+        "por_dia": por_dia,
+    })

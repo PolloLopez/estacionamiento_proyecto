@@ -6,7 +6,10 @@
 
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
     <h2>👮 Inspectores</h2>
-    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a href="{% url 'estadisticas_inspectores' %}" class="btn btn-outline" style="font-size:0.9rem;">📊 Estadísticas</a>
+      <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
+    </div>
   </div>
 
   <!-- TABLA RESUMEN -->
@@ -49,9 +52,11 @@
                 <span style="color:var(--color-danger); font-weight:600;">● Inactivo</span>
               {% endif %}
             </td>
-            <td>
+            <td style="display:flex; gap:0.4rem; flex-wrap:wrap;">
               <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
                  href="{% url 'admin_editar_inspector' i.id %}">Editar</a>
+              <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
+                 href="{% url 'estadisticas_inspectores' %}?inspector_id={{ i.id }}">📊 Stats</a>
             </td>
           </tr>
           {% endfor %}

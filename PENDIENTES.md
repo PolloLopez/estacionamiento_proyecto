@@ -94,6 +94,14 @@ Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `
 
 ## ✅ Resuelto
 
+### feat: estadísticas de inspectores (2026-07-20) ✅
+- Nueva vista `/admin-inspectores/estadisticas/` solo para admin.
+- Filtros: inspector (opcional) + rango de fechas libre (default: mes actual).
+- Modo comparativa: tabla con verificaciones / infracciones / tasa / anuladas por inspector.
+- Modo detalle (inspector seleccionado): distribución horaria con barra, subcuadras patrulladas, actividad diaria.
+- Botón "📊 Stats" por inspector en `gestionar_inspectores` + link general en el header.
+- TODO: `Municipio.estadisticas_activo` para ocultar por municipio desde Django Admin (mejora paga).
+
 ### feat: inspector — subcuadra + exento parcial + watermark (2026-07-20) ✅
 - **verificar.html**: selector de subcuadra visible (dropdown, guarda en sesión).
   Inspector elige dónde está patrullando antes de verificar.
