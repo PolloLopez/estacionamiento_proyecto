@@ -64,9 +64,10 @@
     <form method="post" id="form">
         {% csrf_token %}
 
-        <!-- Selector de subcuadra donde está patrullando el inspector -->
-        {% if subcuadras %}
+        <!-- Selector de subcuadra donde está patrullando el inspector.
+             Zona Única viene primera y es el default cuando no hay sesión previa. -->
         <div class="subcuadra-selector" style="margin-bottom:0.75rem;">
+          {% if subcuadras|length > 1 %}
           <label style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
                         color:var(--color-text-muted); letter-spacing:0.06em; display:block; margin-bottom:0.3rem;">
             📍 Subcuadra actual
@@ -77,14 +78,15 @@
                          color:var(--color-text); font-size:0.9rem; font-weight:600;">
             {% for s in subcuadras %}
               <option value="{{ s.id }}" {% if s.id == subcuadra_activa.id %}selected{% endif %}>
-                {{ s }}
+                {% if s.calle == "Zona Única" %}— Sin zona específica —{% else %}{{ s }}{% endif %}
               </option>
             {% endfor %}
           </select>
+          {% else %}
+          {# Municipio con una sola zona: enviar como campo oculto sin mostrar el selector #}
+          <input type="hidden" name="subcuadra_id" value="{{ subcuadra_activa.id|default:'' }}">
+          {% endif %}
         </div>
-        {% else %}
-        <input type="hidden" name="subcuadra_id" value="{{ subcuadra_activa.id|default:'' }}">
-        {% endif %}
 
         <!-- Selector tipo: Auto / Moto -->
         <style>
@@ -137,12 +139,27 @@
                     {% else %}Pago activo{% endif %}
                 </h3>
                 {% if resultado.estado.name == "EXENTO_PARCIAL" and resultado.subcuadras_exentas %}
-                  <p style="font-size:0.88rem; margin-top:0.5rem; color:var(--color-text-muted);">
-                    Exento en:
-                    {% for s in resultado.subcuadras_exentas %}
-                      <strong>{{ s }}</strong>{% if not forloop.last %}, {% endif %}
-                    {% endfor %}
+                  <p style="font-size:0.82rem; margin-top:0.6rem; color:var(--color-text-muted); margin-bottom:0.4rem;">
+                    Tocá una zona para registrar la verificación:
                   </p>
+                  <div style="display:flex; flex-wrap:wrap; gap:0.4rem; justify-content:center;">
+                    {% for s in resultado.subcuadras_exentas %}
+                    <form method="post" style="margin:0;">
+                      {% csrf_token %}
+                      <input type="hidden" name="patente" value="{{ resultado.patente }}">
+                      <input type="hidden" name="subcuadra_id" value="{{ s.id }}">
+                      <input type="hidden" name="tipo" value="{{ tipo_seleccionado }}">
+                      <button type="submit"
+                              style="padding:0.3rem 0.8rem; font-size:0.88rem; font-weight:700;
+                                     border-radius:20px; border:2px solid var(--color-primary);
+                                     background:{% if s.id == subcuadra_activa.id %}var(--color-primary){% else %}transparent{% endif %};
+                                     color:{% if s.id == subcuadra_activa.id %}white{% else %}var(--color-primary){% endif %};
+                                     cursor:pointer;">
+                        {{ s }}
+                      </button>
+                    </form>
+                    {% endfor %}
+                  </div>
                 {% endif %}
             </div>
 
@@ -175,12 +192,25 @@
                     {% endif %}
                 </h3>
                 {% if resultado.estado.name == "EXENTO_PARCIAL" and resultado.subcuadras_exentas %}
-                  <p style="font-size:0.88rem; margin-top:0.4rem; color:var(--color-text-muted);">
-                    Su exención es válida en:
-                    {% for s in resultado.subcuadras_exentas %}
-                      <strong>{{ s }}</strong>{% if not forloop.last %}, {% endif %}
-                    {% endfor %}
+                  <p style="font-size:0.82rem; margin-top:0.5rem; color:var(--color-text-muted); margin-bottom:0.4rem;">
+                    Exención válida en (tocá para ir a esa zona):
                   </p>
+                  <div style="display:flex; flex-wrap:wrap; gap:0.4rem; justify-content:center;">
+                    {% for s in resultado.subcuadras_exentas %}
+                    <form method="post" style="margin:0;">
+                      {% csrf_token %}
+                      <input type="hidden" name="patente" value="{{ resultado.patente }}">
+                      <input type="hidden" name="subcuadra_id" value="{{ s.id }}">
+                      <input type="hidden" name="tipo" value="{{ tipo_seleccionado }}">
+                      <button type="submit"
+                              style="padding:0.3rem 0.8rem; font-size:0.88rem; font-weight:700;
+                                     border-radius:20px; border:2px solid var(--color-warning, #e67e22);
+                                     background:transparent; color:var(--color-warning, #e67e22); cursor:pointer;">
+                        {{ s }}
+                      </button>
+                    </form>
+                    {% endfor %}
+                  </div>
                 {% endif %}
                 {% if resultado.necesita_infraccion %}
                     <a class="btn btn-danger btn-big"

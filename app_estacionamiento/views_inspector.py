@@ -74,8 +74,16 @@ def verificar_vehiculo(request):
 
     modo = request.GET.get("modo", "desktop")
 
-    # Subcuadras disponibles (el inspector elige en cuál está patrullando)
-    subcuadras = Subcuadra.objects.filter(municipio=municipio).exclude(calle="Zona Única")
+    # Subcuadras disponibles — Zona Unica primero, luego el resto ordenado
+    # Zona Unica se usa como "sin zona especifica" y es el default cuando no hay sesion
+    from django.db.models import Case, When, Value, IntegerField
+    subcuadras = Subcuadra.objects.filter(municipio=municipio).annotate(
+        orden=Case(
+            When(calle="Zona Única", then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        )
+    ).order_by("orden", "calle", "altura")
 
     # Recordar subcuadra seleccionada en sesión
     subcuadra_id = request.POST.get("subcuadra_id") or request.session.get("subcuadra_inspector_id")
