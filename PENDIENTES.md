@@ -92,6 +92,64 @@ Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `
 
 ---
 
+## 💰 Mejoras para vender (Plan Premium)
+
+Funcionalidades que no son necesarias para el funcionamiento base pero agregan valor
+diferencial y se pueden cobrar como módulos adicionales o tier superior.
+
+### Detección automática de subcuadra por GPS
+El teléfono del inspector ubica automáticamente en qué subcuadra está patrullando,
+sin que tenga que seleccionarla manualmente.
+— Cada subcuadra necesita un polígono geográfico (lat/lon de los vértices) o un punto central + radio.
+— Al abrir la pantalla de verificación, se llama a la Geolocation API y se compara contra los polígonos.
+— Si la coincidencia es clara (1 zona), se auto-selecciona y se muestra en verde.
+— Si hay ambigüedad (borde entre zonas), se muestran las opciones candidatas.
+— Requiere: nuevo campo `Subcuadra.poligono` (JSON) + lógica de punto-en-polígono en JS o en backend.
+
+### Toggle de estadísticas por municipio (desde Django Admin)
+Nuevo campo `Municipio.estadisticas_inspectores_activo = BooleanField(default=True)`.
+Permite al superadmin ocultar la vista de estadísticas para municipios que no pagaron el módulo.
+— 1 migración, 1 chequeo en `estadisticas_inspectores`, registrar en `admin.py`.
+
+### Reconocimiento de patente por cámara (OCR)
+El inspector apunta la cámara del teléfono y el sistema lee la patente automáticamente,
+sin necesidad de tipear. Reduce errores y acelera la verificación.
+— Opciones: Google ML Kit (on-device, gratis), Tesseract.js (client-side), o API de OCR en backend.
+— Integrar en `verificar.html`: botón "📷 Escanear" que abre la cámara y rellena el campo patente.
+
+### Alertas de vencimiento al conductor (notificaciones push / WhatsApp)
+El sistema avisa al conductor X minutos antes de que venza su estacionamiento.
+— Push notifications vía service worker (PWA) si el conductor tiene la web abierta.
+— WhatsApp via Twilio/360dialog como canal alternativo más efectivo.
+— El conductor puede renovar directamente desde el link de la notificación.
+
+### Mapa de calor de infracciones
+Visualización geográfica de dónde se concentran las infracciones y verificaciones.
+— Herramienta útil para que la municipalidad decida dónde reforzar la presencia de inspectores.
+— Implementable con Leaflet.js + datos de lat/lon de las subcuadras.
+— Requiere que las subcuadras tengan coordenadas (ver "Detección automática por GPS").
+
+### Módulo de impugnaciones
+El conductor puede impugnar una infracción desde la app, adjuntando evidencia (foto, descripción).
+— Nuevo modelo `Impugnacion` (infraccion, conductor, motivo, evidencia, estado, resuelto_en).
+— El admin recibe la impugnación y puede anular o confirmar la infracción.
+— Notificación al conductor con la resolución.
+
+### Exportación de reportes a Excel/PDF
+El admin puede descargar en un click las estadísticas del período:
+— Reporte de inspectores (ya tenemos la vista, agregar botón de descarga).
+— Reporte de rendiciones para tesorería.
+— Historial de infracciones filtrado.
+— Implementable con `openpyxl` (ya disponible) y `reportlab` (ya instalado para PDF de inspector).
+
+### Dashboard en TV (pantalla municipal en tiempo real)
+Vista de solo lectura sin login, pensada para una pantalla grande en la municipalidad.
+Muestra: infracciones del día, recaudación, inspectores activos, vehículos verificados.
+— Token de acceso de solo lectura, sin autenticación de Google.
+— Auto-refresh cada 60 segundos con htmx o JS.
+
+---
+
 ## ✅ Resuelto
 
 ### feat: estadísticas de inspectores (2026-07-20) ✅
