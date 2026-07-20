@@ -26,25 +26,6 @@ Pasos:
 
 **Afecta**: `Infraccion.foto`, `Municipio.logo`.
 
-### Verificar.html — subcuadra + exento parcial antes del acta
-
-Dos mejoras relacionadas:
-
-**1. Selector de subcuadra en verificar.html (trazabilidad)**
-El inspector debe seleccionar en qué subcuadra está patrullando *antes* de verificar.
-— Agregar selector de subcuadra en la pantalla de verificación.
-— Pasar la subcuadra seleccionada a `registrar_infraccion` por query param o sesión.
-
-**2. Exento parcial: mostrar estado ANTES de ir al acta**
-Si el resultado es `EXENTO_PARCIAL`, mostrar al inspector si el vehículo está exento
-en la subcuadra actual antes de mostrar la opción de infraccionar.
-
-### Watermark: agregar subcuadra al texto de la foto
-El watermark actual incluye: patente, inspector, GPS, fecha/hora.
-Falta: **subcuadra** donde se labró el acta.
-— Modificar `_agregar_marca_de_agua_gps` para recibir y mostrar `subcuadra`.
-— Actualizar llamada en `crear_infraccion()`.
-
 ### Bug: foto en infracción — verificar flujo completo
 Algunas infracciones se guardaron sin foto.
 — Una vez implementado Cloudinary, verificar end-to-end que foto llega a la BD.
@@ -112,6 +93,18 @@ Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `
 ---
 
 ## ✅ Resuelto
+
+### feat: inspector — subcuadra + exento parcial + watermark (2026-07-20) ✅
+- **verificar.html**: selector de subcuadra visible (dropdown, guarda en sesión).
+  Inspector elige dónde está patrullando antes de verificar.
+- **services/verificacion.py**: cuando el vehículo tiene exención parcial pero está
+  FUERA de su zona exenta → retorna `EXENTO_PARCIAL` con `exento_en_subcuadra_actual=False`.
+  El template ya mostraba el botón de infraccionar en ese caso.
+- **registrar_infraccion**: lee `subcuadra_inspector_id` de sesión en lugar de usar
+  la subcuadra default. El dropdown del acta queda pre-seleccionado con la subcuadra activa.
+- **_agregar_marca_de_agua_gps**: nuevo parámetro `subcuadra` (opcional). Se agrega
+  "Subcuadra: ..." como línea del overlay de la foto.
+- 6 nuevos tests: `TestExentoParcialFueraDeZona` (4) + `TestWatermarkConSubcuadra` (2).
 
 ### feat: mejoras UI admin — exenciones, rendiciones, historial (commit 4152c0d, 2026-07-20) ✅
 - **exenciones.html**: si el vehículo no existe → form para crearlo + asignar exención.

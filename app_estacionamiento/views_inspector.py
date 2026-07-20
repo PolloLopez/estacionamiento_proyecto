@@ -167,14 +167,24 @@ def registrar_infraccion(request):
         defaults={"municipio": usuario.municipio}
     )
 
-    subcuadra = get_subcuadra_default(request.user.municipio)
+    # Usar la subcuadra que el inspector seleccionó en verificar.html (guardada en sesión)
+    subcuadra_id_sesion = request.session.get("subcuadra_inspector_id")
+    subcuadra = None
+    if subcuadra_id_sesion:
+        try:
+            subcuadra = Subcuadra.objects.get(id=subcuadra_id_sesion, municipio=municipio)
+        except Subcuadra.DoesNotExist:
+            pass
+    if not subcuadra:
+        subcuadra = get_subcuadra_default(municipio)
 
     if not subcuadra:
         messages.error(request, "No existe subcuadra configurada.")
         return redirect("panel_inspectores")
 
+    # Pre-seleccionar subcuadra en el dropdown: primero sesion, luego ultima infraccion
     ultima_infraccion = Infraccion.objects.filter(inspector=usuario).order_by("-creado_en").first()
-    subcuadra_default = (ultima_infraccion.subcuadra_id if ultima_infraccion else None)
+    subcuadra_default = subcuadra.id if subcuadra else (ultima_infraccion.subcuadra_id if ultima_infraccion else None)
     infracciones_recientes = Infraccion.objects.filter(vehiculo=vehiculo).order_by("-id")[:3]
 
     # Validación previa: muestra el estado actual del vehículo antes de labrar el acta

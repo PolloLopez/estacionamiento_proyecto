@@ -63,7 +63,28 @@
     <!-- FORM PRINCIPAL: ingresar patente -->
     <form method="post" id="form">
         {% csrf_token %}
+
+        <!-- Selector de subcuadra donde está patrullando el inspector -->
+        {% if subcuadras %}
+        <div class="subcuadra-selector" style="margin-bottom:0.75rem;">
+          <label style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
+                        color:var(--color-text-muted); letter-spacing:0.06em; display:block; margin-bottom:0.3rem;">
+            📍 Subcuadra actual
+          </label>
+          <select name="subcuadra_id" id="subcuadra_sel"
+                  style="width:100%; padding:0.5rem 0.65rem; border-radius:8px;
+                         border:2px solid var(--color-border); background:var(--color-surface);
+                         color:var(--color-text); font-size:0.9rem; font-weight:600;">
+            {% for s in subcuadras %}
+              <option value="{{ s.id }}" {% if s.id == subcuadra_activa.id %}selected{% endif %}>
+                {{ s }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% else %}
         <input type="hidden" name="subcuadra_id" value="{{ subcuadra_activa.id|default:'' }}">
+        {% endif %}
 
         <!-- Selector tipo: Auto / Moto -->
         <style>

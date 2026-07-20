@@ -638,3 +638,128 @@ class TestWatermarkGPS(TestCase):
         )
         self.assertGreater(pixeles_oscuros, 5,
             "La foto de la infracción debe tener watermark GPS")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tests de verificacion — exento parcial fuera de zona
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestExentoParcialFueraDeZona(TestCase):
+    """
+    Verifica el comportamiento de verificar_estado_vehiculo cuando un vehiculo
+    tiene exencion parcial pero el inspector esta en una subcuadra distinta.
+    """
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        crear_tarifa(self.municipio)
+        self.inspector = crear_inspector(self.municipio)
+
+        # Subcuadra donde el vehiculo tiene exencion
+        self.subcuadra_exenta = Subcuadra.objects.create(
+            calle="Rivadavia", altura=200, municipio=self.municipio
+        )
+        # Subcuadra donde el inspector esta patrullando (no exenta)
+        self.subcuadra_otra = crear_subcuadra(self.municipio)
+
+        self.vehiculo = crear_vehiculo(self.municipio, patente="EXP001")
+        self.vehiculo.subcuadras_exentas.add(self.subcuadra_exenta)
+
+    def test_vehiculo_en_su_subcuadra_exenta_retorna_exento_parcial_true(self):
+        """Cuando el inspector esta en la subcuadra exenta del vehiculo -> libre."""
+        from app_estacionamiento.services.verificacion import verificar_estado_vehiculo
+        from app_estacionamiento.domain.enums import EstadoVehiculo
+
+        resultado = verificar_estado_vehiculo("EXP001", self.inspector, self.subcuadra_exenta)
+
+        self.assertEqual(resultado.estado, EstadoVehiculo.EXENTO_PARCIAL)
+        self.assertTrue(resultado.exento_en_subcuadra_actual)
+        self.assertFalse(resultado.necesita_infraccion())
+
+    def test_vehiculo_fuera_de_su_subcuadra_exenta_retorna_exento_parcial_false(self):
+        """Cuando el inspector esta en otra subcuadra -> EXENTO_PARCIAL pero infraccionable."""
+        from app_estacionamiento.services.verificacion import verificar_estado_vehiculo
+        from app_estacionamiento.domain.enums import EstadoVehiculo
+
+        resultado = verificar_estado_vehiculo("EXP001", self.inspector, self.subcuadra_otra)
+
+        self.assertEqual(resultado.estado, EstadoVehiculo.EXENTO_PARCIAL)
+        self.assertFalse(resultado.exento_en_subcuadra_actual)
+        self.assertTrue(resultado.necesita_infraccion())
+
+    def test_subcuadras_exentas_se_incluyen_en_resultado(self):
+        """El resultado incluye la lista de subcuadras exentas para mostrarlas al inspector."""
+        from app_estacionamiento.services.verificacion import verificar_estado_vehiculo
+
+        resultado = verificar_estado_vehiculo("EXP001", self.inspector, self.subcuadra_otra)
+
+        self.assertIn(self.subcuadra_exenta, resultado.subcuadras_exentas)
+
+    def test_url_infraccion_se_incluye_cuando_fuera_de_zona(self):
+        """Cuando el vehiculo esta fuera de zona, el resultado tiene URL para infraccionar."""
+        from app_estacionamiento.services.verificacion import verificar_estado_vehiculo
+
+        resultado = verificar_estado_vehiculo("EXP001", self.inspector, self.subcuadra_otra)
+
+        self.assertIsNotNone(resultado.registrar_infraccion_url)
+        self.assertIn("EXP001", resultado.registrar_infraccion_url)
+
+
+class TestWatermarkConSubcuadra(TestCase):
+    """
+    Verifica que _agregar_marca_de_agua_gps incluye la subcuadra en el overlay.
+    """
+
+    def _foto_blanca(self, ancho=800, alto=600):
+        import io
+        from PIL import Image
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        img = Image.new("RGB", (ancho, alto), (255, 255, 255))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=95)
+        buf.seek(0)
+        return InMemoryUploadedFile(
+            file=buf, field_name="foto", name="test.jpg",
+            content_type="image/jpeg", size=buf.getbuffer().nbytes, charset=None,
+        )
+
+    def test_watermark_con_subcuadra_devuelve_imagen_valida(self):
+        """Pasar subcuadra al watermark no rompe el helper."""
+        from PIL import Image
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        from app_estacionamiento.services.infracciones import _agregar_marca_de_agua_gps
+
+        municipio = crear_municipio()
+        subcuadra = crear_subcuadra(municipio)
+        inspector = crear_inspector(municipio)
+
+        resultado = _agregar_marca_de_agua_gps(
+            foto=self._foto_blanca(),
+            lat="-34.65", lon="-59.43", acc="5",
+            patente="SUB001",
+            inspector=inspector,
+            subcuadra=subcuadra,
+        )
+
+        self.assertIsInstance(resultado, InMemoryUploadedFile)
+        resultado.seek(0)
+        img = Image.open(resultado)
+        self.assertEqual(img.mode, "RGB")
+
+    def test_watermark_sin_subcuadra_no_rompe(self):
+        """subcuadra=None es el default y no debe romper el helper."""
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+        from app_estacionamiento.services.infracciones import _agregar_marca_de_agua_gps
+
+        municipio = crear_municipio()
+        inspector = crear_inspector(municipio)
+
+        resultado = _agregar_marca_de_agua_gps(
+            foto=self._foto_blanca(),
+            lat="-34.65", lon="-59.43", acc="5",
+            patente="SUB002",
+            inspector=inspector,
+            subcuadra=None,
+        )
+
+        self.assertIsInstance(resultado, InMemoryUploadedFile)

@@ -106,16 +106,29 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
                 estacionamiento_activo=True,
             )
 
-    # 4. EXENTO PARCIAL en la subcuadra actual
+    # 4. EXENTO PARCIAL
     if hasattr(vehiculo, "subcuadras_exentas") and vehiculo.subcuadras_exentas.exists():
         subcuadras_del_vehiculo = list(vehiculo.subcuadras_exentas.all())
         if subcuadra and vehiculo.subcuadras_exentas.filter(id=subcuadra.id).exists():
+            # El vehiculo esta en su zona exenta -> libre, no infraccionar
             return ResultadoVerificacion(
                 patente=patente,
                 estado=EstadoVehiculo.EXENTO_PARCIAL,
                 subcuadras_exentas=subcuadras_del_vehiculo,
                 estacionamiento_activo=False,
                 exento_en_subcuadra_actual=True,
+            )
+        else:
+            # El vehiculo tiene exencion parcial pero esta FUERA de su zona.
+            # necesita_infraccion() devuelve True cuando exento_en_subcuadra_actual is False,
+            # por lo que el template mostrara el boton de infraccionar.
+            return ResultadoVerificacion(
+                patente=patente,
+                estado=EstadoVehiculo.EXENTO_PARCIAL,
+                subcuadras_exentas=subcuadras_del_vehiculo,
+                estacionamiento_activo=False,
+                exento_en_subcuadra_actual=False,
+                registrar_infraccion_url=_url_infraccion(patente),
             )
 
     # 5. TOLERANCIA del inspector (entre verificaciones sucesivas)

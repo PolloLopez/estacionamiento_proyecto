@@ -38,7 +38,7 @@ class ErrorInfraccion(Exception):
 # Helper privado
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector):
+def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector, subcuadra=None):
     """
     Superpone coordenadas GPS, patente y fecha/hora sobre la foto del acta.
     Retorna un InMemoryUploadedFile listo para el modelo,
@@ -53,9 +53,11 @@ def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector):
 
         fecha_str = timezone.localtime().strftime("%d/%m/%Y %H:%M:%S")
         acc_str   = f" (+-{acc}m)" if acc else ""
+        subcuadra_str = str(subcuadra) if subcuadra else ""
         texto_lineas = [
             f"Patente: {patente}",
             f"Inspector: {inspector.correo}",
+            *([ f"Subcuadra: {subcuadra_str}" ] if subcuadra_str else []),
             f"GPS: {lat}, {lon}{acc_str}",
             f"Fecha: {fecha_str}",
         ]
@@ -177,7 +179,7 @@ def crear_infraccion(
     if foto and gps_lat and gps_lon:
         foto_final = _agregar_marca_de_agua_gps(
             foto=foto, lat=gps_lat, lon=gps_lon, acc=gps_acc,
-            patente=patente, inspector=inspector,
+            patente=patente, inspector=inspector, subcuadra=subcuadra,
         )
 
     infraccion = Infraccion.objects.create(
