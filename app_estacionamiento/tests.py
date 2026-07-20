@@ -554,3 +554,206 @@ class TestPdfInfraccionesInspector(TestCase):
         response = self.client.get(self.url + "?fecha=2026-01-15")
         self.assertEqual(response.status_code, 200)
         self.assertIn("20260115", response["Content-Disposition"])
+
+
+# ═════════════════════════════════════════════
+# 14. ALTA DE CONDUCTOR DESDE ADMIN
+# ═════════════════════════════════════════════
+
+class TestAltaConductorDesdeAdmin(TestCase):
+    """El admin puede crear conductores manualmente desde el panel."""
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.admin = crear_admin(self.municipio)
+        self.client = Client()
+        self.client.force_login(self.admin)
+        self.url = reverse("crear_conductor")
+
+    def test_get_muestra_formulario(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Nuevo conductor")
+
+    def test_crear_conductor_exitosamente(self):
+        resp = self.client.post(self.url, {
+            "nombre":   "María",
+            "apellido": "González",
+            "correo":   "maria@test.com",
+            "password": "segura123",
+        })
+        # Redirige al detalle del conductor creado
+        self.assertEqual(resp.status_code, 302)
+        conductor = Usuario.objects.get(correo="maria@test.com")
+        self.assertTrue(conductor.es_conductor)
+        self.assertEqual(conductor.first_name, "María")
+        self.assertEqual(conductor.municipio, self.municipio)
+
+    def test_nombre_queda_en_title_case(self):
+        self.client.post(self.url, {
+            "nombre":   "carlos",
+            "apellido": "rodríguez",
+            "correo":   "carlos@test.com",
+            "password": "segura123",
+        })
+        conductor = Usuario.objects.get(correo="carlos@test.com")
+        self.assertEqual(conductor.first_name, "Carlos")
+        self.assertEqual(conductor.last_name, "Rodríguez")
+
+    def test_correo_duplicado_no_crea_usuario(self):
+        # Crear conductor previo con ese correo
+        crear_conductor(self.municipio, correo="dup@test.com")
+        resp = self.client.post(self.url, {
+            "nombre":   "Otro",
+            "apellido": "Usuario",
+            "correo":   "dup@test.com",
+            "password": "segura123",
+        })
+        # No redirige — vuelve al form con error
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "dup@test.com")
+        self.assertEqual(Usuario.objects.filter(correo="dup@test.com").count(), 1)
+
+    def test_password_corta_no_crea_usuario(self):
+        resp = self.client.post(self.url, {
+            "nombre":   "Ana",
+            "apellido": "Pérez",
+            "correo":   "ana@test.com",
+            "password": "abc",
+        })
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(Usuario.objects.filter(correo="ana@test.com").exists())
+
+    def test_campos_vacios_no_crea_usuario(self):
+        resp = self.client.post(self.url, {
+            "nombre": "Solo nombre",
+        })
+        self.assertEqual(resp.status_code, 200)
+
+    def test_conductor_no_puede_acceder(self):
+        conductor = crear_conductor(self.municipio, "cond2@test.com")
+        c = Client()
+        c.force_login(conductor)
+        resp = c.get(self.url)
+        self.assertNotEqual(resp.status_code, 200)
+
+
+# ═════════════════════════════════════════════
+# 15. MÉTRICA "SIN RENDIR A TESORERÍA"
+# ═════════════════════════════════════════════
+
+class TestSinRendirMetrica(TestCase):
+    """
+    El panel admin muestra el monto sin rendir = movimientos abiertos
+    + CierreCaja no certificados (monto_municipio).
+    """
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.admin = crear_admin(self.municipio)
+        self.vendedor = crear_vendedor(self.municipio, correo="vend_rendir@test.com")
+        self.client = Client()
+        self.client.force_login(self.admin)
+
+    def _crear_movimiento(self, usuario, monto, cerrado=False):
+        m = MovimientoCaja.objects.create(
+            usuario=usuario, monto=Decimal(str(monto)),
+            tipo="ingreso", medio_pago="efectivo",
+        )
+        if cerrado:
+            MovimientoCaja.objects.filter(pk=m.pk).update(cerrado=True)
+        return m
+
+    def test_movimientos_abiertos_suman_al_sin_rendir(self):
+        self._crear_movimiento(self.vendedor, 300)  # cerrado=False
+        from django.db.models import Sum, Q
+        from app_estacionamiento.models import CierreCaja
+        abiertos = MovimientoCaja.objects.filter(
+            usuario__municipio=self.municipio, tipo="ingreso", cerrado=False
+        ).aggregate(total=Sum("monto"))["total"] or 0
+        self.assertEqual(abiertos, Decimal("300"))
+
+    def test_cierre_no_certificado_suma_al_sin_rendir(self):
+        from app_estacionamiento.models import CierreCaja
+        from django.db.models import Sum
+        # Cierre no certificado con monto_municipio=200
+        CierreCaja.objects.create(
+            usuario=self.vendedor,
+            total_cobrado=Decimal("200"),
+            monto_municipio=Decimal("200"),
+            ganancia_usuario=Decimal("0"),
+            fecha_apertura=__import__("django.utils.timezone", fromlist=["timezone"]).timezone.now(),
+            cantidad_movimientos=1,
+            certificado=False,
+        )
+        en_cierre = CierreCaja.objects.filter(
+            usuario__municipio=self.municipio, certificado=False
+        ).aggregate(total=Sum("monto_municipio"))["total"] or 0
+        self.assertEqual(en_cierre, Decimal("200"))
+
+    def test_cierre_certificado_no_suma_al_sin_rendir(self):
+        from app_estacionamiento.models import CierreCaja
+        from django.db.models import Sum
+        from django.utils import timezone
+        CierreCaja.objects.create(
+            usuario=self.vendedor,
+            total_cobrado=Decimal("500"),
+            monto_municipio=Decimal("500"),
+            ganancia_usuario=Decimal("0"),
+            fecha_apertura=timezone.now(),
+            cantidad_movimientos=1,
+            certificado=True,
+            certificado_por=self.admin,
+            certificado_en=timezone.now(),
+        )
+        en_cierre_sin_cert = CierreCaja.objects.filter(
+            usuario__municipio=self.municipio, certificado=False
+        ).aggregate(total=Sum("monto_municipio"))["total"] or 0
+        self.assertEqual(en_cierre_sin_cert, Decimal("0"))
+
+    def test_panel_admin_responde_200(self):
+        resp = self.client.get(reverse("panel_admin"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("sin_rendir", resp.context)
+
+
+# ═════════════════════════════════════════════
+# 16. HISTORIAL DE VENDEDOR
+# ═════════════════════════════════════════════
+
+class TestHistorialVendedor(TestCase):
+    """El admin puede ver el historial de movimientos de un vendedor."""
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.admin = crear_admin(self.municipio)
+        self.vendedor = crear_vendedor(self.municipio, correo="vend_hist@test.com")
+        self.client = Client()
+        self.client.force_login(self.admin)
+
+    def test_historial_responde_200(self):
+        resp = self.client.get(reverse("admin_historial_vendedor", args=[self.vendedor.id]))
+        self.assertEqual(resp.status_code, 200)
+
+    def test_historial_muestra_movimientos(self):
+        MovimientoCaja.objects.create(
+            usuario=self.vendedor, monto=Decimal("150"),
+            tipo="ingreso", medio_pago="efectivo",
+            descripcion="Test cobro",
+        )
+        resp = self.client.get(reverse("admin_historial_vendedor", args=[self.vendedor.id]))
+        self.assertContains(resp, "150")
+        self.assertContains(resp, "Test cobro")
+
+    def test_historial_otro_municipio_retorna_404(self):
+        otro_municipio = crear_municipio("Otro")
+        otro_vendedor = crear_vendedor(otro_municipio, correo="vend_otro@test.com")
+        resp = self.client.get(reverse("admin_historial_vendedor", args=[otro_vendedor.id]))
+        self.assertEqual(resp.status_code, 404)
+
+    def test_conductor_no_puede_acceder_historial(self):
+        conductor = crear_conductor(self.municipio, "cond_hist@test.com")
+        c = Client()
+        c.force_login(conductor)
+        resp = c.get(reverse("admin_historial_vendedor", args=[self.vendedor.id]))
+        self.assertNotEqual(resp.status_code, 200)

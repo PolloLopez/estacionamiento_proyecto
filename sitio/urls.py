@@ -20,6 +20,8 @@ urlpatterns = [
     path("accounts/", include("allauth.urls")),
 ]
 
-# Servir archivos de media en desarrollo (Railway usa MEDIA_URL directamente)
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Servir archivos de media a través de Django.
+# En producción (Railway) no hay servidor web externo que sirva /media/,
+# así que Django lo hace directamente. No ideal para alta carga, pero
+# suficiente para el volumen actual. Reemplazar con Cloudinary cuando esté listo.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
