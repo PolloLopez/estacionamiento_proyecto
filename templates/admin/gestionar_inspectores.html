@@ -104,23 +104,6 @@
         </div>
       </div>
 
-      <div class="grid grid-2" style="margin-bottom:0.75rem;">
-        <div>
-          <label for="periodicidad_rendicion">Periodicidad de rendición</label>
-          <select id="periodicidad_rendicion" name="periodicidad_rendicion">
-            <option value="diaria">Diaria</option>
-            <option value="semanal" selected>Semanal</option>
-            <option value="mensual">Mensual</option>
-          </select>
-        </div>
-        <div>
-          <label for="porcentaje_ganancia">Comisión (%)</label>
-          <input id="porcentaje_ganancia" name="porcentaje_ganancia" type="number"
-                 step="0.01" min="0" max="100" value="0" placeholder="0.00" />
-          <p class="text-muted" style="font-size:0.82rem; margin-top:0.2rem;">0 = sin comisión</p>
-        </div>
-      </div>
-
       {% if error %}<p class="error">{{ error }}</p>{% endif %}
 
       <button class="btn" type="submit">+ Crear inspector</button>

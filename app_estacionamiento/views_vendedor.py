@@ -328,10 +328,11 @@ def cobrar_infraccion_vendedor(request):
             ).first()
 
             if vehiculo:
-                infraccion = Infraccion.objects.filter(
+                # Devolver TODAS las pendientes, no solo la primera
+                infracciones_pendientes = Infraccion.objects.filter(
                     vehiculo=vehiculo, municipio=municipio, estado="pendiente"
-                ).order_by("-creado_en").first()
-                if not infraccion:
+                ).order_by("-creado_en")
+                if not infracciones_pendientes.exists():
                     messages.info(request, f"El vehículo {patente} no tiene infracciones pendientes.")
             else:
                 messages.warning(request, f"No se encontró el vehículo con patente {patente}.")
@@ -391,6 +392,7 @@ def cobrar_infraccion_vendedor(request):
                 return redirect(reverse("ticket_pago_multa", args=[inf.id]))
 
     return render(request, "vendedores/cobrar_infraccion.html", {
+        "infracciones_pendientes": infracciones_pendientes if 'infracciones_pendientes' in dir() else None,
         "infraccion": infraccion,
         "vehiculo":   vehiculo,
         "patente":    patente,
@@ -522,7 +524,7 @@ def cobrar_abono(request):
     from django.urls import reverse as _reverse
     volver_url = _reverse("panel_admin") if request.user.es_admin else _reverse("panel_vendedor")
 
-    return render(request, "vendedores/cobrar_abono.html", {
+    return render(request, "admin/cobrar_abono.html", {
         "vehiculo":         vehiculo,
         "precio":           precio,
         "confirmar":        confirmar,

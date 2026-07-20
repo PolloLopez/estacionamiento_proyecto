@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Cobrar Abono Mensual{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="panel">
+    <div class="panel-body">
+
+      <h1>📅 Cobrar abono mensual</h1>
+
+      {# Los mensajes los muestra base.html — no duplicar aquí #}
+
+      {% if not confirmar %}
+
+        <!-- FORMULARIO DE BUSQUEDA -->
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="confirmar" />
+
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <div style="flex:2; min-width:140px;">
+              <label for="patente">Patente del vehículo</label>
+              <input
+                id="patente"
+                name="patente"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
+                type="text"
+                maxlength="10"
+                required
+                autofocus
+                style="text-transform:uppercase; margin-top:0.3rem;"
+                value="{{ request.POST.patente|default:'' }}"
+              />
+            </div>
+            <div style="flex:1; min-width:160px;">
+              <label for="mes">Mes a abonar</label>
+              <select id="mes" name="mes" style="width:100%; margin-top:0.3rem;">
+                {% for valor, etiqueta in opciones_mes %}
+                  <option value="{{ valor }}"
+                    {% if valor == mes_seleccionado %}selected{% endif %}>
+                    {{ etiqueta }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          {% if error %}
+            <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
+          {% endif %}
+
+          <button class="btn" type="submit">Verificar patente</button>
+          <a class="btn btn-outline" href="{{ volver_url }}" style="margin-left:0.5rem;">
+            ← Volver
+          </a>
+        </form>
+
+      {% else %}
+
+        <!-- CONFIRMACION DE COBRO -->
+        <div class="card" style="margin-bottom:1.5rem; border:2px solid var(--color-primary);">
+          <h3 style="margin-bottom:0.75rem;">Confirmar cobro de abono</h3>
+
+          <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Patente</td>
+              <td style="padding:0.4rem 0; font-weight:700;">{{ vehiculo.patente }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Tipo</td>
+              <td style="padding:0.4rem 0;">{{ vehiculo.get_tipo_display }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Período</td>
+              <td style="padding:0.4rem 0; font-weight:600;">{{ mes_label }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.4rem 0; color:var(--color-text-muted);">Monto</td>
+              <td style="padding:0.4rem 0; font-size:1.3rem; font-weight:800; color:var(--color-primary);">
+                ${{ precio }}
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <form method="post" style="display:inline;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="cobrar" />
+          <input type="hidden" name="patente" value="{{ vehiculo.patente }}" />
+          <input type="hidden" name="mes" value="{{ mes_seleccionado }}" />
+          <button class="btn" type="submit" style="font-size:1.05rem;">
+            ✅ Confirmar cobro — ${{ precio }}
+          </button>
+        </form>
+
+        <form method="post" style="display:inline; margin-left:0.75rem;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="buscar" />
+          <button class="btn btn-outline" type="submit">Cancelar</button>
+        </form>
+
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}

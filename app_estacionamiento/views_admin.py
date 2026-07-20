@@ -103,7 +103,7 @@ def panel_admin(request):
 
     infracciones_recientes = Infraccion.objects.filter(
         municipio=municipio
-    ).order_by("-creado_en")[:5]
+    ).order_by("-creado_en")[:20]
 
     total_cobrado = MovimientoCaja.objects.filter(
         usuario__municipio=municipio, tipo="ingreso"

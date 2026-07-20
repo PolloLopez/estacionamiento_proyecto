@@ -8,6 +8,47 @@
     <h2>💰 Vendedores / Kioscos</h2>
     <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
   </div>
+    <!-- TABLA VENDEDORES -->
+  <div class="card">
+    <h3 style="margin-bottom:0.8rem;">Vendedores activos</h3>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Negocio</th>
+            <th>Propietario</th>
+            <th>Teléfono</th>
+            <th>Horario</th>
+            <th>Correo</th>
+            <th>Saldo</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in vendedores %}
+          <tr>
+            <td><strong>{{ v.nombre|default:"—" }}</strong></td>
+            <td style="font-size:0.88rem;">{{ v.nombre_propietario|default:"—" }}</td>
+            <td style="font-size:0.88rem;">{{ v.telefono|default:"—" }}</td>
+            <td style="font-size:0.85rem;">{{ v.horario_atencion|default:"—" }}</td>
+            <td style="font-size:0.88rem;">{{ v.correo }}</td>
+            <td>${{ v.saldo }}</td>
+            <td>
+              <a class="btn btn-outline" style="font-size:0.85rem; padding:0.35rem 0.75rem;"
+                 href="{% url 'admin_editar_vendedor' v.id %}">Editar</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" style="color:var(--color-text-muted); text-align:center; padding:1rem;">
+              No hay vendedores registrados.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 
   <!-- FORMULARIO CREAR -->
   <div class="card" style="margin-bottom:1.5rem;">
@@ -17,11 +58,11 @@
 
       <div class="grid grid-2" style="margin-bottom:0.75rem;">
         <div>
-          <label for="nombre">Nombre de fantasía del negocio *</label>
+          <label for="nombre">Nombre del negocio *</label>
           <input id="nombre" name="nombre" placeholder="Ej: Kiosco Central" />
         </div>
         <div>
-          <label for="nombre_propietario">Nombre del propietario</label>
+          <label for="nombre_propietario">Nombre del/la propietario/a</label>
           <input id="nombre_propietario" name="nombre_propietario" placeholder="Ej: María García" />
         </div>
       </div>
@@ -77,47 +118,7 @@
     </form>
   </div>
 
-  <!-- TABLA VENDEDORES -->
-  <div class="card">
-    <h3 style="margin-bottom:0.8rem;">Vendedores activos</h3>
-    <div style="overflow-x:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>Negocio</th>
-            <th>Propietario</th>
-            <th>Teléfono</th>
-            <th>Horario</th>
-            <th>Correo</th>
-            <th>Saldo</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for v in vendedores %}
-          <tr>
-            <td><strong>{{ v.nombre|default:"—" }}</strong></td>
-            <td style="font-size:0.88rem;">{{ v.nombre_propietario|default:"—" }}</td>
-            <td style="font-size:0.88rem;">{{ v.telefono|default:"—" }}</td>
-            <td style="font-size:0.85rem;">{{ v.horario_atencion|default:"—" }}</td>
-            <td style="font-size:0.88rem;">{{ v.correo }}</td>
-            <td>${{ v.saldo }}</td>
-            <td>
-              <a class="btn btn-outline" style="font-size:0.85rem; padding:0.35rem 0.75rem;"
-                 href="{% url 'admin_editar_vendedor' v.id %}">Editar</a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="7" style="color:var(--color-text-muted); text-align:center; padding:1rem;">
-              No hay vendedores registrados.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+
 
 </section>
 {% endblock %}
