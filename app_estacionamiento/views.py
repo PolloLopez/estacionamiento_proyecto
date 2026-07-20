@@ -90,6 +90,8 @@ from .views_admin import (
     resolver_verificacion,
     admin_vehiculos,
     admin_estacionamientos,
+    historial_vendedor,
+    crear_conductor,
 )
 from .views_mp import (
     mp_iniciar_carga,
