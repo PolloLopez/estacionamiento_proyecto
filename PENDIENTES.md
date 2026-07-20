@@ -1,21 +1,18 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-18
+Última actualización: 2026-07-20
 
 ---
 
 ## 🔴 Alta prioridad
 
 ### Media storage persistente (Cloudinary)
-Las fotos de infracciones se guardan en disco local (`media/`). Railway tiene **filesystem efímero**: los archivos se borran al hacer redeploy o restart del contenedor.
-
-Solución: Cloudinary (gratis hasta 25 GB, CDN, integración directa con Django).
+Las fotos de infracciones se guardan en disco local (`media/`). Railway tiene **filesystem efímero**: los archivos se borran al hacer redeploy o restart.
 
 Pasos:
-1. Crear cuenta en https://cloudinary.com (plan free)
-2. `pip install cloudinary django-cloudinary-storage`
-3. Agregar a `requirements.txt`
-4. En `settings.py`:
+1. Crear cuenta en https://cloudinary.com (plan free, 25 GB)
+2. `pip install cloudinary django-cloudinary-storage` + agregar a `requirements.txt`
+3. En `settings.py`:
    ```python
    INSTALLED_APPS += ["cloudinary_storage", "cloudinary"]
    CLOUDINARY_STORAGE = {
@@ -25,207 +22,229 @@ Pasos:
    }
    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
    ```
-5. Agregar 3 variables en Railway: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
-6. Las fotos existentes en `media/` quedan orphaned — no hace falta migrarlas.
+4. Agregar 3 variables en Railway: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 
-**Afecta**: `Infraccion.foto`, `Municipio.logo`, cualquier otro `ImageField`.
+**Afecta**: `Infraccion.foto`, `Municipio.logo`.
+
+### Verificar.html — subcuadra + exento parcial antes del acta
+
+Dos mejoras relacionadas:
+
+**1. Selector de subcuadra en verificar.html (trazabilidad)**
+El inspector debe seleccionar en qué subcuadra está patrullando *antes* de verificar,
+para que la infracción registre la ubicación correcta. Actualmente se selecciona en el
+formulario del acta pero no hay contexto de dónde está el inspector al escanear.
+— Agregar selector de subcuadra en la pantalla de verificación.
+— Pasar la subcuadra seleccionada a `registrar_infraccion` por query param o sesión.
+
+**2. Exento parcial: mostrar estado ANTES de ir al acta**
+Si el resultado es `EXENTO_PARCIAL`, el inspector actualmente ve el botón de infraccionar
+sin saber si está en la subcuadra exenta o no.
+— Mostrar al momento de verificar si el vehículo está exento en la subcuadra actual.
+— Solo si está FUERA de sus subcuadras exentas mostrar la opción de infraccionar.
+— Actualmente esto se resuelve al "grabar el acta" (demasiado tarde).
+
+### Watermark: agregar subcuadra al texto de la foto
+El watermark actual incluye: patente, inspector, GPS, fecha/hora.
+Falta: **subcuadra** donde se labró el acta.
+— Modificar `_agregar_marca_de_agua_gps` para recibir y mostrar `subcuadra`.
+— Actualizar llamada en `crear_infraccion()` y pasar `subcuadra.nombre`.
+
+### Bug: foto en infracción — verificar flujo completo
+Algunas infracciones se guardaron sin foto. La foto tiene que mostrar:
+coordenadas GPS + subcuadra + timestamp.
+— Una vez implementado el "detalle de infracción" en admin (ver 🟡) y Cloudinary,
+  verificar manualmente que la foto llega correcta a la BD.
+— Si el problema persiste, agregar log en `crear_infraccion()` para registrar si `foto` llega None.
+
+---
 
 ## 🟡 Media prioridad
 
-### 1. Transferencia de saldo entre usuarios
-El conductor puede transferir saldo a otro conductor. El receptor tiene **24 horas** para aceptar; si no responde, el monto se reintegra automáticamente al emisor.
+### 1. Modal "detalle de infracción" en admin-infracciones
+En `/usuarios/admin-infracciones/` al hacer click en cualquier infracción (tabla o
+infracciones_recientes del panel), abrir un modal con:
+- Todos los datos del acta: patente, vehículo, inspector, subcuadra, fecha, monto, estado
+- **Foto del acta** (si existe)
+- Botón **Cobrar** (si pendiente) → registra cobro en efectivo
+- Botón **Anular** (si pendiente) → pide motivo (campo texto requerido)
+
+Modelo: agregar campo `motivo_anulacion = models.TextField(blank=True)` a `Infraccion` + migración.
+
+También: en `{% for inf in infracciones_recientes %}` del panel admin → click lleva al modal.
+
+### 2. Admin: cobrar-infraccion — mostrar TODAS las infracciones pendientes
+`/usuarios/vendedores/cobrar-infraccion/` actualmente muestra solo la última infracción pendiente.
+Cambiar para mostrar **todas** las pendientes de esa patente (puede tener varias).
+Aplica también a la vista equivalente del admin.
+
+### 3. Panel admin: métrica "Sin rendir a tesorería"
+Reemplazar `${{ total_cobrado }}` (suma histórica total) por el monto acumulado
+**sin rendir a tesorería** del municipio.
+Cálculo: suma de `MovimientoCaja.monto` donde `tipo="ingreso"` y el `CierreCaja`
+asociado aún no fue certificado (o donde no hay cierre de caja todavía).
+Incluir también rendiciones de puntos de venta que ya rindieron.
+
+### 4. Alta de conductor desde admin
+Desde `/usuarios/admin-usuarios/` agregar botón "➕ Nuevo conductor".
+Form: nombre, apellido, correo, contraseña provisional.
+Después de crear → ir al detalle del conductor para agregar vehículo y exención.
+Permite al admin registrar conductores que vienen en persona sin que se registren solos.
+
+### 5. Admin-inspectores: eliminar campos de comisión
+Los inspectores de este municipio no realizan cobros.
+Eliminar del form de edición de inspector:
+- `id="periodicidad_rendicion"` (selector de periodicidad)
+- `id="porcentaje_ganancia"` (campo % de comisión)
+
+Evaluar si conviene hacerlo configurable por municipio o directamente eliminar del modelo.
+
+### 6. Admin-vendedores: historial de operaciones del punto de venta
+Click en nombre del vendedor → nueva vista con:
+- Todos los `MovimientoCaja` del vendedor (fecha, tipo, descripción, monto, comisión)
+- Posibilidad de editar/anular movimientos individuales (con motivo)
+- Totales del período
+
+### 7. Admin-rendiciones: separar en dos secciones
+`/usuarios/admin-rendiciones/` debe mostrar claramente separadas:
+- **Rendiciones a Tesorería** (del admin al tesorero): historial, estados, observaciones
+- **Comisiones a Puntos de Venta** (del municipio a los vendedores): pendientes de depósito,
+  depositadas, certificadas por el vendedor
+
+Flujo ya implementado en el modelo (`LiquidacionComision`):
+  `pendiente` → tesorería marca como `depositada` → vendedor certifica como `certificada`.
+La UI de separación es lo que falta.
+
+### 8. Cobrar abono: comprobante imprimible
+Después de confirmar el cobro de un abono (✅ Confirmar cobro — ${{ precio }}),
+mostrar comprobante para imprimir/entregar. Similar al comprobante de cargar_saldo.
+Debe incluir: patente, vehículo, mes, monto, quién cobró, fecha/hora, municipio.
+
+### 9. Mover cobrar_abono.html a templates/admin/ + quitar de vendedores
+- Mover `templates/vendedores/cobrar_abono.html` → `templates/admin/cobrar_abono.html`
+- Actualizar la view `cobrar_abono` para que use el nuevo template
+- Quitar el botón `{% url 'cobrar_abono' %}` del panel de vendedor (`panel.html`)
+- El "Volver" del template siempre va a `panel_admin` (no es accesible para vendedores)
+
+### 10. Admin-exenciones: flujo completo + listado global
+**Agregar exención a patente nueva:**
+Si la patente ingresada no existe en el sistema:
+  1. Crear/buscar conductor por DNI o correo
+  2. Agregar la patente a ese conductor
+  3. Otorgar la exención
+Si existe pero no tiene exención → ir directamente al formulario de exención.
+
+**Listado global de exenciones:**
+Mostrar tabla de TODAS las patentes con exención activa:
+- Patente, tipo de vehículo, conductor, tipo de exención (Global/Parcial), subcuadras exentas (si parcial)
+Filtros: tipo de exención, estado.
+
+### 11. Transferencia de saldo entre usuarios
+El conductor puede transferir saldo a otro conductor. El receptor tiene **24 horas** para aceptar;
+si no responde, el monto se reintegra automáticamente al emisor.
 Pendiente de diseño:
 - Nuevo modelo `TransferenciaSaldo` (emisor, receptor, monto, estado: `pendiente`/`aceptada`/`rechazada`/`expirada`, creado_en).
 - Vista de envío (buscar receptor por correo o DNI).
 - Vista de recepción/rechazo (notificación en el panel del receptor).
 - Lógica de expiración: verificar en login o con tarea periódica (Celery o chequeo reactivo).
 
-### 5. Prueba demo completa antes de presentación municipal
-- Conductor con $500 saldo
-- Vehículo con infracción pendiente fuera de tolerancia (demo 3 timestamps)
-- Kiosco con movimientos pendientes (cierre de caja sin certificar)
-- Municipio: `nombre_sistema = "EstacionAR"`, tolerancia = 5 min, tarifa visible
-
-### 6. Configurar email en Railway (recuperación de contraseña)
+### 12. Configurar email en Railway (recuperación de contraseña)
 En local los emails aparecen en la consola (backend `console`). En Railway hay que setear 3 variables:
 ```
 EMAIL_HOST_USER=tumail@gmail.com
-EMAIL_HOST_PASSWORD=xxxx xxxx xxxx xxxx   ← contraseña de app de Google (no la contraseña normal)
+EMAIL_HOST_PASSWORD=xxxx xxxx xxxx xxxx   ← contraseña de app de Google
 DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
 ```
-La contraseña de app se genera en: Google Account → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones.
 **Disparador**: cuando se reactive el deploy en Railway.
 
-### 7. Prueba de navegador — modal tolerancia ⏸️
-Testear manualmente el modal diferenciado en `mis_infracciones`.
-Ver pasos en `testeo.md` → sección "Test manual — Tolerancia de gracia" (Casos A, B, C, D).
-**Bloqueado por**: Railway trial expirado. Hacer cuando se reactive o migre el deploy.
-
-### 8. Tests faltantes (coverage incompleto)
+### 13. Tests faltantes
 - Flujo MP webhook (integración)
+- `TestWatermarkGPS` pasando en Railway (verificar con Cloudinary activo)
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-### PWA / App móvil sin Play Store
-Hacer la app instalable desde el navegador (Android/iOS) sin publicar en tiendas.
-Requiere: `manifest.json` (nombre, íconos, colores) + service worker básico (offline fallback).
-Relativamente poco trabajo, mejora mucho la percepción del municipio.
+### Rendiciones: balances mensuales + rol Staff
+- Resumen mensual de rendiciones a tesorería (totales por período)
+- Campos para enviar el resumen por mail a personas del Staff
+- Nuevo rol `Staff`: solo reciben mails del sistema, pero también son usuarios.
+  Algunos comparten correo con su cuenta de sistema → manejar como alias o campo separado.
+- Implementar envío de mails desde Django (depende de ítem 12)
 
-### 9. Evaluar migración a Digital Ocean
-Railway conveniente pero con limitaciones de costo/control a largo plazo.
+### Flujo tesorería → vendedor: verificar UI completa
+El modelo `LiquidacionComision` ya tiene el flujo modelado:
+  Tesorería deposita → vendedor certifica recepción.
+Existe `depositar_comision` (tesorero) y `certificar_comision` (vendedor).
+Verificar que la UI del vendedor sea clara para confirmar que recibió su comisión.
+
+### Responsive > 1050px
+En pantallas grandes el layout del panel admin (sidebar 260px + contenido) queda con
+mucho espacio vacío. Revisar grid y max-width del contenido principal.
+
+### PWA / App móvil sin Play Store
+`manifest.json` + service worker básico (offline fallback).
+
+### Evaluar migración a Digital Ocean
 **Disparador**: cuando el sistema tenga usuarios reales pagando.
 
-### 11. Inspector como cobrador (paid feature)
+### Inspector como cobrador
 Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `cobrar_abono`.
 
-### 12. Mejoras OAuth y UI
+### Mejoras OAuth y UI
 - Pantalla de consentimiento Google: completar logo, descripción, dominio verificado
 - Modo alto contraste / uso en exterior con sol
 - Separar `settings_dev.py` / `settings_prod.py`
+
+### Limpiar inicio_admin.html
+`templates/admin/inicio_admin.html` existe pero no se usa. El panel real es `panel_admin.html`.
+Eliminar o redirigir.
 
 ---
 
 ## ✅ Resuelto
 
 ### Geoposición en infracción: watermark GPS ✅
-- `services/infracciones.py::_agregar_marca_de_agua_gps` implementado: overlay oscuro semitransparente en la franja inferior, texto con patente, inspector, coordenadas GPS y fecha/hora.
-- `crear_infraccion()` llama al helper automáticamente cuando `foto and gps_lat and gps_lon`.
-- `views_inspector.py::registrar_infraccion` lee `gps_lat/gps_lon/gps_acc` del POST y los pasa al service.
-- Template `registrar_infraccion.html`: JS captura GPS con `navigator.geolocation`, chip visual de estado (verde/amarillo/rojo), campos ocultos se llenan automáticamente, botón deshabilitado hasta obtener ubicación (o fallo).
-- Pillow 12.0.0 en `requirements.txt` → disponible en Railway.
-- Tests: `TestWatermarkGPS` en `tests_servicios.py` (3 tests: overlay oscuro, sin GPS no explota, integración con `crear_infraccion`).
-- Correr con: `python manage.py test app_estacionamiento.tests_servicios.TestWatermarkGPS --verbosity=2`
+- `services/infracciones.py::_agregar_marca_de_agua_gps`: overlay oscuro + texto con patente, inspector, GPS, fecha/hora.
+- `crear_infraccion()` aplica el watermark automáticamente cuando hay `foto and gps_lat and gps_lon`.
+- `registrar_infraccion` (view) lee GPS del POST y lo pasa al service.
+- Template: JS captura GPS, chip visual de estado, campos ocultos, botón deshabilitado hasta obtener ubicación.
+- Pillow 12.0.0 en `requirements.txt`.
+- Tests: `TestWatermarkGPS` en `tests_servicios.py` (3 tests verdes).
 
 ### feat: mejoras post-presentación municipal (commit e79eb22, 2026-07-16) ✅
-7 mejoras aplicadas tras la presentación al municipio:
-- **Registro de conductor**: `RegistroUsuarioForm` ahora pide `nombre` + `apellido` → evita el redirect de middleware a `completar_perfil` que impedía estacionar inmediatamente.
-- **Nombres en title case**: `.title()` al guardar `first_name`/`last_name` en registro, `completar_perfil` y edición desde admin.
-- **Sanitización de patentes**: nueva `sanitizar_patente()` en `utils.py` (solo alfanumérico, mayúsculas). Aplicada en todas las vistas + handler JS `oninput` en 11 templates.
-- **Mínimo 1 hora**: eliminada la opción de 30 min. `calcular_opciones_duracion()` arranca en `n=2`.
-- **Reintegro < 30 min**: si el conductor finaliza antes de `UMBRAL_REINTEGRO_MINUTOS = 30` min, devuelve 100% del `costo_base` al saldo + registra `MovimientoCaja(tipo="ingreso")`.
-- **Admin cargar saldo**: reescrito `cargar_saldo.html` con formato correcto; corregido bug que mostraba el correo del admin en vez del conductor.
-- **MercadoPago nombre "Pollo Lopez"**: corregido directamente en el portal de MP a "estacionamientoUrbano" (sin cambio de código).
-- 106 tests pasando.
+- Registro de conductor con nombre + apellido (evita redirect middleware).
+- Nombres en title case.
+- Sanitización de patentes (`sanitizar_patente()` en `utils.py`, 11 templates).
+- Mínimo 1 hora (`calcular_opciones_duracion()` arranca en `n=2`).
+- Reintegro < 30 min (`UMBRAL_REINTEGRO_MINUTOS = 30`).
+- Admin cargar saldo: bug corregido (mostraba correo del admin en vez del conductor).
+- MercadoPago nombre: corregido en portal de MP.
 
-### Alta prioridad — tests pre-existentes ✅
-58 tests pasando (16 roles + 42 generales). Fixes aplicados:
-- `Tarifa.objects.create` en `BaseRolesTest.setUp()` + `from decimal import Decimal`
-- `crear_conductor()` con `first_name="Test"` (evita redirect middleware)
-- `REDIRECT_OK = "inicio_usuarios"` en `use_cases/estacionar_vehiculo.py`
+### Panel admin sidebar + nuevas vistas ✅
+- Layout dos columnas: sidebar 260px fijo + contenido.
+- ⚡ Acciones rápidas: 🚗 Registrar, 💳 Cargar saldo, 📅 Cobrar abono, ⚠️ Cobrar infracción, 🅿️ Estacionamientos.
+- Gestión lateral con badges de pendientes.
+- Vistas nuevas: `admin_vehiculos` y `admin_estacionamientos` con filtros y paginación.
 
-### Decisión de negocio: conductor sin verificar puede pagar infracciones ✅
-El conductor busca infracciones por patente, sin requerir verificación.
-No hay restricción a implementar.
+### Cargar saldo: comprobante imprimible ✅
+La vista `cargar_saldo` muestra comprobante con monto, nuevo saldo, fecha/hora y quien lo registró.
+`@media print` oculta nav/footer. Botón "🖨 Imprimir comprobante".
 
-### reportlab instalado localmente ✅
-`pip install reportlab==4.2.5`
+### Inspector UI: múltiples mejoras ✅
+- `base.html` truncado (bug crítico): hamburger no funcionaba en ninguna vista. Corregido.
+- Eliminado `id="form-subcuadra"` del flujo de verificación.
+- Oculto botón "Modo calle/escritorio".
+- Placeholder moto: `123-ABC`.
+- Rediseño `registrar_infraccion.html`: chip GPS, label FOTO, botón grande.
 
-### TRAMA Sprint 1 — Dividir views.py en módulos por rol ✅
-`views.py` pasó de ~3462 líneas a **156 líneas** (facade puro).
-- `views_auth.py` (204 líneas) — login, logout, registro, completar_perfil
-- `views_inspector.py` (384 líneas) — panel, verificación, infracciones, PDF
-- `views_tesorero.py` (81 líneas) — panel tesorero, rendiciones
-- `views_vendedor.py` (782 líneas) — cobros, caja, comisiones
-- `views_conductor.py` (673 líneas) — estacionar, historial, vehículos
-- `views_admin.py` (1033 líneas) — gestión completa del municipio
-- `views_mp.py` (286 líneas) — integración MercadoPago
-
-### TRAMA Sprint 2 — Lógica de negocio a services/ ✅
-Creada la carpeta `services/` con módulos por dominio:
-- `services/caja.py` — `generar_cierre_caja()`
-- `services/infracciones.py` — `crear_infraccion()` + nuevo `cobrar_infraccion_efectivo()`
-- `services/verificacion.py` — `verificar_estado_vehiculo()`
-- `services/horarios.py` — `puede_estacionar_ahora()`, `calcular_opciones_duracion()`, `cerrar_estacionamientos_vencidos_por_horario()`
-- `services/saldo.py` — nuevo `cargar_saldo_conductor()`
-
-`utils.py` quedó en 32 líneas (solo `get_subcuadra_default`).
-Los archivos `services_*.py` viejos son shims de 4 líneas para compatibilidad hacia atrás.
-
-### Tolerancia al estacionar — integración completa ✅
-- `services/infracciones.py` → nueva `calcular_estado_tolerancia()` con `MARGEN_TOLERANCIA_SEGUNDOS = 60`
-  (evita cobrar por diferencias de pocos segundos). Centraliza la lógica usada en 3 lugares.
-- `use_cases/estacionar_vehiculo.py` → antes de crear el Estacionamiento, busca infracción
-  pendiente del vehículo: dentro de tolerancia → anula; fuera → deja pendiente + retorna timestamps.
-- `views_conductor.py` → guarda timestamps en `request.session`, `inicio_usuarios` los muestra
-  como card con los 3 timestamps y link a "Mis infracciones".
-- `views_vendedor.py` → mismo chequeo en `registrar_estacionamiento_vendedor` (avisa por messages).
-- `cobrar_infraccion_vendedor` → reemplazó lógica inline por `calcular_estado_tolerancia`.
-- `use_cases/pagar_infraccion.py` → también usa `calcular_estado_tolerancia` (refactor).
-
-### feat: aviso fuera de término al pagar infracción ✅
-`mis_infracciones` calcula `ids_dentro_tolerancia` al renderizar.
-Modal diferenciado: dentro de gracia → "Anular sin costo" (verde); fuera → aviso amarillo + botón rojo "Pagar $X".
-El use case `pagar_infraccion_uc` decide en el servidor si anula o cobra.
-
-### Tests tolerancia de gracia (6 tests en TestToleranciaMulta) ✅
-Cubre: dentro, exactamente en el límite, fuera, tolerancia=0, doble pago.
-Técnica: `Infraccion.objects.update(creado_en=...)` + `patch("...pagar_infraccion.timezone")`.
-
-### views.py — limpieza de imports legacy ✅
-157 → 98 líneas. Eliminados: models, utils, factories, services_*, use_cases, decorators, forms, django internals. Puro facade.
-
-### TRAMA Sprint 3 — Consolidar use_cases/ con services/ ✅
-- `services/horarios.py` → nueva `obtener_tarifa_hora(tarifa_obj, vehiculo)` (centraliza selección auto/moto)
-- `services/saldo.py` → nueva `debitar_saldo_conductor(conductor, monto, descripcion)` (sin transacción propia)
-- `services/caja.py` → nueva `registrar_cobro_efectivo(cobrador, monto, descripcion, comision_monto)`
-- `use_cases/estacionar_vehiculo.py` 93→76 líneas
-- `use_cases/pagar_infraccion.py` 73→64 líneas
-- `use_cases/cobrar_estacionamiento.py` 37→23 líneas
-- `test_roles.py` (duplicado viejo) eliminado — `tests_roles.py` lo cubre completo
-
-### Tests faltantes cubiertos (tests_servicios.py) ✅
-20 tests en 5 clases: `cobrar_infraccion_efectivo`, `cargar_saldo_conductor`,
-abono mensual, comisiones, multi-municipio, tesorero→depositar→certificar.
-
-### Abono mensual — conductor paga con saldo + admin sin comisión ✅
-- `AbonoMensual.MEDIOS_PAGO` ahora incluye `'saldo'` + migración 0039.
-- Nueva view `pagar_abono_conductor` (GET: selección vehículo/mes, POST confirmar/cobrar con `select_for_update`).
-- Admin cobra abono a través de `cobrar_abono` con `comision_monto = Decimal("0")` → 100% a tesorería.
-- Conductor accede desde panel de inicio (botón "📅 Pagar abono" siempre visible).
-- Panel admin: nuevo botón "📅 Abonos" en cabecera → `cobrar_abono`.
-
-### Infracciones — conductor las paga desde la app ✅
-- `mis_infracciones` muestra modal diferenciado: dentro de tolerancia → botón "Anular sin costo";
-  fuera → aviso amarillo + "Pagar $X".
-- `pagar_infraccion` use case decide en servidor si anula (gracia) o cobra (descuenta saldo).
-- Al estacionar: infracción pendiente detectada → dentro de gracia → anula + mensaje verde;
-  fuera de gracia → estacionamiento igual + notificación con 3 timestamps + link a Mis infracciones.
-
-### Rol Tesorero — flujo completo ✅
-- `redirect_por_rol` incluye `es_tesorero` → redirige al `panel_tesorero` al login
-- `panel_tesorero`: muestra rendiciones del admin + liquidaciones de vendedores, con conteos de pendientes
-- `validar_rendicion`: tesorero marca una rendición como `validada` (recibida) u `observada`, con notas opcionales y registro de quién/cuándo
-- `crear_rendicion` (admin): `fecha_desde` se pre-completa automáticamente con el día siguiente a la última rendición del admin
-- `admin_rendiciones`: nueva sección "Mis rendiciones a tesorería" con estado de validación
-- `panel_vendedor`: aviso de cierres de caja pendientes de certificación por el admin
-- `cobrar_abono`: ahora acepta cualquier patente, crea el vehículo on-the-fly si no existe (`get_or_create`)
-- 17 tests nuevos en `tests_tesorero.py` — 106 tests en total, todos OK
-- `allauth` actualizado de `65.3.0` → `65.17.0` (resolvía SystemCheckError en Railway)
-- Deploy Railway activo: https://estacionamiento.up.railway.app
+### Cobrar abono: fixes ✅
+- "Volver" usa `volver_url` desde el view (admin → panel_admin, vendedor → panel_vendedor).
+- Eliminado mensaje "Comisión generada: $0".
 
 ### Otros ✅
-- `test_conductor_sin_saldo_redirige_a_carga_mp`: test corregido (assertions a `mp_iniciar_carga`)
-- Inspector PDF del día: `pdf_infracciones_hoy` con reportlab
-- Google OAuth nombre/apellido: middleware + completar_perfil
-- Timer "calculando…" indefinido: corregido
-- Subcuadras vacías al registrar infracción: `get_or_create("Zona Única")`
-- Selector de período al cerrar caja: modal + field `CierreCaja.periodo` + migration 0038
-- Banner modo desarrollo
-- Deprecation warnings allauth 65.x
-- Abono mensual: selector de mes con 4 opciones
-- Admin-usuarios: editar teléfono, DNI, toggle es_verificado
-- Admin rendición a tesorería: view + URL + template
-- Cobrar infracciones por patente: `cobrar_infraccion_vendedor` + `MovimientoCaja`
-- Tesorería rendiciones: `panel_tesorero` + template
-- `puede_estacionar_ahora()` con caché de 1 hora
-- `duracion_min` → `duracion_horas` (migration 0036)
-- `precio_por_hora_moto` → null=True (migration 0037)
-- Procfile: `migrate --noinput` antes de `gunicorn`
-- Panel inspector: sin dinero, solo infracciones + verificar
-- CSRF: `CSRF_TRUSTED_ORIGINS` en Railway
-- SITE_ID=2 en Railway
-- Google OAuth `redirect_uri_mismatch`: nuevo cliente OAuth
-- Branding por municipio
-- Menú hamburguesa, botones sin estilo, 403.html
+- `ticket.html` rediseñado con header verde, patente grande, `@media print`.
+- Eliminado aviso "mejora futura" de gestionar_horarios (cierre automático ya implementado).
+- Inspector PDF del día: `pdf_infracciones_hoy` con reportlab.
+- Rol Tesorero: flujo completo (validar rendiciones, liquidaciones, 17 tests).
+- 106 tests pasando.
