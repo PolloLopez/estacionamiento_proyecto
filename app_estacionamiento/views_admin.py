@@ -40,6 +40,7 @@ from .models import (
     MovimientoCaja,
     Notificacion,
     Rendicion,
+    LiquidacionComision,
     SolicitudVerificacion,
     Subcuadra,
     Tarifa,
@@ -938,6 +939,13 @@ def admin_rendiciones(request):
         admin=request.user
     ).order_by("-fecha_hasta")[:20]
 
+    # Comisiones a vendedores (liquidaciones pendientes/depositadas/certificadas)
+    liquidaciones = LiquidacionComision.objects.filter(
+        municipio=municipio
+    ).select_related("vendedor", "rendicion").order_by("-creado_en")[:50]
+
+    seccion = request.GET.get("seccion", "cierres")  # cierres / rendiciones / comisiones
+
     return render(request, "admin/rendiciones.html", {
         "cierres":            page_obj,
         "filtro":             filtro,
@@ -948,6 +956,8 @@ def admin_rendiciones(request):
         "usuarios_con_cierres": usuarios_con_cierres,
         "page_obj":           page_obj,
         "mis_rendiciones":    mis_rendiciones,
+        "liquidaciones":      liquidaciones,
+        "seccion":            seccion,
     })
 
 

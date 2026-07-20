@@ -2,242 +2,298 @@
 {% block title %}Rendiciones{% endblock %}
 
 {% block content %}
-<div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+<div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1.25rem; flex-wrap:wrap;">
   <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
-    <h2 style="margin:0;">💼 Rendiciones de vendedores</h2>
+    <h2 style="margin:0;">💼 Rendiciones</h2>
     {% if conteo_pendientes > 0 %}
       <span class="badge badge-pendiente">{{ conteo_pendientes }} sin certificar</span>
     {% endif %}
   </div>
-  <a href="{% url 'crear_rendicion' %}" class="btn" style="font-size:0.9rem; padding:0.5rem 1.1rem;">
-    📋 Rendir a tesorería
+  <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
+</div>
+
+{# ── TABS ─────────────────────────────────────────────────────── #}
+<div style="display:flex; gap:0; margin-bottom:1.5rem; border-bottom:2px solid var(--color-border);">
+  <a href="?seccion=cierres"
+     style="padding:0.6rem 1.25rem; font-size:0.92rem; font-weight:600; text-decoration:none;
+            border-bottom:2px solid {% if seccion == 'cierres' %}var(--color-primary){% else %}transparent{% endif %};
+            color:{% if seccion == 'cierres' %}var(--color-primary){% else %}var(--color-text-muted){% endif %};
+            margin-bottom:-2px;">
+    🧾 Cierres de caja
+    {% if conteo_pendientes > 0 %}<span style="font-size:0.78rem; background:var(--color-danger); color:#fff; border-radius:99px; padding:0.1rem 0.4rem; margin-left:0.3rem;">{{ conteo_pendientes }}</span>{% endif %}
+  </a>
+  <a href="?seccion=rendiciones"
+     style="padding:0.6rem 1.25rem; font-size:0.92rem; font-weight:600; text-decoration:none;
+            border-bottom:2px solid {% if seccion == 'rendiciones' %}var(--color-primary){% else %}transparent{% endif %};
+            color:{% if seccion == 'rendiciones' %}var(--color-primary){% else %}var(--color-text-muted){% endif %};
+            margin-bottom:-2px;">
+    📋 Rendiciones a tesorería
+  </a>
+  <a href="?seccion=comisiones"
+     style="padding:0.6rem 1.25rem; font-size:0.92rem; font-weight:600; text-decoration:none;
+            border-bottom:2px solid {% if seccion == 'comisiones' %}var(--color-primary){% else %}transparent{% endif %};
+            color:{% if seccion == 'comisiones' %}var(--color-primary){% else %}var(--color-text-muted){% endif %};
+            margin-bottom:-2px;">
+    💰 Comisiones a vendedores
   </a>
 </div>
 
-{# Los mensajes los muestra base.html — no duplicar aquí #}
+{# ══════════════════════════════════════════════════════════════════ #}
+{# TAB 1: CIERRES DE CAJA (CierreCaja)                              #}
+{# ══════════════════════════════════════════════════════════════════ #}
+{% if seccion == 'cierres' %}
 
-{# ── Filtros rápidos ─────────────────────────────────────────────── #}
+<p class="text-muted" style="margin-bottom:1rem; font-size:0.9rem;">
+  Cierres de caja de vendedores e inspectores. Certificá cada uno para registrar que el efectivo fue recibido.
+</p>
+
+{# Filtros rápidos #}
 <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
-  <a href="?filtro=todos"
-     class="btn {% if filtro != 'todos' %}btn-outline{% endif %}"
-     style="font-size:0.9rem; padding:0.4rem 1rem;">Todos</a>
-  <a href="?filtro=pendientes"
-     class="btn {% if filtro != 'pendientes' %}btn-outline{% endif %}"
-     style="font-size:0.9rem; padding:0.4rem 1rem;">⏳ Sin certificar</a>
-  <a href="?filtro=certificados"
-     class="btn {% if filtro != 'certificados' %}btn-outline{% endif %}"
-     style="font-size:0.9rem; padding:0.4rem 1rem;">✅ Certificados</a>
+  <a href="?seccion=cierres&filtro=todos" class="btn {% if filtro != 'todos' %}btn-outline{% endif %}" style="font-size:0.9rem; padding:0.4rem 1rem;">Todos</a>
+  <a href="?seccion=cierres&filtro=pendientes" class="btn {% if filtro != 'pendientes' %}btn-outline{% endif %}" style="font-size:0.9rem; padding:0.4rem 1rem;">⏳ Sin certificar</a>
+  <a href="?seccion=cierres&filtro=certificados" class="btn {% if filtro != 'certificados' %}btn-outline{% endif %}" style="font-size:0.9rem; padding:0.4rem 1rem;">✅ Certificados</a>
 </div>
 
-{# ── Filtros avanzados (usuario + fecha) ─────────────────────────── #}
+{# Filtros avanzados #}
 <form method="get" style="margin-bottom:1.5rem;">
-  {# Preservar filtro de estado #}
+  <input type="hidden" name="seccion" value="cierres">
   {% if filtro != "todos" %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
-
   <div class="card" style="padding:0.75rem 1rem;">
     <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
-
       <div style="flex:1; min-width:160px;">
-        <label style="font-size:0.85rem; font-weight:600; margin-bottom:0.25rem; display:block;">
-          Usuario
-        </label>
+        <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:0.25rem;">Usuario</label>
         <select name="usuario_id" style="width:100%;">
           <option value="">— Todos —</option>
           {% for u in usuarios_con_cierres %}
             <option value="{{ u.id }}" {% if usuario_id == u.id|stringformat:"s" %}selected{% endif %}>
-              {{ u.nombre|default:u.correo }}
-              {% if u.es_inspector %}(Inspector){% elif u.es_vendedor %}(Vendedor){% endif %}
+              {{ u.nombre|default:u.correo }} {% if u.es_inspector %}(Inspector){% elif u.es_vendedor %}(Vendedor){% endif %}
             </option>
           {% endfor %}
         </select>
       </div>
-
       <div>
-        <label style="font-size:0.85rem; font-weight:600; margin-bottom:0.25rem; display:block;">
-          Desde
-        </label>
+        <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:0.25rem;">Desde</label>
         <input type="date" name="fecha_desde" value="{{ fecha_desde }}" />
       </div>
-
       <div>
-        <label style="font-size:0.85rem; font-weight:600; margin-bottom:0.25rem; display:block;">
-          Hasta
-        </label>
+        <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:0.25rem;">Hasta</label>
         <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" />
       </div>
-
-      <div style="display:flex; gap:0.5rem;">
-        <button type="submit" class="btn" style="font-size:0.9rem; padding:0.45rem 1rem;">
-          🔍 Filtrar
-        </button>
-        <a href="?filtro={{ filtro }}" class="btn btn-outline" style="font-size:0.9rem; padding:0.45rem 1rem;">
-          ✕ Limpiar
-        </a>
-      </div>
-
+      <button type="submit" class="btn">Filtrar</button>
+      {% if usuario_id or fecha_desde or fecha_hasta %}
+        <a href="?seccion=cierres{% if filtro != 'todos' %}&filtro={{ filtro }}{% endif %}" class="btn btn-outline">Limpiar</a>
+      {% endif %}
     </div>
   </div>
 </form>
 
-{# ── Lista de cierres ───────────────────────────────────────────── #}
-{% if not cierres %}
-  <div class="card" style="text-align:center; color:var(--color-text-muted); padding:2rem;">
-    No hay rendiciones en este filtro.
-  </div>
-{% endif %}
-
+{# Tabla de cierres #}
 {% for cierre in cierres %}
-<div class="panel" style="margin-bottom:1rem; padding:1rem 1.2rem;">
-
-  <div style="display:flex; justify-content:space-between; align-items:flex-start;
-              flex-wrap:wrap; gap:0.75rem;">
-
-    {# Info del cierre #}
+<div class="card" style="margin-bottom:0.75rem; padding:1rem 1.25rem;">
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
     <div>
-      <div style="font-weight:700; font-size:1rem;">
-        {{ cierre.usuario.nombre|default:cierre.usuario.correo }}
-        <span class="text-muted" style="font-weight:400; font-size:0.88rem;">
-          — {{ cierre.usuario.correo }}
-        </span>
-      </div>
-      <div style="font-size:0.85rem; color:var(--color-text-muted); margin-top:0.2rem;">
+      <strong>{{ cierre.usuario.nombre|default:cierre.usuario.correo }} {{ cierre.usuario.apellido|default:"" }}</strong>
+      <span class="text-muted" style="font-size:0.85rem; margin-left:0.5rem;">
         {% if cierre.usuario.es_inspector %}Inspector{% elif cierre.usuario.es_vendedor %}Vendedor{% endif %}
-        · Cierre: {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
-      </div>
+      </span>
       <div style="font-size:0.85rem; color:var(--color-text-muted);">
-        Período: {{ cierre.fecha_apertura|date:"d/m/Y H:i" }} → {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
+        {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
+        {% if cierre.periodo %} · {{ cierre.get_periodo_display }}{% endif %}
+        · {{ cierre.cantidad_movimientos }} movimiento{{ cierre.cantidad_movimientos|pluralize }}
       </div>
-      <div style="font-size:0.85rem; margin-top:0.2rem;">
-        {{ cierre.cantidad_movimientos }} movimiento{% if cierre.cantidad_movimientos != 1 %}s{% endif %}
-      </div>
-      {% if cierre.porcentaje_ganancia_aplicado > 0 %}
-      <div style="font-size:0.82rem; margin-top:0.3rem; color:var(--color-text-muted);">
-        Comisión {{ cierre.porcentaje_ganancia_aplicado }}%:
-        <strong style="color:var(--color-success);">${{ cierre.ganancia_usuario }}</strong>
-        · Municipio: <strong>${{ cierre.monto_municipio }}</strong>
-      </div>
-      {% endif %}
     </div>
-
-    {# Total + estado #}
     <div style="text-align:right;">
-      <div style="font-size:1.5rem; font-weight:800; color:var(--color-primary);">
-        ${{ cierre.total_cobrado }}
-      </div>
-      {% if cierre.certificado %}
-        <span class="badge badge-aprobada">✅ Certificado</span>
-        <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.3rem;">
-          por {{ cierre.certificado_por.correo }}
-          el {{ cierre.certificado_en|date:"d/m/Y H:i" }}
-        </div>
-      {% else %}
-        <span class="badge badge-pendiente">⏳ Sin certificar</span>
-      {% endif %}
+      <div style="font-size:1.3rem; font-weight:800; color:var(--color-primary);">${{ cierre.monto_municipio }}</div>
+      <div style="font-size:0.8rem; color:var(--color-text-muted);">neto municipio</div>
     </div>
-
   </div>
 
-  {# Botón certificar (solo si no está certificado) #}
+  <div style="display:flex; gap:1.5rem; margin-top:0.5rem; font-size:0.85rem; flex-wrap:wrap;">
+    <span>Total cobrado: <strong>${{ cierre.total_cobrado }}</strong></span>
+    {% if cierre.ganancia_usuario > 0 %}
+      <span>Comisión vendedor: <strong>${{ cierre.ganancia_usuario }}</strong> ({{ cierre.porcentaje_ganancia_aplicado }}%)</span>
+    {% endif %}
+    <span>
+      {% if cierre.certificado %}
+        <span style="color:var(--color-primary);">✅ Certificado {{ cierre.certificado_en|date:"d/m/Y" }}</span>
+        {% if cierre.certificado_por %}<span class="text-muted">por {{ cierre.certificado_por.correo }}</span>{% endif %}
+      {% else %}
+        <span style="color:var(--color-warning, #e67e22);">⏳ Pendiente de certificación</span>
+      {% endif %}
+    </span>
+  </div>
+
   {% if not cierre.certificado %}
-  <div style="margin-top:0.75rem;">
-    <button type="button" class="btn" style="font-size:0.9rem; padding:0.4rem 1.2rem;"
-            onclick="document.getElementById('modal-cert-{{ cierre.id }}').style.display='flex'">
-      ✅ Certificar rendición
+  <div id="modal-cert-{{ cierre.id }}" style="display:none; margin-top:0.75rem; background:var(--color-surface-2,#f5f5f5); border-radius:8px; padding:0.75rem;">
+    <p style="margin:0 0 0.5rem; font-size:0.9rem;">¿Confirmás que recibiste ${{ cierre.total_cobrado }} de {{ cierre.usuario.nombre|default:cierre.usuario.correo }}?</p>
+    <div style="display:flex; gap:0.75rem;">
+      <form method="post" action="{% url 'certificar_cierre' cierre.id %}" style="flex:1;">
+        {% csrf_token %}
+        <button class="btn" type="submit" style="width:100%;">Confirmar</button>
+      </form>
+      <button class="btn btn-outline" type="button" style="flex:1;"
+              onclick="document.getElementById('modal-cert-{{ cierre.id }}').style.display='none'">
+        Cancelar
+      </button>
+    </div>
+  </div>
+  <div style="margin-top:0.6rem;">
+    <button class="btn btn-outline" style="font-size:0.85rem;"
+            onclick="document.getElementById('modal-cert-{{ cierre.id }}').style.display='block'">
+      ✅ Certificar
     </button>
   </div>
-  {# Modal de confirmación (inline, sin JS externo) #}
-  <div id="modal-cert-{{ cierre.id }}"
-       style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
-              z-index:9999; justify-content:center; align-items:center; padding:1rem;">
-    <div style="background:var(--color-surface); border-radius:var(--radius); padding:1.5rem 2rem;
-                max-width:360px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25);">
-      <h3 style="margin-bottom:0.6rem;">Certificar rendición</h3>
-      <p style="font-size:0.9rem; color:var(--color-text-muted); margin-bottom:0.5rem;">
-        {{ cierre.usuario.first_name|default:cierre.usuario.correo }}
-      </p>
-      <p style="font-size:1.3rem; font-weight:800; color:var(--color-primary); margin-bottom:1.2rem;">
-        ${{ cierre.total_cobrado }}
-      </p>
-      <div style="display:flex; gap:0.75rem;">
-        <form method="post" action="{% url 'certificar_cierre' cierre.id %}" style="flex:1;">
-          {% csrf_token %}
-          <button class="btn" type="submit" style="width:100%;">Confirmar</button>
-        </form>
-        <button class="btn btn-outline" type="button" style="flex:1;"
-                onclick="document.getElementById('modal-cert-{{ cierre.id }}').style.display='none'">
-          Cancelar
-        </button>
-      </div>
-    </div>
-  </div>
   {% endif %}
-
+</div>
+{% empty %}
+<div class="card" style="text-align:center; padding:2rem; color:var(--color-text-muted);">
+  No hay cierres de caja{% if filtro == 'pendientes' %} pendientes{% elif filtro == 'certificados' %} certificados{% endif %}.
 </div>
 {% endfor %}
 
-{# ── Paginación ──────────────────────────────────────────────────── #}
+{# Paginación #}
 {% if page_obj.paginator.num_pages > 1 %}
 <div style="display:flex; justify-content:center; gap:0.4rem; margin-top:1.5rem; flex-wrap:wrap;">
   {% if page_obj.has_previous %}
-    <a href="?{% if filtro != 'todos' %}filtro={{ filtro }}&{% endif %}{% if usuario_id %}usuario_id={{ usuario_id }}&{% endif %}{% if fecha_desde %}fecha_desde={{ fecha_desde }}&{% endif %}{% if fecha_hasta %}fecha_hasta={{ fecha_hasta }}&{% endif %}page={{ page_obj.previous_page_number }}"
-       class="btn btn-outline" style="font-size:0.9rem; padding:0.4rem 0.9rem;">‹ Anterior</a>
+    <a href="?seccion=cierres&filtro={{ filtro }}&page={{ page_obj.previous_page_number }}" class="btn btn-outline" style="font-size:0.9rem; padding:0.4rem 0.9rem;">‹ Anterior</a>
   {% endif %}
-  <span style="padding:0.4rem 0.9rem; font-size:0.9rem; color:var(--color-text-muted);">
-    Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-  </span>
+  <span style="padding:0.4rem 0.9rem; font-size:0.9rem; color:var(--color-text-muted);">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
   {% if page_obj.has_next %}
-    <a href="?{% if filtro != 'todos' %}filtro={{ filtro }}&{% endif %}{% if usuario_id %}usuario_id={{ usuario_id }}&{% endif %}{% if fecha_desde %}fecha_desde={{ fecha_desde }}&{% endif %}{% if fecha_hasta %}fecha_hasta={{ fecha_hasta }}&{% endif %}page={{ page_obj.next_page_number }}"
-       class="btn btn-outline" style="font-size:0.9rem; padding:0.4rem 0.9rem;">Siguiente ›</a>
+    <a href="?seccion=cierres&filtro={{ filtro }}&page={{ page_obj.next_page_number }}" class="btn btn-outline" style="font-size:0.9rem; padding:0.4rem 0.9rem;">Siguiente ›</a>
   {% endif %}
 </div>
 {% endif %}
 
-{# ── Mis rendiciones a tesorería ─────────────────────────────────── #}
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# TAB 2: RENDICIONES A TESORERÍA (Rendicion)                       #}
+{# ══════════════════════════════════════════════════════════════════ #}
+{% elif seccion == 'rendiciones' %}
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <p class="text-muted" style="font-size:0.9rem; margin:0;">
+    Rendiciones formales del admin al tesorero. El tesorero las valida o devuelve con observaciones.
+  </p>
+  <a href="{% url 'crear_rendicion' %}" class="btn" style="font-size:0.9rem;">📋 Nueva rendición</a>
+</div>
+
 {% if mis_rendiciones %}
-<div style="margin-top:2.5rem;">
-  <h3 style="margin-bottom:0.75rem;">📋 Mis rendiciones a tesorería</h3>
-  <div class="card" style="overflow-x:auto;">
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Período</th>
-          <th>Desde</th>
-          <th>Hasta</th>
-          <th style="text-align:right;">Neto</th>
-          <th style="text-align:center;">Estado</th>
-          <th>Validado por</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in mis_rendiciones %}
-        <tr>
-          <td style="color:var(--color-text-muted); font-size:0.8rem;">{{ r.id }}</td>
-          <td>{{ r.get_periodo_display }}</td>
-          <td style="font-size:0.85rem;">{{ r.fecha_desde|date:"d/m/Y" }}</td>
-          <td style="font-size:0.85rem;">{{ r.fecha_hasta|date:"d/m/Y" }}</td>
-          <td style="text-align:right; font-weight:700;">${{ r.total_neto }}</td>
-          <td style="text-align:center;">
-            {% if r.estado == "pendiente" %}
-              <span style="color:var(--color-warning); font-weight:600;">⏳ Pendiente</span>
-            {% elif r.estado == "validada" %}
-              <span style="color:var(--color-primary); font-weight:600;">✅ Validada</span>
-            {% else %}
-              <span style="color:var(--color-danger); font-weight:600;">⚠️ Observada</span>
-            {% endif %}
-          </td>
-          <td style="font-size:0.85rem;">
-            {% if r.tesorero %}{{ r.tesorero.correo }}{% else %}—{% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="card" style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Período</th>
+        <th>Desde</th>
+        <th>Hasta</th>
+        <th style="text-align:right;">Efectivo</th>
+        <th style="text-align:right;">Digital</th>
+        <th style="text-align:right;">Comisiones</th>
+        <th style="text-align:right;">Neto</th>
+        <th style="text-align:center;">Estado</th>
+        <th>Validado por</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in mis_rendiciones %}
+      <tr>
+        <td style="color:var(--color-text-muted); font-size:0.8rem;">{{ r.id }}</td>
+        <td>{{ r.get_periodo_display }}</td>
+        <td style="font-size:0.85rem;">{{ r.fecha_desde|date:"d/m/Y" }}</td>
+        <td style="font-size:0.85rem;">{{ r.fecha_hasta|date:"d/m/Y" }}</td>
+        <td style="text-align:right;">${{ r.total_efectivo }}</td>
+        <td style="text-align:right;">${{ r.total_digital }}</td>
+        <td style="text-align:right; color:var(--color-text-muted);">${{ r.total_comisiones }}</td>
+        <td style="text-align:right; font-weight:700;">${{ r.total_neto }}</td>
+        <td style="text-align:center;">
+          {% if r.estado == "pendiente" %}
+            <span style="color:var(--color-warning, #e67e22); font-weight:600;">⏳ Pendiente</span>
+          {% elif r.estado == "validada" %}
+            <span style="color:var(--color-primary); font-weight:600;">✅ Validada</span>
+          {% else %}
+            <span style="color:var(--color-danger); font-weight:600;">⚠️ Observada</span>
+          {% endif %}
+        </td>
+        <td style="font-size:0.85rem;">{% if r.tesorero %}{{ r.tesorero.correo }}{% else %}—{% endif %}</td>
+      </tr>
+      {% if r.notas_tesorero %}
+      <tr>
+        <td colspan="10" style="background:var(--color-surface-2,#f8f8f8); font-size:0.85rem; color:var(--color-text-muted); padding:0.4rem 1rem;">
+          💬 Tesorero: {{ r.notas_tesorero }}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card" style="text-align:center; padding:2rem; color:var(--color-text-muted);">
+  No hay rendiciones a tesorería aún.
+  <div style="margin-top:0.75rem;">
+    <a href="{% url 'crear_rendicion' %}" class="btn">📋 Crear primera rendición</a>
   </div>
 </div>
 {% endif %}
 
-<div style="margin-top:1.5rem;">
-  <a href="{% url 'panel_admin' %}" class="btn btn-outline">← Volver al panel</a>
+
+{# ══════════════════════════════════════════════════════════════════ #}
+{# TAB 3: COMISIONES A VENDEDORES (LiquidacionComision)             #}
+{# ══════════════════════════════════════════════════════════════════ #}
+{% elif seccion == 'comisiones' %}
+
+<p class="text-muted" style="margin-bottom:1rem; font-size:0.9rem;">
+  Comisiones acumuladas de vendedores. Tesorería deposita, el vendedor certifica recepción.
+</p>
+
+{% if liquidaciones %}
+<div class="card" style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Vendedor</th>
+        <th>Período</th>
+        <th style="text-align:right;">Monto comisión</th>
+        <th style="text-align:center;">Estado</th>
+        <th>Depositada</th>
+        <th>Certificada</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for liq in liquidaciones %}
+      <tr>
+        <td>
+          <strong>{{ liq.vendedor.nombre|default:liq.vendedor.correo }}</strong><br>
+          <span class="text-muted" style="font-size:0.82rem;">{{ liq.vendedor.correo }}</span>
+        </td>
+        <td style="font-size:0.85rem;">{{ liq.fecha_desde|date:"d/m/Y" }} → {{ liq.fecha_hasta|date:"d/m/Y" }}</td>
+        <td style="text-align:right; font-weight:700;">${{ liq.monto_total }}</td>
+        <td style="text-align:center;">
+          {% if liq.estado == "pendiente" %}
+            <span style="color:var(--color-warning, #e67e22); font-weight:600;">⏳ Pendiente</span>
+          {% elif liq.estado == "depositada" %}
+            <span style="color:var(--color-primary); font-weight:600;">💳 Depositada</span>
+          {% else %}
+            <span style="color:var(--color-success,#27ae60); font-weight:600;">✅ Certificada</span>
+          {% endif %}
+        </td>
+        <td style="font-size:0.85rem;">
+          {% if liq.depositada_en %}{{ liq.depositada_en|date:"d/m/Y" }}{% else %}—{% endif %}
+        </td>
+        <td style="font-size:0.85rem;">
+          {% if liq.certificada_en %}{{ liq.certificada_en|date:"d/m/Y" }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
+{% else %}
+<div class="card" style="text-align:center; padding:2rem; color:var(--color-text-muted);">
+  No hay liquidaciones de comisiones registradas.
+</div>
+{% endif %}
+
+{% endif %}{# fin tabs #}
+
 {% endblock %}
