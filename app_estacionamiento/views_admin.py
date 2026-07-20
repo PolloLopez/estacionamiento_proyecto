@@ -216,6 +216,19 @@ def panel_exenciones(request):
             patente  = sanitizar_patente(request.POST.get("patente") or "")
             vehiculo = _buscar_vehiculo(patente)
 
+        elif accion == "crear_vehiculo":
+            # El admin confirma crear un vehículo que no existe
+            patente = sanitizar_patente(request.POST.get("patente") or "")
+            tipo    = request.POST.get("tipo", "auto")
+            if tipo not in ("auto", "moto"):
+                tipo = "auto"
+            if patente:
+                vehiculo, _ = Vehiculo.objects.get_or_create(
+                    patente=patente,
+                    defaults={"tipo": tipo, "municipio": municipio},
+                )
+                messages.success(request, f"Vehículo {patente} creado. Configurá su exención.")
+
         elif accion == "guardar":
             patente  = sanitizar_patente(request.POST.get("patente") or "")
             vehiculo = _buscar_vehiculo(patente)
@@ -236,10 +249,19 @@ def panel_exenciones(request):
             else:
                 messages.error(request, "No se encontró el vehículo con esa patente.")
 
+    # Listado global: todos los vehículos con alguna exención en el municipio
+    vehiculos_exentos = Vehiculo.objects.filter(
+        Q(exento_global=True, municipio=municipio)
+        | Q(subcuadras_exentas__municipio=municipio)
+    ).distinct().prefetch_related(
+        "vehiculousuario_set__usuario", "subcuadras_exentas"
+    ).order_by("patente")
+
     return render(request, "admin/exenciones.html", {
-        "vehiculo":      vehiculo,
-        "subcuadras":    subcuadras,
-        "tipos_exencion": TIPOS_EXENCION,
+        "vehiculo":          vehiculo,
+        "subcuadras":        subcuadras,
+        "tipos_exencion":    TIPOS_EXENCION,
+        "vehiculos_exentos": vehiculos_exentos,
     })
 
 
