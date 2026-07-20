@@ -795,3 +795,33 @@ class LiquidacionComision(models.Model):
 
     def __str__(self):
         return f"{self.vendedor} — ${self.monto_total} [{self.get_estado_display()}]"
+
+
+class DestinatarioInforme(models.Model):
+    """
+    Email externo (o usuario del sistema) que recibe informes periódicos
+    del municipio (rendiciones, infracciones, recaudación).
+
+    El admin gestiona esta lista desde el tab "Informes" en rendiciones.
+    Los destinatarios no necesitan tener acceso al sistema.
+    """
+    municipio = models.ForeignKey(
+        Municipio, on_delete=models.CASCADE,
+        related_name="destinatarios_informe",
+    )
+    nombre = models.CharField(max_length=200, verbose_name="Nombre / cargo")
+    correo = models.EmailField(verbose_name="Email")
+    activo = models.BooleanField(
+        default=True,
+        help_text="Desactivar para excluir sin borrar el registro.",
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre"]
+        unique_together = [("municipio", "correo")]
+        verbose_name = "Destinatario de informe"
+        verbose_name_plural = "Destinatarios de informes"
+
+    def __str__(self):
+        return f"{self.nombre} <{self.correo}>"

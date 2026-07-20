@@ -53,10 +53,14 @@ DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
 ```
 **Disparador**: cuando se reactive el deploy en Railway.
 
-### 3. Exportación de reportes a Excel/PDF
-Descarga directa desde las vistas existentes:
+### 3. Exportación de reportes a Excel/PDF (parcial)
+Implementado:
+— **Infracciones impagas → PDF juzgado**: `/admin-infracciones/pdf-juzgado/` (usa reportlab).
+  Tabla con Acta#, Fecha, Patente, Inspector, Subcuadra, Monto, Días vencida.
+  También se adjunta al email del informe mensual.
+
+Pendiente:
 — **Inspectores**: botón "Descargar Excel" en `/admin-inspectores/estadisticas/` con las métricas del período.
-— **Infracciones**: botón "Descargar PDF" en `admin-infracciones/` con el listado filtrado.
 — **Rendiciones**: exportar cierre de caja a PDF para tesorería.
 — Implementable con `openpyxl` (instalar) y `reportlab` (ya instalado).
 
@@ -154,6 +158,17 @@ Muestra: infracciones del día, recaudación, inspectores activos, vehículos ve
 ---
 
 ## ✅ Resuelto
+
+### feat: informes mensuales en rendiciones + PDF juzgado + impagas (2026-07-20) ✅
+- **DestinatarioInforme**: nuevo modelo (municipio, nombre, correo, activo). Migración 0041.
+- **rendiciones.html**: 4º tab "📨 Informes". Gestión de destinatarios (agregar/toggle/quitar).
+  Formulario de envío: período, secciones seleccionables (rendiciones / vendedores / infracciones),
+  destinatarios activos pre-marcados.
+- **admin_rendiciones** (view): maneja POST actions `agregar_destinatario`, `quitar_destinatario`,
+  `toggle_destinatario`, `enviar_informe`. Email con `EmailMessage` + adjunto PDF impagas.
+- **PDF juzgado de faltas**: helper `_generar_pdf_infracciones_juzgado()` (reportlab).
+  Vista `/admin-infracciones/pdf-juzgado/` para descarga directa. Filtros: desde/hasta.
+- **admin_infracciones**: badge contador de impagas + botón "📄 PDF juzgado" con filtros actuales.
 
 ### feat: estadísticas de inspectores (2026-07-20) ✅
 - Nueva vista `/admin-inspectores/estadisticas/` solo para admin.

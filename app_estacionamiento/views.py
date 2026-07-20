@@ -93,6 +93,7 @@ from .views_admin import (
     historial_vendedor,
     crear_conductor,
     estadisticas_inspectores,
+    pdf_infracciones_juzgado,
 )
 from .views_mp import (
     mp_iniciar_carga,

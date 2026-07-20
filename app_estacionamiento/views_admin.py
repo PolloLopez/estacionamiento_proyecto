@@ -740,13 +740,29 @@ def admin_infracciones(request):
 
     inspectores = Usuario.objects.filter(municipio=municipio, es_inspector=True)
 
+    # Conteo de impagas del municipio (sin filtros de la vista, dato global)
+    total_impagas = Infraccion.objects.filter(
+        municipio=municipio, estado="pendiente"
+    ).count()
+
     # Permite abrir el modal de detalle al entrar con ?detalle=ID
     detalle_id = request.GET.get("detalle", "").strip()
 
+    # URL para exportar PDF con los mismos filtros activos en la vista
+    from urllib.parse import urlencode
+    params_export = {}
+    if fecha_desde:
+        params_export["desde"] = fecha_desde
+    if fecha_hasta:
+        params_export["hasta"] = fecha_hasta
+    export_pdf_url = "/usuarios/admin-infracciones/pdf-juzgado/?" + urlencode(params_export)
+
     return render(request, "admin/infracciones.html", {
-        "infracciones": infracciones[:200],
-        "inspectores":  inspectores,
-        "detalle_id":  detalle_id,
+        "infracciones":  infracciones[:200],
+        "inspectores":   inspectores,
+        "detalle_id":    detalle_id,
+        "total_impagas": total_impagas,
+        "export_pdf_url": export_pdf_url,
         "filtros": {
             "patente":     patente,
             "inspector":   inspector_id,
@@ -966,7 +982,165 @@ def admin_rendiciones(request):
         municipio=municipio
     ).select_related("vendedor", "rendicion").order_by("-creado_en")[:50]
 
-    seccion = request.GET.get("seccion", "cierres")  # cierres / rendiciones / comisiones
+    seccion = request.GET.get("seccion", "cierres")  # cierres / rendiciones / comisiones / informes
+
+    # ── Tab Informes ────────────────────────────────────────────────────────
+    from .models import DestinatarioInforme
+    from datetime import date as date_type
+    from django.core.mail import EmailMessage
+
+    destinatarios = DestinatarioInforme.objects.filter(municipio=municipio)
+    informe_enviado = False
+    informe_error   = None
+
+    if request.method == "POST" and request.POST.get("accion_informe"):
+        accion_informe = request.POST.get("accion_informe")
+
+        if accion_informe == "agregar_destinatario":
+            nombre = request.POST.get("dest_nombre", "").strip()
+            correo = request.POST.get("dest_correo", "").strip()
+            if nombre and correo:
+                DestinatarioInforme.objects.get_or_create(
+                    municipio=municipio, correo=correo,
+                    defaults={"nombre": nombre},
+                )
+            return redirect(request.get_full_path().split("?")[0] + "?seccion=informes")
+
+        elif accion_informe == "quitar_destinatario":
+            dest_id = request.POST.get("dest_id")
+            DestinatarioInforme.objects.filter(id=dest_id, municipio=municipio).delete()
+            return redirect(request.get_full_path().split("?")[0] + "?seccion=informes")
+
+        elif accion_informe == "toggle_destinatario":
+            dest_id = request.POST.get("dest_id")
+            dest = DestinatarioInforme.objects.filter(id=dest_id, municipio=municipio).first()
+            if dest:
+                dest.activo = not dest.activo
+                dest.save(update_fields=["activo"])
+            return redirect(request.get_full_path().split("?")[0] + "?seccion=informes")
+
+        elif accion_informe == "enviar_informe":
+            # Período
+            inf_desde_str = request.POST.get("inf_desde", "")
+            inf_hasta_str = request.POST.get("inf_hasta", "")
+            try:
+                inf_desde = date_type.fromisoformat(inf_desde_str)
+            except ValueError:
+                inf_desde = date_type.today().replace(day=1)
+            try:
+                inf_hasta = date_type.fromisoformat(inf_hasta_str)
+            except ValueError:
+                inf_hasta = date_type.today()
+
+            # Secciones seleccionadas
+            secciones = request.POST.getlist("secciones")
+
+            # Destinatarios seleccionados
+            dest_ids = request.POST.getlist("dest_ids")
+            correos_dest = list(
+                DestinatarioInforme.objects
+                .filter(id__in=dest_ids, municipio=municipio)
+                .values_list("correo", flat=True)
+            )
+
+            if not correos_dest:
+                informe_error = "Selecciona al menos un destinatario."
+            else:
+                # Construir cuerpo del email
+                nombre_mun = municipio.nombre if municipio else "Municipio"
+                periodo_str = f"{inf_desde.strftime('%d/%m/%Y')} al {inf_hasta.strftime('%d/%m/%Y')}"
+                asunto = f"Informe {nombre_mun} — {periodo_str}"
+
+                cuerpo_lineas = [
+                    f"Informe del Sistema de Estacionamiento Medido — {nombre_mun}",
+                    f"Período: {periodo_str}",
+                    "",
+                ]
+
+                adjuntos = []
+
+                if "rendiciones" in secciones:
+                    total_rendido = Rendicion.objects.filter(
+                        admin__municipio=municipio,
+                        fecha_desde__date__gte=inf_desde,
+                        fecha_hasta__date__lte=inf_hasta,
+                    ).aggregate(t=Sum("monto_total"))["t"] or 0
+                    cierres_cert = CierreCaja.objects.filter(
+                        usuario__municipio=municipio,
+                        fecha_cierre__date__gte=inf_desde,
+                        fecha_cierre__date__lte=inf_hasta,
+                        certificado=True,
+                    ).aggregate(t=Sum("monto_municipio"))["t"] or 0
+                    cuerpo_lineas += [
+                        "=== RESUMEN DE RENDICIONES ===",
+                        f"Cierres de caja certificados: ${cierres_cert:,.0f}",
+                        f"Rendiciones a tesorería: ${total_rendido:,.0f}",
+                        "",
+                    ]
+
+                if "vendedores" in secciones:
+                    from django.db.models import Sum as DjSum
+                    vendedores_recap = (
+                        MovimientoCaja.objects
+                        .filter(usuario__municipio=municipio, tipo="ingreso",
+                                creado_en__date__gte=inf_desde, creado_en__date__lte=inf_hasta)
+                        .values("usuario__first_name", "usuario__last_name", "usuario__correo")
+                        .annotate(total=Sum("monto"))
+                        .order_by("-total")
+                    )
+                    cuerpo_lineas.append("=== RECAUDACIÓN POR VENDEDOR ===")
+                    for v in vendedores_recap:
+                        nombre_v = f"{v['usuario__first_name']} {v['usuario__last_name']}".strip() or v["usuario__correo"]
+                        cuerpo_lineas.append(f"  {nombre_v}: ${v['total']:,.0f}")
+                    cuerpo_lineas.append("")
+
+                if "infracciones" in secciones:
+                    cant_imp = Infraccion.objects.filter(
+                        municipio=municipio, estado="pendiente",
+                        creado_en__date__gte=inf_desde, creado_en__date__lte=inf_hasta,
+                    ).count()
+                    cant_pag = Infraccion.objects.filter(
+                        municipio=municipio, estado="pagada",
+                        creado_en__date__gte=inf_desde, creado_en__date__lte=inf_hasta,
+                    ).count()
+                    cuerpo_lineas += [
+                        "=== INFRACCIONES ===",
+                        f"Impagas del período: {cant_imp}",
+                        f"Cobradas del período: {cant_pag}",
+                        "",
+                    ]
+                    # Adjuntar PDF del juzgado
+                    try:
+                        pdf_bytes = _generar_pdf_infracciones_juzgado(municipio, inf_desde, inf_hasta)
+                        adjuntos.append((
+                            f"infracciones_impagas_{inf_desde.strftime('%Y%m%d')}.pdf",
+                            pdf_bytes,
+                            "application/pdf",
+                        ))
+                    except Exception as e:
+                        cuerpo_lineas.append(f"(No se pudo adjuntar PDF: {e})")
+
+                cuerpo_lineas += [
+                    "---",
+                    "Este email fue generado automáticamente por el Sistema de Estacionamiento Medido.",
+                ]
+
+                try:
+                    email = EmailMessage(
+                        subject=asunto,
+                        body="\n".join(cuerpo_lineas),
+                        to=correos_dest,
+                    )
+                    for nombre_adj, datos_adj, mime_adj in adjuntos:
+                        email.attach(nombre_adj, datos_adj, mime_adj)
+                    email.send(fail_silently=False)
+                    informe_enviado = True
+                    messages.success(request, f"Informe enviado a {len(correos_dest)} destinatario(s).")
+                except Exception as e:
+                    informe_error = f"Error al enviar: {e}"
+                    messages.error(request, informe_error)
+
+            return redirect(request.get_full_path().split("?")[0] + "?seccion=informes")
 
     return render(request, "admin/rendiciones.html", {
         "cierres":            page_obj,
@@ -980,6 +1154,9 @@ def admin_rendiciones(request):
         "mis_rendiciones":    mis_rendiciones,
         "liquidaciones":      liquidaciones,
         "seccion":            seccion,
+        "destinatarios":      destinatarios,
+        "informe_enviado":    informe_enviado,
+        "informe_error":      informe_error,
     })
 
 
@@ -1390,6 +1567,161 @@ def admin_estacionamientos(request):
             "fecha_hasta": fecha_hasta,
         },
     })
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PDF infracciones impagas — para presentar en juzgado de faltas
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _generar_pdf_infracciones_juzgado(municipio, desde, hasta, infracciones_qs=None):
+    """
+    Genera un PDF con las infracciones impagas del municipio en el rango de fechas.
+    Retorna bytes del PDF listo para HttpResponse o adjunto de email.
+
+    Args:
+        municipio: objeto Municipio
+        desde / hasta: date objects
+        infracciones_qs: queryset ya filtrado (opcional). Si None, filtra impagas del rango.
+    """
+    import io
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, Paragraph
+
+    if infracciones_qs is None:
+        infracciones_qs = (
+            Infraccion.objects
+            .filter(municipio=municipio, estado="pendiente",
+                    creado_en__date__gte=desde, creado_en__date__lte=hasta)
+            .select_related("vehiculo", "inspector", "subcuadra")
+            .order_by("creado_en")
+        )
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=2*cm, leftMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm,
+    )
+    estilos = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle("titulo", parent=estilos["Title"], fontSize=14, alignment=TA_CENTER)
+    estilo_sub    = ParagraphStyle("sub",    parent=estilos["Normal"], fontSize=9,
+                                   textColor=colors.HexColor("#555555"), alignment=TA_CENTER)
+    estilo_pie    = ParagraphStyle("pie",    parent=estilos["Normal"], fontSize=8,
+                                   textColor=colors.HexColor("#888888"))
+
+    partes = []
+
+    municipio_nombre = municipio.nombre if municipio else "Municipio"
+    generado_en = timezone.localtime().strftime("%d/%m/%Y %H:%M")
+
+    partes.append(Paragraph(f"Infracciones impagas — {municipio_nombre}", estilo_titulo))
+    partes.append(Paragraph(
+        f"Período: {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')} "
+        f"&nbsp;|&nbsp; Generado: {generado_en}",
+        estilo_sub,
+    ))
+    partes.append(Spacer(1, 0.6*cm))
+
+    encabezado = ["#Acta", "Fecha", "Patente", "Inspector", "Subcuadra", "Monto", "Días"]
+    filas = [encabezado]
+
+    hoy = timezone.localtime().date()
+    monto_total = 0
+    for inf in infracciones_qs:
+        dias = (hoy - timezone.localtime(inf.creado_en).date()).days
+        filas.append([
+            str(inf.id),
+            timezone.localtime(inf.creado_en).strftime("%d/%m/%Y"),
+            inf.vehiculo.patente if inf.vehiculo else "—",
+            inf.inspector.nombre_completo() if inf.inspector else "—",
+            str(inf.subcuadra) if inf.subcuadra else "—",
+            f"${inf.monto:,.0f}",
+            str(dias),
+        ])
+        monto_total += inf.monto
+
+    if len(filas) == 1:
+        partes.append(Paragraph("Sin infracciones impagas en el período.", estilos["Normal"]))
+    else:
+        anchos = [1.4*cm, 2.2*cm, 2.2*cm, 4.0*cm, 3.5*cm, 2.0*cm, 1.4*cm]
+        tabla = Table(filas, colWidths=anchos, repeatRows=1)
+        tabla.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, 0), 8),
+            ("FONTSIZE",      (0, 1), (-1, -1), 7.5),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
+            ("ALIGN",         (5, 0), (6, -1), "RIGHT"),
+            ("ALIGN",         (0, 0), (0, -1), "RIGHT"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        partes.append(tabla)
+        partes.append(Spacer(1, 0.5*cm))
+        total_actas = len(filas) - 1
+        partes.append(Paragraph(
+            f"Total: <b>{total_actas}</b> acta{'s' if total_actas != 1 else ''} "
+            f"&nbsp;|&nbsp; Monto total adeudado: <b>${monto_total:,.0f}</b>",
+            estilos["Normal"],
+        ))
+
+    partes.append(Spacer(1, 1.5*cm))
+    partes.append(Paragraph(
+        "Documento generado automáticamente por el Sistema de Estacionamiento Medido Municipal.",
+        estilo_pie,
+    ))
+
+    doc.build(partes)
+    buffer.seek(0)
+    return buffer.read()
+
+
+@require_role("admin")
+def pdf_infracciones_juzgado(request):
+    """
+    Descarga un PDF con las infracciones impagas del municipio.
+
+    Parámetros GET:
+        frecuencia: "diario" | "semanal" | "mensual" (pre-selecciona rango)
+        desde / hasta: YYYY-MM-DD (override manual)
+    """
+    from datetime import date as date_type, timedelta
+    from django.http import HttpResponse
+
+    municipio = request.user.municipio
+    hoy = timezone.localtime().date()
+
+    frecuencia = request.GET.get("frecuencia", "mensual")
+    desde_str  = request.GET.get("desde", "")
+    hasta_str  = request.GET.get("hasta", "")
+
+    try:
+        desde = date_type.fromisoformat(desde_str)
+    except ValueError:
+        if frecuencia == "diario":
+            desde = hoy
+        elif frecuencia == "semanal":
+            desde = hoy - timedelta(days=hoy.weekday())
+        else:  # mensual
+            desde = hoy.replace(day=1)
+
+    try:
+        hasta = date_type.fromisoformat(hasta_str)
+    except ValueError:
+        hasta = hoy
+
+    pdf_bytes = _generar_pdf_infracciones_juzgado(municipio, desde, hasta)
+    nombre = f"infracciones_impagas_{desde.strftime('%Y%m%d')}_{hasta.strftime('%Y%m%d')}.pdf"
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre}"'
+    return response
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Estadísticas de inspectores
