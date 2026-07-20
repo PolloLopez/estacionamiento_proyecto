@@ -133,7 +133,8 @@
             </thead>
             <tbody>
               {% for inf in infracciones_recientes %}
-              <tr>
+              <tr style="cursor:pointer;"
+                  onclick="location.href='{% url 'admin_infracciones' %}?detalle={{ inf.id }}'">
                 <td><strong>{{ inf.vehiculo.patente }}</strong></td>
                 <td>{{ inf.inspector.nombre|default:inf.inspector.correo }}</td>
                 <td>${{ inf.monto }}</td>

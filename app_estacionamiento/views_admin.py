@@ -579,9 +579,14 @@ def admin_infracciones(request):
 
         if accion == "anular" and infraccion_id:
             inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
+            motivo_anulacion = request.POST.get("motivo_anulacion", "").strip()
+            if not motivo_anulacion:
+                messages.error(request, "Debés ingresar un motivo para anular la infracción.")
+                return redirect(request.get_full_path() + f"#inf-{infraccion_id}")
             if inf.estado == "pendiente":
                 inf.estado = "anulada"
-                inf.save()
+                inf.motivo_anulacion = motivo_anulacion
+                inf.save(update_fields=["estado", "motivo_anulacion"])
                 messages.success(request, f"Infracción #{inf.id} anulada.")
 
         elif accion == "cobrar" and infraccion_id:
@@ -600,9 +605,13 @@ def admin_infracciones(request):
 
     inspectores = Usuario.objects.filter(municipio=municipio, es_inspector=True)
 
+    # Permite abrir el modal de detalle al entrar con ?detalle=ID
+    detalle_id = request.GET.get("detalle", "").strip()
+
     return render(request, "admin/infracciones.html", {
         "infracciones": infracciones[:200],
         "inspectores":  inspectores,
+        "detalle_id":  detalle_id,
         "filtros": {
             "patente":     patente,
             "inspector":   inspector_id,

@@ -463,6 +463,8 @@ class Infraccion(models.Model):
     monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     creado_en = models.DateTimeField(auto_now_add=True)   # única fecha de creación
     fecha_pago = models.DateTimeField(null=True, blank=True)
+    # Motivo requerido cuando el admin anula una infracción desde el panel
+    motivo_anulacion = models.TextField(blank=True, default="")
 
     def save(self, *args, **kwargs):
         if not self.municipio:
