@@ -24,7 +24,7 @@
 
   <div class="ticket">
 
-    <h3>🚨 INFRACCIÓN DE TRÁNSITO</h3>
+    <h3>🚨 ACTA DE INFRACCIÓN</h3>
     <p>{{ infraccion.municipio.nombre }}</p>
 
     <hr>
@@ -59,7 +59,8 @@
     {% endif %}
 
     <hr>
-    <p style="font-size:0.8rem;">Para pagar ingresá a la app con tu patente.</p>
+    <p style="font-size:0.8rem;">Para pagar ingresá a la app con tu patente.
+    estacionamiento.up.railway.app/</p>
 
   </div>
 
@@ -72,6 +73,14 @@
       🔍 Verificar otro
     </button>
   </div>
+
+  {% if infraccion.foto %}
+  <div class="no-print" style="margin-top:1.2rem;">
+    <img src="{{ infraccion.foto.url }}"
+         alt="Foto del acta"
+         style="max-width:320px; width:100%; border-radius:8px; border:1px solid #ccc;">
+  </div>
+  {% endif %}
 
 </body>
 <script>

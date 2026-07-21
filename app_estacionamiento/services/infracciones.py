@@ -54,9 +54,10 @@ def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector, subcuadr
         fecha_str = timezone.localtime().strftime("%d/%m/%Y %H:%M:%S")
         acc_str   = f" (+-{acc}m)" if acc else ""
         subcuadra_str = str(subcuadra) if subcuadra else ""
+        nombre_inspector = f"{inspector.first_name} {inspector.last_name}".strip() or inspector.correo
         texto_lineas = [
             f"Patente: {patente}",
-            f"Inspector: {inspector.correo}",
+            f"Inspector: {nombre_inspector}",
             *([ subcuadra_str ] if subcuadra_str else []),
             f"GPS: {lat}, {lon}{acc_str}",
             fecha_str,
