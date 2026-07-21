@@ -63,7 +63,7 @@ def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector, subcuadr
         ]
 
         ancho     = imagen.width
-        font_size = max(16, ancho // 40)
+        font_size = max(28, ancho // 22)  # más grande: 2600px → ~118px
 
         try:
             font = ImageFont.truetype(
