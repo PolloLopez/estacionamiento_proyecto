@@ -7,10 +7,10 @@ from django.urls import reverse
 # URLs que se pueden acceder sin tener municipio asignado.
 # Se usa startswith() para cubrir variantes con parámetros.
 URLS_EXENTAS_DE_MUNICIPIO = [
-    "/usuarios/completar-perfil/",
-    "/usuarios/logout/",
+    "/completar-perfil/",
+    "/logout/",
     "/accounts/",         # allauth (Google OAuth)
-    "/admin/",            # Django admin
+    "/sistema-interno/",  # Django admin
 ]
 
 
@@ -18,7 +18,7 @@ class RequiereMunicipioMiddleware:
     """
     Si el usuario está logueado pero no tiene municipio asignado,
     y el sistema tiene más de un municipio activo, lo redirige
-    a /usuarios/completar-perfil/ para que elija uno.
+    a /completar-perfil/ para que elija uno.
 
     En sistemas de un solo municipio el adapter ya lo asigna automáticamente
     al hacer login con Google, por lo que este middleware nunca actúa.

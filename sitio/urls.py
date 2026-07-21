@@ -10,14 +10,14 @@ urlpatterns = [
     # 🌐 ROOT → redirección inteligente por rol
     path("", inicio, name="inicio"),
 
-    # 🔐 ADMIN DJANGO
-    path("admin/", admin.site.urls),
-
-    # 🔌 APP PRINCIPAL
-    path("usuarios/", include("app_estacionamiento.urls")),
+    # 🔐 ADMIN DJANGO — URL no obvia para reducir bruteforce de bots
+    path("sistema-interno/", admin.site.urls),
 
     # 🔐 AUTH EXTERNO
     path("accounts/", include("allauth.urls")),
+
+    # 🔌 APP PRINCIPAL — sin prefijo, URLs directas en raíz
+    path("", include("app_estacionamiento.urls")),
 ]
 
 # Servir archivos de media a través de Django.

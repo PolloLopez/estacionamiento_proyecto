@@ -750,12 +750,13 @@ def admin_infracciones(request):
 
     # URL para exportar PDF con los mismos filtros activos en la vista
     from urllib.parse import urlencode
+    from django.urls import reverse as _reverse
     params_export = {}
     if fecha_desde:
         params_export["desde"] = fecha_desde
     if fecha_hasta:
         params_export["hasta"] = fecha_hasta
-    export_pdf_url = "/usuarios/admin-infracciones/pdf-juzgado/?" + urlencode(params_export)
+    export_pdf_url = _reverse("pdf_infracciones_juzgado") + ("?" + urlencode(params_export) if params_export else "")
 
     return render(request, "admin/infracciones.html", {
         "infracciones":  infracciones[:200],

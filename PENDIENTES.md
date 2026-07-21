@@ -1,10 +1,32 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-20
+Última actualización: 2026-07-21
+
+---
+
+## 🗺️ Contexto de deploy
+
+- **Railway** → ambiente de prueba (inspectores + admin testeando). No es producción municipal real.
+- **Digital Ocean** → deploy definitivo cuando el sistema vaya a municipios reales pagando.
+- El código es el mismo; los cambios son de infraestructura y configuración.
 
 ---
 
 ## 🔴 Alta prioridad
+
+### 🔐 SEGURIDAD: URL del Django Admin por defecto
+Contraseña ya cambiada ✅. Falta cambiar la URL en `sitio/urls.py`:
+```python
+path("gestion-interna-xxxxxx/", admin.site.urls),   # cualquier string no obvio
+```
+Corta el bruteforce automatizado de bots. 1 línea, deploy inmediato.
+
+### 🔐 SEGURIDAD: Webhook de MercadoPago sin verificación de firma
+El endpoint `/mp/webhook/` acepta cualquier POST sin verificar el header `x-signature` de MP.
+La mitigación actual (re-consultar la API de MP con el payment_id) es sólida, pero no es suficiente para producción municipal real.
+
+Implementar al migrar a Digital Ocean: HMAC-SHA256 del body con `MP_CLIENT_SECRET`.
+- Docs MP: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks#editor_1
 
 ### Media storage persistente (Cloudinary)
 Las fotos de infracciones se guardan en disco local (`media/`). Railway tiene **filesystem efímero**: los archivos se borran al hacer redeploy o restart.
@@ -64,7 +86,17 @@ Pendiente:
 — **Rendiciones**: exportar cierre de caja a PDF para tesorería.
 — Implementable con `openpyxl` (instalar) y `reportlab` (ya instalado).
 
-### 4. Tests faltantes
+### 4. 🔐 SEGURIDAD: FileField sin restricción en SolicitudVerificacion
+`documento_1` y `documento_2` aceptan cualquier tipo de archivo. Agregar validador:
+```python
+from django.core.validators import FileExtensionValidator
+documento_1 = models.FileField(
+    ...,
+    validators=[FileExtensionValidator(["pdf", "jpg", "jpeg", "png"])]
+)
+```
+
+### 8. Tests faltantes
 - Flujo MP webhook (integración)
 - `TestWatermarkGPS` pasando en Railway (verificar con Cloudinary activo)
 
@@ -77,6 +109,16 @@ Pendiente:
 - Nuevo rol `Staff`: solo reciben mails
 - Implementar envío de mails desde Django (depende de email Railway)
 
+### 🔐 Logging de eventos de seguridad
+Agregar logueo en `require_role()` cuando devuelve 403, y en `login_view()` cuando falla.
+(Baja urgencia en etapa de pruebas — más importante en producción municipal.)
+
+### 🔐 Límite máximo de monto en MercadoPago
+Validar en `mp_iniciar_carga` que el monto no supere un tope (ej. $50.000).
+
+### 🔐 Verificación de email al registrarse
+Incluida en el checklist de migración a DO. Requiere email SMTP funcionando primero.
+
 ### Flujo tesorería → vendedor: verificar UI completa
 El modelo `LiquidacionComision` ya tiene el flujo modelado.
 Verificar que la UI del vendedor sea clara para certificar que recibió su comisión.
@@ -87,8 +129,19 @@ En pantallas grandes el layout del panel admin queda con mucho espacio vacío.
 ### PWA / App móvil sin Play Store
 `manifest.json` + service worker básico (offline fallback).
 
-### Evaluar migración a Digital Ocean
-**Disparador**: cuando el sistema tenga usuarios reales pagando.
+### Migración a Digital Ocean (producción municipal real)
+**Disparador**: cuando el sistema pase de pruebas a municipio real pagando.
+
+Checklist para el deploy en DO:
+- Gunicorn: `--workers $((2 * CPU + 1))` (ej: 3 workers con 1 vCPU)
+- Remover pandas/numpy de requirements (solo se usan en análisis offline, pesan 80MB por worker)
+- Configurar Nginx como proxy reverso (DO Droplet o App Platform)
+- Verificar firma de webhook de MercadoPago (`x-signature`)
+- Rate limiting en login (`django-ratelimit`)
+- CSP headers (`django-csp`)
+- Verificación de email al registrarse (`ACCOUNT_EMAIL_VERIFICATION = "optional"`)
+- Cloudinary con signed URLs para fotos de infracciones
+- Backups automáticos de PostgreSQL configurados y testeados
 
 ### Inspector como cobrador
 Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `cobrar_abono`.

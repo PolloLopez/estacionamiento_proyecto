@@ -187,7 +187,7 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 DEFAULT_FROM_EMAIL  = os.getenv("DEFAULT_FROM_EMAIL", "Sistema de Estacionamiento <noreply@estacionamiento.ar>")
 
 # ─── Login / Logout ───────────────────────────────────────────────────────────
-LOGIN_URL = "/usuarios/login/"
+LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
 
 # ─── Allauth (login solo con email, sin username) ─────────────────────────────

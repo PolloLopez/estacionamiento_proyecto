@@ -26,6 +26,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
 from .decorators import require_login
@@ -66,13 +67,6 @@ def mp_iniciar_carga(request):
 
     sdk = mercadopago.SDK(access_token)
 
-    # La URL base del sitio (necesaria para los callbacks de MP).
-    # En Railway, el proxy termina el SSL. Forzamos HTTPS en producción
-    # porque MP requiere HTTPS estricto en back_urls.
-    base_url = request.build_absolute_uri("/").rstrip("/")
-    if not settings.DEBUG:
-        base_url = base_url.replace("http://", "https://")
-
     preferencia = {
         "items": [
             {
@@ -83,13 +77,13 @@ def mp_iniciar_carga(request):
             }
         ],
         "back_urls": {
-            "success": f"{base_url}/usuarios/mp/exitoso/",
-            "failure": f"{base_url}/usuarios/mp/fallido/",
-            "pending": f"{base_url}/usuarios/mp/pendiente/",
+            "success": request.build_absolute_uri(reverse("mp_exitoso")),
+            "failure": request.build_absolute_uri(reverse("mp_fallido")),
+            "pending": request.build_absolute_uri(reverse("mp_pendiente")),
         },
         # auto_return eliminado: requería back_urls HTTPS estricto y daba
         # error 400 "auto_return invalid". El webhook + back_urls alcanzan.
-        "notification_url": f"{base_url}/usuarios/mp/webhook/",
+        "notification_url": request.build_absolute_uri(reverse("mp_webhook")),
         # Metadatos para identificar al usuario en el webhook
         "metadata": {
             "usuario_id": str(request.user.id),
