@@ -57,9 +57,9 @@ def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector, subcuadr
         texto_lineas = [
             f"Patente: {patente}",
             f"Inspector: {inspector.correo}",
-            *([ f"Subcuadra: {subcuadra_str}" ] if subcuadra_str else []),
+            *([ subcuadra_str ] if subcuadra_str else []),
             f"GPS: {lat}, {lon}{acc_str}",
-            f"Fecha: {fecha_str}",
+            fecha_str,
         ]
 
         ancho     = imagen.width
