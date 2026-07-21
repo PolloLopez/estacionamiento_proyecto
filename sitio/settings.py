@@ -171,8 +171,6 @@ STORAGES = {
 # suben automáticamente a la nube. En local sin esas variables, usa el filesystem.
 _cloudinary_cloud = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
 if _cloudinary_cloud:
-    import cloudinary
-
     INSTALLED_APPS += ["cloudinary_storage", "cloudinary"]
 
     CLOUDINARY_STORAGE = {
