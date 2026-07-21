@@ -184,7 +184,9 @@ if _cloudinary_cloud:
     STORAGES["default"] = {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     }
-    MEDIA_URL = f"https://res.cloudinary.com/{_cloudinary_cloud}/"
+    # MEDIA_URL vacío: django-cloudinary-storage construye la URL completa de Cloudinary
+    # internamente. Si se setea a la URL base de Cloudinary, la URL se duplica.
+    MEDIA_URL = ""
     MEDIA_ROOT = ""  # No se usa con Cloudinary
 else:
     # Desarrollo local: filesystem normal
