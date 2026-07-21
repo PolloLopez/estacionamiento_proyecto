@@ -157,8 +157,14 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-# WhiteNoise comprime y cachea los estáticos automáticamente en producción.
-STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
+# Django 5.x: STORAGES reemplaza DEFAULT_FILE_STORAGE y STATICFILES_STORAGE.
+# Se define acá con WhiteNoise para estáticos; el bloque de Cloudinary
+# agrega el "default" si las variables están seteadas.
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
 
 # ─── Archivos de media (fotos infracciones, logos) ───────────────────────────
 # Si las variables de Cloudinary están seteadas (en Railway), las fotos se
@@ -174,7 +180,10 @@ if _cloudinary_cloud:
         "API_KEY":    os.getenv("CLOUDINARY_API_KEY", ""),
         "API_SECRET": os.getenv("CLOUDINARY_API_SECRET", ""),
     }
-    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+    # "default" = storage para ImageField/FileField → Cloudinary
+    STORAGES["default"] = {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    }
     MEDIA_URL = f"https://res.cloudinary.com/{_cloudinary_cloud}/"
     MEDIA_ROOT = ""  # No se usa con Cloudinary
 else:
