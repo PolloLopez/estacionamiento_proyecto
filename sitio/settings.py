@@ -169,7 +169,7 @@ STORAGES = {
 # ─── Archivos de media (fotos infracciones, logos) ───────────────────────────
 # Si las variables de Cloudinary están seteadas (en Railway), las fotos se
 # suben automáticamente a la nube. En local sin esas variables, usa el filesystem.
-_cloudinary_cloud = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+_cloudinary_cloud = os.getenv("CLOUDINARY_CLOUD_NAME", "").strip()
 if _cloudinary_cloud:
     import cloudinary
 
