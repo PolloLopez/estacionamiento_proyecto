@@ -63,7 +63,7 @@ def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector, subcuadr
         ]
 
         ancho     = imagen.width
-        font_size = max(28, ancho // 22)  # más grande: 2600px → ~118px
+        font_size = max(32, ancho // 28)  # 2600px → ~93px, bien visible
 
         try:
             font = ImageFont.truetype(
@@ -75,7 +75,11 @@ def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector, subcuadr
                     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", font_size
                 )
             except Exception:
-                font = ImageFont.load_default()
+                # Pillow 10+ soporta size en load_default; si falla usamos el fijo
+                try:
+                    font = ImageFont.load_default(size=font_size)
+                except TypeError:
+                    font = ImageFont.load_default()
 
         linea_alto = font_size + 4
         bloque_alto = linea_alto * len(texto_lineas) + 10
