@@ -160,9 +160,27 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # WhiteNoise comprime y cachea los estáticos automáticamente en producción.
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
-# ─── Archivos de media (fotos infracciones) ───────────────────────────────────
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# ─── Archivos de media (fotos infracciones, logos) ───────────────────────────
+# Si las variables de Cloudinary están seteadas (en Railway), las fotos se
+# suben automáticamente a la nube. En local sin esas variables, usa el filesystem.
+_cloudinary_cloud = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+if _cloudinary_cloud:
+    import cloudinary
+
+    INSTALLED_APPS += ["cloudinary_storage", "cloudinary"]
+
+    CLOUDINARY_STORAGE = {
+        "CLOUD_NAME": _cloudinary_cloud,
+        "API_KEY":    os.getenv("CLOUDINARY_API_KEY", ""),
+        "API_SECRET": os.getenv("CLOUDINARY_API_SECRET", ""),
+    }
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+    MEDIA_URL = f"https://res.cloudinary.com/{_cloudinary_cloud}/"
+    MEDIA_ROOT = ""  # No se usa con Cloudinary
+else:
+    # Desarrollo local: filesystem normal
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = BASE_DIR / "media"
 
 # ─── Email (SMTP) ─────────────────────────────────────────────────────────────
 # En local: si no definís EMAIL_HOST_USER, los emails se muestran en consola.

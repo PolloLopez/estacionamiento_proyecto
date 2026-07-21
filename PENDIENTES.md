@@ -1,6 +1,6 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-21
+Última actualización: 2026-07-22
 
 ---
 
@@ -14,12 +14,8 @@
 
 ## 🔴 Alta prioridad
 
-### 🔐 SEGURIDAD: URL del Django Admin por defecto
-Contraseña ya cambiada ✅. Falta cambiar la URL en `sitio/urls.py`:
-```python
-path("gestion-interna-xxxxxx/", admin.site.urls),   # cualquier string no obvio
-```
-Corta el bruteforce automatizado de bots. 1 línea, deploy inmediato.
+### 🔐 SEGURIDAD: URL del Django Admin ✅
+Contraseña cambiada ✅. URL movida a `/sistema-interno/` ✅.
 
 ### 🔐 SEGURIDAD: Webhook de MercadoPago sin verificación de firma
 El endpoint `/mp/webhook/` acepta cualquier POST sin verificar el header `x-signature` de MP.
@@ -96,7 +92,7 @@ documento_1 = models.FileField(
 )
 ```
 
-### 8. Tests faltantes
+### 5. Tests faltantes
 - Flujo MP webhook (integración)
 - `TestWatermarkGPS` pasando en Railway (verificar con Cloudinary activo)
 
@@ -211,6 +207,12 @@ Muestra: infracciones del día, recaudación, inspectores activos, vehículos ve
 ---
 
 ## ✅ Resuelto
+
+### refactor: quitar prefijo /usuarios/ + URL admin (2026-07-21) ✅
+- Todas las URLs pasaron a la raíz: `/login/`, `/inspectores/`, `/admin-infracciones/`, etc.
+- Admin Django movido a `/sistema-interno/` (URL no obvia).
+- Callbacks de MercadoPago via `reverse()` + `build_absolute_uri()` (no más hardcodeo).
+- `LOGIN_URL`, middleware y `export_pdf_url` actualizados en consecuencia.
 
 ### feat: informes mensuales en rendiciones + PDF juzgado + impagas (2026-07-20) ✅
 - **DestinatarioInforme**: nuevo modelo (municipio, nombre, correo, activo). Migración 0041.
