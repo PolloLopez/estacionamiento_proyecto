@@ -182,15 +182,29 @@ def crear_infraccion(
             patente=patente, inspector=inspector, subcuadra=subcuadra,
         )
 
-    infraccion = Infraccion.objects.create(
-        vehiculo=vehiculo,
-        inspector=inspector,
-        municipio=municipio,
-        subcuadra=subcuadra,
-        estacionamiento=estacionamiento,
-        foto=foto_final,
-        monto=monto,
-    )
+    # Intentar crear con foto. Si el storage (Cloudinary) falla, guardar sin foto
+    # para no perder el acta. El inspector puede agregar la foto manualmente si hace falta.
+    try:
+        infraccion = Infraccion.objects.create(
+            vehiculo=vehiculo,
+            inspector=inspector,
+            municipio=municipio,
+            subcuadra=subcuadra,
+            estacionamiento=estacionamiento,
+            foto=foto_final,
+            monto=monto,
+        )
+    except Exception as e:
+        logger.error("Error al guardar foto de infraccion (¿Cloudinary?): %s", e)
+        infraccion = Infraccion.objects.create(
+            vehiculo=vehiculo,
+            inspector=inspector,
+            municipio=municipio,
+            subcuadra=subcuadra,
+            estacionamiento=estacionamiento,
+            foto=None,
+            monto=monto,
+        )
 
     # Trazabilidad: marcar que la última verificación generó infracción
     ultima_verificacion = VerificacionInspector.objects.filter(
