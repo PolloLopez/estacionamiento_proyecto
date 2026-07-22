@@ -52,14 +52,18 @@ def _agregar_marca_de_agua_gps(foto, lat, lon, acc, patente, inspector, subcuadr
             imagen = imagen.convert("RGB")
 
         fecha_str = timezone.localtime().strftime("%d/%m/%Y %H:%M:%S")
-        acc_str   = f" (+-{acc}m)" if acc else ""
-        subcuadra_str = str(subcuadra) if subcuadra else ""
+        subcuadra_str    = str(subcuadra) if subcuadra else ""
         nombre_inspector = f"{inspector.first_name} {inspector.last_name}".strip() or inspector.correo
+        if lat and lon:
+            acc_str = f" (+-{acc}m)" if acc else ""
+            gps_linea = f"GPS: {lat}, {lon}{acc_str}"
+        else:
+            gps_linea = "GPS: sin señal"
         texto_lineas = [
             f"Patente: {patente}",
             f"Inspector: {nombre_inspector}",
             *([ subcuadra_str ] if subcuadra_str else []),
-            f"GPS: {lat}, {lon}{acc_str}",
+            gps_linea,
             fecha_str,
         ]
 
@@ -180,8 +184,9 @@ def crear_infraccion(
     tarifa = Tarifa.objects.filter(municipio=municipio).first()
     monto  = tarifa.monto_infraccion if tarifa else Decimal("0")
 
+    # Siempre agregar marca de agua si hay foto (GPS opcional — muestra "sin señal" si falta)
     foto_final = foto
-    if foto and gps_lat and gps_lon:
+    if foto:
         foto_final = _agregar_marca_de_agua_gps(
             foto=foto, lat=gps_lat, lon=gps_lon, acc=gps_acc,
             patente=patente, inspector=inspector, subcuadra=subcuadra,

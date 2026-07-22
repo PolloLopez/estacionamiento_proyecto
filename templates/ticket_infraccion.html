@@ -84,13 +84,9 @@
 
 </body>
 <script>
-  // Después de cerrar el diálogo de impresión, redirige automáticamente al verificador
+  // Después de imprimir, redirige automáticamente al verificador
   window.onafterprint = function() {
     window.location.href = "{% url 'inspectores_verificar_vehiculo' %}";
-  };
-  // Abrir impresión automáticamente al cargar
-  window.onload = function() {
-    window.print();
   };
 </script>
 </html>
