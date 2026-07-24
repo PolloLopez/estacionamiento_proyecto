@@ -143,6 +143,29 @@ def marcar_notificacion_leida(request, notif_id):
 # Verificación de identidad y exenciones
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Tipos y tamaño máximo permitidos para los documentos de verificación/exención.
+_TIPOS_DOCUMENTO_PERMITIDOS = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
+_TAMAÑO_MAX_DOCUMENTO_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def _validar_documento(archivo):
+    """
+    Valida tipo y tamaño de un archivo subido por el conductor.
+    Retorna None si es válido, o un string con el mensaje de error.
+
+    No depende de la extensión (fácil de falsificar) sino del content_type
+    que Django detecta del header MIME enviado por el browser.
+    """
+    if archivo is None:
+        return None
+    if archivo.content_type not in _TIPOS_DOCUMENTO_PERMITIDOS:
+        return f"Tipo de archivo no permitido ({archivo.content_type}). Usá JPG, PNG, WEBP o PDF."
+    if archivo.size > _TAMAÑO_MAX_DOCUMENTO_BYTES:
+        mb = archivo.size / 1024 / 1024
+        return f"El archivo pesa {mb:.1f} MB; el máximo permitido es 10 MB."
+    return None
+
+
 @require_role("conductor")
 def solicitar_verificacion(request):
     """
@@ -203,6 +226,15 @@ def solicitar_verificacion(request):
         # Validar documentos según tipo de exención
         doc1 = request.FILES.get("documento_1")
         doc2 = request.FILES.get("documento_2")
+
+        # Validar tipo y tamaño antes de llegar a la lógica de negocio
+        for archivo in filter(None, [doc1, doc2]):
+            error_doc = _validar_documento(archivo)
+            if error_doc:
+                messages.error(request, error_doc)
+                return render(request, "usuarios/solicitar_verificacion.html", {
+                    "solicitud": solicitud, "vehiculos": vehiculos_usuario,
+                })
 
         if solicita_exencion:
             if not tipo_exencion_sol:

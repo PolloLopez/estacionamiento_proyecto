@@ -676,13 +676,14 @@ class TestSinRendirMetrica(TestCase):
     def test_cierre_no_certificado_suma_al_sin_rendir(self):
         from app_estacionamiento.models import CierreCaja
         from django.db.models import Sum
+        from django.utils import timezone
         # Cierre no certificado con monto_municipio=200
         CierreCaja.objects.create(
             usuario=self.vendedor,
             total_cobrado=Decimal("200"),
             monto_municipio=Decimal("200"),
             ganancia_usuario=Decimal("0"),
-            fecha_apertura=__import__("django.utils.timezone", fromlist=["timezone"]).timezone.now(),
+            fecha_apertura=timezone.now(),
             cantidad_movimientos=1,
             certificado=False,
         )

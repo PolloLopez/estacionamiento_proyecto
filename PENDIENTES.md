@@ -1,6 +1,6 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-22
+Última actualización: 2026-07-24 (auditoría de seguridad)
 
 ---
 
@@ -21,33 +21,25 @@ Contraseña cambiada ✅. URL movida a `/sistema-interno/` ✅.
 El endpoint `/mp/webhook/` acepta cualquier POST sin verificar el header `x-signature` de MP.
 La mitigación actual (re-consultar la API de MP con el payment_id) es sólida, pero no es suficiente para producción municipal real.
 
-Implementar al migrar a Digital Ocean: HMAC-SHA256 del body con `MP_CLIENT_SECRET`.
+Implementar al migrar a Digital Ocean: verificar `x-signature` via HMAC-SHA256 con `MP_WEBHOOK_SECRET`.
+Agregar `MP_WEBHOOK_SECRET` como variable de entorno en Railway.
 - Docs MP: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks#editor_1
 
-### Media storage persistente (Cloudinary)
-Las fotos de infracciones se guardan en disco local (`media/`). Railway tiene **filesystem efímero**: los archivos se borran al hacer redeploy o restart.
+### 🔐 SEGURIDAD: Rate limiting en login
+El `login_view` manual (`views_auth.py`) no tiene protección contra brute force.
+Instalar `django-axes` (2 líneas en INSTALLED_APPS + MIDDLEWARE + migración):
+```
+pip install django-axes
+# INSTALLED_APPS += ["axes"]
+# MIDDLEWARE: "axes.middleware.AxesMiddleware" después de SecurityMiddleware
+# AXES_FAILURE_LIMIT = 5 / AXES_COOLOFF_TIME = 1
+```
 
-Pasos:
-1. Crear cuenta en https://cloudinary.com (plan free, 25 GB)
-2. `pip install cloudinary django-cloudinary-storage` + agregar a `requirements.txt`
-3. En `settings.py`:
-   ```python
-   INSTALLED_APPS += ["cloudinary_storage", "cloudinary"]
-   CLOUDINARY_STORAGE = {
-       "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME"),
-       "API_KEY":    env("CLOUDINARY_API_KEY"),
-       "API_SECRET": env("CLOUDINARY_API_SECRET"),
-   }
-   DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-   ```
-4. Agregar 3 variables en Railway: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+### 🔐 SEGURIDAD: Idempotencia MP basada en texto libre
+`acreditar_saldo_mp.py` usa `descripcion__contains="MP:{payment_id}"` para evitar double-credit.
+Si el formato de descripción cambia, la idempotencia se rompe silenciosamente.
+Fix: agregar campo `mp_payment_id = CharField(max_length=50, null=True, unique=True)` a `MovimientoCaja`.
 
-**Afecta**: `Infraccion.foto`, `Municipio.logo`.
-
-### Bug: foto en infracción — verificar flujo completo
-Algunas infracciones se guardaron sin foto.
-— Una vez implementado Cloudinary, verificar end-to-end que foto llega a la BD.
-— Si persiste, agregar log en `crear_infraccion()` cuando `foto` llega None.
 
 ---
 
@@ -82,15 +74,13 @@ Pendiente:
 — **Rendiciones**: exportar cierre de caja a PDF para tesorería.
 — Implementable con `openpyxl` (instalar) y `reportlab` (ya instalado).
 
-### 4. 🔐 SEGURIDAD: FileField sin restricción en SolicitudVerificacion
-`documento_1` y `documento_2` aceptan cualquier tipo de archivo. Agregar validador:
+### 4. 🔐 SEGURIDAD: Verificación de email al registrarse
+`ACCOUNT_EMAIL_VERIFICATION = "none"` permite registrarse con cualquier email sin verificar.
+Activar cuando email SMTP esté configurado en Railway:
 ```python
-from django.core.validators import FileExtensionValidator
-documento_1 = models.FileField(
-    ...,
-    validators=[FileExtensionValidator(["pdf", "jpg", "jpeg", "png"])]
-)
+ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ```
+Depende de: Email configurado en Railway (ver punto 2).
 
 ### 5. Tests faltantes
 - Flujo MP webhook (integración)
@@ -207,6 +197,46 @@ Muestra: infracciones del día, recaudación, inspectores activos, vehículos ve
 ---
 
 ## ✅ Resuelto
+
+### fix: auditoría de seguridad — hardening inmediato (2026-07-24) ✅
+Informe completo: `AUDITORIA_SEGURIDAD_2026-07-24.md`.
+Cambios aplicados:
+- `settings.py`: `SESSION_COOKIE_AGE = 43200` (sesiones expiran a las 12hs, antes nunca expiraban).
+- `settings.py`: `ALLOWED_HOSTS` fallback seguro — `["*"]` solo si `DEBUG=True`, en producción sin la variable falla en lugar de quedar abierto.
+- `urls.py`: eliminada URL duplicada `ticket-pago-multa` (sección COMPROBANTES que Django ignoraba).
+- `views_conductor.py`: `_validar_documento()` — valida tipo (JPG/PNG/WEBP/PDF) y tamaño máximo (10MB) antes de guardar archivos de verificación.
+- `services/infracciones.py`: `getattr` defensivo en `inspector.first_name/last_name` (watermark no falla con objetos livianos de tests).
+- `tests.py:685`: fix `__import__("django.utils.timezone")` roto → `from django.utils import timezone`.
+- `settings.py`: `STORAGES["default"]` siempre presente (Django 5.x — faltaba cuando Cloudinary no está configurado).
+Pendientes de seguridad restantes: firma MP webhook, rate limiting login, idempotencia MP, verificación email → ver 🔴 arriba.
+
+### refactor: auditoría DB — constraints e integridad referencial (2026-07-24) ✅
+Migración 0042. Cambios en `models.py`:
+- `Subcuadra.unique_together`: ahora incluye `municipio` → fix multi-tenancy (dos municipios pueden tener la misma calle+altura).
+- `on_delete=PROTECT` en: `Infraccion.inspector`, `Infraccion.vehiculo`, `MovimientoCaja.usuario`, `CierreCaja.usuario`, `Usuario.municipio` → borrar esos objetos ya no destruye silenciosamente el historial contable.
+- `Infraccion.municipio`: `CASCADE → SET_NULL` (el municipio puede borrarse, la infracción queda sin municipio).
+- Removidos campos muertos: `Municipio.apellido` (desde migración 0003) e `Infraccion.qr_code` (desde migración 0008).
+- `MovimientoCaja.tipo`: agregado `choices=[("ingreso","Ingreso"),("egreso","Egreso")]`.
+- `VerificacionInspector.resultado`: agregado `choices` + `default="verificado"`.
+Informe completo: `AUDITORIA_DB_2026-07-24.md`.
+
+### feat: foto en infracción — Cloudinary + watermark + ticket (2026-07-22) ✅
+- Cloudinary activo en Railway (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`).
+- `STORAGES["default"]` con `MediaCloudinaryStorage` (Django 5.x — reemplaza `DEFAULT_FILE_STORAGE`).
+- `MEDIA_URL = ""` con Cloudinary activo para evitar URL duplicada.
+- Watermark siempre aplicado (antes solo si había GPS). GPS opcional → muestra "sin señal".
+- Nombre del inspector en watermark (`first_name last_name` o `correo` como fallback).
+- Foto visible en ticket de infracción (pantalla, no imprime). Inspector revisa y confirma print.
+- Auto-print eliminado: el inspector hace clic en "Imprimir acta" él mismo.
+- Fallback en `crear_infraccion()`: si Cloudinary falla, guarda sin foto (no bloquea el acta).
+
+### feat: Cloudinary como media storage (2026-07-21) ✅
+- `requirements.txt`: `cloudinary==1.41.0` + `django-cloudinary-storage==0.3.0`
+- `settings.py`: configuración condicional — activo solo si `CLOUDINARY_CLOUD_NAME` está seteado.
+  En local sigue usando filesystem. En Railway usa CDN de Cloudinary.
+- `urls.py`: guard `if settings.MEDIA_ROOT:` para no servir archivos locales cuando Cloudinary está activo.
+- Variables en Railway: `CLOUDINARY_CLOUD_NAME=braigulp`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`.
+- Verificación pendiente end-to-end (ver 🔴 arriba).
 
 ### refactor: quitar prefijo /usuarios/ + URL admin (2026-07-21) ✅
 - Todas las URLs pasaron a la raíz: `/login/`, `/inspectores/`, `/admin-infracciones/`, etc.

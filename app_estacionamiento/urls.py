@@ -120,11 +120,6 @@ urlpatterns = [
     path("admin-infracciones/pdf-juzgado/", views.pdf_infracciones_juzgado, name="pdf_infracciones_juzgado"),
 
     # =========================
-    # 🖨 COMPROBANTES
-    # =========================
-    path("ticket-pago-multa/<int:infraccion_id>/", views.ticket_pago_multa, name="ticket_pago_multa"),
-
-    # =========================
     # 📅 ABONO MENSUAL
     # =========================
     path("vendedores/abono/", views.cobrar_abono, name="cobrar_abono"),

@@ -22,9 +22,10 @@ DEBUG = os.getenv("DEBUG", "True") == "True"
 MP_SANDBOX = os.getenv("MP_SANDBOX", str(DEBUG)) == "True"
 
 # En Railway: ALLOWED_HOSTS=tuapp.up.railway.app
-# En local: deja la variable vacía o no la definas (usará "*")
+# En local: deja la variable vacía (usará "*" solo si DEBUG=True).
+# Si DEBUG=False sin ALLOWED_HOSTS, falla ruidosamente en lugar de quedar abierto.
 _allowed = os.getenv("ALLOWED_HOSTS", "")
-ALLOWED_HOSTS = _allowed.split(",") if _allowed else ["*"]
+ALLOWED_HOSTS = _allowed.split(",") if _allowed else (["*"] if os.getenv("DEBUG", "True") == "True" else ["localhost", "127.0.0.1"])
 
 # ─── Aplicaciones ─────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -67,6 +68,9 @@ MIDDLEWARE = [
 ]
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
+# 12 horas: razonable para tablets de inspectores y kioskos compartidos.
+# allauth respeta este valor; las sesiones se renuevan en cada login.
+SESSION_COOKIE_AGE = 43200
 
 ROOT_URLCONF = "sitio.urls"
 WSGI_APPLICATION = "sitio.wsgi.application"
@@ -161,6 +165,11 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 # Se define acá con WhiteNoise para estáticos; el bloque de Cloudinary
 # agrega el "default" si las variables están seteadas.
 STORAGES = {
+    # "default" siempre presente (Django 5.x lo requiere aunque no haya media files).
+    # Si Cloudinary está configurado, el bloque de abajo sobreescribe este valor.
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
