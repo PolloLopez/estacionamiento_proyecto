@@ -594,23 +594,33 @@ def crear_conductor(request):
 
 @require_role("admin")
 def gestionar_usuarios(request):
-    """Lista de conductores del municipio con búsqueda por correo o nombre."""
+    """
+    Lista paginada de conductores del municipio con búsqueda por correo o nombre.
+    Paginado a 50 por página: evita traer 400+ conductores + sus vehículos a memoria
+    cuando el municipio tiene historial largo. prefetch_related se mantiene para
+    que cada página no dispare N+1 al acceder a los vehículos de cada conductor.
+    """
     usuario   = request.user
     municipio = usuario.municipio
 
     q = request.GET.get("q", "").strip()
-    usuarios = Usuario.objects.filter(
+    qs = Usuario.objects.filter(
         es_conductor=True, municipio=municipio
-    ).prefetch_related("vehiculos")
+    ).prefetch_related("vehiculos").order_by("first_name", "last_name")
 
     if q:
-        usuarios = usuarios.filter(
+        qs = qs.filter(
             Q(correo__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q)
         )
 
+    paginator  = Paginator(qs, 50)
+    numero_pag = request.GET.get("pagina", 1)
+    usuarios   = paginator.get_page(numero_pag)
+
     return render(request, "admin/gestionar_usuarios.html", {
-        "usuarios": usuarios,
-        "q":        q,
+        "usuarios":  usuarios,
+        "paginator": paginator,
+        "q":         q,
     })
 
 
@@ -745,6 +755,12 @@ def admin_infracciones(request):
         municipio=municipio, estado="pendiente"
     ).count()
 
+    # Paginación: 50 por página reemplaza el slice [:200] que ocultaba infracciones
+    # más antiguas al superar el límite. El admin ahora puede navegar el historial completo.
+    paginator  = Paginator(infracciones, 50)
+    numero_pag = request.GET.get("pagina", 1)
+    infracciones_pag = paginator.get_page(numero_pag)
+
     # Permite abrir el modal de detalle al entrar con ?detalle=ID
     detalle_id = request.GET.get("detalle", "").strip()
 
@@ -759,7 +775,8 @@ def admin_infracciones(request):
     export_pdf_url = _reverse("pdf_infracciones_juzgado") + ("?" + urlencode(params_export) if params_export else "")
 
     return render(request, "admin/infracciones.html", {
-        "infracciones":  infracciones[:200],
+        "infracciones":  infracciones_pag,
+        "paginator":     paginator,
         "inspectores":   inspectores,
         "detalle_id":    detalle_id,
         "total_impagas": total_impagas,

@@ -1,6 +1,6 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-24 (auditoría UX/UI)
+Última actualización: 2026-07-24 (auditoría de rendimiento)
 
 ---
 
@@ -197,6 +197,17 @@ Muestra: infracciones del día, recaudación, inspectores activos, vehículos ve
 ---
 
 ## ✅ Resuelto
+
+### fix: auditoría de rendimiento — completa (2026-07-24) ✅
+Informe completo: `AUDITORIA_RENDIMIENTO_2026-07-24.md`.
+6 hallazgos, todos implementados:
+1. `historial_estacionamientos`: Paginator (20/pág) + `select_related("vehiculo", "subcuadra")`
+2. `gestionar_usuarios`: Paginator (50/pág) + orden por nombre
+3. `cerrar_estacionamientos_vencidos_por_horario`: caché "ya cerrado hoy" hasta las 05:00 del día siguiente
+4. `VerificacionInspector`: índice compuesto `(vehiculo_id, fecha DESC)` — migración 0043
+5. `admin_infracciones`: Paginator (50/pág) reemplaza el slice `[:200]`
+6. `MovimientoCaja.save()`: `values_list("cerrado", flat=True)` en vez de `get()`
+Controles de paginación agregados en 3 templates: `historial_estacionamientos.html`, `gestionar_usuarios.html`, `infracciones.html`.
 
 ### fix: auditoría UX/UI — completa (2026-07-24) ✅
 Informe completo: `AUDITORIA_UX_2026-07-24.md`.

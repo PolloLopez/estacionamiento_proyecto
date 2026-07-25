@@ -66,5 +66,22 @@
     </table>
   </div>
 
+  {% if usuarios.has_other_pages %}
+  <nav style="display:flex; justify-content:center; align-items:center; gap:0.5rem;
+              margin-top:1rem; flex-wrap:wrap;">
+    {% if usuarios.has_previous %}
+      <a href="?q={{ q }}&pagina={{ usuarios.previous_page_number }}"
+         class="btn btn-outline" style="font-size:0.9rem;">← Anterior</a>
+    {% endif %}
+    <span style="color:var(--color-text-muted); font-size:0.9rem; line-height:2.2rem;">
+      Página {{ usuarios.number }} de {{ usuarios.paginator.num_pages }}
+    </span>
+    {% if usuarios.has_next %}
+      <a href="?q={{ q }}&pagina={{ usuarios.next_page_number }}"
+         class="btn btn-outline" style="font-size:0.9rem;">Siguiente →</a>
+    {% endif %}
+  </nav>
+  {% endif %}
+
 </section>
 {% endblock %}

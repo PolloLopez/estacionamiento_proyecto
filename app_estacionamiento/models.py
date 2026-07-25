@@ -387,8 +387,11 @@ class MovimientoCaja(models.Model):
 
     def save(self, *args, **kwargs):
         if self.pk:
-            original = MovimientoCaja.objects.get(pk=self.pk)
-            if original.cerrado:
+            # values_list trae solo el booleano "cerrado" en vez del objeto completo.
+            # Evita una query SELECT * innecesaria cuando lo único que necesitamos
+            # es chequear ese campo.
+            cerrado = MovimientoCaja.objects.filter(pk=self.pk).values_list("cerrado", flat=True).first()
+            if cerrado:
                 raise Exception("No se puede modificar un movimiento cerrado")
         super().save(*args, **kwargs)
     
@@ -457,6 +460,16 @@ class VerificacionInspector(models.Model):
     # choices documentan los valores válidos sin depender de texto libre.
     RESULTADOS = [("verificado", "Verificado")]
     resultado  = models.CharField(max_length=50, choices=RESULTADOS, default="verificado")
+
+    class Meta:
+        indexes = [
+            # Índice compuesto para la query más frecuente sobre esta tabla:
+            #   filter(vehiculo=v).order_by("-fecha").first()
+            # Sin este índice, Postgres ordena todos los registros del vehículo en memoria.
+            # Con ~75.000 registros/año (3 inspectores × 100 checks/día × 250 días),
+            # el impacto se nota antes del primer año en producción municipal.
+            models.Index(fields=["vehiculo", "-fecha"], name="idx_verificacion_vehiculo_fecha"),
+        ]
 
 class Infraccion(models.Model):
     # SET_NULL: desnormalización intencional para queries sin JOIN con inspector.

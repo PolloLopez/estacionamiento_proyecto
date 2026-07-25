@@ -117,9 +117,28 @@
           </tbody>
         </table>
       </div>
-      <p class="text-muted" style="font-size:0.83rem; margin-top:0.75rem;">
-        {{ infracciones|length }} resultado{{ infracciones|length|pluralize }}. Usá los filtros para acotar la búsqueda.
-      </p>
+      <div style="display:flex; justify-content:space-between; align-items:center;
+                  flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;">
+        <p class="text-muted" style="font-size:0.83rem; margin:0;">
+          {{ infracciones|length }} resultado{{ infracciones|length|pluralize }} en esta página.
+          {% if paginator.count %}({{ paginator.count }} en total){% endif %}
+        </p>
+        {% if infracciones.has_other_pages %}
+        <nav style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          {% if infracciones.has_previous %}
+            <a href="?patente={{ filtros.patente }}&inspector={{ filtros.inspector }}&estado={{ filtros.estado }}&fecha_desde={{ filtros.fecha_desde }}&fecha_hasta={{ filtros.fecha_hasta }}&pagina={{ infracciones.previous_page_number }}"
+               class="btn btn-outline" style="font-size:0.9rem;">← Anterior</a>
+          {% endif %}
+          <span style="color:var(--color-text-muted); font-size:0.9rem; line-height:2.2rem;">
+            Página {{ infracciones.number }} de {{ infracciones.paginator.num_pages }}
+          </span>
+          {% if infracciones.has_next %}
+            <a href="?patente={{ filtros.patente }}&inspector={{ filtros.inspector }}&estado={{ filtros.estado }}&fecha_desde={{ filtros.fecha_desde }}&fecha_hasta={{ filtros.fecha_hasta }}&pagina={{ infracciones.next_page_number }}"
+               class="btn btn-outline" style="font-size:0.9rem;">Siguiente →</a>
+          {% endif %}
+        </nav>
+        {% endif %}
+      </div>
     {% else %}
       <p class="text-muted" style="text-align:center; padding:2rem;">
         No hay infracciones con los filtros seleccionados.

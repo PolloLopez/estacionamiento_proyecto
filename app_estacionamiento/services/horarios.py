@@ -177,14 +177,27 @@ def cerrar_estacionamientos_vencidos_por_horario(municipio):
 
     Se llama en inicio_usuarios de forma reactiva (sin tarea periódica programada).
     No hace nada si el horario sigue activo.
+
+    Usa caché para evitar dos problemas:
+    1. Query a HorarioEstacionamiento en CADA visita al home de cualquier conductor.
+    2. Que 10 conductores abriendo el home al mismo tiempo cierren los mismos
+       estacionamientos en paralelo (trabajo duplicado + race condition).
+    El caché dura hasta las 05:00 del día siguiente para cubrir toda la noche.
     """
+    from django.core.cache import cache
     from app_estacionamiento.use_cases.finalizar_estacionamiento import (
         ejecutar as finalizar_estacionamiento_uc,
     )
 
-    ahora       = timezone.localtime()
-    hoy_dia     = ahora.weekday()
+    ahora      = timezone.localtime()
+    hoy_fecha  = ahora.date()
+    hoy_dia    = ahora.weekday()
     hora_actual = ahora.time()
+
+    # Si ya se procesó el cierre de hoy para este municipio, no repetir
+    cache_key_cierre = f"cierre_horario_{municipio.id}_{hoy_fecha}"
+    if cache.get(cache_key_cierre):
+        return
 
     horario = HorarioEstacionamiento.objects.filter(
         municipio=municipio, dia_semana=hoy_dia, activo=True
@@ -197,3 +210,14 @@ def cerrar_estacionamientos_vencidos_por_horario(municipio):
         )
         for est in activos:
             finalizar_estacionamiento_uc(est)
+
+        # Marcar el cierre como hecho: expira a las 05:00 del día siguiente
+        # para que al día siguiente vuelva a correr normalmente.
+        from datetime import datetime, time as _time
+        dia_siguiente = ahora.date() + timedelta(days=1)
+        proximas_5am  = timezone.make_aware(
+            datetime.combine(dia_siguiente, _time(5, 0)),
+            timezone.get_current_timezone(),
+        )
+        segundos_hasta_5am = max(int((proximas_5am - ahora).total_seconds()), 1)
+        cache.set(cache_key_cierre, True, timeout=segundos_hasta_5am)

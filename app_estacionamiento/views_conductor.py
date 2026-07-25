@@ -21,6 +21,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -601,15 +602,26 @@ def estacionar_vehiculo(request):
 
 @require_role("conductor")
 def historial_estacionamientos(request):
-    """Lista de todos los estacionamientos del conductor, ordenados por fecha desc."""
+    """
+    Lista paginada de estacionamientos del conductor, ordenados por fecha desc.
+    Paginado a 20 por página para evitar traer cientos de registros de un golpe
+    cuando el conductor tiene historial largo (ej: 2 años de uso diario = 730+ registros).
+    select_related evita N+1 al acceder a vehiculo.patente y subcuadra en el template.
+    """
     usuario = request.user
-    estacionamientos = (
+    qs = (
         Estacionamiento.objects
         .filter(usuario=usuario)
+        .select_related("vehiculo", "subcuadra")
         .order_by("-hora_inicio")
     )
+    paginator   = Paginator(qs, 20)
+    numero_pag  = request.GET.get("pagina", 1)
+    estacionamientos = paginator.get_page(numero_pag)
+
     return render(request, "usuarios/historial_estacionamientos.html", {
         "estacionamientos": estacionamientos,
+        "paginator":        paginator,
     })
 
 
