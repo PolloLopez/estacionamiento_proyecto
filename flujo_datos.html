@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Flujo de Datos — Sistema de Estacionamiento Medido</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #222; }
+
+    h1 { text-align: center; padding: 1.5rem; font-size: 1.3rem; background: #1a2f4a; color: #fff; }
+    h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: .08em; color: #667; margin-bottom: .6rem; }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+
+    /* ── LEGEND ── */
+    .legend { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
+    .legend-item { display: flex; align-items: center; gap: .4rem; font-size: .78rem; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+    /* ── MAIN GRID ── */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+    .full { grid-column: 1 / -1; }
+
+    /* ── CARD ── */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      border-top: 4px solid #ccc;
+    }
+    .card.conductor  { border-color: #3b82f6; }
+    .card.inspector  { border-color: #ef4444; }
+    .card.vendedor   { border-color: #f59e0b; }
+    .card.admin      { border-color: #8b5cf6; }
+    .card.tesorero   { border-color: #10b981; }
+    .card.sistema    { border-color: #64748b; }
+    .card.flujo      { border-color: #0ea5e9; }
+
+    /* ── FLOW DIAGRAM (SVG-based) ── */
+    .diagram-wrap { overflow-x: auto; }
+
+    /* ── FLOW STEPS ── */
+    .steps { list-style: none; padding: 0; }
+    .steps li {
+      display: flex; align-items: flex-start; gap: .6rem;
+      padding: .35rem 0; border-bottom: 1px solid #f0f0f0; font-size: .82rem;
+    }
+    .steps li:last-child { border-bottom: none; }
+    .step-num {
+      min-width: 20px; height: 20px; border-radius: 50%;
+      background: #e2e8f0; font-size: .7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .badge {
+      display: inline-block; font-size: .68rem; padding: 1px 6px;
+      border-radius: 4px; font-weight: 600; vertical-align: middle;
+    }
+    .b-conductor { background: #dbeafe; color: #1d4ed8; }
+    .b-inspector { background: #fee2e2; color: #b91c1c; }
+    .b-vendedor  { background: #fef3c7; color: #b45309; }
+    .b-admin     { background: #ede9fe; color: #6d28d9; }
+    .b-tesorero  { background: #d1fae5; color: #065f46; }
+    .b-sistema   { background: #e2e8f0; color: #334155; }
+    .b-mp        { background: #fce7f3; color: #9d174d; }
+    .b-cloudinary{ background: #e0f2fe; color: #0369a1; }
+
+    .arrow { color: #94a3b8; font-size: .9rem; }
+    .model { font-family: monospace; font-size: .78rem; background: #f8fafc; padding: 1px 5px; border-radius: 3px; border: 1px solid #e2e8f0; }
+
+    .note { font-size: .75rem; color: #64748b; margin-top: .4rem; padding: .4rem .6rem; background: #f8fafc; border-radius: 6px; border-left: 3px solid #cbd5e1; }
+
+    /* ── ENTITY DIAGRAM ── */
+    .entity-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .6rem; }
+    .entity {
+      border: 1px solid #e2e8f0; border-radius: 6px;
+      padding: .5rem .6rem; background: #f8fafc;
+    }
+    .entity-name { font-weight: 700; font-size: .8rem; margin-bottom: .2rem; }
+    .entity-fields { font-size: .71rem; color: #64748b; list-style: none; }
+    .entity-fields li::before { content: "· "; }
+  </style>
+</head>
+<body>
+
+<h1>🅿️ Flujo de Datos — Sistema de Estacionamiento Medido</h1>
+
+<div class="page">
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <span class="legend-item"><span class="dot" style="background:#3b82f6"></span> Conductor</span>
+    <span class="legend-item"><span class="dot" style="background:#ef4444"></span> Inspector</span>
+    <span class="legend-item"><span class="dot" style="background:#f59e0b"></span> Vendedor</span>
+    <span class="legend-item"><span class="dot" style="background:#8b5cf6"></span> Admin</span>
+    <span class="legend-item"><span class="dot" style="background:#10b981"></span> Tesorero</span>
+    <span class="legend-item"><span class="dot" style="background:#64748b"></span> Sistema automático</span>
+  </div>
+
+  <div class="grid">
+
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <!-- FLUJO 1: ESTACIONAMIENTO -->
+    <!-- ══════════════════════════════════════════════════════════════ -->
+    <div class="card flujo">
+      <h2>Flujo 1 — Estacionamiento (conductor paga solo)</h2>
+      <ul class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span><span class="badge b-conductor">Conductor</span> inicia sesión → va a "Estacionar" → elige vehículo + duración</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span><span class="badge b-sistema">Sistema</span> verifica horario activo y saldo suficiente (optimista). Si hay infracción pendiente → aplica tolerancia de gracia.</span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span><span class="badge b-sistema">Sistema</span> debita saldo con <span class="model">select_for_update()</span> → crea <span class="model">Estacionamiento(ACTIVO)</span> + <span class="model">MovimientoCaja(ingreso)</span></span>
+        </li>
+        <li>
+          <span class="step-num">4</span>
+          <span><span class="badge b-conductor">Conductor</span> ve timer en pantalla. Al vencer: <span class="model">Estacionamiento(FINALIZADO)</span> automáticamente.</span>
+        </li>
+        <li>
+          <span class="step-num">5</span>
+          <span>Si finaliza antes de 30 min → <span class="badge b-sistema">Sistema</span> reintegra 100% del costo al saldo.</span>
+        </li>
+      </ul>
+      <p class="note">Reintegro por cancelación temprana: umbral = 30 min. Lógica en <code>use_cases/finalizar_estacionamiento.py</code>.</p>
+    </div>
+
+    <!-- FLUJO 2: COBRO MANUAL -->
+    <div class="card flujo">
+      <h2>Flujo 2 — Cobro manual (inspector/vendedor)</h2>
+      <ul class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span><span class="badge b-vendedor">Vendedor</span> / <span class="badge b-inspector">Inspector</span> ingresa patente + duración → "Registrar estacionamiento"</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span><span class="badge b-sistema">Sistema</span> crea <span class="model">Estacionamiento(ACTIVO)</span> + <span class="model">MovimientoCaja</span> con <code>comision_monto</code></span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span>Se genera ticket de cobro imprimible.</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- FLUJO 3: VERIFICACION E INFRACCION -->
+    <div class="card flujo full">
+      <h2>Flujo 3 — Verificación e infracción (inspector en calle)</h2>
+      <ul class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span><span class="badge b-inspector">Inspector</span> elige subcuadra → ingresa patente → sistema evalúa:</span>
+        </li>
+        <li>
+          <span class="step-num"></span>
+          <span style="padding-left:.5rem; font-size:.8rem;">
+            ✅ Exento total → libre &nbsp;|&nbsp;
+            ✅ Exento parcial en esta subcuadra → libre &nbsp;|&nbsp;
+            ✅ Pago activo o abono mensual → OK &nbsp;|&nbsp;
+            ⏳ Verificado hace &lt;15 min → no se puede infraccionar &nbsp;|&nbsp;
+            🚨 Resto → INFRACCIONAR
+          </span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span>Si 🚨 INFRACCIONAR: inspector confirma → sube foto (opcional)</span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span><span class="badge b-sistema">Sistema</span> aplica watermark a la foto (patente, inspector, subcuadra, GPS o "sin señal", fecha/hora) vía <span class="badge b-cloudinary">Cloudinary</span> → crea <span class="model">Infraccion(pendiente)</span></span>
+        </li>
+        <li>
+          <span class="step-num">4</span>
+          <span>Inspector revisa ticket con foto → hace clic en "Imprimir acta" → después de imprimir redirige a verificar.</span>
+        </li>
+      </ul>
+      <p class="note">Fallback: si Cloudinary falla al subir la foto, la infracción se guarda igual sin foto (no bloquea el acta). Watermark: Pillow, <code>services/infracciones.py::_agregar_marca_de_agua_gps()</code>.</p>
+    </div>
+
+    <!-- FLUJO 4: PAGO DE INFRACCION -->
+    <div class="card flujo">
+      <h2>Flujo 4 — Pago de infracción</h2>
+      <ul class="steps">
+        <li>
+          <span class="step-num">A</span>
+          <span><strong>Conductor paga:</strong> <span class="badge b-conductor">Conductor</span> → "Mis infracciones" → paga con saldo digital</span>
+        </li>
+        <li>
+          <span class="step-num">B</span>
+          <span><strong>Vendedor cobra:</strong> <span class="badge b-vendedor">Vendedor</span> → "Cobrar infracción" → ingresa patente → cobra en efectivo</span>
+        </li>
+        <li>
+          <span class="step-num">C</span>
+          <span><strong>Al estacionar:</strong> <span class="badge b-conductor">Conductor</span> registra estacionamiento → sistema detecta infracción pendiente → aplica gracia</span>
+        </li>
+      </ul>
+      <p class="note">
+        En todos los casos: <code>calcular_estado_tolerancia()</code> decide si anular o cobrar.
+        Dentro de gracia → <span class="model">Infraccion(anulada)</span>, sin cobro.
+        Fuera → <span class="model">Infraccion(pagada)</span> + <span class="model">MovimientoCaja</span>.
+      </p>
+    </div>
+
+    <!-- FLUJO 5: ABONO MENSUAL -->
+    <div class="card flujo">
+      <h2>Flujo 5 — Abono mensual</h2>
+      <ul class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span>Quien cobra: <span class="badge b-vendedor">Vendedor</span> (con comisión) / <span class="badge b-admin">Admin</span> (100% tesorería) / <span class="badge b-conductor">Conductor</span> (saldo digital)</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span>Si el vehículo no existe → <span class="badge b-sistema">Sistema</span> lo crea con <code>get_or_create</code></span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span>Crea <span class="model">AbonoMensual</span> (unique por mes/vehículo/municipio) + <span class="model">MovimientoCaja</span></span>
+        </li>
+        <li>
+          <span class="step-num">4</span>
+          <span>Inspector ve "✅ Abono vigente" al verificar → no puede infraccionar</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- FLUJO 6: CAJA Y RENDICION -->
+    <div class="card flujo full">
+      <h2>Flujo 6 — Caja → Rendición → Tesorería</h2>
+      <ul class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span><span class="badge b-inspector">Inspector</span> / <span class="badge b-vendedor">Vendedor</span> acumula <span class="model">MovimientoCaja</span> durante el turno</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span>Al cierre: confirma <span class="model">CierreCaja</span> (ganancia_usuario + monto_municipio). El admin lo recibe.</span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span><span class="badge b-admin">Admin</span> genera <span class="model">Rendicion</span> con desglose efectivo/digital/comisiones para el período → envía al tesorero</span>
+        </li>
+        <li>
+          <span class="step-num">4</span>
+          <span><span class="badge b-tesorero">Tesorero</span> valida (recibida) u observa (con notas) → <span class="model">Rendicion(validada/observada)</span></span>
+        </li>
+        <li>
+          <span class="step-num">5</span>
+          <span><span class="badge b-tesorero">Tesorero</span> deposita comisión al vendedor → <span class="model">LiquidacionComision(depositada)</span>. Vendedor certifica recibo → <span class="model">LiquidacionComision(certificada)</span></span>
+        </li>
+        <li>
+          <span class="step-num">6</span>
+          <span><span class="badge b-admin">Admin</span> puede enviar informe mensual por email (con PDF de infracciones impagas adjunto) a destinatarios configurados en <span class="model">DestinatarioInforme</span></span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- FLUJO 7: CARGA DE SALDO MP -->
+    <div class="card flujo">
+      <h2>Flujo 7 — Carga de saldo (MercadoPago)</h2>
+      <ul class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span><span class="badge b-conductor">Conductor</span> elige monto → redirige a <span class="badge b-mp">MercadoPago</span></span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span><span class="badge b-mp">MP</span> notifica al webhook <code>/mp/webhook/</code></span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span><span class="badge b-sistema">Sistema</span> re-consulta la API de MP con el payment_id → si aprobado: <code>cargar_saldo_conductor()</code> + <span class="model">MovimientoCaja</span></span>
+        </li>
+      </ul>
+      <p class="note">Admin también puede cargar saldo manualmente con comprobante imprimible.</p>
+    </div>
+
+    <!-- FLUJO 8: HORARIOS -->
+    <div class="card flujo">
+      <h2>Flujo 8 — Horarios y días especiales</h2>
+      <ul class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <span><span class="badge b-admin">Admin</span> configura <span class="model">HorarioEstacionamiento</span> (por día) y <span class="model">DiaEspecial</span> (feriados)</span>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <span>Al intentar estacionar: <code>puede_estacionar_ahora()</code> → DiaEspecial tiene prioridad sobre HorarioEstacionamiento</span>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <span><span class="badge b-sistema">Sistema</span> cierra automáticamente estacionamientos activos cuando vence el horario configurado</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- MODELO DE DATOS -->
+    <div class="card sistema full">
+      <h2>Entidades principales y relaciones</h2>
+      <div class="entity-grid">
+        <div class="entity">
+          <div class="entity-name" style="color:#8b5cf6">Municipio</div>
+          <ul class="entity-fields">
+            <li>nombre, logo, colores</li>
+            <li>precio_hora</li>
+            <li>comision_vendedor %</li>
+            <li>tolerancia_multa_min</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name" style="color:#3b82f6">Usuario</div>
+          <ul class="entity-fields">
+            <li>correo (login), saldo</li>
+            <li>es_admin / inspector / vendedor / conductor / tesorero</li>
+            <li>municipio (FK)</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name">Vehiculo</div>
+          <ul class="entity-fields">
+            <li>patente (único)</li>
+            <li>tipo: auto/moto</li>
+            <li>exento_global</li>
+            <li>subcuadras_exentas (M2M)</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name">Estacionamiento</div>
+          <ul class="entity-fields">
+            <li>estado: ACTIVO/FINALIZADO</li>
+            <li>hora_inicio, duracion_horas</li>
+            <li>costo_base, costo_final</li>
+            <li>vehiculo, subcuadra</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name" style="color:#ef4444">Infraccion</div>
+          <ul class="entity-fields">
+            <li>estado: pendiente/pagada/anulada</li>
+            <li>monto, motivo, motivo_anulacion</li>
+            <li>foto → Cloudinary</li>
+            <li>inspector, subcuadra</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name">MovimientoCaja</div>
+          <ul class="entity-fields">
+            <li>tipo: ingreso/egreso</li>
+            <li>medio_pago: efectivo/mp</li>
+            <li>monto, comision_monto</li>
+            <li>usuario (operador)</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name">CierreCaja</div>
+          <ul class="entity-fields">
+            <li>ganancia_usuario</li>
+            <li>monto_municipio</li>
+            <li>usuario, fecha</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name">AbonoMensual</div>
+          <ul class="entity-fields">
+            <li>mes (1er día del mes)</li>
+            <li>vehiculo, municipio</li>
+            <li>vendedor (null si conductor)</li>
+            <li>medio_pago</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name" style="color:#10b981">Rendicion</div>
+          <ul class="entity-fields">
+            <li>estado: pendiente/validada/observada</li>
+            <li>admin, tesorero</li>
+            <li>efectivo, digital, comisiones, neto</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name" style="color:#10b981">LiquidacionComision</div>
+          <ul class="entity-fields">
+            <li>pendiente → depositada → certificada</li>
+            <li>vendedor, tesorero</li>
+            <li>monto</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name">Subcuadra</div>
+          <ul class="entity-fields">
+            <li>calle + altura</li>
+            <li>municipio</li>
+          </ul>
+        </div>
+        <div class="entity">
+          <div class="entity-name">Tarifa</div>
+          <ul class="entity-fields">
+            <li>precio_por_hora (auto/moto)</li>
+            <li>precio_abono (auto/moto)</li>
+            <li>monto_infraccion</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARQUITECTURA DE CAPAS -->
+    <div class="card sistema full">
+      <h2>Arquitectura de capas</h2>
+      <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap; padding:.5rem 0; font-size:.83rem;">
+        <div style="background:#e0f2fe;border:1px solid #7dd3fc;border-radius:6px;padding:.5rem .8rem;text-align:center">
+          <div style="font-weight:700;color:#0369a1">views_*.py</div>
+          <div style="color:#64748b;font-size:.72rem">entrada HTTP<br>validación de formulario<br>mensajes al usuario</div>
+        </div>
+        <span style="font-size:1.4rem;color:#94a3b8">→</span>
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:.5rem .8rem;text-align:center">
+          <div style="font-weight:700;color:#166534">use_cases/</div>
+          <div style="color:#64748b;font-size:.72rem">orquestación de flujos<br>sin lógica inline<br>delegan en services/</div>
+        </div>
+        <span style="font-size:1.4rem;color:#94a3b8">→</span>
+        <div style="background:#fef9c3;border:1px solid #fde047;border-radius:6px;padding:.5rem .8rem;text-align:center">
+          <div style="font-weight:700;color:#854d0e">services/</div>
+          <div style="color:#64748b;font-size:.72rem">lógica de negocio<br>infracciones, saldo<br>horarios, caja, verificación</div>
+        </div>
+        <span style="font-size:1.4rem;color:#94a3b8">→</span>
+        <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:6px;padding:.5rem .8rem;text-align:center">
+          <div style="font-weight:700;color:#6b21a8">domain/</div>
+          <div style="color:#64748b;font-size:.72rem">políticas puras<br>saldo_policy<br>vehiculo_policy</div>
+        </div>
+        <span style="font-size:1.4rem;color:#94a3b8">→</span>
+        <div style="background:#fff1f2;border:1px solid #fecdd3;border-radius:6px;padding:.5rem .8rem;text-align:center">
+          <div style="font-weight:700;color:#9f1239">models.py</div>
+          <div style="color:#64748b;font-size:.72rem">Django ORM<br>PostgreSQL (Railway)<br>SQLite (local)</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end .grid -->
+
+  <p style="text-align:center;font-size:.75rem;color:#94a3b8;margin-top:1.5rem;">
+    Última actualización: 2026-07-22 · Sistema de Estacionamiento Medido Municipal
+  </p>
+
+</div><!-- end .page -->
+</body>
+</html>

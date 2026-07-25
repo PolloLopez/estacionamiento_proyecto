@@ -1,6 +1,6 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-24 (auditoría de seguridad)
+Última actualización: 2026-07-24 (auditoría UX/UI)
 
 ---
 
@@ -197,6 +197,18 @@ Muestra: infracciones del día, recaudación, inspectores activos, vehículos ve
 ---
 
 ## ✅ Resuelto
+
+### fix: auditoría UX/UI — completa (2026-07-24) ✅
+Informe completo: `AUDITORIA_UX_2026-07-24.md`.
+Top 3 fricciones resueltas:
+- `login.html`: campo correo pierde el valor al fallar login → `value="{{ request.POST.correo|default:'' }}"`. Labels con `for`/`id`.
+- `base.html`: sin feedback de carga → listener global en `submit` que muestra "Enviando…" y bloquea doble submit.
+- `estacionar_vehiculo.html`: aviso inline `#aviso-saldo-insuficiente` + botón bloqueado si `costo > SALDO_CONDUCTOR`.
+Mejoras opcionales implementadas:
+- `base.html`: mensajes hardcodeados → clases `.alert-success/warning/danger/info` (usan CSS variables del municipio).
+- `vendedores/panel.html`: 4 tarjetas con `grid-3` → `grid-2` (layout 2x2 balanceado).
+- `registro.html`: "Apellido" marcado como `(opcional)`.
+- `views_inspector.py` + `panel_inspectores.html`: inspector ve sus cierres sin certificar en el panel.
 
 ### fix: auditoría de seguridad — hardening inmediato (2026-07-24) ✅
 Informe completo: `AUDITORIA_SEGURIDAD_2026-07-24.md`.

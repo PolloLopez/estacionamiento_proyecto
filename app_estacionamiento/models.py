@@ -54,7 +54,9 @@ class Usuario(AbstractUser):
 
     municipio = models.ForeignKey(
         "Municipio",
-        on_delete=models.CASCADE,
+        # PROTECT: no permite borrar un municipio que tenga usuarios.
+        # Era CASCADE y borrar el municipio destruía todos sus usuarios silenciosamente.
+        on_delete=models.PROTECT,
         null=True,
         blank=True
     )
@@ -159,7 +161,6 @@ class Usuario(AbstractUser):
 
 class Municipio(models.Model):
     nombre = models.CharField(max_length=100, blank=True)
-    apellido = models.CharField(max_length=100, blank=True)
     activo = models.BooleanField(default=True)
 
     # Configuración de negocio
@@ -274,7 +275,8 @@ class Subcuadra(models.Model):
     altura = models.IntegerField()
 
     class Meta:
-        unique_together = ("calle", "altura")
+        # municipio incluido: distintos municipios pueden tener la misma calle+altura
+        unique_together = ("municipio", "calle", "altura")
 
     def __str__(self):
         # Zona Única (altura=0) no muestra el número
@@ -364,9 +366,11 @@ class Estacionamiento(models.Model):
         ]
 
 class MovimientoCaja(models.Model):
-    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    # PROTECT: no permite borrar un usuario que tenga movimientos de caja (historial contable).
+    usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT)
     monto = models.DecimalField(max_digits=10, decimal_places=2)
-    tipo = models.CharField(max_length=10)  # egreso / ingreso
+    TIPOS = [("ingreso", "Ingreso"), ("egreso", "Egreso")]
+    tipo = models.CharField(max_length=10, choices=TIPOS)
     descripcion = models.TextField(blank=True, null=True)
     cerrado = models.BooleanField(default=False)
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -389,7 +393,8 @@ class MovimientoCaja(models.Model):
         super().save(*args, **kwargs)
     
 class CierreCaja(models.Model):
-    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    # PROTECT: no permite borrar un usuario que tenga cierres de caja (historial contable).
+    usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT)
 
     total_cobrado = models.DecimalField(max_digits=10, decimal_places=2)
 
@@ -444,23 +449,33 @@ class CierreCaja(models.Model):
 
 class VerificacionInspector(models.Model):
     inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
-    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
+    vehiculo  = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
     subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)
-    fecha = models.DateTimeField(auto_now_add=True)
+    fecha     = models.DateTimeField(auto_now_add=True)
     infraccion_generada = models.BooleanField(default=False)
-    resultado = models.CharField(max_length=50)
+    # "verificado" es el único valor que se guarda actualmente.
+    # choices documentan los valores válidos sin depender de texto libre.
+    RESULTADOS = [("verificado", "Verificado")]
+    resultado  = models.CharField(max_length=50, choices=RESULTADOS, default="verificado")
 
 class Infraccion(models.Model):
-    municipio = models.ForeignKey(Municipio, on_delete=models.CASCADE, null=True, blank=True)
-    estado = models.CharField(max_length=20, choices=[("pendiente", "Pendiente"), ("pagada", "Pagada"), ("anulada", "Anulada")], default="pendiente")
-    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
-    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
+    # SET_NULL: desnormalización intencional para queries sin JOIN con inspector.
+    # Si el municipio se borra, la infracción queda sin municipio en vez de borrarse.
+    municipio = models.ForeignKey(Municipio, on_delete=models.SET_NULL, null=True, blank=True)
+    estado = models.CharField(
+        max_length=20,
+        choices=[("pendiente", "Pendiente"), ("pagada", "Pagada"), ("anulada", "Anulada")],
+        default="pendiente",
+    )
+    # PROTECT: no permite borrar un vehículo o inspector con infracciones (historial contable).
+    vehiculo  = models.ForeignKey(Vehiculo, on_delete=models.PROTECT)
+    inspector = models.ForeignKey(Usuario,  on_delete=models.PROTECT)
     subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE, null=True, blank=True)
     estacionamiento = models.ForeignKey(Estacionamiento, on_delete=models.SET_NULL, null=True, blank=True)
     motivo = models.CharField(max_length=255, default="Impago")
-    foto = models.ImageField(upload_to="infracciones/", null=True, blank=True)
-    qr_code = models.CharField(max_length=255, null=True, blank=True)
-    monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    foto   = models.ImageField(upload_to="infracciones/", null=True, blank=True)
+    # qr_code eliminado: campo muerto desde migración 0008, nunca se usó.
+    monto  = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     creado_en = models.DateTimeField(auto_now_add=True)   # única fecha de creación
     fecha_pago = models.DateTimeField(null=True, blank=True)
     # Motivo requerido cuando el admin anula una infracción desde el panel

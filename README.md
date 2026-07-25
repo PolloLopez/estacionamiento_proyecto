@@ -97,9 +97,10 @@ Cobertura por módulo:
 |---|---|
 | Backend | Django 5.2, Python 3.12 |
 | Base de datos | SQLite (dev) / PostgreSQL (prod) |
-| Autenticación | Django auth + `correo` como USERNAME_FIELD |
+| Autenticación | django-allauth + Google OAuth |
+| Media storage | Cloudinary (Railway) / filesystem (local) |
 | Frontend | HTML + CSS (estilos propios) |
-| Tests | pytest + pytest-cov |
+| Tests | Django TestCase |
 
 ---
 
@@ -115,8 +116,7 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 python manage.py migrate
-python manage.py runscript crear_usuarios  # carga datos de prueba
-
+python manage.py migrate
 python manage.py runserver
 ```
 
@@ -157,9 +157,7 @@ MP_PUBLIC_KEY=
 
 ### 📅 Próximamente
 
-- API REST (Django REST Framework + JWT)
-- Deploy activo (Railway Hobby cuando se reactive)
-- Inspector como cobrador (paid feature)
+Ver [PENDIENTES.md](PENDIENTES.md) para el detalle de tareas en curso y roadmap.
 
 ---
 

@@ -10,6 +10,23 @@
     <div style="font-size:2.5rem; font-weight:800;">{{ resumen.infracciones_hoy }}</div>
   </div>
 
+  {% if cierres_sin_certificar %}
+  <div style="margin-bottom:1.2rem; background:var(--color-warning-bg);
+              border:1px solid var(--color-warning); border-radius:8px; padding:0.85rem 1rem;">
+    <div style="font-weight:700; margin-bottom:0.5rem; color:var(--color-warning);">
+      ⏳ Cierres pendientes de certificación ({{ cierres_sin_certificar|length }})
+    </div>
+    {% for c in cierres_sin_certificar %}
+    <div style="font-size:0.88rem; color:var(--color-text-muted); margin-bottom:0.2rem;">
+      {{ c.fecha_cierre|date:"d/m/Y H:i" }} — ${{ c.total_cobrado }}
+    </div>
+    {% endfor %}
+    <div style="font-size:0.82rem; margin-top:0.4rem; color:var(--color-text-muted);">
+      El admin los verá en Rendiciones para certificarlos.
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Acciones principales -->
   <div class="card">
     <h2 style="margin-bottom:1.2rem;">👮 Acciones</h2>

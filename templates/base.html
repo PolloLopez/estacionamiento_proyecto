@@ -120,17 +120,8 @@
     {% if messages %}
       <div style="margin-bottom:1rem;">
         {% for message in messages %}
-          <div style="padding:0.75rem 1rem; border-radius:8px; margin-bottom:0.5rem;
-               font-weight:600;
-               {% if message.tags == 'success' %}
-                 background:#d4edda; color:#155724; border:1px solid #b7dfcb;
-               {% elif message.tags == 'warning' %}
-                 background:#fff3cd; color:#856404; border:1px solid #ffeeba;
-               {% elif message.tags == 'error' or message.tags == 'danger' %}
-                 background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
-               {% else %}
-                 background:#d1ecf1; color:#0c5460; border:1px solid #bee5eb;
-               {% endif %}">
+          {# Mapeo de tags de Django al sistema de clases alert de global.css #}
+          <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% elif message.tags == 'error' or message.tags == 'danger' %}alert-danger{% else %}alert-info{% endif %}" style="margin-bottom:0.5rem;">
             {{ message }}
           </div>
         {% endfor %}
@@ -197,6 +188,22 @@
     });
 
   }());
+
+  // Feedback visual al enviar formularios: deshabilita el botón con "Enviando…"
+  // solo si NO estaba ya disabled (no interfiere con GPS pendiente en registrar_infraccion).
+  // Se re-habilita tras 10 s por si hay error de red o el servidor tarda.
+  document.addEventListener("submit", function(e) {
+    var btn = e.target.querySelector("[type='submit']:not([disabled])");
+    if (!btn) return;
+    var textoOriginal = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Enviando…";
+    setTimeout(function() {
+      btn.disabled = false;
+      btn.textContent = textoOriginal;
+    }, 10000);
+  });
+
   </script>
 
 </body>

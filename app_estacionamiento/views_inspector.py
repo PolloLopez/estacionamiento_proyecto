@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from .decorators import require_role
 from .models import (
+    CierreCaja,
     Estacionamiento,
     Infraccion,
     Subcuadra,
@@ -50,11 +51,19 @@ def panel_inspectores(request):
         creado_en__date=hoy,
     ).count()
 
+    # Cierres de caja que el admin todavía no certificó — igual al panel de vendedor
+    cierres_sin_certificar = CierreCaja.objects.filter(
+        usuario=inspector, certificado=False
+    ).order_by("-fecha_cierre")[:10]
+
     resumen = {
         "infracciones_hoy": infracciones_hoy,
     }
 
-    return render(request, "inspectores/panel_inspectores.html", {"resumen": resumen})
+    return render(request, "inspectores/panel_inspectores.html", {
+        "resumen": resumen,
+        "cierres_sin_certificar": cierres_sin_certificar,
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────

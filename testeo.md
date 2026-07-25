@@ -1,6 +1,6 @@
 # testeo.md — Checklist de validación
 
-Última actualización: 2026-07-13
+Última actualización: 2026-07-22
 
 ---
 
@@ -10,12 +10,12 @@
 python manage.py test app_estacionamiento --verbosity=2
 ```
 
-Resultado esperado: **95+ tests, 0 failures**
+Resultado esperado: **89 tests, 0 failures**
 
 Archivos de tests:
-- `tests.py` — 42 tests generales (flujos, roles, PDF, caja)
-- `tests_roles.py` — 16 tests de permisos por rol + flujo completo conductor
-- `tests_servicios.py` — 26 tests de services: infracciones, saldo, abono, comisiones, multi-municipio, tesorero, tolerancia multa
+- `tests.py` — tests generales (flujos, roles, PDF, caja)
+- `tests_roles.py` — tests de permisos por rol + flujo completo conductor
+- `tests_servicios.py` — tests de services: infracciones, saldo, abono, comisiones, multi-municipio, tesorero, tolerancia multa, watermark, subcuadra, exento parcial
 
 ---
 
@@ -71,8 +71,10 @@ Si el conductor no tiene saldo suficiente: el botón "Pagar con saldo" no aparec
 - Sin saldo → intentar estacionar → redirige a cargar saldo (MercadoPago)
 
 ### Inspector
-- Verificar vehículo por patente
-- Registrar infracción con foto (opcional)
+- Seleccionar subcuadra en el dropdown → verificar patente → confirmar que el estado es correcto
+- Registrar infracción con foto: la foto debe aparecer en el ticket con watermark (patente, inspector, subcuadra, GPS o "sin señal", fecha/hora)
+- Registrar infracción SIN GPS disponible: watermark igual debe aparecer con "GPS: sin señal"
+- Ticket: NO se imprime automáticamente. El inspector debe ver la foto y hacer clic en "Imprimir acta"
 - Ver PDF de infracciones del día
 
 ### Vendedor

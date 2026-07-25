@@ -12,11 +12,13 @@
   </a>
   <hr style="margin: 1rem 0;">
 
-  <label>Correo</label>
-  <input type="email" name="correo" required>
+  <label for="id_correo">Correo</label>
+  <input type="email" id="id_correo" name="correo"
+         value="{{ request.POST.correo|default:'' }}"
+         required placeholder="tucorreo@ejemplo.com">
 
-  <label>Contraseña</label>
-  <input type="password" name="password" required>
+  <label for="id_password">Contraseña</label>
+  <input type="password" id="id_password" name="password" required>
 
   <button type="submit" class="btn" style="width:100%;">Entrar</button>
 

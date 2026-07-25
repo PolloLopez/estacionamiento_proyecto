@@ -255,10 +255,10 @@ Panel Admin → "👮 Inspectores" → click en el inspector → sección "Confi
 Desde mi panel → "🚓 Verificar vehículo". Ingreso la patente directamente. El sistema me muestra el estado.
 
 **¿Tengo que seleccionar subcuadra antes de verificar?**
-No. Ingresás la patente directamente y el sistema evalúa el estado del vehículo.
+Sí. El dropdown de subcuadra está en la parte superior de "Verificar vehículo". Elegís en qué zona estás patrullando antes de verificar. El sistema la recuerda durante todo el turno; solo hay que cambiarla si te movés de zona.
 
 **¿Cómo registro una infracción?**
-Si el resultado es 🚨 INFRACCIONAR, aparece el formulario de infracción. Sacás la foto (el sistema captura las coordenadas GPS automáticamente), confirmás y se genera el acta.
+Si el resultado es 🚨 INFRACCIONAR, aparece el formulario de infracción. La foto es opcional — si la subís, el sistema le agrega automáticamente una marca de agua con patente, nombre del inspector, subcuadra, GPS (o "sin señal" si no está disponible) y fecha/hora. Confirmás y se genera el acta. Antes de imprimir el ticket podés revisar la foto; el ticket no se imprime solo.
 
 **¿Qué pasa si el vehículo tiene exención parcial?**
 Si está en una de sus subcuadras exentas → aparece ✅ OK. Si está fuera de ellas → aparece 🚨 INFRACCIONAR — el vehículo igual debe pagar en esa zona.
@@ -350,8 +350,9 @@ Cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja".
 
 1. Inspector inicia sesión
 2. Panel Inspector → "🚓 Verificar vehículo"
-3. Ingresa la patente del vehículo a verificar
-4. El sistema muestra el estado directamente
+3. En el dropdown de subcuadra, elegí la zona donde vas a patrullar (se recuerda en sesión)
+4. Ingresá la patente del vehículo a verificar
+5. El sistema muestra el estado directamente
 
 ### Fin de turno — cierre de caja
 
@@ -395,6 +396,15 @@ Cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja".
 | `GOOGLE_CLIENT_ID` | Client ID de OAuth 2.0 de Google Cloud |
 | `GOOGLE_CLIENT_SECRET` | Client Secret de OAuth 2.0 de Google Cloud |
 | `MP_ACCESS_TOKEN` | Access token de MercadoPago (sandbox o producción) |
+| `MP_PUBLIC_KEY` | Public key de MercadoPago |
+| `MP_CLIENT_ID` | Client ID de MercadoPago |
+| `MP_CLIENT_SECRET` | Client Secret de MercadoPago (para verificar webhooks) |
+| `CLOUDINARY_CLOUD_NAME` | Nombre del cloud en Cloudinary (para fotos de infracciones) |
+| `CLOUDINARY_API_KEY` | API key de Cloudinary |
+| `CLOUDINARY_API_SECRET` | API secret de Cloudinary |
+| `EMAIL_HOST_USER` | Correo remitente para emails del sistema |
+| `EMAIL_HOST_PASSWORD` | Contraseña de app de Google (para Gmail SMTP) |
+| `DEFAULT_FROM_EMAIL` | Nombre + correo del remitente |
 | `CSRF_TRUSTED_ORIGINS` | `https://estacionamiento.up.railway.app` |
 
 ### Primer deploy en un entorno nuevo
@@ -416,20 +426,6 @@ Desde Django Admin → Municipios → editar municipio:
 - **Nombre del sistema:** texto del navbar si no hay logo (ej: `Estacionamiento Medido`)
 
 ---
-
-## 7. Mejoras Futuras (roadmap)
-
-- **Geoposición en foto de infracción:** watermark GPS sobre la foto (coordenadas ya se capturan, falta estamparlas en la imagen)
-- **Transferencia de saldo entre conductores** con ventana de aceptación de 24 horas
-- **PWA / App instalable** sin publicar en tiendas (manifest.json + service worker)
-- **Adjunto de documentos** en exenciones (foto de cédula, certificado de discapacidad, etc.)
-- **Notificaciones push** al conductor cuando se acerca el vencimiento
-- **Dashboard de métricas** para admin (recaudación por día, inspector más activo, etc.)
-- **Integración con padrón municipal** para verificar vecinos frentistas automáticamente
-- **Renovación de exenciones** con fecha de vencimiento y aviso al admin
-- **MercadoPago producción** (migrar de sandbox a credenciales productivas)
-- **Configurar email en Railway** (recuperación de contraseña en producción)
-
 
 Para enviar por whatsapp:
 🛠️ ADMINISTRADOR — EstacionAR
@@ -457,7 +453,8 @@ Horarios → Días especiales → Agregar → fecha + tipo "Feriado nacional" �
 Para verificar un vehículo:
 
 Entrá a tu panel → "Verificar vehículo"
-Ingresá la patente directamente (no hace falta elegir subcuadra)
+Elegí tu subcuadra en el dropdown (se recuerda en sesión)
+Ingresá la patente
 El sistema te muestra el estado: ✅ OK / 🚨 INFRACCIONAR / ⏳ En tolerancia
 
 Para autos: la patente tiene formato AAA111

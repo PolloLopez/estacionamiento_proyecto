@@ -2,7 +2,7 @@
 https://github.com/leandrolopezalbini/estacionamiento.git
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-07-16
+Última actualización estructural: 2026-07-22
 
 ---
 
@@ -23,21 +23,23 @@ Repo: https://github.com/PolloLopez/estacionamiento_proyecto
 
 | Entorno | Plataforma | URL |
 |---------|-----------|-----|
-| Producción | Railway (Hobby plan, $5/mes) | https://estacionamiento.up.railway.app |
+| Testing | Railway (Hobby, $5/mes) | https://estacionamiento.up.railway.app |
+| Producción futura | Digital Ocean | — (migración pendiente) |
 | Local | `python manage.py runserver` | http://localhost:8000 |
 
-Variables de entorno requeridas:
+Variables de entorno en Railway:
 ```
-SECRET_KEY
-DATABASE_URL         # PostgreSQL en prod, SQLite en local
-DEBUG                # False en prod
-SITE_ID              # 2 en Railway (para allauth)
-CSRF_TRUSTED_ORIGINS # https://dominio.railway.app
-MP_ACCESS_TOKEN      # MercadoPago
-MP_PUBLIC_KEY        # MercadoPago
+SECRET_KEY, DEBUG=False, ALLOWED_HOSTS, CSRF_TRUSTED_ORIGINS
+DATABASE_URL          # PostgreSQL (Railway add-on)
+SITE_ID               # 2 (para allauth)
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+MP_ACCESS_TOKEN, MP_PUBLIC_KEY, MP_CLIENT_ID, MP_CLIENT_SECRET
+CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+EMAIL_HOST_USER, EMAIL_HOST_PASSWORD, DEFAULT_FROM_EMAIL
 ```
 
 Git flow: `develop` → trabajo activo · `main` → Railway auto-deploy.
+Admin URL: `/sistema-interno/` (no obvia, reduce bruteforce).
 
 ---
 
@@ -45,14 +47,17 @@ Git flow: `develop` → trabajo activo · `main` → Railway auto-deploy.
 
 | Capa | Tecnología | Motivo |
 |------|-----------|--------|
-| Backend | Django 5.x, Python 3.12 | Framework principal |
-| Base de datos | SQLite (local) / PostgreSQL (prod) | Railway provee Postgres |
+| Backend | Django 5.2, Python 3.12 | Framework principal |
+| Base de datos | SQLite (local) / PostgreSQL (Railway) | Railway provee Postgres |
 | Autenticación | django-allauth + Google OAuth | Login social + email |
-| Pagos | MercadoPago SDK | Carga de saldo online |
-| PDF | reportlab | PDF de infracciones del día |
+| Pagos | MercadoPago SDK (producción real) | Carga de saldo online |
+| Media storage | Cloudinary (cdn) / filesystem (local) | Fotos de infracciones persistentes en Railway |
+| Imágenes | Pillow | Watermark GPS sobre fotos de actas |
+| PDF | reportlab | PDF de infracciones para juzgado de faltas |
+| Excel | openpyxl | Exportación de estadísticas (pendiente) |
 | Frontend | HTML + CSS propio | Sin frameworks JS |
-| Deploy | Railway + gunicorn + WhiteNoise | PaaS simple |
-| Tests | Django TestCase | 106 tests, sin pytest |
+| Deploy | Railway + Gunicorn + WhiteNoise | PaaS simple |
+| Tests | Django TestCase | 89 tests |
 
 ---
 
@@ -110,7 +115,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `VehiculoUsuario` | Relación N:N entre vehículo y conductor. |
 | `Subcuadra` | Calle + altura + municipio. Unique together. |
 | `Estacionamiento` | Estado: `ACTIVO` / `FINALIZADO`. `hora_inicio`, `hora_fin`, `duracion_horas`, `costo_base`, `costo_final`. Constraint: un ACTIVO por vehículo. |
-| `Infraccion` | Estado: `pendiente` / `pagada` / `anulada`. `monto`, `motivo`, `foto`, `fecha_pago`, `creado_en`. |
+| `Infraccion` | Estado: `pendiente` / `pagada` / `anulada`. `monto`, `motivo`, `foto` (ImageField → Cloudinary en Railway), `motivo_anulacion`, `fecha_pago`, `creado_en`. |
 | `MovimientoCaja` | Registro contable de cada cobro. `tipo`: `ingreso`/`egreso`. `medio_pago`: `efectivo`/`mercadopago`. `comision_monto`. |
 | `CierreCaja` | Cierre de turno de inspector/vendedor. Incluye `ganancia_usuario` y `monto_municipio`. |
 | `AbonoMensual` | Habilita estacionamiento libre por un mes. `mes` (primer día del mes), `vehiculo`, `municipio`, `vendedor` (null si lo paga el conductor). `medio_pago`: `efectivo` / `mercadopago` / `saldo`. |
@@ -121,6 +126,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `SolicitudVerificacion` | El conductor pide verificación de identidad al admin. |
 | `Rendicion` | El admin cierra un período y genera totales (efectivo/digital/comisiones/neto) para el tesorero. Estado: `pendiente`/`validada`/`observada`. El tesorero registra quién validó y cuándo (`tesorero`, `validado_en`). |
 | `LiquidacionComision` | Pago de comisiones acumuladas a un vendedor. Flujo: `pendiente` → `depositada` (tesorero) → `certificada` (vendedor). |
+| `DestinatarioInforme` | Personas que reciben el informe mensual por email. `nombre`, `correo`, `activo`, `municipio`. |
 | `Notificacion` | Notificaciones internas al conductor. |
 
 ---

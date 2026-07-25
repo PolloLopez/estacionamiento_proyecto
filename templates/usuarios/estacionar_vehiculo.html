@@ -114,6 +114,17 @@
         </span>
       </div>
 
+      <!-- Aviso de saldo insuficiente (se muestra por JS si costo > saldo) -->
+      <div id="aviso-saldo-insuficiente" style="display:none; margin-bottom:0.75rem;
+           background:var(--color-danger-bg); color:var(--color-danger);
+           border:1px solid var(--color-danger); border-radius:8px; padding:0.75rem 1rem;
+           font-weight:600; font-size:0.95rem;">
+        ⚠️ Saldo insuficiente para esta duración.
+        <a href="{% url 'mp_iniciar_carga' %}" style="color:var(--color-danger); text-decoration:underline;">
+          Cargá saldo acá.
+        </a>
+      </div>
+
       <button class="btn" type="submit" id="btn-confirmar-est"
               style="width:100%; font-size:1.2rem; padding:1rem;" disabled>
         ✅ Confirmar estacionamiento
@@ -161,6 +172,8 @@
 
 <script>
 const PRECIO_HORA = parseFloat("{{ tarifa_hora|default:'100' }}");
+// Saldo actual del conductor — usado para validar antes de habilitar "Confirmar"
+const SALDO_CONDUCTOR = parseFloat("{{ usuario.saldo|default:'0' }}");
 let vehiculoActivo = null;
 
 // Preseleccionar si viene de "agregar vehículo"
@@ -207,7 +220,12 @@ botones.forEach(btn => {
     horasInput.value = horas;
     document.getElementById("duracionTexto").innerText = label;
     document.getElementById("costoTexto").innerText = "$" + costo.toFixed(2);
-    if (btnConfirmar) btnConfirmar.disabled = false;
+
+    // Si el costo supera el saldo, aviso inline y bloquea el submit
+    var avisoSaldo = document.getElementById("aviso-saldo-insuficiente");
+    var saldoInsuficiente = costo > SALDO_CONDUCTOR;
+    if (avisoSaldo) avisoSaldo.style.display = saldoInsuficiente ? "block" : "none";
+    if (btnConfirmar) btnConfirmar.disabled = saldoInsuficiente;
   });
 });
 
