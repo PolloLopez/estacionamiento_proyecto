@@ -32,7 +32,7 @@ Flujo de trabajo:
 
 ```powershell
 python manage.py test app_estacionamiento --verbosity=2
-# Resultado esperado: 89 tests, OK
+# Resultado esperado: 130 tests, OK
 ```
 
 ## Gotchas conocidos

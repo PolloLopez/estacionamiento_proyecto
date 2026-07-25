@@ -468,7 +468,7 @@ class VerificacionInspector(models.Model):
             # Sin este índice, Postgres ordena todos los registros del vehículo en memoria.
             # Con ~75.000 registros/año (3 inspectores × 100 checks/día × 250 días),
             # el impacto se nota antes del primer año en producción municipal.
-            models.Index(fields=["vehiculo", "-fecha"], name="idx_verificacion_vehiculo_fecha"),
+            models.Index(fields=["vehiculo", "-fecha"], name="idx_verif_vehiculo_fecha"),
         ]
 
 class Infraccion(models.Model):

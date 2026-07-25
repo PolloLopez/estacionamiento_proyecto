@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
             model_name="verificacioninspector",
             index=models.Index(
                 fields=["vehiculo", "-fecha"],
-                name="idx_verificacion_vehiculo_fecha",
+                name="idx_verif_vehiculo_fecha",
             ),
         ),
     ]
