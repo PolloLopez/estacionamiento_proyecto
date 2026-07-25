@@ -345,7 +345,13 @@ class Estacionamiento(models.Model):
     hora_inicio = models.DateTimeField(auto_now_add=True)
     hora_fin = models.DateTimeField(null=True, blank=True)
 
-    duracion_horas = models.IntegerField(default=1, verbose_name="Duración (horas)")
+    # DecimalField con 1 decimal para soportar medias horas (1.5h, 2.5h, etc.)
+    # Antes era IntegerField, lo que truncaba Decimal("1.5") → 1 silenciosamente,
+    # haciendo que el estacionamiento venciera 30 min antes de lo pagado.
+    duracion_horas = models.DecimalField(
+        max_digits=4, decimal_places=1, default=1,
+        verbose_name="Duración (horas)"
+    )
 
     costo_base = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     costo_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)

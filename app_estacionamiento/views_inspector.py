@@ -122,7 +122,7 @@ def verificar_vehiculo(request):
                 ).first()
                 if est_vencido:
                     expiracion = est_vencido.hora_inicio + timedelta(
-                        hours=est_vencido.duracion_horas
+                        hours=float(est_vencido.duracion_horas)
                     )
                     if timezone.now() >= expiracion:
                         finalizar_estacionamiento_uc(est_vencido)

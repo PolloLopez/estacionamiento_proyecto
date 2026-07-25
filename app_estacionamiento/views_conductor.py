@@ -75,7 +75,7 @@ def inicio_usuarios(request):
     # Auto-cierre: si el tiempo pago ya venció, finalizar automáticamente
     if estacionamiento_activo:
         expiracion = estacionamiento_activo.hora_inicio + timedelta(
-            hours=estacionamiento_activo.duracion_horas
+            hours=float(estacionamiento_activo.duracion_horas)
         )
         if timezone.now() >= expiracion:
             finalizar_estacionamiento_uc(estacionamiento_activo)
@@ -662,7 +662,8 @@ def renovar_estacionamiento(request, est_id):
                     if usuario_db.saldo < costo_extra:
                         error = "Saldo insuficiente."
                     else:
-                        estacionamiento.duracion_horas = estacionamiento.duracion_horas + int(horas_extra)
+                        # horas_extra ya es Decimal — sin int() para no perder medias horas
+                        estacionamiento.duracion_horas = estacionamiento.duracion_horas + horas_extra
                         estacionamiento.save(update_fields=["duracion_horas"])
 
                         usuario_db.saldo -= costo_extra
@@ -672,12 +673,12 @@ def renovar_estacionamiento(request, est_id):
                             usuario=usuario_db,
                             monto=costo_extra,
                             tipo="egreso",
-                            descripcion=f"Renovación {horas_extra:.0f}h — {estacionamiento.vehiculo.patente}",
+                            descripcion=f"Renovación {float(horas_extra):g}h — {estacionamiento.vehiculo.patente}",
                         )
 
                         messages.success(
                             request,
-                            f"✅ Estacionamiento extendido {horas_extra:.0f}h más. "
+                            f"✅ Estacionamiento extendido {float(horas_extra):g}h más. "
                             f"Se descontaron ${costo_extra:.2f} de tu saldo."
                         )
                         return redirect("inicio_usuarios")
