@@ -1225,11 +1225,28 @@ def crear_rendicion(request):
     ultima = Rendicion.objects.filter(admin=request.user).order_by("-fecha_hasta").first()
     from datetime import timedelta
     fecha_desde_sugerida = (ultima.fecha_hasta + timedelta(days=1)) if ultima else date.today().replace(day=1)
+    hoy = date.today()
+
+    # Calcular totales de cierres certificados en el período sugerido.
+    # Sirve de referencia para que el admin no tenga que calcular manualmente.
+    cierres_certificados = CierreCaja.objects.filter(
+        usuario__municipio=municipio,
+        certificado=True,
+        fecha_cierre__date__gte=fecha_desde_sugerida,
+        fecha_cierre__date__lte=hoy,
+    )
+    totales_cierres = cierres_certificados.aggregate(
+        suma_cobrado=Sum("total_cobrado"),
+        suma_comisiones=Sum("ganancia_usuario"),
+        suma_neto=Sum("monto_municipio"),
+        cantidad=Count("id"),
+    )
 
     return render(request, "admin/crear_rendicion.html", {
-        "periodos":            Rendicion.PERIODOS,
-        "hoy":                 date.today(),
+        "periodos":             Rendicion.PERIODOS,
+        "hoy":                  hoy,
         "fecha_desde_sugerida": fecha_desde_sugerida,
+        "totales_cierres":      totales_cierres,
     })
 
 
@@ -1457,52 +1474,6 @@ def admin_vehiculos(request):
         "filtros": {"patente": patente, "tipo": tipo},
     })
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Historial de estacionamientos del municipio
-# ─────────────────────────────────────────────────────────────────────────────
-
-@require_role("admin")
-def admin_estacionamientos(request):
-    """
-    Historial de estacionamientos del municipio con filtros básicos.
-    Útil para auditoría y para verificar el funcionamiento del sistema.
-    """
-    municipio   = request.user.municipio
-    patente     = sanitizar_patente(request.GET.get("patente", ""))
-    estado      = request.GET.get("estado", "").strip()
-    fecha_desde = request.GET.get("fecha_desde", "").strip()
-    fecha_hasta = request.GET.get("fecha_hasta", "").strip()
-
-    estacionamientos = (
-        Estacionamiento.objects
-        .filter(subcuadra__municipio=municipio)
-        .select_related("vehiculo", "usuario", "subcuadra")
-        .order_by("-hora_inicio")
-    )
-
-    if patente:
-        estacionamientos = estacionamientos.filter(vehiculo__patente__icontains=patente)
-    if estado:
-        estacionamientos = estacionamientos.filter(estado=estado)
-    if fecha_desde:
-        estacionamientos = estacionamientos.filter(hora_inicio__date__gte=fecha_desde)
-    if fecha_hasta:
-        estacionamientos = estacionamientos.filter(hora_inicio__date__lte=fecha_hasta)
-
-    paginator = Paginator(estacionamientos, 50)
-    page      = request.GET.get("page", 1)
-    estacionamientos_pag = paginator.get_page(page)
-
-    return render(request, "admin/estacionamientos.html", {
-        "estacionamientos": estacionamientos_pag,
-        "filtros": {
-            "patente":     patente,
-            "estado":      estado,
-            "fecha_desde": fecha_desde,
-            "fecha_hasta": fecha_hasta,
-        },
-    })
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Vehículos del municipio

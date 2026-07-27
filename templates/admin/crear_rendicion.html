@@ -11,6 +11,38 @@
 
   {# Los mensajes los muestra base.html — no duplicar aquí #}
 
+  {# Referencia de cierres certificados para el período sugerido #}
+  {% if totales_cierres.cantidad %}
+  <div class="card" style="margin-bottom:1.25rem; background:var(--color-surface-2,#f0f7ff);
+                            border:1px solid var(--color-primary-light, #bdd7f5);">
+    <h3 style="margin:0 0 0.75rem; font-size:0.95rem; color:var(--color-primary);">
+      📊 Cierres certificados en el período sugerido ({{ totales_cierres.cantidad }})
+    </h3>
+    <div style="display:flex; gap:1.5rem; flex-wrap:wrap; font-size:0.92rem;">
+      <div>
+        <span class="text-muted">Total cobrado</span><br>
+        <strong style="font-size:1.15rem;">${{ totales_cierres.suma_cobrado }}</strong>
+      </div>
+      <div>
+        <span class="text-muted">Comisiones vendedores</span><br>
+        <strong style="font-size:1.15rem; color:var(--color-warning);">
+          ${{ totales_cierres.suma_comisiones }}
+        </strong>
+      </div>
+      <div>
+        <span class="text-muted">Neto municipio</span><br>
+        <strong style="font-size:1.15rem; color:var(--color-primary);">
+          ${{ totales_cierres.suma_neto }}
+        </strong>
+      </div>
+    </div>
+    <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0.6rem 0 0;">
+      Estos valores son una referencia de los cierres ya certificados. Completá efectivo/digital
+      según el desglose de movimientos de cada vendedor. Las comisiones ya están pre-cargadas abajo.
+    </p>
+  </div>
+  {% endif %}
+
   <form method="post" id="form-rendicion">
     {% csrf_token %}
 
@@ -66,9 +98,17 @@
         </div>
 
         <div style="margin-bottom:0.75rem;">
-          <label>Comisiones de vendedores ($)</label>
+          <label>
+            Comisiones de vendedores ($)
+            {% if totales_cierres.cantidad %}
+              <span style="font-size:0.78rem; color:var(--color-primary); font-weight:400;">
+                (pre-cargado desde cierres)
+              </span>
+            {% endif %}
+          </label>
           <input type="number" name="total_comisiones" id="id_comisiones"
-                 min="0" step="0.01" value="0"
+                 min="0" step="0.01"
+                 value="{{ totales_cierres.suma_comisiones|default:'0' }}"
                  style="width:100%; margin-top:0.3rem;"
                  oninput="calcularNeto()" />
         </div>

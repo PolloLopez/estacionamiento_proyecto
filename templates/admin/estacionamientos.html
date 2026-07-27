@@ -52,7 +52,7 @@
             <th>Patente</th>
             <th>Conductor</th>
             <th>Inicio</th>
-            <th>Fin</th>
+            <th>Fin / Vence</th>
             <th>Duración</th>
             <th>Costo</th>
             <th>Estado</th>
@@ -65,7 +65,10 @@
             <td>{{ est.usuario.nombre_completo|default:est.usuario.correo }}</td>
             <td>{{ est.hora_inicio|date:"d/m/Y H:i" }}</td>
             <td>
-              {% if est.hora_fin %}
+              {% if est.estado == "ACTIVO" and est.hora_vencimiento %}
+                <span style="color:#16a34a;">{{ est.hora_vencimiento|date:"d/m/Y H:i" }}</span>
+                <span class="text-muted" style="font-size:0.8rem; display:block;">vence {{ est.hora_vencimiento|timeuntil }}</span>
+              {% elif est.hora_fin %}
                 {{ est.hora_fin|date:"d/m/Y H:i" }}
               {% else %}
                 <span class="text-muted">—</span>

@@ -73,7 +73,7 @@
           <option value="">— Todos —</option>
           {% for u in usuarios_con_cierres %}
             <option value="{{ u.id }}" {% if usuario_id == u.id|stringformat:"s" %}selected{% endif %}>
-              {{ u.nombre|default:u.correo }} {% if u.es_inspector %}(Inspector){% elif u.es_vendedor %}(Vendedor){% endif %}
+              {{ u.nombre_completo|default:u.correo }} {% if u.es_inspector %}(Inspector){% elif u.es_vendedor %}(Vendedor){% endif %}
             </option>
           {% endfor %}
         </select>
@@ -99,7 +99,7 @@
 <div class="card" style="margin-bottom:0.75rem; padding:1rem 1.25rem;">
   <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
     <div>
-      <strong>{{ cierre.usuario.nombre|default:cierre.usuario.correo }} {{ cierre.usuario.apellido|default:"" }}</strong>
+      <strong>{{ cierre.usuario.nombre_completo|default:cierre.usuario.correo }}</strong>
       <span class="text-muted" style="font-size:0.85rem; margin-left:0.5rem;">
         {% if cierre.usuario.es_inspector %}Inspector{% elif cierre.usuario.es_vendedor %}Vendedor{% endif %}
       </span>
@@ -132,7 +132,7 @@
 
   {% if not cierre.certificado %}
   <div id="modal-cert-{{ cierre.id }}" style="display:none; margin-top:0.75rem; background:var(--color-surface-2,#f5f5f5); border-radius:8px; padding:0.75rem;">
-    <p style="margin:0 0 0.5rem; font-size:0.9rem;">¿Confirmás que recibiste ${{ cierre.total_cobrado }} de {{ cierre.usuario.nombre|default:cierre.usuario.correo }}?</p>
+    <p style="margin:0 0 0.5rem; font-size:0.9rem;">¿Confirmás que recibiste ${{ cierre.total_cobrado }} de {{ cierre.usuario.nombre_completo|default:cierre.usuario.correo }}?</p>
     <div style="display:flex; gap:0.75rem;">
       <form method="post" action="{% url 'certificar_cierre' cierre.id %}" style="flex:1;">
         {% csrf_token %}
@@ -225,8 +225,15 @@
       </tr>
       {% if r.notas_tesorero %}
       <tr>
-        <td colspan="10" style="background:var(--color-surface-2,#f8f8f8); font-size:0.85rem; color:var(--color-text-muted); padding:0.4rem 1rem;">
-          💬 Tesorero: {{ r.notas_tesorero }}
+        <td colspan="10"
+            style="font-size:0.85rem; padding:0.5rem 1rem;
+                   {% if r.estado == 'observada' %}
+                     background:#fdecea; border-left:3px solid var(--color-danger); color:var(--color-danger);
+                   {% else %}
+                     background:var(--color-surface-2,#f8f8f8); color:var(--color-text-muted);
+                   {% endif %}">
+          {% if r.estado == 'observada' %}⚠️{% else %}💬{% endif %}
+          <strong>Tesorero:</strong> {{ r.notas_tesorero }}
         </td>
       </tr>
       {% endif %}
@@ -270,7 +277,7 @@
       {% for liq in liquidaciones %}
       <tr>
         <td>
-          <strong>{{ liq.vendedor.nombre|default:liq.vendedor.correo }}</strong><br>
+          <strong>{{ liq.vendedor.nombre_completo|default:liq.vendedor.correo }}</strong><br>
           <span class="text-muted" style="font-size:0.82rem;">{{ liq.vendedor.correo }}</span>
         </td>
         <td style="font-size:0.85rem;">{{ liq.fecha_desde|date:"d/m/Y" }} → {{ liq.fecha_hasta|date:"d/m/Y" }}</td>
@@ -420,15 +427,15 @@
       <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:0.5rem;">📋 Secciones a incluir</label>
       <div style="display:flex; flex-direction:column; gap:0.4rem;">
         <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem;">
-          <input type="checkbox" name="inf_secciones" value="rendiciones" checked>
+          <input type="checkbox" name="secciones" value="rendiciones" checked>
           Rendiciones a tesorería
         </label>
         <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem;">
-          <input type="checkbox" name="inf_secciones" value="vendedores" checked>
+          <input type="checkbox" name="secciones" value="vendedores" checked>
           Recaudación por vendedor
         </label>
         <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem;">
-          <input type="checkbox" name="inf_secciones" value="infracciones" checked>
+          <input type="checkbox" name="secciones" value="infracciones" checked>
           Infracciones impagas (adjunta PDF para juzgado)
         </label>
       </div>
@@ -441,7 +448,7 @@
         {% for dest in destinatarios %}
         <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.9rem;
                       {% if not dest.activo %}opacity:0.5;{% endif %}">
-          <input type="checkbox" name="inf_destinatarios" value="{{ dest.id }}"
+          <input type="checkbox" name="dest_ids" value="{{ dest.id }}"
                  {% if dest.activo %}checked{% endif %}>
           <span>{{ dest.nombre }}</span>
           <span style="color:var(--color-text-muted); font-size:0.82rem;">{{ dest.correo }}</span>

@@ -362,6 +362,19 @@ class Estacionamiento(models.Model):
     def activo(self):
         return self.estado == Estado.ACTIVO
 
+    @property
+    def hora_vencimiento(self):
+        """
+        Hora estimada de vencimiento para estacionamientos ACTIVOS.
+        Se calcula como hora_inicio + duracion_horas.
+        No reemplaza hora_fin (que se registra al finalizar el turno),
+        sino que sirve para mostrar cuándo vence visualmente.
+        """
+        from datetime import timedelta
+        if self.hora_inicio and self.duracion_horas:
+            return self.hora_inicio + timedelta(hours=float(self.duracion_horas))
+        return None
+
     class Meta:
         constraints = [
             UniqueConstraint(

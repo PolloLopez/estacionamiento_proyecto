@@ -10,6 +10,7 @@ Responsabilidades:
 
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -21,26 +22,35 @@ from .models import LiquidacionComision, Rendicion
 def panel_tesorero(request):
     """
     Panel principal del tesorero.
-    Muestra rendiciones de administradores y liquidaciones de comisiones de vendedores,
-    con el conteo de pendientes de cada tipo.
+    Muestra rendiciones de administradores y liquidaciones de comisiones de vendedores.
+    Las rendiciones se separan en pendientes (acción requerida) e historial.
     """
     municipio = request.user.municipio
 
-    qs_rendiciones = Rendicion.objects.filter(municipio=municipio).select_related("admin")
+    qs_rendiciones   = Rendicion.objects.filter(municipio=municipio).select_related("admin")
     qs_liquidaciones = LiquidacionComision.objects.filter(municipio=municipio).select_related("vendedor")
 
-    # Contar pendientes antes de aplicar el slice (no se puede filtrar sobre queryset sliceado)
-    pendientes_rendicion   = qs_rendiciones.filter(estado="pendiente").count()
+    # Separar pendientes del historial para que el tesorero vea primero qué necesita acción
+    rendiciones_pendientes = qs_rendiciones.filter(estado="pendiente").order_by("-creado_en")
+    rendiciones_historial  = qs_rendiciones.exclude(estado="pendiente").order_by("-validado_en")[:30]
+
+    # Total de neto pendiente de validar
+    total_neto_pendiente = (
+        rendiciones_pendientes.aggregate(total=Sum("total_neto"))["total"] or 0
+    )
+
+    pendientes_rendicion   = rendiciones_pendientes.count()
     pendientes_liquidacion = qs_liquidaciones.filter(estado="pendiente").count()
 
-    rendiciones   = qs_rendiciones.order_by("-creado_en")[:50]
     liquidaciones = qs_liquidaciones.order_by("-creado_en")[:50]
 
     return render(request, "tesorero/panel_tesorero.html", {
-        "rendiciones":            rendiciones,
-        "liquidaciones":          liquidaciones,
-        "pendientes_rendicion":   pendientes_rendicion,
-        "pendientes_liquidacion": pendientes_liquidacion,
+        "rendiciones_pendientes":  rendiciones_pendientes,
+        "rendiciones_historial":   rendiciones_historial,
+        "total_neto_pendiente":    total_neto_pendiente,
+        "liquidaciones":           liquidaciones,
+        "pendientes_rendicion":    pendientes_rendicion,
+        "pendientes_liquidacion":  pendientes_liquidacion,
     })
 
 
