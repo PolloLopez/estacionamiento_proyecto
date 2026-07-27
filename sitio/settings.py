@@ -44,6 +44,8 @@ INSTALLED_APPS = [
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
+
+    "axes",   # rate limiting: bloqueo por IP después de N intentos fallidos
 ]
 
 # SITE_ID debe coincidir con el ID del registro en Django Admin → Sites.
@@ -54,7 +56,8 @@ SITE_ID = int(os.environ.get("SITE_ID", 2))
 # WhiteNoise va justo después de SecurityMiddleware para servir estáticos en prod.
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",   # ← archivos estáticos en prod
+    "whitenoise.middleware.WhiteNoiseMiddleware",        # ← archivos estáticos en prod
+    "axes.middleware.AxesMiddleware",                   # ← rate limiting (debe ir antes de SessionMiddleware)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -112,6 +115,8 @@ else:
 AUTH_USER_MODEL = "app_estacionamiento.Usuario"
 
 AUTHENTICATION_BACKENDS = [
+    # axes debe ser el primero: verifica lockout antes de que los demás backends autentiquen
+    "axes.backends.AxesStandaloneBackend",
     "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
@@ -144,6 +149,31 @@ if not DEBUG:
 # W008 (SECURE_SSL_REDIRECT) se silencia porque Railway maneja el redirect
 # a HTTPS en el load balancer. Activarlo en Django causaría redirect loops.
 SILENCED_SYSTEM_CHECKS = ["security.W008"]
+
+# ─── Error tracking — Sentry ─────────────────────────────────────────────────
+# Solo activo en producción (DEBUG=False) y si SENTRY_DSN está seteada.
+# En Railway: agregar variable SENTRY_DSN con el DSN del proyecto en sentry.io.
+# traces_sample_rate=0.1 → captura el 10% de las transacciones para performance
+# (suficiente para detectar cuellos de botella sin llenar la cuota del plan free).
+_sentry_dsn = os.getenv("SENTRY_DSN", "").strip()
+if not DEBUG and _sentry_dsn:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        traces_sample_rate=0.1,
+        send_default_pii=False,   # no envía datos personales (correo, IP) a Sentry
+    )
+
+# ─── Rate limiting — django-axes ──────────────────────────────────────────────
+# Bloquea una IP después de AXES_FAILURE_LIMIT intentos fallidos consecutivos.
+# El bloqueo dura AXES_COOLOFF_TIME horas y se resetea al entrar exitosamente.
+# Se bloquea solo por IP (no por username) para evitar que un atacante bloquee
+# cuentas legítimas conociendo solo el correo del usuario.
+AXES_FAILURE_LIMIT      = 5     # intentos fallidos antes de bloquear
+AXES_COOLOFF_TIME       = 1     # horas bloqueado (acepta int o timedelta)
+AXES_RESET_ON_SUCCESS   = True  # resetea el contador al loguearse bien
+AXES_LOCKOUT_PARAMETERS = ["ip_address"]   # bloquea por IP, no por username
+AXES_LOCKOUT_TEMPLATE   = "lockout.html"   # template para la pantalla de bloqueo
 
 # ─── CSRF ─────────────────────────────────────────────────────────────────────
 # En Railway: CSRF_TRUSTED_ORIGINS=https://tuapp.up.railway.app
@@ -258,10 +288,15 @@ SOCIALACCOUNT_PROVIDERS = {
 # ─── MercadoPago ──────────────────────────────────────────────────────────────
 # En Railway: setear MP_ACCESS_TOKEN con el token de producción o sandbox.
 # Obtenerlos en: https://www.mercadopago.com.ar/developers/panel/credentials
-MP_ACCESS_TOKEN  = os.getenv("MP_ACCESS_TOKEN", "")
-MP_PUBLIC_KEY    = os.getenv("MP_PUBLIC_KEY", "")
-MP_CLIENT_ID     = os.getenv("MP_CLIENT_ID", "")
-MP_CLIENT_SECRET = os.getenv("MP_CLIENT_SECRET", "")
+MP_ACCESS_TOKEN   = os.getenv("MP_ACCESS_TOKEN", "")
+MP_PUBLIC_KEY     = os.getenv("MP_PUBLIC_KEY", "")
+MP_CLIENT_ID      = os.getenv("MP_CLIENT_ID", "")
+MP_CLIENT_SECRET  = os.getenv("MP_CLIENT_SECRET", "")
+# Secreto del webhook MP para verificar la firma HMAC-SHA256 del header x-signature.
+# Obtenerlo en: MP Dashboard → Tus integraciones → [tu app] → Webhooks → secreto.
+# En Railway: setear como variable MP_WEBHOOK_SECRET.
+# Sin esta variable, la verificación se omite (modo permisivo para entornos de prueba).
+MP_WEBHOOK_SECRET = os.getenv("MP_WEBHOOK_SECRET", "")
 
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

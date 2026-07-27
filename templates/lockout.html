@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso bloqueado</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f4f6f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 2.5rem 2rem;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .icono {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            color: #2c3e50;
+            margin-bottom: 0.75rem;
+        }
+
+        p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        .detalle {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin: 1.25rem 0;
+            font-size: 0.9rem;
+            color: #664d03;
+        }
+
+        a {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.6rem 1.5rem;
+            background: #2c3e50;
+            color: white;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: background 0.2s;
+        }
+
+        a:hover {
+            background: #3d5166;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icono">🔒</div>
+        <h1>Acceso bloqueado temporalmente</h1>
+        <p>
+            Se detectaron demasiados intentos fallidos de inicio de sesión
+            desde esta conexión.
+        </p>
+        <div class="detalle">
+            Por seguridad, el acceso quedó bloqueado por <strong>1 hora</strong>.
+            Después de ese tiempo podés intentarlo de nuevo.
+        </div>
+        <p>
+            Si olvidaste tu contraseña, contactá al administrador del sistema
+            para que la restablezca.
+        </p>
+        <a href="/login/">← Volver al inicio de sesión</a>
+    </div>
+</body>
+</html>

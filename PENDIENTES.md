@@ -1,6 +1,6 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-24 (auditoría de rendimiento)
+Última actualización: 2026-07-25 (checklist de producción + fix duracion_horas)
 
 ---
 
@@ -17,23 +17,24 @@
 ### 🔐 SEGURIDAD: URL del Django Admin ✅
 Contraseña cambiada ✅. URL movida a `/sistema-interno/` ✅.
 
-### 🔐 SEGURIDAD: Webhook de MercadoPago sin verificación de firma
-El endpoint `/mp/webhook/` acepta cualquier POST sin verificar el header `x-signature` de MP.
-La mitigación actual (re-consultar la API de MP con el payment_id) es sólida, pero no es suficiente para producción municipal real.
+### 🔴 PRODUCCIÓN: Sin backups automáticos del PostgreSQL de Railway Hobby
+Railway Hobby no incluye backups automáticos. Opciones:
+- **Railway Pro** ($20/mes): habilita backups diarios desde el dashboard.
+- **Script `pg_dump`** vía scheduled task o GitHub Actions → sube a S3/Backblaze/GCS.
+Verificar que el backup se puede restaurar al menos una vez antes del go-live real.
+Ver: `CHECKLIST_PRODUCCION_2026-07-25.md` — item 🔴 #1.
 
-Implementar al migrar a Digital Ocean: verificar `x-signature` via HMAC-SHA256 con `MP_WEBHOOK_SECRET`.
-Agregar `MP_WEBHOOK_SECRET` como variable de entorno en Railway.
+### 🔐 SEGURIDAD: Webhook de MercadoPago sin verificación de firma ✅
+Implementado en `views_mp.py`: función `_verificar_firma_mp()` verifica el header `x-signature`
+via HMAC-SHA256. Si `MP_WEBHOOK_SECRET` no está seteada, loguea warning y pasa (modo permisivo
+para pruebas). Firma inválida → se descarta silenciosamente con 200 (MP no reintenta, no revela detección).
+⚠️ Pendiente en Railway: agregar variable `MP_WEBHOOK_SECRET` desde MP Dashboard → Webhooks → secreto.
 - Docs MP: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks#editor_1
 
-### 🔐 SEGURIDAD: Rate limiting en login
-El `login_view` manual (`views_auth.py`) no tiene protección contra brute force.
-Instalar `django-axes` (2 líneas en INSTALLED_APPS + MIDDLEWARE + migración):
-```
-pip install django-axes
-# INSTALLED_APPS += ["axes"]
-# MIDDLEWARE: "axes.middleware.AxesMiddleware" después de SecurityMiddleware
-# AXES_FAILURE_LIMIT = 5 / AXES_COOLOFF_TIME = 1
-```
+### 🔐 SEGURIDAD: Rate limiting en login ✅
+Implementado con `django-axes==7.0.1`. Bloquea por IP después de 5 intentos fallidos, 1 hora de cooloff.
+Archivos modificados: `requirements.txt`, `settings.py` (INSTALLED_APPS + MIDDLEWARE + AUTHENTICATION_BACKENDS + AXES_*), `templates/lockout.html`.
+⚠️ Pendiente localmente: `pip install django-axes && python manage.py migrate`
 
 ### 🔐 SEGURIDAD: Idempotencia MP basada en texto libre
 `acreditar_saldo_mp.py` usa `descripcion__contains="MP:{payment_id}"` para evitar double-credit.
@@ -197,6 +198,20 @@ Muestra: infracciones del día, recaudación, inspectores activos, vehículos ve
 ---
 
 ## ✅ Resuelto
+
+### fix: duracion_horas bug — IntegerField → DecimalField (2026-07-25) ✅
+Migración 0044. `Estacionamiento.duracion_horas` era `IntegerField` pero el sistema genera
+duraciones en múltiplos de 0.5h. Django truncaba silenciosamente `Decimal("1.5")` → 1,
+haciendo que el estacionamiento expirara 30 min antes de lo pagado.
+Fix: `DecimalField(max_digits=4, decimal_places=1)`. Actualizados `views_conductor.py`,
+`views_inspector.py` y `services/horarios.py` para usar `float()` en `timedelta(hours=...)`.
+Los datos existentes eran todos enteros (ya estaban truncados) — migración segura sin backfill.
+
+### docs: checklist de producción (2026-07-25) ✅
+Informe completo: `CHECKLIST_PRODUCCION_2026-07-25.md`.
+3 bloqueantes: backups automáticos, HMAC MP webhook, rate limiting login.
+4 recomendados: Sentry, UptimeRobot, email SMTP, limpieza datos prueba.
+Plan de go-live con smoke test de 5 pasos y procedimiento de rollback.
 
 ### fix: auditoría de rendimiento — completa (2026-07-24) ✅
 Informe completo: `AUDITORIA_RENDIMIENTO_2026-07-24.md`.

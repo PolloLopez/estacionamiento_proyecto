@@ -18,6 +18,8 @@ SEGURIDAD:
   - La acreditación (use_case acreditar_saldo_mp) es idempotente: no acredita dos veces el mismo pago.
 """
 
+import hashlib
+import hmac as hmac_module
 import json
 import logging
 from decimal import Decimal
@@ -221,6 +223,71 @@ def mp_pendiente(request):
     return redirect("inicio_usuarios")
 
 
+def _verificar_firma_mp(request, data_id: str) -> bool:
+    """
+    Verifica la firma HMAC-SHA256 del webhook de MercadoPago.
+
+    MP envía el header x-signature con el formato:
+        ts=<timestamp>;v1=<hmac_sha256>
+
+    La firma se calcula sobre el manifest:
+        id:<data_id>;request-id:<x-request-id>;ts:<ts>;
+
+    Retorna True si la firma es válida.
+    Si MP_WEBHOOK_SECRET no está configurada, loguea un warning y retorna True
+    (compatibilidad con entornos de prueba que aún no tienen el secreto seteado).
+
+    Docs: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
+    """
+    webhook_secret = getattr(settings, "MP_WEBHOOK_SECRET", "").strip()
+    if not webhook_secret:
+        # Sin secreto configurado no podemos verificar. En producción municipal real,
+        # MP_WEBHOOK_SECRET debe estar seteado en Railway para activar la verificación.
+        logger.warning("mp_webhook: MP_WEBHOOK_SECRET no configurado — verificación de firma omitida")
+        return True
+
+    firma_header = request.headers.get("x-signature", "")
+    if not firma_header:
+        logger.warning("mp_webhook: header x-signature ausente — request rechazado")
+        return False
+
+    # Parsear "ts=...;v1=..." → {"ts": "...", "v1": "..."}
+    partes = {}
+    for fragmento in firma_header.split(";"):
+        if "=" in fragmento:
+            clave, valor = fragmento.split("=", 1)
+            partes[clave.strip()] = valor.strip()
+
+    ts          = partes.get("ts", "")
+    v1_recibido = partes.get("v1", "")
+
+    if not ts or not v1_recibido:
+        logger.warning("mp_webhook: x-signature mal formado: %s", firma_header)
+        return False
+
+    # x-request-id es opcional en el manifest; si MP no lo envía, queda vacío
+    request_id = request.headers.get("x-request-id", "")
+
+    # Manifest exacto que MP usa para generar la firma
+    manifest = f"id:{data_id};request-id:{request_id};ts:{ts};"
+
+    firma_calculada = hmac_module.new(
+        webhook_secret.encode("utf-8"),
+        manifest.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac_module.compare_digest(firma_calculada, v1_recibido):
+        logger.warning(
+            "mp_webhook: firma inválida | data_id=%s | ts=%s",
+            data_id,
+            ts,
+        )
+        return False
+
+    return True
+
+
 @csrf_exempt
 def mp_webhook(request):
     """
@@ -248,6 +315,12 @@ def mp_webhook(request):
 
     payment_id = str(data.get("data", {}).get("id", ""))
     if not payment_id:
+        return HttpResponse(status=200)
+
+    # Verificar firma HMAC-SHA256 antes de procesar.
+    # Respondemos 200 siempre (firma válida o no) para que MP no reintente ni
+    # sepa que detectamos la solicitud inválida. El log queda para auditoría.
+    if not _verificar_firma_mp(request, payment_id):
         return HttpResponse(status=200)
 
     # Consultar el detalle del pago directamente a la API de MP

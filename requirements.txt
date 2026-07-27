@@ -18,6 +18,10 @@ dj-database-url==2.3.0
 cloudinary==1.41.0
 django-cloudinary-storage==0.3.0
 
+# Seguridad
+django-axes==7.0.1          # rate limiting en login (bloqueo por IP)
+sentry-sdk[django]          # error tracking en producción
+
 # Utilidades Django
 django-extensions==4.1
 Pillow==12.0.0
