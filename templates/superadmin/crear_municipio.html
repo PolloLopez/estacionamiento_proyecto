@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Nuevo municipio{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:480px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+    <h1 style="font-size:1.4rem;">🏙️ Nuevo municipio</h1>
+    <a href="{% url 'panel_superadmin' %}" class="btn btn-outline">← Volver</a>
+  </div>
+
+  <div class="card">
+    <form method="post">
+      {% csrf_token %}
+      <div style="margin-bottom:1rem;">
+        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">
+          Nombre del municipio <span style="color:var(--color-danger);">*</span>
+        </label>
+        <input type="text" name="nombre" placeholder="Ej: General Pueyrredon"
+               style="width:100%;" required autofocus>
+      </div>
+      <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+        <a href="{% url 'panel_superadmin' %}" class="btn btn-outline">Cancelar</a>
+        <button type="submit" class="btn">Crear municipio</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

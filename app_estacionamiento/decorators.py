@@ -3,6 +3,7 @@
 from functools import wraps
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
+from django.db.models import Q
 
 
 def require_login(view_func):
@@ -94,6 +95,12 @@ def require_role(*roles):
                     "tesorero" in roles and
                     getattr(usuario, "es_tesorero", False)
                 ),
+
+                # SUPERADMIN (rol global — sin municipio propio)
+                (
+                    "superadmin" in roles and
+                    getattr(usuario, "es_superadmin", False)
+                ),
             ])
 
             # ==========================================
@@ -106,6 +113,59 @@ def require_role(*roles):
             # ==========================================
             # 4. CONTINUAR VIEW
             # ==========================================
+            return view_func(request, *args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def require_modulo(nombre_modulo):
+    """
+    Verifica que el municipio del usuario tenga activo el módulo de pago indicado.
+
+    Uso:
+        @require_modulo("geolocalizacion_inspector")
+
+    Si el municipio no tiene el módulo activo, muestra la pantalla
+    'módulo no disponible' en vez de un 403 genérico.
+
+    Nota: el superadmin puede acceder a todo sin restricción de módulos,
+    porque necesita poder configurar y probar cada módulo.
+    """
+
+    def decorator(view_func):
+
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+
+            if not request.user.is_authenticated:
+                return redirect("login")
+
+            usuario = request.user
+
+            # El superadmin pasa siempre — puede gestionar y probar cualquier módulo
+            if getattr(usuario, "es_superadmin", False):
+                return view_func(request, *args, **kwargs)
+
+            # Para el resto: verificar que el municipio tenga el módulo activo
+            municipio = getattr(usuario, "municipio", None)
+            if not municipio:
+                return TemplateResponse(request, "403.html", status=403)
+
+            # Import local para evitar importación circular con models
+            from .models import ModuloMunicipio
+            tiene_modulo = ModuloMunicipio.objects.filter(
+                municipio=municipio,
+                modulo=nombre_modulo,
+                activo=True,
+            ).exists()
+
+            if not tiene_modulo:
+                return TemplateResponse(request, "modulo_no_disponible.html", {
+                    "modulo": nombre_modulo,
+                }, status=402)
+
             return view_func(request, *args, **kwargs)
 
         return wrapper

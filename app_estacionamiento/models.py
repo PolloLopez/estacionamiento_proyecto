@@ -110,11 +110,14 @@ class Usuario(AbstractUser):
                              verbose_name="Horarios de atención",
                              help_text="Ej: Lun-Vie 9-18, Sáb 9-13")
 
-    es_conductor = models.BooleanField(default=True)
-    es_inspector = models.BooleanField(default=False)
-    es_vendedor = models.BooleanField(default=False)
-    es_admin     = models.BooleanField(default=False)
-    es_tesorero  = models.BooleanField(default=False)
+    es_conductor   = models.BooleanField(default=True)
+    es_inspector   = models.BooleanField(default=False)
+    es_vendedor    = models.BooleanField(default=False)
+    es_admin       = models.BooleanField(default=False)
+    es_tesorero    = models.BooleanField(default=False)
+    # Superadmin global: no pertenece a ningún municipio, gestiona todo el sistema.
+    # municipio = null para este rol.
+    es_superadmin  = models.BooleanField(default=False)
 
     # ✅ Verificación de identidad del conductor (aprobada por el admin)
     es_verificado = models.BooleanField(
@@ -872,3 +875,52 @@ class DestinatarioInforme(models.Model):
 
     def __str__(self):
         return f"{self.nombre} <{self.correo}>"
+
+
+class ModuloMunicipio(models.Model):
+    """
+    Módulos de pago que el superadmin activa por municipio.
+
+    Cada municipio puede tener habilitado un subconjunto de módulos.
+    Las vistas de cada módulo usan el decorator require_modulo() para
+    verificar si el municipio del usuario tiene ese módulo activo.
+    """
+
+    MODULOS = [
+        ("ocupacion_tiempo_real",   "Ocupación en tiempo real"),
+        ("reportes_comparativos",   "Reportes comparativos"),
+        ("balance_por_dominio",     "Balance por dominio"),
+        ("areas_reservadas",        "Áreas reservadas"),
+        ("geolocalizacion_inspector", "Geolocalización del inspector"),
+        ("notificaciones_conductor", "Notificaciones al conductor"),
+        ("informes_automaticos",    "Informes automáticos programados"),
+    ]
+
+    municipio      = models.ForeignKey(
+        "Municipio",
+        on_delete=models.CASCADE,
+        related_name="modulos",
+    )
+    modulo         = models.CharField(max_length=50, choices=MODULOS)
+    activo         = models.BooleanField(default=True)
+    precio_mensual = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Precio mensual en pesos que el municipio paga por este módulo.",
+    )
+    activado_en    = models.DateTimeField(auto_now_add=True)
+    activado_por   = models.ForeignKey(
+        "Usuario",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="modulos_activados",
+        help_text="Superadmin que activó este módulo.",
+    )
+
+    class Meta:
+        # Un municipio no puede tener el mismo módulo dos veces
+        unique_together = [("municipio", "modulo")]
+        verbose_name        = "Módulo de municipio"
+        verbose_name_plural = "Módulos de municipios"
+
+    def __str__(self):
+        return f"{self.municipio} — {self.get_modulo_display()}"

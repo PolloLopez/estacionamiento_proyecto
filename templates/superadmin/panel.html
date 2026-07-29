@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Panel Superadmin{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+    <h1>🌐 Panel Superadmin</h1>
+    <a href="{% url 'crear_municipio' %}" class="btn">➕ Nuevo municipio</a>
+  </div>
+
+  {# Resumen global #}
+  <div class="grid grid-2" style="margin-bottom:2rem;">
+    <div class="card" style="text-align:center;">
+      <div class="text-muted" style="font-size:0.85rem;">Municipios activos</div>
+      <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">{{ total_municipios }}</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="text-muted" style="font-size:0.85rem;">Admins activos (total)</div>
+      <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">{{ total_admins }}</div>
+    </div>
+  </div>
+
+  {# Tabla de municipios #}
+  <div class="card" style="overflow-x:auto;">
+    {% if municipios %}
+    <table>
+      <thead>
+        <tr>
+          <th>Municipio</th>
+          <th style="text-align:center;">Estado</th>
+          <th style="text-align:center;">Admins</th>
+          <th style="text-align:center;">Módulos activos</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in municipios %}
+        <tr>
+          <td>
+            <strong>{{ m.nombre }}</strong>
+          </td>
+          <td style="text-align:center;">
+            {% if m.activo %}
+              <span style="color:var(--color-primary); font-weight:600;">● Activo</span>
+            {% else %}
+              <span style="color:var(--color-text-muted);">○ Inactivo</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center; font-weight:700;">{{ m.cant_admins }}</td>
+          <td style="text-align:center; font-weight:700; color:var(--color-primary);">{{ m.cant_modulos }}</td>
+          <td>
+            <a href="{% url 'editar_municipio' m.id %}" class="btn btn-outline"
+               style="font-size:0.82rem; padding:0.3rem 0.7rem;">
+              ⚙️ Gestionar
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted" style="padding:1.5rem; text-align:center;">
+      No hay municipios creados todavía.
+      <a href="{% url 'crear_municipio' %}">Crear el primero</a>
+    </p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

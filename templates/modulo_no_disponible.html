@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Módulo no disponible{% endblock %}
+
+{% block content %}
+<div style="text-align:center; padding:4rem 1rem;">
+  <div style="font-size:3rem; margin-bottom:1rem;">🔒</div>
+  <h1 style="font-size:1.5rem; margin-bottom:0.75rem;">Módulo no disponible</h1>
+  <p style="color:var(--color-text-muted); max-width:420px; margin:0 auto 1.5rem;">
+    Esta función es parte de un módulo adicional que no está activo para tu municipio.
+    Contactá al administrador del sistema para habilitarlo.
+  </p>
+  <a href="javascript:history.back()" class="btn btn-outline">← Volver</a>
+</div>
+{% endblock %}

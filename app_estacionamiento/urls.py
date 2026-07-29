@@ -2,6 +2,7 @@
 
 from django.urls import path
 from . import views
+from . import views_superadmin
 
 urlpatterns = [
 
@@ -136,5 +137,15 @@ urlpatterns = [
     path("tesorero/", views.panel_tesorero, name="panel_tesorero"),
     path("tesorero/rendicion/<int:rendicion_id>/validar/", views.validar_rendicion, name="validar_rendicion"),
     path("tesorero/depositar/<int:liquidacion_id>/", views.depositar_comision, name="depositar_comision"),
+
+    # =========================
+    # 🌐 SUPERADMIN
+    # =========================
+    path("superadmin/",                                         views_superadmin.panel_superadmin,  name="panel_superadmin"),
+    path("superadmin/municipio/nuevo/",                         views_superadmin.crear_municipio,   name="crear_municipio"),
+    path("superadmin/municipio/<int:municipio_id>/",            views_superadmin.editar_municipio,  name="editar_municipio"),
+    path("superadmin/municipio/<int:municipio_id>/admin/nuevo/", views_superadmin.crear_admin,      name="crear_admin"),
+    path("superadmin/admin/<int:admin_id>/toggle/",             views_superadmin.toggle_admin,      name="toggle_admin"),
+    path("superadmin/municipio/<int:municipio_id>/modulo/",     views_superadmin.gestionar_modulo,  name="gestionar_modulo"),
 
 ]

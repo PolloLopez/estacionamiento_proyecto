@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}{{ municipio.nombre }} — Superadmin{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+    <h1 style="font-size:1.5rem;">🏙️ {{ municipio.nombre }}</h1>
+    <a href="{% url 'panel_superadmin' %}" class="btn btn-outline">← Volver</a>
+  </div>
+
+  <div class="grid grid-2" style="gap:1.5rem;">
+
+    {# ── COLUMNA IZQUIERDA: Configuración + Admins ── #}
+    <div>
+
+      {# Configuración del municipio #}
+      <div class="card" style="margin-bottom:1.5rem;">
+        <h2 style="font-size:1.05rem; margin-bottom:1rem;">⚙️ Configuración</h2>
+        <form method="post">
+          {% csrf_token %}
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Nombre</label>
+            <input type="text" name="nombre" value="{{ municipio.nombre }}"
+                   style="width:100%; margin-top:0.25rem;" required>
+          </div>
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Comisión vendedor (%)</label>
+            <input type="number" name="comision_vendedor" step="0.1" min="0" max="100"
+                   value="{{ municipio.comision_vendedor }}"
+                   style="width:100%; margin-top:0.25rem;">
+          </div>
+          <div style="margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+            <input type="checkbox" name="activo" id="id_activo"
+                   {% if municipio.activo %}checked{% endif %}>
+            <label for="id_activo" style="font-size:0.9rem;">Municipio activo</label>
+          </div>
+          <button type="submit" class="btn" style="width:100%;">Guardar cambios</button>
+        </form>
+      </div>
+
+      {# Admins del municipio #}
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+          <h2 style="font-size:1.05rem; margin:0;">👤 Administradores</h2>
+          <a href="{% url 'crear_admin' municipio.id %}" class="btn btn-outline"
+             style="font-size:0.82rem; padding:0.3rem 0.7rem;">➕ Nuevo admin</a>
+        </div>
+
+        {% if admins %}
+        <table>
+          <thead>
+            <tr>
+              <th>Correo</th>
+              <th>Nombre</th>
+              <th style="text-align:center;">Estado</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for admin in admins %}
+            <tr>
+              <td style="font-size:0.85rem;">{{ admin.correo }}</td>
+              <td style="font-size:0.85rem;">{{ admin.nombre_completo }}</td>
+              <td style="text-align:center;">
+                {% if admin.is_active %}
+                  <span style="color:var(--color-primary); font-size:0.82rem;">● Activo</span>
+                {% else %}
+                  <span style="color:var(--color-text-muted); font-size:0.82rem;">○ Inactivo</span>
+                {% endif %}
+              </td>
+              <td>
+                <form method="post" action="{% url 'toggle_admin' admin.id %}" style="margin:0;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-outline"
+                          style="font-size:0.78rem; padding:0.2rem 0.6rem;
+                                 {% if admin.is_active %}color:var(--color-warning); border-color:var(--color-warning);{% endif %}">
+                    {% if admin.is_active %}Desactivar{% else %}Activar{% endif %}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted" style="font-size:0.9rem;">Sin admins asignados todavía.</p>
+        {% endif %}
+      </div>
+
+    </div>
+
+    {# ── COLUMNA DERECHA: Módulos de pago ── #}
+    <div class="card">
+      <h2 style="font-size:1.05rem; margin-bottom:1rem;">🧩 Módulos de pago</h2>
+
+      {# Módulos ya asignados #}
+      {% if modulos %}
+      <div style="margin-bottom:1.25rem;">
+        {% for m in modulos %}
+        <div style="display:flex; justify-content:space-between; align-items:center;
+                    padding:0.6rem 0; border-bottom:1px solid var(--color-border);">
+          <div>
+            <div style="font-weight:600; font-size:0.9rem;">{{ m.get_modulo_display }}</div>
+            <div style="font-size:0.8rem; color:var(--color-text-muted);">
+              ${{ m.precio_mensual }}/mes
+              {% if m.activado_por %} · activado por {{ m.activado_por.nombre_completo }}{% endif %}
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            {% if m.activo %}
+              <span style="color:var(--color-primary); font-size:0.82rem; font-weight:600;">● Activo</span>
+              <form method="post" action="{% url 'gestionar_modulo' municipio.id %}" style="margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="desactivar">
+                <input type="hidden" name="modulo" value="{{ m.modulo }}">
+                <button type="submit" class="btn btn-outline"
+                        style="font-size:0.78rem; padding:0.2rem 0.6rem;
+                               color:var(--color-warning); border-color:var(--color-warning);">
+                  Desactivar
+                </button>
+              </form>
+            {% else %}
+              <span style="color:var(--color-text-muted); font-size:0.82rem;">○ Inactivo</span>
+              <form method="post" action="{% url 'gestionar_modulo' municipio.id %}" style="margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="activar">
+                <input type="hidden" name="modulo" value="{{ m.modulo }}">
+                <input type="hidden" name="precio_mensual" value="{{ m.precio_mensual }}">
+                <button type="submit" class="btn btn-outline"
+                        style="font-size:0.78rem; padding:0.2rem 0.6rem;">
+                  Reactivar
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# Agregar nuevo módulo #}
+      {% if modulos_disponibles %}
+      <div style="margin-top:0.75rem;">
+        <p style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">Agregar módulo:</p>
+        <form method="post" action="{% url 'gestionar_modulo' municipio.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="activar">
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end;">
+            <div style="flex:2; min-width:160px;">
+              <select name="modulo" style="width:100%;" required>
+                <option value="">— Seleccionar módulo —</option>
+                {% for clave, nombre in modulos_disponibles %}
+                <option value="{{ clave }}">{{ nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div style="width:110px;">
+              <input type="number" name="precio_mensual" placeholder="$/mes"
+                     min="0" step="0.01" style="width:100%;">
+            </div>
+            <button type="submit" class="btn" style="white-space:nowrap;">➕ Activar</button>
+          </div>
+        </form>
+      </div>
+      {% else %}
+      <p class="text-muted" style="font-size:0.85rem; margin-top:0.5rem;">
+        ✅ Todos los módulos disponibles ya están asignados.
+      </p>
+      {% endif %}
+    </div>
+
+  </div>{# /grid #}
+
+</div>
+{% endblock %}

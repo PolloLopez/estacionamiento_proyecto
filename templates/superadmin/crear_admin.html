@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Nuevo admin — {{ municipio.nombre }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:480px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+    <h1 style="font-size:1.4rem;">👤 Nuevo admin — {{ municipio.nombre }}</h1>
+    <a href="{% url 'editar_municipio' municipio.id %}" class="btn btn-outline">← Volver</a>
+  </div>
+
+  <div class="card">
+    <form method="post">
+      {% csrf_token %}
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">
+          Correo <span style="color:var(--color-danger);">*</span>
+        </label>
+        <input type="email" name="correo" placeholder="admin@municipio.gob.ar"
+               style="width:100%;" required autofocus>
+      </div>
+      <div style="display:flex; gap:0.75rem; margin-bottom:0.75rem;">
+        <div style="flex:1;">
+          <label style="font-weight:600; display:block; margin-bottom:0.3rem;">Nombre</label>
+          <input type="text" name="first_name" placeholder="Juan" style="width:100%;">
+        </div>
+        <div style="flex:1;">
+          <label style="font-weight:600; display:block; margin-bottom:0.3rem;">Apellido</label>
+          <input type="text" name="last_name" placeholder="García" style="width:100%;">
+        </div>
+      </div>
+      <div style="margin-bottom:1.25rem;">
+        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">
+          Contraseña inicial <span style="color:var(--color-danger);">*</span>
+        </label>
+        <input type="password" name="password" style="width:100%;" required>
+        <p style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.25rem;">
+          El admin puede cambiarla desde su perfil una vez que ingrese.
+        </p>
+      </div>
+      <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+        <a href="{% url 'editar_municipio' municipio.id %}" class="btn btn-outline">Cancelar</a>
+        <button type="submit" class="btn">Crear admin</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
