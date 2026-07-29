@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Importar estacionamientos — {{ municipio.nombre }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:560px;">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+    <h1 style="font-size:1.4rem;">📂 Importar estacionamientos</h1>
+    <a href="{% url 'editar_municipio' municipio.id %}" class="btn btn-outline">← Volver</a>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem;">
+    <p style="font-size:0.9rem; color:var(--color-text-muted); margin:0 0 0.5rem;">
+      <strong>Municipio:</strong> {{ municipio.nombre }}
+    </p>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0;">
+      Importa estacionamientos activos desde el sistema anterior (TransactionInfo.xlsx).
+      Cada estacionamiento se crea con <strong>hora de inicio = ahora</strong> y duración
+      calculada de la diferencia Hasta−Desde del archivo.
+      Las filas con error se saltean y se muestran en el reporte.
+    </p>
+  </div>
+
+  <div class="card">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div style="margin-bottom:1.25rem;">
+        <label style="font-weight:600; display:block; margin-bottom:0.4rem;">
+          Archivo Excel (.xlsx) <span style="color:var(--color-danger);">*</span>
+        </label>
+        <input type="file" name="archivo" accept=".xlsx,.xls" required
+               style="display:block; width:100%;">
+        <p style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.3rem;">
+          Formato esperado: TransactionInfo.xlsx con columnas Domino, Desde, Hasta, Cuadra, Teléfono, Monto.
+        </p>
+      </div>
+      <button type="submit" class="btn" style="width:100%;">
+        📥 Importar estacionamientos
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}

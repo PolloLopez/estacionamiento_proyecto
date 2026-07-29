@@ -6,7 +6,11 @@
 
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
     <h1 style="font-size:1.5rem;">🏙️ {{ municipio.nombre }}</h1>
-    <a href="{% url 'panel_superadmin' %}" class="btn btn-outline">← Volver</a>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a href="{% url 'importar_estacionamientos' municipio.id %}" class="btn btn-outline"
+         style="font-size:0.88rem;">📂 Importar Excel</a>
+      <a href="{% url 'panel_superadmin' %}" class="btn btn-outline">← Volver</a>
+    </div>
   </div>
 
   <div class="grid grid-2" style="gap:1.5rem;">

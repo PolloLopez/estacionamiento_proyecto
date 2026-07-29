@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Resultado importación — {{ municipio.nombre }}{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+    <h1 style="font-size:1.4rem;">📊 Resultado de importación — {{ municipio.nombre }}</h1>
+    <a href="{% url 'editar_municipio' municipio.id %}" class="btn btn-outline">← Volver al municipio</a>
+  </div>
+
+  {# Resumen #}
+  <div class="grid grid-2" style="margin-bottom:1.5rem; gap:1rem;">
+    <div class="card" style="text-align:center; background:{% if importados %}#eafaf1{% else %}var(--color-surface){% endif %};">
+      <div style="font-size:2.5rem; font-weight:800; color:var(--color-primary);">{{ importados }}</div>
+      <div style="font-size:0.9rem; color:var(--color-text-muted);">estacionamientos importados</div>
+    </div>
+    <div class="card" style="text-align:center; background:{% if omitidos %}#fdecea{% else %}var(--color-surface){% endif %};">
+      <div style="font-size:2.5rem; font-weight:800; color:{% if omitidos %}var(--color-danger){% else %}var(--color-text-muted){% endif %};">{{ omitidos }}</div>
+      <div style="font-size:0.9rem; color:var(--color-text-muted);">filas con error (omitidas)</div>
+    </div>
+  </div>
+
+  {% if not errores %}
+  <div class="card" style="text-align:center; padding:1.5rem; color:var(--color-primary);">
+    ✅ Importación completa sin errores. {{ total }} filas procesadas.
+  </div>
+  {% else %}
+
+  {# Tabla de errores #}
+  <div class="card" style="overflow-x:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+      <h2 style="font-size:1rem; margin:0;">⚠️ Filas con error ({{ errores|length }})</h2>
+      <button onclick="copiarErrores()" class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.7rem;">
+        📋 Copiar como texto
+      </button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="text-align:center;"># Fila</th>
+          <th>Patente</th>
+          <th>Motivo del error</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-errores">
+        {% for e in errores %}
+        <tr>
+          <td style="text-align:center; font-size:0.85rem; color:var(--color-text-muted);">{{ e.fila }}</td>
+          <td style="font-weight:600;">{{ e.patente }}</td>
+          <td style="font-size:0.85rem; color:var(--color-danger);">{{ e.error }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+  function copiarErrores() {
+    const filas = document.querySelectorAll('#tabla-errores tr');
+    const lineas = Array.from(filas).map(tr => {
+      const celdas = tr.querySelectorAll('td');
+      return Array.from(celdas).map(td => td.textContent.trim()).join('\t');
+    });
+    navigator.clipboard.writeText('Fila\tPatente\tError\n' + lineas.join('\n'))
+      .then(() => alert('Errores copiados al portapapeles.'))
+      .catch(() => alert('No se pudo copiar automáticamente.'));
+  }
+  </script>
+
+  {% endif %}
+
+  {# Importar otro archivo #}
+  <div style="margin-top:1.5rem; text-align:center;">
+    <a href="{% url 'importar_estacionamientos' municipio.id %}" class="btn btn-outline">
+      📂 Importar otro archivo
+    </a>
+  </div>
+
+</div>
+{% endblock %}

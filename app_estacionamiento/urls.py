@@ -146,6 +146,7 @@ urlpatterns = [
     path("superadmin/municipio/<int:municipio_id>/",            views_superadmin.editar_municipio,  name="editar_municipio"),
     path("superadmin/municipio/<int:municipio_id>/admin/nuevo/", views_superadmin.crear_admin,      name="crear_admin"),
     path("superadmin/admin/<int:admin_id>/toggle/",             views_superadmin.toggle_admin,      name="toggle_admin"),
-    path("superadmin/municipio/<int:municipio_id>/modulo/",     views_superadmin.gestionar_modulo,  name="gestionar_modulo"),
+    path("superadmin/municipio/<int:municipio_id>/modulo/",     views_superadmin.gestionar_modulo,      name="gestionar_modulo"),
+    path("superadmin/municipio/<int:municipio_id>/importar/",  views_superadmin.importar_estacionamientos, name="importar_estacionamientos"),
 
 ]
