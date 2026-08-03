@@ -1,6 +1,6 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-07-25 (checklist de producción + fix duracion_horas)
+Última actualización: 2026-08-03 (hallazgos de auditoría de seguridad registrados)
 
 ---
 
@@ -83,7 +83,40 @@ ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 ```
 Depende de: Email configurado en Railway (ver punto 2).
 
-### 5. Tests faltantes
+⚠️ **Actualización auditoría 2026-08-03**: el riesgo es mayor de lo que parece a simple vista —
+combinado con `SOCIALACCOUNT_AUTO_SIGNUP = True`, permite un ataque de pre-registro: alguien se
+registra con el correo de otra persona (sin verificarlo) y, cuando la víctima real más adelante
+entra con "Iniciar sesión con Google" usando ese mismo correo, allauth puede vincular el login
+social a la cuenta ya existente — dejándola bajo control de quien puso la contraseña original.
+Mientras no se active la verificación mandatoria, evaluar bloquear el auto-connect en
+`SocialAccountAdapter.save_user` cuando ya exista un `Usuario` con ese correo creado por
+password. [`views_auth.py:110-139`, `forms.py` (`RegistroUsuarioForm`), `adapters.py`]
+
+### 5. 🔐 SEGURIDAD: Contraseñas débiles — los validadores de Django nunca se ejecutan
+`AUTH_PASSWORD_VALIDATORS` está bien configurado en `settings.py` para producción, pero ningún
+flujo de creación de usuario lo invoca: todos llaman `create_user()`/`make_password()`
+directamente sin pasar por `validate_password()`. Único chequeo manual existente:
+`len(password) < 6` en `crear_conductor` — los demás (`crear_admin`, `gestionar_inspectores`,
+`gestionar_vendedores`, autorregistro) no tienen ningún mínimo.
+Fix sugerido: llamar `validate_password(password)` (con `try/except ValidationError`) en los
+4 puntos de creación, o centralizarlo en una función de `services/`.
+[`views_superadmin.py:150-165`, `views_admin.py:331-339,489-497,568-583`, `forms.py:26-28`]
+
+### 6. 🔐 SEGURIDAD: Webhook de MercadoPago "fail-open" si falta `MP_WEBHOOK_SECRET`
+Distinto del punto ya resuelto de verificación de firma: acá el riesgo es que, si la variable
+de entorno no está seteada en producción, `_verificar_firma_mp()` devuelve `True` (omite la
+verificación) en vez de rechazar. Riesgo acotado en la práctica (se re-consulta el pago contra
+la API de MP y la acreditación es idempotente), pero conviene fallar cerrado como ya se hace
+con `ALLOWED_HOSTS`. [`views_mp.py:242-247`]
+
+### 7. 🔐 SEGURIDAD: `SECRET_KEY`/`DEBUG` con fallback silencioso inseguro
+Mismo patrón de riesgo que se resolvió para `ALLOWED_HOSTS` (falla ruidoso si falta la
+variable), pero acá no está aplicado: si se olvida `DEBUG=False` en un nuevo entorno, el
+default es `"True"` (páginas de error con stack trace completo); si se olvida `SECRET_KEY`,
+cae en un valor hardcodeado y público (`"dev-key-insegura-cambiar-en-produccion"`).
+[`settings.py:12,16`]
+
+### 8. Tests faltantes
 - Flujo MP webhook (integración)
 - `TestWatermarkGPS` pasando en Railway (verificar con Cloudinary activo)
 
@@ -102,6 +135,19 @@ Agregar logueo en `require_role()` cuando devuelve 403, y en `login_view()` cuan
 
 ### 🔐 Límite máximo de monto en MercadoPago
 Validar en `mp_iniciar_carga` que el monto no supere un tope (ej. $50.000).
+
+### 🔐 Hallazgos menores — auditoría de seguridad 2026-08-03
+- `registro_view`: no valida que el `municipio_id` recibido por POST tenga `activo=True`
+  (el `<select>` del template sí filtra, pero se puede manipular el form). [`views_auth.py:122-127`]
+- `importar_estacionamientos`: sin límite de tamaño en el archivo Excel antes de
+  `openpyxl.load_workbook()` — riesgo bajo (solo superadmin), pero conviene poner un tope
+  (ej. 10 MB). [`views_superadmin.py:308-323`]
+- `mp_webhook`: la firma HMAC no valida que el `ts` del manifest sea reciente (ventana
+  anti-replay). Mitigado en la práctica por la idempotencia de `acreditar_saldo_mp`, pero es
+  defensa en profundidad. [`views_mp.py:226-288`]
+- `django-axes`: bloqueo solo por IP (`AXES_LOCKOUT_PARAMETERS = ["ip_address"]`), decisión ya
+  documentada y razonable. Como mejora opcional: evaluar un segundo umbral combinando IP+usuario
+  para mitigar credential stuffing distribuido. [`settings.py:175`]
 
 ### 🔐 Verificación de email al registrarse
 Incluida en el checklist de migración a DO. Requiere email SMTP funcionando primero.
