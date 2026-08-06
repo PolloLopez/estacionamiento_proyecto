@@ -21,7 +21,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Max, Min, Q, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -1217,72 +1217,123 @@ def admin_rendiciones(request):
 @require_role("admin")
 def crear_rendicion(request):
     """
-    El admin genera una rendición a tesorería con desglose efectivo/digital/comisiones.
-    El total_neto = efectivo + digital − comisiones.
+    El admin genera una rendición a tesorería seleccionando cierres de caja certificados.
+
+    Los totales se calculan automáticamente desde los CierreCaja seleccionados:
+    - total_efectivo    = suma de cierre.total_efectivo
+    - total_digital     = suma de cierre.total_transferencia + cierre.total_digital
+                          (desde la perspectiva de tesorería, transferencia y digital/card
+                           son lo mismo: no es efectivo que el admin manipula físicamente)
+    - total_neto        = total_efectivo + total_digital
+    - El admin NO puede escribir los montos — solo certifica lo que el sistema calculó.
     """
+    from django.db import transaction as db_transaction
+
     municipio = request.user.municipio
 
     if request.method == "POST":
-        periodo         = request.POST.get("periodo", "").strip()
-        fecha_desde_str = request.POST.get("fecha_desde", "").strip()
-        fecha_hasta_str = request.POST.get("fecha_hasta", "").strip()
-        notas           = request.POST.get("notas", "").strip()
+        periodo      = request.POST.get("periodo", "").strip()
+        notas        = request.POST.get("notas", "").strip()
+        cierre_ids   = request.POST.getlist("cierre_ids")
+        comprobante  = request.FILES.get("comprobante_archivo")
+
+        if not periodo:
+            messages.error(request, "Indicá el período.")
+            return redirect("crear_rendicion")
+
+        if not cierre_ids:
+            messages.error(request, "Seleccioná al menos un cierre de caja.")
+            return redirect("crear_rendicion")
 
         try:
-            total_efectivo   = Decimal(request.POST.get("total_efectivo",   "0") or "0")
-            total_digital    = Decimal(request.POST.get("total_digital",    "0") or "0")
-            total_comisiones = Decimal(request.POST.get("total_comisiones", "0") or "0")
-        except Exception:
-            messages.error(request, "Los montos deben ser números válidos.")
+            cierre_ids_int = [int(pk) for pk in cierre_ids]
+        except ValueError:
+            messages.error(request, "IDs de cierres inválidos.")
             return redirect("crear_rendicion")
 
-        if not periodo or not fecha_desde_str or not fecha_hasta_str:
-            messages.error(request, "Completá todos los campos obligatorios.")
-            return redirect("crear_rendicion")
+        with db_transaction.atomic():
+            # Traer solo cierres del municipio, certificados y aún sin rendir.
+            # select_for_update evita race conditions si dos admins operan simultáneamente.
+            cierres = CierreCaja.objects.select_for_update().filter(
+                id__in=cierre_ids_int,
+                usuario__municipio=municipio,
+                certificado=True,
+                rendicion__isnull=True,
+            )
 
-        total_neto = total_efectivo + total_digital - total_comisiones
+            if cierres.count() != len(cierre_ids_int):
+                messages.error(
+                    request,
+                    "Algunos cierres seleccionados no son válidos (ya rendidos, no certificados o de otro municipio)."
+                )
+                return redirect("crear_rendicion")
 
-        Rendicion.objects.create(
-            municipio        = municipio,
-            admin            = request.user,
-            periodo          = periodo,
-            fecha_desde      = fecha_desde_str,
-            fecha_hasta      = fecha_hasta_str,
-            total_efectivo   = total_efectivo,
-            total_digital    = total_digital,
-            total_comisiones = total_comisiones,
-            total_neto       = total_neto,
-            notas_tesorero   = notas,
+            # Calcular totales desde el desglose de cada cierre
+            totales = cierres.aggregate(
+                tefectivo     = Sum("total_efectivo"),
+                ttransferencia = Sum("total_transferencia"),
+                tdigital      = Sum("total_digital"),
+            )
+            suma_efectivo      = totales["tefectivo"]      or Decimal("0")
+            suma_transferencia = totales["ttransferencia"] or Decimal("0")
+            suma_digital       = totales["tdigital"]       or Decimal("0")
+
+            # Para tesorería, transferencia + digital (débito/crédito/QR) se agrupan como "digital"
+            total_efectivo = suma_efectivo
+            total_digital  = suma_transferencia + suma_digital
+            total_neto     = total_efectivo + total_digital
+
+            # Fechas del período: min(fecha_cierre) / max(fecha_cierre) de los cierres elegidos
+            fechas = cierres.aggregate(
+                desde=Min("fecha_cierre"),
+                hasta=Max("fecha_cierre"),
+            )
+
+            cantidad_cierres = cierres.count()
+
+            rendicion = Rendicion.objects.create(
+                municipio           = municipio,
+                admin               = request.user,
+                periodo             = periodo,
+                fecha_desde         = fechas["desde"].date() if fechas["desde"] else date.today(),
+                fecha_hasta         = fechas["hasta"].date() if fechas["hasta"] else date.today(),
+                total_efectivo      = total_efectivo,
+                total_digital       = total_digital,
+                total_neto          = total_neto,
+                notas_tesorero      = notas,
+                comprobante_archivo = comprobante,
+            )
+
+            # Vincular cada cierre a esta rendición (auditoría)
+            cierres.update(rendicion=rendicion)
+
+        messages.success(
+            request,
+            f"Rendición creada con {cantidad_cierres} cierre(s). Total neto: ${total_neto:,.2f}"
         )
-        messages.success(request, f"Rendición generada. Total neto a rendir: ${total_neto}")
         return redirect("admin_rendiciones")
 
-    # Sugerir fecha_desde = día siguiente a la última rendición del admin
-    ultima = Rendicion.objects.filter(admin=request.user).order_by("-fecha_hasta").first()
-    from datetime import timedelta
-    fecha_desde_sugerida = (ultima.fecha_hasta + timedelta(days=1)) if ultima else date.today().replace(day=1)
-    hoy = date.today()
-
-    # Calcular totales de cierres certificados en el período sugerido.
-    # Sirve de referencia para que el admin no tenga que calcular manualmente.
-    cierres_certificados = CierreCaja.objects.filter(
+    # GET: mostrar cierres disponibles (certificados y sin rendir)
+    cierres_pendientes = CierreCaja.objects.filter(
         usuario__municipio=municipio,
         certificado=True,
-        fecha_cierre__date__gte=fecha_desde_sugerida,
-        fecha_cierre__date__lte=hoy,
-    )
-    totales_cierres = cierres_certificados.aggregate(
-        suma_cobrado=Sum("total_cobrado"),
-        suma_comisiones=Sum("ganancia_usuario"),
-        suma_neto=Sum("monto_municipio"),
-        cantidad=Count("id"),
+        rendicion__isnull=True,
+    ).select_related("usuario").order_by("fecha_cierre")
+
+    # Pre-calcular totales de todos los cierres disponibles para mostrar en el resumen
+    totales_disponibles = cierres_pendientes.aggregate(
+        cantidad          = Count("id"),
+        suma_efectivo     = Sum("total_efectivo"),
+        suma_transferencia = Sum("total_transferencia"),
+        suma_digital      = Sum("total_digital"),
+        suma_cobrado      = Sum("total_cobrado"),
     )
 
     return render(request, "admin/crear_rendicion.html", {
-        "periodos":             Rendicion.PERIODOS,
-        "hoy":                  hoy,
-        "fecha_desde_sugerida": fecha_desde_sugerida,
-        "totales_cierres":      totales_cierres,
+        "periodos":            Rendicion.PERIODOS,
+        "cierres_pendientes":  cierres_pendientes,
+        "totales_disponibles": totales_disponibles,
+        "hoy":                 date.today(),
     })
 
 

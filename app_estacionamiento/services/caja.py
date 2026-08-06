@@ -10,10 +10,14 @@ Responsabilidades:
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Case, DecimalField, Sum, Value, When
 from django.utils import timezone
 
 from app_estacionamiento.models import CierreCaja, MovimientoCaja
+
+# Medios de pago que van directamente a tesorería (débito, crédito, QR, MercadoPago).
+# No pasan por el efectivo del cobrador — se auditan pero no se rinden en efectivo.
+MEDIOS_DIGITALES = ("debito", "credito", "qr", "mercadopago")
 
 
 def registrar_cobro_efectivo(cobrador, monto: Decimal, descripcion: str = "", comision_monto: Decimal = Decimal("0")):
@@ -72,7 +76,38 @@ def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None, periodo="")
         if not movimientos.exists():
             return None
 
-        total          = movimientos.aggregate(total=Sum("monto"))["total"] or Decimal("0")
+        # Calcular totales globales y el desglose por medio de pago en una sola query
+        # usando agregación condicional (evita múltiples queries para cada subtotal).
+        totales = movimientos.aggregate(
+            total=Sum("monto"),
+            efectivo=Sum(
+                Case(
+                    When(medio_pago="efectivo", then="monto"),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            transferencia=Sum(
+                Case(
+                    When(medio_pago="transferencia", then="monto"),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            digital=Sum(
+                Case(
+                    When(medio_pago__in=MEDIOS_DIGITALES, then="monto"),
+                    default=Value(0),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+        )
+
+        total              = totales["total"]        or Decimal("0")
+        total_efectivo     = totales["efectivo"]     or Decimal("0")
+        total_transferencia = totales["transferencia"] or Decimal("0")
+        total_digital      = totales["digital"]      or Decimal("0")
+
         fecha_apertura = movimientos.first().creado_en
 
         # Comisión: snapshot del porcentaje actual al momento del cierre
@@ -85,6 +120,9 @@ def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None, periodo="")
         cierre = CierreCaja.objects.create(
             usuario=usuario,
             total_cobrado=total,
+            total_efectivo=total_efectivo,
+            total_transferencia=total_transferencia,
+            total_digital=total_digital,
             fecha_apertura=fecha_apertura,
             cantidad_movimientos=movimientos.count(),
             creado_por=usuario,

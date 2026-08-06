@@ -396,9 +396,17 @@ class MovimientoCaja(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     cerrado = models.BooleanField(default=False)
     creado_en = models.DateTimeField(auto_now_add=True)
+    MEDIOS_PAGO = [
+        ('efectivo',      'Efectivo'),
+        ('transferencia', 'Transferencia bancaria'),
+        ('debito',        'Débito'),
+        ('credito',       'Crédito'),
+        ('qr',            'QR'),
+        ('mercadopago',   'MercadoPago'),
+    ]
     medio_pago = models.CharField(
         max_length=20, default='efectivo',
-        choices=[('efectivo', 'Efectivo'), ('mercadopago', 'MercadoPago')],
+        choices=MEDIOS_PAGO,
         verbose_name='Medio de pago',
     )
     comision_monto = models.DecimalField(
@@ -453,6 +461,20 @@ class CierreCaja(models.Model):
         verbose_name='Período',
     )
 
+    # Desglose por medio de pago (calculado automáticamente al cerrar caja)
+    total_efectivo = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Total cobrado en efectivo.",
+    )
+    total_transferencia = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Total cobrado por transferencia bancaria.",
+    )
+    total_digital = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Total cobrado por débito/crédito/QR (va directo a tesorería).",
+    )
+
     # certificación por el admin
     certificado = models.BooleanField(default=False, help_text="El admin auditó y certificó este cierre.")
     certificado_en = models.DateTimeField(null=True, blank=True, help_text="Fecha en que el admin certificó el cierre.")
@@ -463,6 +485,16 @@ class CierreCaja(models.Model):
         blank=True,
         related_name="cierres_certificados",
         help_text="Admin que certificó el cierre.",
+    )
+
+    # Rendición a la que pertenece este cierre (null = aún no rendido)
+    rendicion = models.ForeignKey(
+        'Rendicion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cierres',
+        help_text="Rendición en la que se incluyó este cierre. Null = pendiente de rendir.",
     )
 
     class Meta:
@@ -761,13 +793,18 @@ class Rendicion(models.Model):
     fecha_desde  = models.DateField()
     fecha_hasta  = models.DateField()
 
-    # Totales (se calculan al generar la rendición y quedan como snapshot)
-    total_efectivo    = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    total_digital     = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    total_comisiones  = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    total_neto        = models.DecimalField(
-        max_digits=12, decimal_places=2, default=0,
-        help_text='Total a rendir = efectivo + digital - comisiones.',
+    # Totales: auto-calculados desde los CierreCaja vinculados al crear la rendición
+    total_efectivo  = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+        help_text='Suma del efectivo de todos los cierres incluidos.')
+    total_digital   = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+        help_text='Total no efectivo (transferencia + débito + crédito + QR) de los cierres incluidos.')
+    total_neto      = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+        help_text='Total a rendir = efectivo + digital. Las comisiones las gestiona tesorería aparte.')
+
+    # Comprobante de transferencia (si parte del pago fue por transferencia)
+    comprobante_archivo = models.FileField(
+        upload_to='comprobantes_rendicion/', null=True, blank=True,
+        help_text='Comprobante de transferencia bancaria (si aplica).',
     )
 
     estado          = models.CharField(max_length=15, choices=ESTADOS, default='pendiente')
@@ -835,6 +872,16 @@ class LiquidacionComision(models.Model):
 
     # Vendedor certifica recibo
     certificada_en = models.DateTimeField(null=True, blank=True)
+
+    # Factura del vendedor (requerida para la liquidación de comisiones)
+    factura_presentada = models.BooleanField(
+        default=False,
+        help_text='El vendedor presentó factura por sus comisiones.',
+    )
+    factura_archivo = models.FileField(
+        upload_to='facturas_comision/', null=True, blank=True,
+        help_text='Archivo de la factura presentada.',
+    )
 
     creado_en = models.DateTimeField(auto_now_add=True)
 

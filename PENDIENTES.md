@@ -1,6 +1,6 @@
 # Pendiente — Estacionamiento Proyecto
 
-Última actualización: 2026-08-03 (hallazgos de auditoría de seguridad registrados)
+Última actualización: 2026-08-06 (sesión: email Brevo, Excel inspectores, validación contraseñas, panel admin rediseño, cambiar contraseña desde admin)
 
 ---
 
@@ -46,6 +46,14 @@ Fix: agregar campo `mp_payment_id = CharField(max_length=50, null=True, unique=T
 
 ## 🟡 Media prioridad
 
+### 0. Bug: contador "Sin rendir" acumula indefinidamente ✅ (parcial — código muerto limpiado)
+Causa raíz: los reintegros de conductores (`finalizar_estacionamiento.py`) crean
+`MovimientoCaja(tipo="ingreso")` para el conductor, que nunca se cierra con `generar_cierre_caja`
+(esa función es solo para inspectores/vendedores). El contador incluía esos movimientos inflándose.
+Las queries muertas de `panel_admin` (sin_rendir/abiertos/en_cierre_sin_certificar) fueron
+eliminadas. Si en el futuro se requiere volver a mostrar esta métrica, filtrar por
+`usuario__es_vendedor=True` OR `usuario__es_inspector=True` para excluir conductores.
+
 ### 1. Transferencia de saldo entre usuarios
 El conductor puede transferir saldo a otro conductor. El receptor tiene **24 horas** para aceptar;
 si no responde, el monto se reintegra automáticamente al emisor.
@@ -56,24 +64,27 @@ Pendiente de diseño:
 - Lógica de expiración: verificar en login o con tarea periódica.
 
 ### 2. Configurar email en Railway (recuperación de contraseña)
-En local los emails aparecen en la consola. En Railway hay que setear 3 variables:
-```
-EMAIL_HOST_USER=tumail@gmail.com
-EMAIL_HOST_PASSWORD=xxxx xxxx xxxx xxxx   ← contraseña de app de Google
-DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
-```
-**Disparador**: cuando se reactive el deploy en Railway.
+SMTP bloqueado en Railway (puertos 587/465 no disponibles). Se migró a API transaccional:
+- **Backend**: `django-anymail[brevo,resend]` instalado, `anymail` en INSTALLED_APPS ✅
+- **Brevo** (primera opción): cuenta creada, pero verificación del remitente incompleta.
+  Completar desde Brevo → Senders & Domains → verificar `leandrolopezalbini@gmail.com`.
+  Luego agregar en Railway: `BREVO_API_KEY=...` + `DEFAULT_FROM_EMAIL=leandrolopezalbini@gmail.com`
+- **Resend** (segunda opción): requiere dominio propio verificado — no viable por ahora.
+  ⚠️ La API key `re_95PPXHDZ_...` quedó expuesta en chat — **regenerar urgente** en resend.com
+- **Workaround activo**: admin puede cambiar contraseña de cualquier conductor desde `/admin-usuarios/` ✅
+
+Mientras tanto, `ACCOUNT_EMAIL_VERIFICATION = "none"` + recuperación de contraseña desactivada en Railway.
 
 ### 3. Exportación de reportes a Excel/PDF (parcial)
 Implementado:
 — **Infracciones impagas → PDF juzgado**: `/admin-infracciones/pdf-juzgado/` (usa reportlab).
   Tabla con Acta#, Fecha, Patente, Inspector, Subcuadra, Monto, Días vencida.
   También se adjunta al email del informe mensual.
+— **Inspectores → Excel**: `/admin-inspectores/estadisticas/excel/` ✅ (openpyxl, botón "⬇️ Descargar Excel" con filtros activos).
 
 Pendiente:
-— **Inspectores**: botón "Descargar Excel" en `/admin-inspectores/estadisticas/` con las métricas del período.
 — **Rendiciones**: exportar cierre de caja a PDF para tesorería.
-— Implementable con `openpyxl` (instalar) y `reportlab` (ya instalado).
+— `reportlab` ya instalado, sin dependencia nueva.
 
 ### 4. 🔐 SEGURIDAD: Verificación de email al registrarse
 `ACCOUNT_EMAIL_VERIFICATION = "none"` permite registrarse con cualquier email sin verificar.
@@ -92,15 +103,20 @@ Mientras no se active la verificación mandatoria, evaluar bloquear el auto-conn
 `SocialAccountAdapter.save_user` cuando ya exista un `Usuario` con ese correo creado por
 password. [`views_auth.py:110-139`, `forms.py` (`RegistroUsuarioForm`), `adapters.py`]
 
-### 5. 🔐 SEGURIDAD: Contraseñas débiles — los validadores de Django nunca se ejecutan
-`AUTH_PASSWORD_VALIDATORS` está bien configurado en `settings.py` para producción, pero ningún
-flujo de creación de usuario lo invoca: todos llaman `create_user()`/`make_password()`
-directamente sin pasar por `validate_password()`. Único chequeo manual existente:
-`len(password) < 6` en `crear_conductor` — los demás (`crear_admin`, `gestionar_inspectores`,
-`gestionar_vendedores`, autorregistro) no tienen ningún mínimo.
-Fix sugerido: llamar `validate_password(password)` (con `try/except ValidationError`) en los
-4 puntos de creación, o centralizarlo en una función de `services/`.
-[`views_superadmin.py:150-165`, `views_admin.py:331-339,489-497,568-583`, `forms.py:26-28`]
+### 5. 🔐 SEGURIDAD: Contraseñas débiles ✅
+Resuelto. Función `_error_password()` centralizada en `views_admin.py` (baseline `len < 6` +
+`validate_password()` del framework). Aplicada en `gestionar_inspectores`, `gestionar_vendedores`,
+`crear_conductor` y `crear_admin`. Tests pasan (130 OK).
+
+### 6. 🔐 SEGURIDAD: Webhook de MercadoPago "fail-open" si falta `MP_WEBHOOK_SECRET` ✅
+Resuelto. `_verificar_firma_mp()` retorna `False` cuando `MP_WEBHOOK_SECRET` no está seteada
+(antes retornaba `True` y omitía la verificación). [`views_mp.py`]
+⚠️ Pendiente en Railway: agregar variable `MP_WEBHOOK_SECRET` desde MP Dashboard → Webhooks → secreto.
+
+### 7. 🔐 SEGURIDAD: `SECRET_KEY` con fallback silencioso inseguro ✅
+Resuelto. En producción (`DEBUG=False`) sin `SECRET_KEY` configurada, Django falla al arrancar
+con `ImproperlyConfigured` en vez de usar la clave hardcodeada pública. En local (`DEBUG=True`)
+el fallback de desarrollo sigue funcionando. [`settings.py`]
 
 ### 6. 🔐 SEGURIDAD: Webhook de MercadoPago "fail-open" si falta `MP_WEBHOOK_SECRET`
 Distinto del punto ya resuelto de verificación de firma: acá el riesgo es que, si la variable
@@ -244,6 +260,38 @@ Muestra: infracciones del día, recaudación, inspectores activos, vehículos ve
 ---
 
 ## ✅ Resuelto
+
+### feat: panel admin rediseño (2026-08-06) ✅
+- Eliminado grid-3 de stats (sin_rendir, conteo inspectores, conteo conductores) — datos incorrectos o innecesarios.
+- Reemplazado card "Personal" por "Estacionamientos activos": tabla en tiempo real con patente, subcuadra y hora de inicio. Scrollable con `max-height: calc(100vh - 7rem)`.
+- Agregada columna "Estado" a infracciones recientes con colores: Pendiente (naranja), Pagada (verde), Cancelada (gris, sin motivo = auto-cancelada por estacionamiento), Anulada (gris, con tooltip del motivo).
+- Ambos cards usan flex + overflow-y:auto para no desbordar viewport.
+- Test `test_panel_admin_responde_200` actualizado para chequear `estacionamientos_activos` en context.
+- 130 tests OK.
+
+### feat: cambiar contraseña de conductor desde admin (2026-08-06) ✅
+Workaround para recuperación de contraseña por email (aún sin funcionar en Railway).
+Card "Cambiar contraseña" en `/admin-usuarios/<id>/` con `nueva_password` + `confirmar_password`.
+Valida no vacío, coincidencia y mínimo 6 caracteres. Usa `set_password()` + `save()`.
+
+### feat: Excel estadísticas inspectores (2026-08-06) ✅
+Nueva vista `estadisticas_inspectores_excel` en `views_admin.py`. URL: `/admin-inspectores/estadisticas/excel/`.
+Descarga `.xlsx` (openpyxl) con encabezados, datos por inspector, fila de totales y anchos de columna ajustados.
+Botón "⬇️ Descargar Excel" en `estadisticas_inspectores.html` conserva los filtros activos (desde/hasta/inspector).
+
+### fix: anymail no cargaba (500 en /accounts/password/reset/) (2026-08-06) ✅
+`anymail` estaba configurado en `EMAIL_BACKEND` pero no en `INSTALLED_APPS`.
+Django no podía cargar el backend → 500 al intentar recuperar contraseña.
+Fix: agregar `"anymail"` a `INSTALLED_APPS` en `settings.py`.
+
+### fix: es_superadmin en Django Admin fieldsets (2026-08-06) ✅
+El campo `es_superadmin` no aparecía en la pantalla de edición del Admin Django.
+Fix: agregado al fieldset "Roles" en `app_estacionamiento/admin.py`.
+
+### fix: contraseñas débiles — validate_password en 4 puntos (2026-08-06) ✅
+Ver sección 🟡 #5 (marcada como resuelta). Función `_error_password()` centralizada.
+Aplicada en `gestionar_inspectores`, `gestionar_vendedores`, `crear_conductor` (views_admin.py)
+y `crear_admin` (views_superadmin.py). Baseline `len < 6` + validadores del framework.
 
 ### fix: duracion_horas bug — IntegerField → DecimalField (2026-07-25) ✅
 Migración 0044. `Estacionamiento.duracion_horas` era `IntegerField` pero el sistema genera
