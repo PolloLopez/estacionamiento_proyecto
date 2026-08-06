@@ -29,6 +29,8 @@ def redirect_por_rol(usuario):
     Redirige al panel correcto según el rol del usuario autenticado.
     Usado después del login, registro y completar_perfil.
     """
+    if getattr(usuario, "es_superadmin", False):
+        return redirect("panel_superadmin")
     if usuario.es_admin:
         return redirect("panel_admin")
     elif usuario.es_tesorero:
