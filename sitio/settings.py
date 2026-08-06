@@ -230,27 +230,32 @@ else:
     MEDIA_URL = "/media/"
     MEDIA_ROOT = BASE_DIR / "media"
 
-# ─── Email (SMTP) ─────────────────────────────────────────────────────────────
-# En local: si no definís EMAIL_HOST_USER, los emails se muestran en consola.
-# En Railway: configurá EMAIL_HOST_USER y EMAIL_HOST_PASSWORD con una cuenta Gmail
-# (con contraseña de aplicación, no la contraseña normal).
-# Pasos Railway:
-#   EMAIL_HOST=smtp.gmail.com
-#   EMAIL_PORT=587
-#   EMAIL_HOST_USER=tumail@gmail.com
-#   EMAIL_HOST_PASSWORD=xxxx xxxx xxxx xxxx  ← contraseña de app de Google
-#   DEFAULT_FROM_EMAIL=Sistema Estacionamiento <tumail@gmail.com>
-EMAIL_BACKEND = (
-    "django.core.mail.backends.smtp.EmailBackend"
-    if os.getenv("EMAIL_HOST_USER")
-    else "django.core.mail.backends.console.EmailBackend"
-)
-EMAIL_HOST          = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT          = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_USE_TLS       = True
-EMAIL_HOST_USER     = os.getenv("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-DEFAULT_FROM_EMAIL  = os.getenv("DEFAULT_FROM_EMAIL", "Sistema de Estacionamiento <noreply@estacionamiento.ar>")
+# ─── Email ────────────────────────────────────────────────────────────────────
+# Prioridad:
+#   1. RESEND_API_KEY → usa Resend vía API HTTPS (recomendado en Railway, no depende de SMTP)
+#   2. EMAIL_HOST_USER → usa SMTP directo (solo funciona si el proveedor no bloquea puerto 587)
+#   3. Sin variables → consola (desarrollo local)
+#
+# Para Railway: configurar RESEND_API_KEY + DEFAULT_FROM_EMAIL en Variables.
+# Obtener API key en https://resend.com (free: 100 emails/día).
+# FROM address para pruebas: onboarding@resend.dev (no requiere dominio verificado).
+# Para producción: verificar tu dominio en Resend y usar noreply@tudominio.com.
+if os.getenv("RESEND_API_KEY"):
+    EMAIL_BACKEND  = "anymail.backends.resend.EmailBackend"
+    ANYMAIL = {
+        "RESEND_API_KEY": os.getenv("RESEND_API_KEY"),
+    }
+elif os.getenv("EMAIL_HOST_USER"):
+    EMAIL_BACKEND   = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST      = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT      = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS   = True
+    EMAIL_HOST_USER     = os.getenv("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Sistema de Estacionamiento <noreply@estacionamiento.ar>")
 
 # ─── Login / Logout ───────────────────────────────────────────────────────────
 LOGIN_URL = "/login/"
