@@ -46,6 +46,10 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
 
     "axes",   # rate limiting: bloqueo por IP después de N intentos fallidos
+
+    # anymail: backend de email transaccional (Resend vía API HTTPS, no SMTP)
+    # Debe estar en INSTALLED_APPS para que Django reconozca el backend.
+    "anymail",
 ]
 
 # SITE_ID debe coincidir con el ID del registro en Django Admin → Sites.

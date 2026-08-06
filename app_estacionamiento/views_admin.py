@@ -657,7 +657,15 @@ def detalle_usuario_admin(request, usuario_id):
         apellido      = request.POST.get("apellido", "").strip()
         telefono      = request.POST.get("telefono", "").strip()
         numero_dni    = request.POST.get("numero_dni", "").strip()
+        correo_nuevo  = request.POST.get("correo", "").strip().lower()
         es_verificado = request.POST.get("es_verificado") == "1"
+
+        # Validar correo: no vacío y no duplicado
+        if correo_nuevo and correo_nuevo != conductor.correo:
+            if Usuario.objects.filter(correo=correo_nuevo).exclude(pk=conductor.pk).exists():
+                messages.error(request, f"El correo {correo_nuevo} ya está en uso por otro usuario.")
+                return redirect("detalle_usuario_admin", usuario_id=conductor.id)
+            conductor.correo = correo_nuevo
 
         if nombre:
             conductor.first_name = nombre.title()
@@ -667,7 +675,7 @@ def detalle_usuario_admin(request, usuario_id):
         conductor.numero_dni    = numero_dni
         conductor.es_verificado = es_verificado
         conductor.save(update_fields=[
-            "first_name", "last_name", "telefono", "numero_dni", "es_verificado"
+            "correo", "first_name", "last_name", "telefono", "numero_dni", "es_verificado"
         ])
         messages.success(request, "Datos actualizados.")
 

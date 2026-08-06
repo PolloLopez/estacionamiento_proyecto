@@ -37,6 +37,10 @@ class RequiereMunicipioMiddleware:
         if not request.user.is_authenticated:
             return False
 
+        # El superadmin es global (sin municipio propio) — nunca redirigir
+        if getattr(request.user, "es_superadmin", False):
+            return False
+
         # Evitar loop: no redirigir si ya está en una URL exenta
         ruta = request.path
         for url_exenta in URLS_EXENTAS_DE_MUNICIPIO:
