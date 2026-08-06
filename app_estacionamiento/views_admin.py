@@ -679,6 +679,20 @@ def detalle_usuario_admin(request, usuario_id):
         ])
         messages.success(request, "Datos actualizados.")
 
+    elif accion == "cambiar_password":
+        nueva_password  = request.POST.get("nueva_password", "").strip()
+        confirmar       = request.POST.get("confirmar_password", "").strip()
+        if not nueva_password:
+            messages.error(request, "La contraseña no puede estar vacía.")
+        elif nueva_password != confirmar:
+            messages.error(request, "Las contraseñas no coinciden.")
+        elif len(nueva_password) < 6:
+            messages.error(request, "La contraseña debe tener al menos 6 caracteres.")
+        else:
+            conductor.set_password(nueva_password)
+            conductor.save()
+            messages.success(request, f"Contraseña de {conductor.correo} actualizada.")
+
     # Últimas 5 infracciones (preview)
     infracciones = Infraccion.objects.filter(
         vehiculo__vehiculousuario__usuario=conductor,
