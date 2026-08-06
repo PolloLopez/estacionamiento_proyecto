@@ -22,6 +22,9 @@ django-cloudinary-storage==0.3.0
 django-axes==7.0.1          # rate limiting en login (bloqueo por IP)
 sentry-sdk[django]          # error tracking en producción
 
+# Email transaccional (API, no SMTP — Railway bloquea puertos SMTP salientes)
+django-anymail[resend]
+
 # Utilidades Django
 django-extensions==4.1
 Pillow==12.0.0
