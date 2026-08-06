@@ -42,6 +42,12 @@
       {% if inspector_sel or request.GET.desde or request.GET.hasta %}
         <a href="{% url 'estadisticas_inspectores' %}" class="btn btn-outline">Limpiar</a>
       {% endif %}
+
+      {# Botón de descarga: conserva los mismos filtros activos #}
+      <a href="{% url 'estadisticas_inspectores_excel' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}{% if inspector_sel %}&inspector_id={{ inspector_sel.id }}{% endif %}"
+         class="btn btn-outline" style="margin-left:auto;">
+        ⬇️ Descargar Excel
+      </a>
     </form>
 
     {% if inspector_sel %}
