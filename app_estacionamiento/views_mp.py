@@ -233,18 +233,18 @@ def _verificar_firma_mp(request, data_id: str) -> bool:
     La firma se calcula sobre el manifest:
         id:<data_id>;request-id:<x-request-id>;ts:<ts>;
 
-    Retorna True si la firma es válida.
-    Si MP_WEBHOOK_SECRET no está configurada, loguea un warning y retorna True
-    (compatibilidad con entornos de prueba que aún no tienen el secreto seteado).
+    Retorna True si la firma es válida, False en cualquier otro caso.
+    Si MP_WEBHOOK_SECRET no está configurada, falla cerrado (retorna False).
+    Sin el secreto no es posible verificar la autenticidad — aceptar sería fail-open.
 
     Docs: https://www.mercadopago.com.ar/developers/es/docs/your-integrations/notifications/webhooks
     """
     webhook_secret = getattr(settings, "MP_WEBHOOK_SECRET", "").strip()
     if not webhook_secret:
-        # Sin secreto configurado no podemos verificar. En producción municipal real,
-        # MP_WEBHOOK_SECRET debe estar seteado en Railway para activar la verificación.
-        logger.warning("mp_webhook: MP_WEBHOOK_SECRET no configurado — verificación de firma omitida")
-        return True
+        # Fail closed: sin secreto configurado no podemos verificar la firma.
+        # Setear MP_WEBHOOK_SECRET en Railway (MP Dashboard → Webhooks → secreto).
+        logger.warning("mp_webhook: MP_WEBHOOK_SECRET no configurado — webhook rechazado")
+        return False
 
     firma_header = request.headers.get("x-signature", "")
     if not firma_header:

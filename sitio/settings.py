@@ -7,13 +7,20 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ─── Seguridad ────────────────────────────────────────────────────────────────
-# SECRET_KEY debe estar en la variable de entorno. El fallback solo sirve para
-# desarrollo local; en producción Railway/Render la inyectan automáticamente.
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-key-insegura-cambiar-en-produccion")
-
-# DEBUG=True en local, DEBUG=False en producción.
+# DEBUG se define primero para que SECRET_KEY pueda depender de él.
 # Railway setea DEBUG=False; en local no setees esta variable y queda True.
 DEBUG = os.getenv("DEBUG", "True") == "True"
+
+# SECRET_KEY: en local usa el fallback inseguro solo si DEBUG=True.
+# En producción (DEBUG=False) sin SECRET_KEY falla al arrancar — mejor que
+# correr con una clave pública que cualquiera puede usar para forjar sesiones.
+_secret_key = os.getenv("SECRET_KEY", "dev-key-insegura-cambiar-en-produccion" if DEBUG else "")
+if not _secret_key:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured(
+        "SECRET_KEY no está configurada. Agregar la variable de entorno SECRET_KEY en Railway."
+    )
+SECRET_KEY = _secret_key
 
 # MP_SANDBOX controla si MercadoPago usa el sandbox o producción.
 # Por defecto sigue a DEBUG: True en local, False en producción.
