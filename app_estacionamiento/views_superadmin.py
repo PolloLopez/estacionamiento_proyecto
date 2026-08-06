@@ -17,12 +17,15 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .decorators import require_role
+from .views_admin import _error_password
 from .models import Estacionamiento, ModuloMunicipio, Municipio, Subcuadra, Usuario, Vehiculo
 from .utils import sanitizar_patente
 
@@ -151,6 +154,10 @@ def crear_admin(request, municipio_id):
 
         if not correo or not password:
             messages.error(request, "Correo y contraseña son obligatorios.")
+            return redirect("crear_admin", municipio_id=municipio_id)
+
+        if error_pwd := _error_password(password):
+            messages.error(request, error_pwd)
             return redirect("crear_admin", municipio_id=municipio_id)
 
         if Usuario.objects.filter(correo=correo).exists():
