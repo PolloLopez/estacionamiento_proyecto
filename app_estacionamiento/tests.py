@@ -715,7 +715,7 @@ class TestSinRendirMetrica(TestCase):
     def test_panel_admin_responde_200(self):
         resp = self.client.get(reverse("panel_admin"))
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("sin_rendir", resp.context)
+        self.assertIn("estacionamientos_activos", resp.context)
 
 
 # ═════════════════════════════════════════════
