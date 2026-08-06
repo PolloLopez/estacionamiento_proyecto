@@ -11,7 +11,7 @@
 
   {# Los mensajes los muestra base.html — no duplicar aquí #}
 
-  <div class="grid grid-2" style="margin-bottom:1rem;">
+  <div class="grid grid-3" style="margin-bottom:1rem;">
 
     <!-- DATOS + EDICIÓN -->
     <div class="card">
@@ -95,6 +95,31 @@
           </label>
           <button class="btn btn-outline" type="submit" style="font-size:0.9rem;">Guardar</button>
         </div>
+      </form>
+    </div>
+
+    <!-- CAMBIAR CONTRASEÑA -->
+    <div class="card">
+      <h3 style="margin-bottom:0.8rem;">🔑 Cambiar contraseña</h3>
+      <p class="text-muted" style="font-size:0.9rem; margin-bottom:0.75rem;">
+        Usá esto si el conductor no puede recuperar su contraseña por email.
+      </p>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="cambiar_password">
+        <div style="margin-bottom:0.5rem;">
+          <label style="font-size:0.88rem; color:var(--color-text-muted);">Nueva contraseña</label>
+          <input name="nueva_password" type="password" placeholder="Mínimo 6 caracteres"
+                 style="width:100%; margin-top:0.2rem;" required />
+        </div>
+        <div style="margin-bottom:0.75rem;">
+          <label style="font-size:0.88rem; color:var(--color-text-muted);">Confirmar contraseña</label>
+          <input name="confirmar_password" type="password" placeholder="Repetí la contraseña"
+                 style="width:100%; margin-top:0.2rem;" required />
+        </div>
+        <button class="btn btn-outline" type="submit" style="font-size:0.9rem; width:100%;">
+          Establecer contraseña
+        </button>
       </form>
     </div>
 

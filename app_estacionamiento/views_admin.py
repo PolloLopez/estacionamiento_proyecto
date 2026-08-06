@@ -679,6 +679,20 @@ def detalle_usuario_admin(request, usuario_id):
         ])
         messages.success(request, "Datos actualizados.")
 
+    elif accion == "cambiar_password":
+        nueva_password  = request.POST.get("nueva_password", "").strip()
+        confirmar       = request.POST.get("confirmar_password", "").strip()
+        if not nueva_password:
+            messages.error(request, "La contraseña no puede estar vacía.")
+        elif nueva_password != confirmar:
+            messages.error(request, "Las contraseñas no coinciden.")
+        elif len(nueva_password) < 6:
+            messages.error(request, "La contraseña debe tener al menos 6 caracteres.")
+        else:
+            conductor.set_password(nueva_password)
+            conductor.save()
+            messages.success(request, f"Contraseña de {conductor.correo} actualizada.")
+
     # Últimas 5 infracciones (preview)
     infracciones = Infraccion.objects.filter(
         vehiculo__vehiculousuario__usuario=conductor,
@@ -1871,3 +1885,163 @@ def estadisticas_inspectores(request):
         "subcuadras_stats": subcuadras_stats,
         "por_dia": por_dia,
     })
+
+
+@require_role("admin")
+def estadisticas_inspectores_excel(request):
+    """
+    Exporta las estadísticas de inspectores al período filtrado como .xlsx.
+    Acepta los mismos parámetros GET que estadisticas_inspectores:
+    ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&inspector_id=X
+    """
+    import io
+    from datetime import date as date_type
+    from django.db.models import Count, Q
+    from django.http import HttpResponse
+    from .models import VerificacionInspector
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    municipio = request.user.municipio
+    hoy = timezone.localtime().date()
+
+    # ── Filtros (misma lógica que la vista principal) ─────────────────────────
+    desde_str = request.GET.get("desde", "")
+    hasta_str = request.GET.get("hasta", "")
+    inspector_id = request.GET.get("inspector_id", "")
+
+    try:
+        desde = date_type.fromisoformat(desde_str)
+    except ValueError:
+        desde = hoy.replace(day=1)
+
+    try:
+        hasta = date_type.fromisoformat(hasta_str)
+    except ValueError:
+        hasta = hoy
+
+    inspector_sel = None
+    if inspector_id:
+        try:
+            inspector_sel = Usuario.objects.get(
+                id=int(inspector_id), municipio=municipio, es_inspector=True
+            )
+        except (Usuario.DoesNotExist, ValueError):
+            pass
+
+    # ── Datos de comparativa ──────────────────────────────────────────────────
+    rango_q = Q(
+        verificacioninspector__fecha__date__gte=desde,
+        verificacioninspector__fecha__date__lte=hasta,
+    )
+    rango_inf_q = Q(
+        infraccion__creado_en__date__gte=desde,
+        infraccion__creado_en__date__lte=hasta,
+        infraccion__municipio=municipio,
+    )
+    qs_inspectores = Usuario.objects.filter(
+        municipio=municipio, es_inspector=True
+    )
+    if inspector_sel:
+        qs_inspectores = qs_inspectores.filter(pk=inspector_sel.pk)
+
+    comparativa = qs_inspectores.order_by("first_name", "last_name").annotate(
+        total_verificaciones=Count("verificacioninspector", filter=rango_q),
+        total_infracciones=Count(
+            "infraccion",
+            filter=rango_inf_q & ~Q(infraccion__estado="anulada"),
+        ),
+        infracciones_anuladas=Count(
+            "infraccion",
+            filter=rango_inf_q & Q(infraccion__estado="anulada"),
+        ),
+    )
+
+    # ── Armar el Excel ────────────────────────────────────────────────────────
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Estadísticas inspectores"
+
+    # Estilo de encabezado
+    COLOR_HEADER = "1a4d6e"  # azul oscuro
+    estilo_header = Font(bold=True, color="FFFFFF")
+    relleno_header = PatternFill("solid", fgColor=COLOR_HEADER)
+    centrado = Alignment(horizontal="center")
+
+    # ── Título del reporte ────────────────────────────────────────────────────
+    ws.merge_cells("A1:F1")
+    celda_titulo = ws["A1"]
+    celda_titulo.value = f"Estadísticas de inspectores — {municipio.nombre}"
+    celda_titulo.font = Font(bold=True, size=13)
+    celda_titulo.alignment = centrado
+
+    ws.merge_cells("A2:F2")
+    celda_periodo = ws["A2"]
+    celda_periodo.value = f"Período: {desde.strftime('%d/%m/%Y')} al {hasta.strftime('%d/%m/%Y')}"
+    celda_periodo.alignment = centrado
+
+    ws.append([])  # fila vacía
+
+    # ── Encabezados de la tabla ───────────────────────────────────────────────
+    encabezados = [
+        "Inspector",
+        "Verificaciones",
+        "Infracciones",
+        "Anuladas",
+        "Tasa infracción (%)",
+        "Efectividad (%)",
+    ]
+    ws.append(encabezados)
+    fila_header = ws.max_row
+    for col_idx, _ in enumerate(encabezados, start=1):
+        celda = ws.cell(row=fila_header, column=col_idx)
+        celda.font = estilo_header
+        celda.fill = relleno_header
+        celda.alignment = centrado
+
+    # ── Filas de datos ────────────────────────────────────────────────────────
+    for insp in comparativa:
+        nombre_completo = f"{insp.first_name} {insp.last_name}".strip() or insp.correo
+        verif = insp.total_verificaciones
+        inf   = insp.total_infracciones
+        anul  = insp.infracciones_anuladas
+        # tasa = infracciones / verificaciones (cuántas verificaciones terminaron en infracción)
+        tasa = round(inf / verif * 100, 1) if verif else 0
+        # efectividad = (inf - anuladas) / inf (de las que labró, cuántas sobrevivieron)
+        efectividad = round((inf - anul) / inf * 100, 1) if inf else 0
+        ws.append([nombre_completo, verif, inf, anul, tasa, efectividad])
+
+    # ── Fila de totales ───────────────────────────────────────────────────────
+    total_verif = sum(i.total_verificaciones for i in comparativa)
+    total_inf   = sum(i.total_infracciones   for i in comparativa)
+    total_anul  = sum(i.infracciones_anuladas for i in comparativa)
+    tasa_total  = round(total_inf / total_verif * 100, 1) if total_verif else 0
+
+    ws.append([])  # separador
+    fila_totales = ["TOTAL", total_verif, total_inf, total_anul, tasa_total, ""]
+    ws.append(fila_totales)
+    fila_tot_idx = ws.max_row
+    for col_idx in range(1, 7):
+        celda = ws.cell(row=fila_tot_idx, column=col_idx)
+        celda.font = Font(bold=True)
+
+    # ── Ancho de columnas ─────────────────────────────────────────────────────
+    anchos = [30, 16, 14, 12, 20, 18]
+    for i, ancho in enumerate(anchos, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = ancho
+
+    # ── Respuesta HTTP como descarga ──────────────────────────────────────────
+    nombre_archivo = (
+        f"inspectores_{desde.strftime('%Y%m%d')}_{hasta.strftime('%Y%m%d')}.xlsx"
+    )
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response

@@ -118,6 +118,7 @@ urlpatterns = [
     path("admin-vehiculos/", views.admin_vehiculos, name="admin_vehiculos"),
     path("admin-estacionamientos/", views.admin_estacionamientos, name="admin_estacionamientos"),
     path("admin-inspectores/estadisticas/", views.estadisticas_inspectores, name="estadisticas_inspectores"),
+    path("admin-inspectores/estadisticas/excel/", views.estadisticas_inspectores_excel, name="estadisticas_inspectores_excel"),
     path("admin-infracciones/pdf-juzgado/", views.pdf_infracciones_juzgado, name="pdf_infracciones_juzgado"),
 
     # =========================

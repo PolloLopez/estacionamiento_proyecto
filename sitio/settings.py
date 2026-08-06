@@ -244,7 +244,15 @@ else:
 # Obtener API key en https://resend.com (free: 100 emails/día).
 # FROM address para pruebas: onboarding@resend.dev (no requiere dominio verificado).
 # Para producción: verificar tu dominio en Resend y usar noreply@tudominio.com.
-if os.getenv("RESEND_API_KEY"):
+if os.getenv("BREVO_API_KEY"):
+    # Brevo (ex-Sendinblue): API HTTPS, sin dominio propio, solo verificar email remitente.
+    # Crear cuenta en brevo.com → Settings → API Keys.
+    EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
+    ANYMAIL = {
+        "BREVO_API_KEY": os.getenv("BREVO_API_KEY"),
+    }
+elif os.getenv("RESEND_API_KEY"):
+    # Resend: requiere dominio verificado en resend.com/domains para enviar a cualquier destinatario.
     EMAIL_BACKEND  = "anymail.backends.resend.EmailBackend"
     ANYMAIL = {
         "RESEND_API_KEY": os.getenv("RESEND_API_KEY"),
