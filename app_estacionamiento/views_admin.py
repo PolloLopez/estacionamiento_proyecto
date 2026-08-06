@@ -118,9 +118,6 @@ def panel_admin(request):
     if not municipio:
         return redirect("login")
 
-    inspectores = Usuario.objects.filter(es_inspector=True, municipio=municipio)
-    vendedores  = Usuario.objects.filter(es_vendedor=True,  municipio=municipio)
-
     infracciones_recientes = Infraccion.objects.filter(
         municipio=municipio
     ).select_related("vehiculo", "inspector").order_by("-creado_en")[:20]
@@ -130,15 +127,6 @@ def panel_admin(request):
         subcuadra__municipio=municipio,
         estado="ACTIVO",
     ).select_related("vehiculo", "subcuadra").order_by("-hora_inicio")
-
-    # Sin rendir: movimientos abiertos + cierres no certificados
-    abiertos = MovimientoCaja.objects.filter(
-        usuario__municipio=municipio, tipo="ingreso", cerrado=False
-    ).aggregate(total=Sum("monto"))["total"] or 0
-    en_cierre_sin_certificar = CierreCaja.objects.filter(
-        usuario__municipio=municipio, certificado=False
-    ).aggregate(total=Sum("monto_municipio"))["total"] or 0
-    sin_rendir = abiertos + en_cierre_sin_certificar
 
     verificaciones_pendientes = SolicitudVerificacion.objects.filter(
         estado="pendiente", usuario__municipio=municipio
@@ -166,8 +154,6 @@ def panel_admin(request):
     ]
 
     return render(request, "admin/panel_admin.html", {
-        "inspectores":               inspectores,
-        "vendedores":                vendedores,
         "infracciones_recientes":    infracciones_recientes,
         "estacionamientos_activos":  estacionamientos_activos,
         "verificaciones_pendientes": verificaciones_pendientes,
