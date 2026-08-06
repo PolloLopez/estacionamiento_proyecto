@@ -27,6 +27,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 from .decorators import require_role
 from .services.infracciones import cobrar_infraccion_efectivo
 from .services.saldo import cargar_saldo_conductor
@@ -89,6 +92,23 @@ def _enviar_email_verificacion(correo, nombre, aprobado, motivo=""):
 # ─────────────────────────────────────────────────────────────────────────────
 # Panel y dashboard
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _error_password(password):
+    """
+    Valida la contraseña con dos niveles:
+    1. Mínimo de 6 caracteres — siempre, en cualquier entorno.
+    2. AUTH_PASSWORD_VALIDATORS de settings.py — vacíos en DEBUG=True (dev/tests),
+       los 4 validadores estándar de Django en producción (DEBUG=False).
+    Devuelve un string con el error, o None si la contraseña es válida.
+    """
+    if len(password) < 6:
+        return "La contraseña debe tener al menos 6 caracteres."
+    try:
+        validate_password(password)
+        return None
+    except DjangoValidationError as e:
+        return " ".join(e.messages)
+
 
 @require_role("admin")
 def panel_admin(request):
@@ -320,6 +340,8 @@ def gestionar_inspectores(request):
 
         if not correo or not password:
             error = "Correo y contraseña son obligatorios"
+        elif error_pwd := _error_password(password):
+            error = error_pwd
         elif Usuario.objects.filter(correo=correo).exists():
             error = "Ya existe un usuario con ese correo"
         else:
@@ -478,6 +500,8 @@ def gestionar_vendedores(request):
 
         if not correo or not password:
             error = "Correo y contraseña son obligatorios"
+        elif error_pwd := _error_password(password):
+            error = error_pwd
         elif Usuario.objects.filter(correo=correo).exists():
             error = "Ya existe un usuario con ese correo"
         else:
@@ -565,8 +589,8 @@ def crear_conductor(request):
 
         if not all([nombre, apellido, correo, password]):
             error = "Todos los campos son obligatorios."
-        elif len(password) < 6:
-            error = "La contraseña debe tener al menos 6 caracteres."
+        elif error_pwd := _error_password(password):
+            error = error_pwd
         elif Usuario.objects.filter(correo=correo).exists():
             error = f"Ya existe un usuario con el correo {correo}."
         else:
