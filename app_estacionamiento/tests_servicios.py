@@ -812,6 +812,125 @@ class TestExentoParcialFueraDeZona(TestCase):
         self.assertIn("EXP001", resultado.registrar_infraccion_url)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. generar_cierre_caja() — desglose por medio de pago
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestGenerarCierreCajaDesglose(TestCase):
+    """
+    Verifica que generar_cierre_caja() calcule correctamente el desglose
+    total_efectivo / total_transferencia / total_digital según los
+    medios de pago de los MovimientoCaja abiertos del usuario.
+
+    Estrategia: crear MovimientoCaja directamente (sin pasar por vistas)
+    con distintos medios de pago, llamar al service y verificar los campos
+    del CierreCaja resultante.
+    """
+
+    def setUp(self):
+        from app_estacionamiento.services.caja import generar_cierre_caja as _gen
+        self._generar = _gen
+
+        self.municipio = crear_municipio()
+        self.vendedor  = crear_vendedor(self.municipio)
+        # Sin porcentaje_ganancia para simplificar los cálculos de comisión
+        self.vendedor.porcentaje_ganancia = Decimal("0")
+        self.vendedor.save()
+
+    def _mov(self, monto, medio_pago):
+        """Crea un MovimientoCaja abierto para el vendedor."""
+        return MovimientoCaja.objects.create(
+            usuario=self.vendedor,
+            monto=Decimal(str(monto)),
+            tipo="ingreso",
+            medio_pago=medio_pago,
+            cerrado=False,
+        )
+
+    def test_solo_efectivo(self):
+        """Solo movimientos en efectivo → total_efectivo = total, resto 0."""
+        self._mov(1000, "efectivo")
+        self._mov(500, "efectivo")
+        cierre = self._generar(self.vendedor)
+
+        self.assertEqual(cierre.total_cobrado,      Decimal("1500"))
+        self.assertEqual(cierre.total_efectivo,     Decimal("1500"))
+        self.assertEqual(cierre.total_transferencia, Decimal("0"))
+        self.assertEqual(cierre.total_digital,      Decimal("0"))
+
+    def test_efectivo_y_transferencia(self):
+        """Efectivo y transferencia se separan en sus campos."""
+        self._mov(800, "efectivo")
+        self._mov(400, "transferencia")
+        cierre = self._generar(self.vendedor)
+
+        self.assertEqual(cierre.total_cobrado,       Decimal("1200"))
+        self.assertEqual(cierre.total_efectivo,      Decimal("800"))
+        self.assertEqual(cierre.total_transferencia, Decimal("400"))
+        self.assertEqual(cierre.total_digital,       Decimal("0"))
+
+    def test_medios_digitales_van_a_total_digital(self):
+        """Débito, crédito, QR y mercadopago van todos a total_digital."""
+        self._mov(200, "debito")
+        self._mov(150, "credito")
+        self._mov(100, "qr")
+        self._mov(50,  "mercadopago")
+        cierre = self._generar(self.vendedor)
+
+        self.assertEqual(cierre.total_cobrado,       Decimal("500"))
+        self.assertEqual(cierre.total_efectivo,      Decimal("0"))
+        self.assertEqual(cierre.total_transferencia, Decimal("0"))
+        self.assertEqual(cierre.total_digital,       Decimal("500"))
+
+    def test_mix_todos_los_medios(self):
+        """Mezcla de todos los medios: cada campo acumula solo su parte."""
+        self._mov(1000, "efectivo")
+        self._mov(300,  "transferencia")
+        self._mov(200,  "debito")
+        self._mov(100,  "credito")
+        self._mov(50,   "qr")
+        cierre = self._generar(self.vendedor)
+
+        self.assertEqual(cierre.total_cobrado,       Decimal("1650"))
+        self.assertEqual(cierre.total_efectivo,      Decimal("1000"))
+        self.assertEqual(cierre.total_transferencia, Decimal("300"))
+        # digital = debito(200) + credito(100) + qr(50) = 350
+        self.assertEqual(cierre.total_digital,       Decimal("350"))
+
+    def test_sin_movimientos_retorna_none(self):
+        """Si no hay movimientos abiertos, el service devuelve None."""
+        cierre = self._generar(self.vendedor)
+        self.assertIsNone(cierre)
+
+    def test_cierre_marca_movimientos_como_cerrados(self):
+        """Después del cierre, todos los MovimientoCaja quedan con cerrado=True."""
+        self._mov(500, "efectivo")
+        self._mov(300, "debito")
+        self._generar(self.vendedor)
+
+        abiertos = MovimientoCaja.objects.filter(
+            usuario=self.vendedor, tipo="ingreso", cerrado=False
+        ).count()
+        self.assertEqual(abiertos, 0)
+
+    def test_segundo_cierre_sin_movimientos_nuevos_retorna_none(self):
+        """Un segundo cierre inmediato sin movimientos nuevos devuelve None."""
+        self._mov(500, "efectivo")
+        self._generar(self.vendedor)   # primer cierre — cierra los movimientos
+        cierre2 = self._generar(self.vendedor)  # sin movimientos nuevos
+        self.assertIsNone(cierre2)
+
+    def test_total_cobrado_es_suma_de_todos_los_medios(self):
+        """total_cobrado == total_efectivo + total_transferencia + total_digital."""
+        self._mov(600, "efectivo")
+        self._mov(200, "transferencia")
+        self._mov(100, "qr")
+        cierre = self._generar(self.vendedor)
+
+        suma_partes = cierre.total_efectivo + cierre.total_transferencia + cierre.total_digital
+        self.assertEqual(cierre.total_cobrado, suma_partes)
+
+
 class TestWatermarkConSubcuadra(TestCase):
     """
     Verifica que _agregar_marca_de_agua_gps incluye la subcuadra en el overlay.

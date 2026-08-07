@@ -84,7 +84,7 @@ Pendiente de diseño:
 ### 7. Tests faltantes
 - Flujo MP webhook (integración)
 - `TestWatermarkGPS` pasando en Railway (verificar con Cloudinary activo)
-- Tests de desglose de `generar_cierre_caja` con múltiples medios de pago
+- ~~Tests de desglose de `generar_cierre_caja` con múltiples medios de pago~~ ✅ 2026-08-07
 
 ---
 
