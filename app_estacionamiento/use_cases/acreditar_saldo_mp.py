@@ -46,5 +46,6 @@ def ejecutar(usuario: Usuario, monto: Decimal, payment_id: str) -> None:
             usuario=usuario_locked,
             monto=monto,
             tipo="ingreso",
+            medio_pago="mercadopago",
             descripcion=f"Carga de saldo via MercadoPago | MP:{payment_id}",
         )
