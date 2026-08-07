@@ -31,7 +31,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .decorators import require_role
-from .services.infracciones import cobrar_infraccion_efectivo
+from .services.infracciones import cobrar_infraccion_efectivo, MEDIOS_VALIDOS_COBRO
 from .services.saldo import cargar_saldo_conductor
 from .utils import sanitizar_patente
 from .models import (
@@ -772,8 +772,11 @@ def admin_infracciones(request):
 
         elif accion == "cobrar" and infraccion_id:
             inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
+            medio_pago_admin = request.POST.get("medio_pago", "efectivo")
+            if medio_pago_admin not in MEDIOS_VALIDOS_COBRO:
+                medio_pago_admin = "efectivo"
             try:
-                inf = cobrar_infraccion_efectivo(infraccion=inf, cobrador=usuario)
+                inf = cobrar_infraccion_efectivo(infraccion=inf, cobrador=usuario, medio_pago=medio_pago_admin)
             except ValueError as e:
                 messages.warning(request, str(e))
                 return redirect(request.get_full_path())

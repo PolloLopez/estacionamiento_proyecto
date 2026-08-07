@@ -138,23 +138,26 @@
       </p>
     </div>
 
-    <div style="display:flex; gap:0.75rem; justify-content:center;">
-      {# Paso 2: ejecutar cobro #}
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="cobrar">
-        <input type="hidden" name="infraccion_id" value="{{ infraccion_a_confirmar.id }}">
-        <input type="hidden" name="patente" value="{{ patente }}">
+    {# Paso 2: ejecutar cobro #}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="cobrar">
+      <input type="hidden" name="infraccion_id" value="{{ infraccion_a_confirmar.id }}">
+      <input type="hidden" name="patente" value="{{ patente }}">
+
+      {% include "includes/medio_pago_selector.html" %}
+
+      <div style="display:flex; gap:0.75rem; justify-content:center;">
         <button type="submit" class="btn"
                 style="background:var(--color-danger); border-color:var(--color-danger); font-size:1rem; padding:0.75rem 1.5rem;">
           ✅ Confirmar cobro
         </button>
-      </form>
-      <a href="{% url 'consultar_deuda' %}?patente={{ patente }}" class="btn btn-outline"
-         style="font-size:1rem; padding:0.75rem 1.2rem;">
-        Cancelar
-      </a>
-    </div>
+        <a href="{% url 'consultar_deuda' %}?patente={{ patente }}" class="btn btn-outline"
+           style="font-size:1rem; padding:0.75rem 1.2rem;">
+          Cancelar
+        </a>
+      </div>
+    </form>
 
   </div>
 </div>

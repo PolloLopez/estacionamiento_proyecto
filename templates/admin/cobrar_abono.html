@@ -142,20 +142,20 @@
           </table>
         </div>
 
-        <form method="post" style="display:inline;">
+        <form method="post">
           {% csrf_token %}
           <input type="hidden" name="accion" value="cobrar" />
           <input type="hidden" name="patente" value="{{ vehiculo.patente }}" />
           <input type="hidden" name="mes" value="{{ mes_seleccionado }}" />
-          <button class="btn" type="submit" style="font-size:1.05rem;">
-            ✅ Confirmar cobro — ${{ precio }}
-          </button>
-        </form>
 
-        <form method="post" style="display:inline; margin-left:0.75rem;">
-          {% csrf_token %}
-          <input type="hidden" name="accion" value="buscar" />
-          <button class="btn btn-outline" type="submit">Cancelar</button>
+          {% include "includes/medio_pago_selector.html" %}
+
+          <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+            <button class="btn" type="submit" style="font-size:1.05rem;">
+              ✅ Confirmar cobro — ${{ precio }}
+            </button>
+            <button class="btn btn-outline" type="submit" name="accion" value="buscar">Cancelar</button>
+          </div>
         </form>
 
       {% endif %}

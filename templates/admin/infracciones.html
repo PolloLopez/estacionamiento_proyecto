@@ -218,13 +218,16 @@
       <hr style="border:none; border-top:1px solid var(--color-border); margin:0 0 1.2rem;">
 
       <!-- Cobrar -->
-      <form method="post" action="{% url 'admin_infracciones' %}" id="form-cobrar" style="display:inline;">
+      <form method="post" action="{% url 'admin_infracciones' %}" id="form-cobrar">
         {% csrf_token %}
         <input type="hidden" name="accion" value="cobrar">
         <input type="hidden" name="infraccion_id" id="cobrar-inf-id" value="">
+
+        {% include "includes/medio_pago_selector.html" %}
+
         <button type="submit" class="btn"
                 style="background:var(--color-primary); border-color:var(--color-primary); margin-bottom:0.75rem; width:100%; font-size:1rem; padding:0.75rem;">
-          💵 Cobrar en efectivo
+          💳 Registrar cobro
         </button>
       </form>
 

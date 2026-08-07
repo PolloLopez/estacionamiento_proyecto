@@ -28,6 +28,9 @@ from app_estacionamiento.models import (
 
 logger = logging.getLogger(__name__)
 
+# Medios de pago aceptados en cobros manuales (sin mercadopago, que es automático vía webhook)
+MEDIOS_VALIDOS_COBRO = frozenset({"efectivo", "transferencia", "debito", "credito", "qr"})
+
 
 class ErrorInfraccion(Exception):
     """Error controlado durante la creación de una infracción."""
@@ -231,9 +234,9 @@ def crear_infraccion(
     return infraccion
 
 
-def cobrar_infraccion_efectivo(infraccion, cobrador):
+def cobrar_infraccion_efectivo(infraccion, cobrador, medio_pago="efectivo"):
     """
-    Cobra una infracción en efectivo desde el panel admin.
+    Cobra una infracción desde el panel admin o vendedor.
 
     - Marca la infracción como pagada (con fecha_pago).
     - Registra el ingreso en la caja del cobrador (con su comisión).
@@ -241,7 +244,9 @@ def cobrar_infraccion_efectivo(infraccion, cobrador):
 
     Parámetros:
         infraccion: instancia de Infraccion (debe estar en estado 'pendiente')
-        cobrador: instancia de Usuario admin que cobra
+        cobrador: instancia de Usuario admin/vendedor que cobra
+        medio_pago: medio de pago usado ('efectivo', 'transferencia', 'debito', 'credito', 'qr')
+                    — se valida y normaliza a 'efectivo' si el valor no es reconocido.
 
     Retorna:
         La infraccion actualizada.
@@ -249,6 +254,10 @@ def cobrar_infraccion_efectivo(infraccion, cobrador):
     Lanza:
         ValueError si la infracción ya fue procesada.
     """
+    # Normalizar: si llega un valor inválido, caer a efectivo antes de persistir
+    if medio_pago not in MEDIOS_VALIDOS_COBRO:
+        medio_pago = "efectivo"
+
     municipio = getattr(cobrador, "municipio", None)
 
     with transaction.atomic():
@@ -268,10 +277,10 @@ def cobrar_infraccion_efectivo(infraccion, cobrador):
             usuario=cobrador,
             monto=inf.monto,
             tipo="ingreso",
-            medio_pago="efectivo",
+            medio_pago=medio_pago,
             comision_monto=comision,
             descripcion=(
-                f"Cobro en efectivo infracción #{inf.id} — {inf.vehiculo.patente}"
+                f"Cobro infracción #{inf.id} — {inf.vehiculo.patente} ({medio_pago})"
             ),
         )
 

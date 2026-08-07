@@ -160,6 +160,22 @@ class TestCobrarInfraccionEfectivo(TestCase):
         resultado = cobrar_infraccion_efectivo(infraccion=self.infraccion, cobrador=self.admin)
         self.assertEqual(resultado.estado, "pagada")
 
+    def test_medio_pago_personalizado_se_guarda(self):
+        """Pasar medio_pago='transferencia' persiste ese valor en MovimientoCaja."""
+        cobrar_infraccion_efectivo(
+            infraccion=self.infraccion, cobrador=self.admin, medio_pago="transferencia"
+        )
+        mov = MovimientoCaja.objects.filter(usuario=self.admin).first()
+        self.assertEqual(mov.medio_pago, "transferencia")
+
+    def test_medio_pago_invalido_cae_a_efectivo(self):
+        """Un medio_pago no reconocido se normaliza a 'efectivo' antes de persistir."""
+        cobrar_infraccion_efectivo(
+            infraccion=self.infraccion, cobrador=self.admin, medio_pago="cripto"
+        )
+        mov = MovimientoCaja.objects.filter(usuario=self.admin).first()
+        self.assertEqual(mov.medio_pago, "efectivo")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. cargar_saldo_conductor()
@@ -517,6 +533,97 @@ class TestToleranciaMulta(TestCase):
         from app_estacionamiento.use_cases.pagar_infraccion import ejecutar
         with self.assertRaises(Exception):
             ejecutar(self.conductor, self.infraccion)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. medio_pago en flujos de cobro (vistas vendedor y admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestMedioPagoCobros(TestCase):
+    """
+    Verifica que medio_pago llegue correctamente desde el POST de la vista
+    al MovimientoCaja creado en cada flujo de cobro.
+    """
+
+    def setUp(self):
+        self.municipio  = crear_municipio(comision_pct=10)
+        self.vendedor   = crear_vendedor(self.municipio)
+        self.admin      = crear_admin(self.municipio)
+        self.inspector  = crear_inspector(self.municipio)
+        self.subcuadra  = crear_subcuadra(self.municipio)
+        self.vehiculo   = crear_vehiculo(self.municipio)
+        crear_tarifa(self.municipio)
+
+    def _crear_infraccion(self):
+        return crear_infraccion(
+            self.municipio, self.inspector, self.vehiculo, self.subcuadra, monto=1000
+        )
+
+    # ── Vendedor: cobrar_infraccion_vendedor ──────────────────────────────────
+
+    def test_vendedor_cobro_infraccion_con_debito(self):
+        """El vendedor puede cobrar una infracción con débito y queda en MovimientoCaja."""
+        inf = self._crear_infraccion()
+        client = Client()
+        client.force_login(self.vendedor)
+        client.post(reverse("vendedores_cobrar_infraccion"), {
+            "accion":        "cobrar",
+            "infraccion_id": inf.id,
+            "patente":       self.vehiculo.patente,
+            "medio_pago":    "debito",
+        })
+        inf.refresh_from_db()
+        self.assertEqual(inf.estado, "pagada")
+        mov = MovimientoCaja.objects.filter(usuario=self.vendedor, tipo="ingreso").first()
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov.medio_pago, "debito")
+
+    def test_vendedor_cobro_infraccion_medio_invalido_cae_a_efectivo(self):
+        """Un medio_pago no válido en el POST se normaliza a 'efectivo'."""
+        inf = self._crear_infraccion()
+        client = Client()
+        client.force_login(self.vendedor)
+        client.post(reverse("vendedores_cobrar_infraccion"), {
+            "accion":        "cobrar",
+            "infraccion_id": inf.id,
+            "patente":       self.vehiculo.patente,
+            "medio_pago":    "billetera_magica",
+        })
+        mov = MovimientoCaja.objects.filter(usuario=self.vendedor, tipo="ingreso").first()
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov.medio_pago, "efectivo")
+
+    # ── Admin: admin_infracciones ─────────────────────────────────────────────
+
+    def test_admin_cobro_infraccion_con_transferencia(self):
+        """El admin puede cobrar una infracción con transferencia."""
+        inf = self._crear_infraccion()
+        client = Client()
+        client.force_login(self.admin)
+        client.post(reverse("admin_infracciones"), {
+            "accion":        "cobrar",
+            "infraccion_id": inf.id,
+            "medio_pago":    "transferencia",
+        })
+        inf.refresh_from_db()
+        self.assertEqual(inf.estado, "pagada")
+        mov = MovimientoCaja.objects.filter(usuario=self.admin, tipo="ingreso").first()
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov.medio_pago, "transferencia")
+
+    def test_admin_cobro_infraccion_sin_medio_pago_usa_efectivo(self):
+        """Si el admin no envía medio_pago, el default es 'efectivo'."""
+        inf = self._crear_infraccion()
+        client = Client()
+        client.force_login(self.admin)
+        client.post(reverse("admin_infracciones"), {
+            "accion":        "cobrar",
+            "infraccion_id": inf.id,
+            # sin medio_pago en el POST
+        })
+        mov = MovimientoCaja.objects.filter(usuario=self.admin, tipo="ingreso").first()
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov.medio_pago, "efectivo")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
