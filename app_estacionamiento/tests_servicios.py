@@ -547,6 +547,10 @@ class TestMedioPagoCobros(TestCase):
 
     def setUp(self):
         self.municipio  = crear_municipio(comision_pct=10)
+        # tolerancia=0 para que la infracción recién creada no quede dentro
+        # del período de gracia y la view la cobre en vez de anularla
+        self.municipio.tolerancia_multa_minutos = 0
+        self.municipio.save()
         self.vendedor   = crear_vendedor(self.municipio)
         self.admin      = crear_admin(self.municipio)
         self.inspector  = crear_inspector(self.municipio)
