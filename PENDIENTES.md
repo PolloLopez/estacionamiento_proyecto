@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-07 (sesión: medio_pago en todos los flujos de cobro — servicio, vistas, templates y tests)
+Última actualización: 2026-08-07 (sesión: medio_pago en todos los flujos de cobro + UI factura LiquidacionComision + tests generar_cierre_caja. 149 tests OK.)
 
 ---
 
@@ -29,12 +29,6 @@ Fix: agregar campo `mp_payment_id = CharField(max_length=50, null=True, unique=T
 ---
 
 ## 🟡 Media prioridad
-
-### ~~1. Vendedor: selección de medio_pago al cobrar~~ ✅ RESUELTO 2026-08-07
-~~**Gap crítico post-rediseño financiero.**~~ Ver sección ✅ Resuelto.
-
-### ~~2. LiquidacionComision: UI de factura pendiente~~ ✅ RESUELTO 2026-08-07
-Ver sección ✅ Resuelto.
 
 ### 3. Configurar email en Railway (recuperación de contraseña)
 SMTP bloqueado en Railway (puertos 587/465 no disponibles). Se migró a API transaccional:
@@ -79,17 +73,10 @@ Pendiente de diseño:
 ### 7. Tests faltantes
 - Flujo MP webhook (integración)
 - `TestWatermarkGPS` pasando en Railway (verificar con Cloudinary activo)
-- ~~Tests de desglose de `generar_cierre_caja` con múltiples medios de pago~~ ✅ 2026-08-07
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
-
-### acreditar_saldo_mp: medio_pago incorrecto
-`acreditar_saldo_mp.py` crea `MovimientoCaja` sin especificar `medio_pago` (queda en default
-`'efectivo'`). Debería ser `'mercadopago'`. No afecta el CierreCaja (los conductores no pasan
-por `generar_cierre_caja`), pero distorsiona reportes globales de MovimientoCaja.
-Fix: `MovimientoCaja.objects.create(..., medio_pago='mercadopago')` en `acreditar_saldo_mp.py`.
 
 ### Rendiciones: balances mensuales + rol Staff
 - Resumen mensual de rendiciones a tesorería
@@ -159,132 +146,3 @@ Leaflet.js + lat/lon de subcuadras. Requiere coordenadas en Subcuadra (ver GPS a
 
 ### Dashboard en TV (pantalla municipal en tiempo real)
 Vista sin login con token de solo lectura. Auto-refresh cada 60s con htmx o JS.
-
----
-
-## ✅ Resuelto
-
-### feat: LiquidacionComision — UI de factura (2026-08-07) ✅
-- `views_vendedor.py::presentar_factura()`: nueva vista `@require_role("vendedor")`.
-  Disponible para estados 'depositada' y 'certificada'. POST con `factura_archivo`
-  (file upload opcional) → marca `factura_presentada=True` y guarda el archivo.
-- `urls.py`: nueva ruta `vendedores/comisiones/<id>/factura/` → `presentar_factura`.
-- `templates/vendedores/presentar_factura.html`: form con file input (PDF/JPG/PNG).
-  Resumen de la liquidación + soporte para reemplazar factura ya presentada.
-- `templates/vendedores/mis_comisiones.html`: columna "Factura" — botón "Adjuntar" si
-  aún no presentó, "✅ Presentada" + link al archivo si ya lo hizo.
-- `templates/tesorero/panel_tesorero.html`: columna "Factura" — "✅ Presentada" + 📄,
-  "⏳ Sin factura" o "—" según estado.
-
-### feat: medio_pago en todos los flujos de cobro (2026-08-07) ✅
-- `services/infracciones.py::cobrar_infraccion_efectivo()`: acepta param `medio_pago='efectivo'` (default).
-  Normaliza valores inválidos a 'efectivo'. Constante `MEDIOS_VALIDOS_COBRO` exportada.
-- `views_vendedor.py`: lee `medio_pago` del POST en cobrar_infraccion, cobrar_abono y consultar_deuda.
-- `views_admin.py`: lee `medio_pago` del POST en admin_infracciones y lo pasa al service.
-- Templates: partial `includes/medio_pago_selector.html` con button-group radio (5 opciones).
-  Incluido en: `vendedores/cobrar_infraccion.html` (Paso 2), `admin/cobrar_abono.html`,
-  `usuarios/consultar_deuda.html`, `admin/infracciones.html` (modal).
-- Tests: 2 tests unitarios al service + 4 tests de integración de vista en `TestMedioPagoCobros`.
-
-### feat: rediseño módulo financiero — rendición vinculada a CierreCaja (2026-08-06) ✅
-- `MovimientoCaja.medio_pago`: expandido de 2 a 6 opciones (efectivo, transferencia, débito, crédito, QR, mercadopago).
-- `CierreCaja`: nuevos campos `total_efectivo`, `total_transferencia`, `total_digital` calculados
-  automáticamente en `generar_cierre_caja()` con una sola query de agregación condicional.
-  Nuevo `rendicion FK → Rendicion (SET_NULL)`: permite auditar qué cierres están en cada rendición.
-- `Rendicion`: eliminado `total_comisiones` (comisiones son responsabilidad de tesorería, no del admin).
-  Nuevo `comprobante_archivo (FileField)`. Totales calculados automáticamente desde los cierres seleccionados.
-- `LiquidacionComision`: nuevos `factura_presentada (BooleanField)` + `factura_archivo (FileField)`.
-- `crear_rendicion` (view): rediseñada. Admin selecciona CierreCaja certificados con checkboxes,
-  totales calculados por el sistema (no entrada manual), cada cierre queda FK a la rendición creada.
-- Templates: `crear_rendicion.html` rediseñado con tabla de checkboxes + JS. Columna "Comisiones"
-  eliminada de `rendiciones.html` y `panel_tesorero.html`.
-- Migración 0046. 135 tests OK.
-
-### fix: sin_rendir — código muerto limpiado (2026-08-06) ✅
-- Eliminadas queries muertas de `panel_admin` (sin_rendir, abiertos, en_cierre_sin_certificar).
-- Causa raíz del problema original: los reintegros de conductores crean `MovimientoCaja(tipo="ingreso")`
-  para el conductor, que nunca se cierra con `generar_cierre_caja` (esa función es solo para
-  inspectores/vendedores). Para restaurar la métrica correctamente, usar CierreCaja certificados sin rendicion.
-
-### fix: webhook MP fail-open → fail-closed (2026-08-06) ✅
-`_verificar_firma_mp()` retorna `False` cuando `MP_WEBHOOK_SECRET` no está seteada (antes `True`).
-⚠️ Pendiente en Railway: agregar variable `MP_WEBHOOK_SECRET` desde MP Dashboard → Webhooks → secreto.
-
-### fix: SECRET_KEY con fallback silencioso inseguro (2026-08-06) ✅
-En producción (`DEBUG=False`) sin `SECRET_KEY`, Django falla al arrancar con `ImproperlyConfigured`.
-En local (`DEBUG=True`) el fallback de desarrollo sigue funcionando. [`settings.py`]
-
-### fix: HMAC en webhook de MercadoPago (2026-08-03) ✅
-`_verificar_firma_mp()` en `views_mp.py` verifica header `x-signature` via HMAC-SHA256.
-Firma inválida → se descarta silenciosamente con 200.
-
-### fix: django-axes — rate limiting en login (2026-08-03) ✅
-`django-axes==7.0.1`. Bloquea por IP después de 5 intentos fallidos, 1 hora de cooloff.
-`requirements.txt`, `settings.py`, `templates/lockout.html`.
-
-### feat: panel admin rediseño (2026-08-06) ✅
-Eliminado grid-3 de stats incorrectas. Card "Estacionamientos activos" con tabla en tiempo real.
-Columna "Estado" en infracciones recientes con colores. 130 tests OK.
-
-### feat: cambiar contraseña de conductor desde admin (2026-08-06) ✅
-Card "Cambiar contraseña" en `/admin-usuarios/<id>/`. Workaround para email aún no funcional.
-
-### feat: Excel estadísticas inspectores (2026-08-06) ✅
-`/admin-inspectores/estadisticas/excel/` — `.xlsx` con openpyxl, conserva filtros activos.
-
-### feat: Superadmin + ModuloMunicipio (2026-07-30) ✅
-- `Usuario.es_superadmin`, `ModuloMunicipio` (municipio, módulo, activo). Migración 0045.
-- `require_modulo()` decorator para feature flags por municipio.
-- `views_superadmin.py`: panel, CRUD municipios, asignar admins, toggle módulos.
-- Importación Excel de estacionamientos históricos (openpyxl).
-- 130 tests OK.
-
-### fix: contraseñas débiles — validate_password (2026-08-06) ✅
-`_error_password()` centralizada en `views_admin.py`. `len < 6` + validadores del framework.
-Aplicada en `gestionar_inspectores`, `gestionar_vendedores`, `crear_conductor`, `crear_admin`.
-
-### fix: anymail en INSTALLED_APPS (2026-08-06) ✅
-`anymail` estaba en `EMAIL_BACKEND` pero no en `INSTALLED_APPS` → 500 al resetear contraseña.
-
-### fix: es_superadmin en Django Admin fieldsets (2026-08-06) ✅
-Agregado al fieldset "Roles" en `app_estacionamiento/admin.py`.
-
-### fix: duracion_horas — IntegerField → DecimalField (2026-07-25) ✅
-Migración 0044. Django truncaba silenciosamente `1.5h → 1h`. Fix: `DecimalField(max_digits=4, decimal_places=1)`.
-
-### docs: checklist de producción (2026-07-25) ✅
-`CHECKLIST_PRODUCCION_2026-07-25.md`. 3 bloqueantes, 4 recomendados, plan de go-live.
-
-### fix: auditoría de rendimiento (2026-07-24) ✅
-6 hallazgos implementados. Informe: `AUDITORIA_RENDIMIENTO_2026-07-24.md`.
-
-### fix: auditoría UX/UI (2026-07-24) ✅
-Top 3 fricciones + mejoras opcionales. Informe: `AUDITORIA_UX_2026-07-24.md`.
-
-### fix: auditoría de seguridad — hardening (2026-07-24) ✅
-SESSION_COOKIE_AGE, ALLOWED_HOSTS seguro, URL duplicada, validación uploads.
-Informe: `AUDITORIA_SEGURIDAD_2026-07-24.md`.
-
-### refactor: auditoría DB — constraints e integridad referencial (2026-07-24) ✅
-Migración 0042. on_delete=PROTECT en historial contable, Subcuadra.unique_together con municipio,
-campos muertos removidos. Informe: `AUDITORIA_DB_2026-07-24.md`.
-
-### feat: foto en infracción — Cloudinary + watermark (2026-07-22) ✅
-Cloudinary activo en Railway. Watermark con GPS, nombre inspector, subcuadra. Foto en ticket.
-
-### feat: informes mensuales + PDF juzgado + impagas (2026-07-20) ✅
-`DestinatarioInforme`, tab "📨 Informes" en rendiciones, PDF infracciones con reportlab.
-
-### feat: estadísticas de inspectores (2026-07-20) ✅
-`/admin-inspectores/estadisticas/` con filtros, comparativa y detalle por inspector.
-
-### feat: inspector — subcuadra + exento parcial + watermark (2026-07-20) ✅
-Selector de subcuadra en verificar.html. EXENTO_PARCIAL fuera de zona. Subcuadra en watermark.
-
-### feat: mejoras UI admin (exenciones, rendiciones, historial) (2026-07-20) ✅
-Crear vehículo desde exenciones. Rendiciones con 3 tabs. Historial vendedor. Alta conductor desde admin.
-
-### feat: mejoras post-presentación municipal (2026-07-16) ✅
-Nombre + apellido, title case, sanitización patentes, mínimo 1 hora, reintegro < 30 min.
-
-### Otros ✅ (panel admin sidebar, Cloudinary, Sentry, Rol Tesorero, 106 tests base)
