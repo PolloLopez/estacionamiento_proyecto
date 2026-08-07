@@ -33,13 +33,8 @@ Fix: agregar campo `mp_payment_id = CharField(max_length=50, null=True, unique=T
 ### ~~1. Vendedor: selección de medio_pago al cobrar~~ ✅ RESUELTO 2026-08-07
 ~~**Gap crítico post-rediseño financiero.**~~ Ver sección ✅ Resuelto.
 
-### 2. LiquidacionComision: UI de factura pendiente
-El modelo ya tiene `factura_presentada (BooleanField)` y `factura_archivo (FileField)` (migración 0046),
-pero no hay formulario para usarlos. Pendiente:
-- Panel vendedor: form para adjuntar factura (checkbox + file upload). La factura se refiere a la
-  comisión que el tesorero ya depositó (`LiquidacionComision.estado = 'depositada'`).
-- Panel tesorero: visualizar si el vendedor presentó factura, marcar como validada.
-- Panel admin: puede ver el estado (lectura), no necesita acción.
+### ~~2. LiquidacionComision: UI de factura pendiente~~ ✅ RESUELTO 2026-08-07
+Ver sección ✅ Resuelto.
 
 ### 3. Configurar email en Railway (recuperación de contraseña)
 SMTP bloqueado en Railway (puertos 587/465 no disponibles). Se migró a API transaccional:
@@ -168,6 +163,18 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s con htmx o JS.
 ---
 
 ## ✅ Resuelto
+
+### feat: LiquidacionComision — UI de factura (2026-08-07) ✅
+- `views_vendedor.py::presentar_factura()`: nueva vista `@require_role("vendedor")`.
+  Disponible para estados 'depositada' y 'certificada'. POST con `factura_archivo`
+  (file upload opcional) → marca `factura_presentada=True` y guarda el archivo.
+- `urls.py`: nueva ruta `vendedores/comisiones/<id>/factura/` → `presentar_factura`.
+- `templates/vendedores/presentar_factura.html`: form con file input (PDF/JPG/PNG).
+  Resumen de la liquidación + soporte para reemplazar factura ya presentada.
+- `templates/vendedores/mis_comisiones.html`: columna "Factura" — botón "Adjuntar" si
+  aún no presentó, "✅ Presentada" + link al archivo si ya lo hizo.
+- `templates/tesorero/panel_tesorero.html`: columna "Factura" — "✅ Presentada" + 📄,
+  "⏳ Sin factura" o "—" según estado.
 
 ### feat: medio_pago en todos los flujos de cobro (2026-08-07) ✅
 - `services/infracciones.py::cobrar_infraccion_efectivo()`: acepta param `medio_pago='efectivo'` (default).

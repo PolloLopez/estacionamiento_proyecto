@@ -869,3 +869,42 @@ def certificar_comision(request, liquidacion_id):
     return render(request, "vendedores/certificar_comision.html", {
         "liquidacion": liquidacion,
     })
+
+
+@require_role("vendedor")
+def presentar_factura(request, liquidacion_id):
+    """
+    El vendedor adjunta la factura de sus comisiones.
+
+    - Solo accesible por el vendedor dueño de la liquidación.
+    - Disponible en estados 'depositada' y 'certificada' (la factura
+      puede presentarse antes o después de certificar el recibo).
+    - POST con factura_archivo (file upload, opcional) marca
+      factura_presentada=True y guarda el archivo si se adjuntó.
+    """
+    vendedor    = request.user
+    liquidacion = get_object_or_404(
+        LiquidacionComision, id=liquidacion_id, vendedor=vendedor,
+    )
+
+    # Solo tiene sentido presentar factura después de que tesorería depositó
+    if liquidacion.estado == "pendiente":
+        messages.warning(request, "La factura se puede presentar una vez que tesorería realice el depósito.")
+        return redirect("mis_comisiones")
+
+    if request.method == "POST":
+        archivo = request.FILES.get("factura_archivo")
+        campos_a_guardar = ["factura_presentada"]
+
+        liquidacion.factura_presentada = True
+        if archivo:
+            liquidacion.factura_archivo = archivo
+            campos_a_guardar.append("factura_archivo")
+
+        liquidacion.save(update_fields=campos_a_guardar)
+        messages.success(request, "Factura registrada correctamente.")
+        return redirect("mis_comisiones")
+
+    return render(request, "vendedores/presentar_factura.html", {
+        "liquidacion": liquidacion,
+    })

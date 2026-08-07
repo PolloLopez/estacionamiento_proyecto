@@ -51,6 +51,7 @@ from .views_vendedor import (
     cerrar_caja,
     mis_comisiones,
     certificar_comision,
+    presentar_factura,
 )
 from .views_conductor import (
     inicio_usuarios,

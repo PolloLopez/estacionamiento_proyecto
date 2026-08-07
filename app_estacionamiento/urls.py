@@ -131,6 +131,7 @@ urlpatterns = [
     # =========================
     path("vendedores/comisiones/", views.mis_comisiones, name="mis_comisiones"),
     path("vendedores/comisiones/<int:liquidacion_id>/certificar/", views.certificar_comision, name="certificar_comision"),
+    path("vendedores/comisiones/<int:liquidacion_id>/factura/", views.presentar_factura, name="presentar_factura"),
 
     # =========================
     # 🏦 TESORERÍA

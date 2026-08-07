@@ -144,6 +144,7 @@
             <th>Hasta</th>
             <th style="text-align:right;">Monto</th>
             <th style="text-align:center;">Estado</th>
+            <th style="text-align:center;">Factura</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -163,6 +164,19 @@
                 <span style="color:#2563eb; font-weight:600;">🏦 Depositada</span>
               {% else %}
                 <span style="color:var(--color-primary); font-weight:600;">✅ Certificada</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center; font-size:0.85rem;">
+              {% if liq.factura_presentada %}
+                <span style="color:var(--color-primary); font-weight:600;">✅ Presentada</span>
+                {% if liq.factura_archivo %}
+                  &nbsp;<a href="{{ liq.factura_archivo.url }}" target="_blank"
+                           title="Ver factura" style="color:var(--color-text-muted);">📄</a>
+                {% endif %}
+              {% elif liq.estado == "pendiente" %}
+                <span class="text-muted">—</span>
+              {% else %}
+                <span style="color:var(--color-warning);">⏳ Sin factura</span>
               {% endif %}
             </td>
             <td>
