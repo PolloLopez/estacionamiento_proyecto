@@ -29,13 +29,13 @@ def ejecutar(usuario: Usuario, monto: Decimal, payment_id: str) -> None:
     if monto <= 0:
         raise ValueError(f"Monto inválido: {monto}")
 
-    # Verificar idempotencia: no acreditar dos veces el mismo pago
-    ya_acreditado = MovimientoCaja.objects.filter(
-        descripcion__contains=f"MP:{payment_id}"
-    ).exists()
+    # Idempotencia: el webhook de MP puede llegar más de una vez para el mismo pago.
+    # Chequeamos por mp_payment_id (campo unique) en lugar de buscar en el texto
+    # de descripción, que era frágil ante cualquier cambio de formato.
+    ya_acreditado = MovimientoCaja.objects.filter(mp_payment_id=payment_id).exists()
 
     if ya_acreditado:
-        return  # El webhook puede llegar múltiples veces, ignoramos duplicados
+        return
 
     with transaction.atomic():
         usuario_locked = Usuario.objects.select_for_update().get(pk=usuario.pk)
@@ -47,5 +47,6 @@ def ejecutar(usuario: Usuario, monto: Decimal, payment_id: str) -> None:
             monto=monto,
             tipo="ingreso",
             medio_pago="mercadopago",
-            descripcion=f"Carga de saldo via MercadoPago | MP:{payment_id}",
+            mp_payment_id=payment_id,
+            descripcion=f"Carga de saldo via MercadoPago",
         )

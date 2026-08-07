@@ -188,10 +188,60 @@ Los totales son calculados por el sistema, no hay entrada manual. El admin puede
 de transferencia. Las comisiones de vendedores son gestionadas por tesorería aparte via LiquidacionComision.
 
 **Multi-municipio:** cada municipio tiene su propia tarifa, horario, inspectores y vendedores.
-Los datos no se cruzan entre municipios.
+Los datos no se cruzan entre municipios. Patrón obligatorio en todas las vistas:
+```python
+get_object_or_404(Modelo, id=pk, municipio=request.user.municipio)
+# Nunca: Modelo.objects.get(id=pk)  ← no filtra por municipio
+```
+
+**Concurrencia:** todo cobro usa `transaction.atomic()` + `select_for_update()`:
+```python
+with transaction.atomic():
+    obj = Modelo.objects.select_for_update().get(pk=...)
+    # modificar y guardar
+```
+Modelos que requieren este patrón: `Usuario` (saldo), `MovimientoCaja`, `Infraccion`.
+
+**Cierre reactivo (sin Celery):** los estacionamientos vencidos se cierran al acceder a
+`inicio_usuarios` y al verificar una patente. Pull-based: no hay tareas programadas.
+
+**Cache:** `puede_estacionar_ahora(municipio)` cacheada 1 hora por clave `municipio+fecha+hora`.
+Se invalida automáticamente al cambiar el tramo horario.
 
 **Patentes sanitizadas:** `sanitizar_patente()` en `utils.py` — alfanumérico, mayúsculas, en todas
 las vistas y templates via handler JS `oninput`.
 
 **Saldo doble-check:** antes de estacionar se verifica saldo optimista (sin lock) y luego dentro
 de `select_for_update()` para evitar race conditions.
+
+---
+
+## URLs de referencia
+
+```
+/usuarios/                                     → inicio conductor
+/usuarios/admin-inicio/                        → panel admin
+/usuarios/admin-usuarios/                      → gestionar conductores
+/usuarios/admin-usuarios/<id>/                 → detalle conductor (cambiar contraseña)
+/usuarios/admin-inspectores/                   → gestionar inspectores
+/usuarios/admin-inspectores/estadisticas/      → estadísticas + exportar Excel
+/usuarios/admin-vendedores/                    → gestionar vendedores
+/usuarios/admin-infracciones/                  → infracciones (cobrar / anular / PDF juzgado)
+/usuarios/admin-rendiciones/                   → rendiciones (crear / certificar cierres)
+/usuarios/admin-exenciones/                    → exenciones de vehículos
+/usuarios/inspectores/                         → panel inspector
+/usuarios/inspectores/verificar/               → verificar patente en calle
+/usuarios/inspectores/infraccion/              → labrar acta
+/usuarios/inspectores/resumen/                 → mis infracciones del día
+/usuarios/vendedores/                          → panel vendedor
+/usuarios/vendedores/cobrar-infraccion/        → cobrar multa en efectivo
+/usuarios/vendedores/cobrar-abono/             → cobrar abono mensual
+/usuarios/vendedores/caja/                     → resumen de caja del vendedor
+/usuarios/vendedores/comisiones/               → mis liquidaciones de comisión
+/usuarios/vendedores/comisiones/<id>/factura/  → presentar factura de comisión
+/usuarios/tesorero/                            → panel tesorero
+/usuarios/mp/cargar/                           → iniciar carga MercadoPago
+/usuarios/mis-infracciones/                    → infracciones del conductor
+/usuarios/consultar-deuda/                     → buscar deuda por patente (conductor/vendedor)
+/sistema-interno/                              → Django Admin (URL no obvia, reduce bruteforce)
+```

@@ -9,6 +9,7 @@ Cubre:
 - Comisiones               :: comision_monto se graba en MovimientoCaja
 - Multi-municipio          :: aislamiento de datos entre municipios
 - Tesorero / vendedor      :: depositar_comision → certificar_comision
+- use_cases/acreditar_saldo_mp.py :: idempotencia por mp_payment_id
 
 Correr con:
     python manage.py test app_estacionamiento.tests_servicios --verbosity=2
@@ -993,3 +994,67 @@ class TestWatermarkConSubcuadra(TestCase):
         )
 
         self.assertIsInstance(resultado, InMemoryUploadedFile)
+
+
+class TestAcreditarSaldoMp(TestCase):
+    """
+    Tests de idempotencia de acreditar_saldo_mp.
+
+    El webhook de MercadoPago puede dispararse más de una vez para el mismo pago.
+    El use case debe acreditar el saldo solo la primera vez, ignorando los duplicados.
+    Con el campo mp_payment_id (unique) la verificación es exacta y no depende del
+    formato de la descripción.
+    """
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.conductor = crear_conductor(self.municipio)
+        self.conductor.saldo = Decimal("0.00")
+        self.conductor.save()
+
+    def _ejecutar(self, payment_id="PAY123", monto=Decimal("500.00")):
+        from app_estacionamiento.use_cases.acreditar_saldo_mp import ejecutar
+        ejecutar(usuario=self.conductor, monto=monto, payment_id=payment_id)
+
+    def test_acredita_saldo_correctamente(self):
+        """Primera llamada: acredita el monto al conductor."""
+        self._ejecutar(monto=Decimal("500.00"))
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.saldo, Decimal("500.00"))
+
+    def test_crea_movimiento_con_mp_payment_id(self):
+        """El MovimientoCaja creado guarda el payment_id en el campo dedicado."""
+        from app_estacionamiento.models import MovimientoCaja
+        self._ejecutar(payment_id="PAY_ABC")
+        mov = MovimientoCaja.objects.get(mp_payment_id="PAY_ABC")
+        self.assertEqual(mov.medio_pago, "mercadopago")
+        self.assertEqual(mov.tipo, "ingreso")
+        self.assertEqual(mov.monto, Decimal("500.00"))
+
+    def test_segunda_llamada_no_acredita_de_nuevo(self):
+        """El mismo payment_id no debe acreditarse dos veces (idempotencia)."""
+        self._ejecutar(payment_id="PAY_DOBLE", monto=Decimal("300.00"))
+        self._ejecutar(payment_id="PAY_DOBLE", monto=Decimal("300.00"))
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.saldo, Decimal("300.00"))
+
+    def test_segunda_llamada_no_crea_movimiento_duplicado(self):
+        """Solo existe un MovimientoCaja por payment_id, aunque se llame dos veces."""
+        from app_estacionamiento.models import MovimientoCaja
+        self._ejecutar(payment_id="PAY_UNO")
+        self._ejecutar(payment_id="PAY_UNO")
+        cantidad = MovimientoCaja.objects.filter(mp_payment_id="PAY_UNO").count()
+        self.assertEqual(cantidad, 1)
+
+    def test_payment_ids_distintos_acreditan_independientemente(self):
+        """Dos pagos distintos se acreditan por separado sin interferencia."""
+        self._ejecutar(payment_id="PAY_A", monto=Decimal("100.00"))
+        self._ejecutar(payment_id="PAY_B", monto=Decimal("200.00"))
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.saldo, Decimal("300.00"))
+
+    def test_monto_invalido_lanza_error(self):
+        """monto <= 0 debe lanzar ValueError antes de tocar la DB."""
+        from app_estacionamiento.use_cases.acreditar_saldo_mp import ejecutar
+        with self.assertRaises(ValueError):
+            ejecutar(usuario=self.conductor, monto=Decimal("0"), payment_id="PAY_CERO")

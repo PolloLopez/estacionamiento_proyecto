@@ -414,6 +414,14 @@ class MovimientoCaja(models.Model):
         verbose_name='Comisión generada',
         help_text='Monto que retiene el vendedor como comisión en este movimiento.',
     )
+    # ID del pago en MercadoPago. Solo se usa para cobros via MP (webhook/exitoso).
+    # Permite verificar idempotencia con una query exacta en lugar de LIKE sobre
+    # la descripción, que es frágil ante cambios de formato.
+    # unique=True garantiza a nivel DB que no se acredite el mismo pago dos veces.
+    mp_payment_id = models.CharField(
+        max_length=50, null=True, blank=True, unique=True,
+        verbose_name='ID de pago MercadoPago',
+    )
 
     def save(self, *args, **kwargs):
         if self.pk:
