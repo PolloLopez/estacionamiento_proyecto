@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-07 (sesión: medio_pago en todos los flujos de cobro + UI factura LiquidacionComision + tests generar_cierre_caja. 149 tests OK.)
+Última actualización: 2026-08-10 (sesión: idempotencia MP via mp_payment_id + PDF rendiciones para admin/tesorero + CONTEXT.md unificado. 155 tests OK.)
 
 ---
 
@@ -21,10 +21,8 @@ Railway Hobby no incluye backups automáticos. Opciones:
 Verificar que el backup se puede restaurar al menos una vez antes del go-live real.
 Ver: `CHECKLIST_PRODUCCION_2026-07-25.md` — item 🔴 #1.
 
-### 🔐 SEGURIDAD: Idempotencia MP basada en texto libre
-`acreditar_saldo_mp.py` usa `descripcion__contains="MP:{payment_id}"` para evitar double-credit.
-Si el formato de descripción cambia, la idempotencia se rompe silenciosamente.
-Fix: agregar campo `mp_payment_id = CharField(max_length=50, null=True, unique=True)` a `MovimientoCaja`.
+### ~~🔐 SEGURIDAD: Idempotencia MP basada en texto libre~~ ✅ RESUELTO 2026-08-10
+`MovimientoCaja.mp_payment_id (CharField unique)` — migración 0047. Verifica por campo exacto en lugar de `descripcion__contains`. 6 tests en `TestAcreditarSaldoMp`.
 
 ---
 
@@ -47,8 +45,7 @@ Implementado:
 — **Infracciones impagas → PDF juzgado**: `/admin-infracciones/pdf-juzgado/` (usa reportlab).
 — **Inspectores → Excel**: `/admin-inspectores/estadisticas/excel/` ✅
 
-Pendiente:
-— **Rendiciones**: exportar cierre de caja a PDF para tesorería. `reportlab` ya instalado.
+Pendiente: ~~**Rendiciones**: exportar cierre de caja a PDF para tesorería~~ ✅ RESUELTO 2026-08-10 — `pdf_rendicion` view + botón 📄 en tabla admin y panel tesorero.
 
 ### 5. 🔐 SEGURIDAD: Verificación de email al registrarse
 `ACCOUNT_EMAIL_VERIFICATION = "none"` permite registrarse con cualquier email sin verificar.
@@ -111,8 +108,11 @@ En pantallas grandes el layout del panel admin queda con mucho espacio vacío.
 **Disparador**: cuando el sistema pase de pruebas a municipio real pagando.
 Ver checklist: `CHECKLIST_PRODUCCION_2026-07-25.md`.
 
-### Inspector como cobrador
-Agregar rol "inspector" al decorator de `registrar_estacionamiento_vendedor` y `cobrar_abono`.
+### Inspector como cobrador (configurable por municipio)
+No todos los municipios usan al inspector como cobrador. Debe ser un toggle
+gestionado por el superadmin (via `ModuloMunicipio` o flag en `Municipio`).
+Cuando está activo: habilitar inspector en `registrar_estacionamiento_vendedor` y `cobrar_abono`.
+Cuando está inactivo: inspector solo verifica y labra actas (comportamiento actual).
 
 ### Mejoras OAuth y UI
 - Pantalla de consentimiento Google: completar logo, descripción, dominio verificado.

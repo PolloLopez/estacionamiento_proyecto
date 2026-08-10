@@ -11,8 +11,11 @@ Responsabilidades:
 No incluye lógica de negocio de ningún rol específico.
 """
 
+import logging
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
+
+logger = logging.getLogger(__name__)
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
@@ -86,6 +89,11 @@ def login_view(request):
             login(request, usuario)
             return redirect_por_rol(usuario)
 
+        logger.warning(
+            "Login fallido: correo=%s ip=%s",
+            correo,
+            request.META.get("REMOTE_ADDR"),
+        )
         return render(request, "usuarios/login.html", {
             "form": {"errors": True}
         })
