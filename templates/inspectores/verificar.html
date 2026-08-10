@@ -65,12 +65,15 @@
         {% csrf_token %}
 
         <!-- Selector de subcuadra donde está patrullando el inspector.
-             Zona Única viene primera y es el default cuando no hay sesión previa. -->
+             Zona Única viene primera y es el default cuando no hay sesión previa.
+             Si el municipio tiene coordenadas cargadas, el GPS preselecciona
+             la subcuadra más cercana automáticamente al abrir la pantalla. -->
         <div class="subcuadra-selector" style="margin-bottom:0.75rem;">
           {% if subcuadras|length > 1 %}
           <label style="font-size:0.72rem; font-weight:700; text-transform:uppercase;
                         color:var(--color-text-muted); letter-spacing:0.06em; display:block; margin-bottom:0.3rem;">
             📍 Subcuadra actual
+            <span id="gps-estado" style="font-weight:400; text-transform:none; margin-left:0.4rem;"></span>
           </label>
           <select name="subcuadra_id" id="subcuadra_sel"
                   style="width:100%; padding:0.5rem 0.65rem; border-radius:8px;
@@ -293,6 +296,56 @@ window.onload = () => {
         document.getElementById("ok").play();
     }
 };
+
+// ── GPS: preseleccionar subcuadra más cercana ──────────────────────────────
+// Solo se activa si el selector de subcuadras está visible en la pantalla
+// (municipios con más de 1 subcuadra). En municipios con Zona Única no hay
+// selector, así que no hay nada que preseleccionar.
+(function detectarSubcuadraGPS() {
+    const sel = document.getElementById("subcuadra_sel");
+    if (!sel) return;                          // solo 1 zona, campo oculto
+    if (!navigator.geolocation) return;        // navegador sin soporte GPS
+
+    const estadoEl = document.getElementById("gps-estado");
+    if (estadoEl) estadoEl.textContent = "📡 detectando…";
+
+    navigator.geolocation.getCurrentPosition(
+        function onPos(pos) {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+
+            fetch(`{% url 'inspectores_subcuadra_cercana' %}?lat=${lat}&lon=${lon}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.id) {
+                        // Municipio sin coordenadas cargadas — silencioso
+                        if (estadoEl) estadoEl.textContent = "";
+                        return;
+                    }
+                    // Preseleccionar si la opción existe en el selector
+                    const opcion = sel.querySelector(`option[value="${data.id}"]`);
+                    if (opcion) {
+                        sel.value = data.id;
+                        if (estadoEl) {
+                            estadoEl.textContent = "✅ GPS";
+                            estadoEl.title = `Detectado por GPS: ${data.nombre}`;
+                        }
+                    } else {
+                        if (estadoEl) estadoEl.textContent = "";
+                    }
+                })
+                .catch(() => {
+                    // Error de red — silencioso, el inspector sigue con selección manual
+                    if (estadoEl) estadoEl.textContent = "";
+                });
+        },
+        function onError() {
+            // Permiso denegado o GPS no disponible — silencioso
+            if (estadoEl) estadoEl.textContent = "";
+        },
+        { timeout: 8000, maximumAge: 30000 }
+    );
+})();
 </script>
 
 {% endblock %}

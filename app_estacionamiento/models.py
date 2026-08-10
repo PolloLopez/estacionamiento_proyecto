@@ -277,6 +277,20 @@ class Subcuadra(models.Model):
     calle = models.CharField(max_length=100)
     altura = models.IntegerField()
 
+    # Coordenadas del centroide de la cuadra.
+    # Opcionales: cuando están cargadas, el inspector puede usar GPS para
+    # preseleccionar su subcuadra automáticamente desde verificar.html.
+    lat = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        null=True, blank=True,
+        verbose_name='Latitud',
+    )
+    lon = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        null=True, blank=True,
+        verbose_name='Longitud',
+    )
+
     class Meta:
         # municipio incluido: distintos municipios pueden tener la misma calle+altura
         unique_together = ("municipio", "calle", "altura")
