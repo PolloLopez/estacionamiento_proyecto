@@ -198,6 +198,7 @@
         <th style="text-align:right;">Neto</th>
         <th style="text-align:center;">Estado</th>
         <th>Validado por</th>
+        <th style="text-align:center;">PDF</th>
       </tr>
     </thead>
     <tbody>
@@ -220,6 +221,13 @@
           {% endif %}
         </td>
         <td style="font-size:0.85rem;">{% if r.tesorero %}{{ r.tesorero.correo }}{% else %}—{% endif %}</td>
+        <td style="text-align:center;">
+          <a href="{% url 'pdf_rendicion' r.id %}"
+             title="Descargar PDF"
+             style="font-size:1.1rem; text-decoration:none; color:var(--color-danger);">
+            📄
+          </a>
+        </td>
       </tr>
       {% if r.notas_tesorero %}
       <tr>

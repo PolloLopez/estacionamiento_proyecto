@@ -96,6 +96,7 @@ from .views_admin import (
     estadisticas_inspectores,
     estadisticas_inspectores_excel,
     pdf_infracciones_juzgado,
+    pdf_rendicion,
 )
 from .views_mp import (
     mp_iniciar_carga,

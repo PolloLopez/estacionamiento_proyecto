@@ -2113,3 +2113,201 @@ def estadisticas_inspectores_excel(request):
     )
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
+
+
+# ─── PDF de rendición ────────────────────────────────────────────────────────
+
+def _generar_pdf_rendicion(rendicion):
+    """
+    Genera el PDF de una rendición para tesorería.
+
+    Incluye:
+    - Encabezado: municipio, período, admin, estado
+    - Resumen: efectivo / digital / neto
+    - Tabla de detalle: un fila por CierreCaja incluido en la rendición
+    - Pie: fecha de generación + notas del tesorero si las hay
+
+    Retorna bytes del PDF listos para HttpResponse.
+    """
+    import io
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, Paragraph, HRFlowable
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=2*cm, leftMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm,
+    )
+
+    estilos = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle(
+        "titulo", parent=estilos["Title"], fontSize=14, alignment=TA_CENTER, spaceAfter=4,
+    )
+    estilo_sub = ParagraphStyle(
+        "sub", parent=estilos["Normal"], fontSize=9,
+        textColor=colors.HexColor("#555555"), alignment=TA_CENTER, spaceAfter=2,
+    )
+    estilo_seccion = ParagraphStyle(
+        "seccion", parent=estilos["Normal"], fontSize=10,
+        textColor=colors.HexColor("#2c3e50"), fontName="Helvetica-Bold", spaceBefore=10, spaceAfter=4,
+    )
+    estilo_pie = ParagraphStyle(
+        "pie", parent=estilos["Normal"], fontSize=8,
+        textColor=colors.HexColor("#888888"), alignment=TA_CENTER,
+    )
+    estilo_notas = ParagraphStyle(
+        "notas", parent=estilos["Normal"], fontSize=9,
+        textColor=colors.HexColor("#664d03"),
+        backColor=colors.HexColor("#fff3cd"),
+        borderPadding=(4, 8, 4, 8),
+    )
+
+    municipio_nombre = rendicion.municipio.nombre if rendicion.municipio else "Municipio"
+    admin_nombre = rendicion.admin.nombre_completo() if rendicion.admin else "—"
+    generado_en = timezone.localtime().strftime("%d/%m/%Y %H:%M")
+
+    # Estado con color de texto (no hay color en PDF inline, usamos texto)
+    estado_texto = {
+        "pendiente": "Pendiente de validación",
+        "validada":  "Validada por tesorería",
+        "observada": "Con observaciones",
+    }.get(rendicion.estado, rendicion.estado)
+
+    partes = []
+
+    # ── Encabezado ──────────────────────────────────────────────────────────
+    partes.append(Paragraph(f"Rendición — {municipio_nombre}", estilo_titulo))
+    partes.append(Paragraph(
+        f"Período: {rendicion.fecha_desde.strftime('%d/%m/%Y')} al {rendicion.fecha_hasta.strftime('%d/%m/%Y')}"
+        f"&nbsp;|&nbsp; Admin: {admin_nombre}"
+        f"&nbsp;|&nbsp; Estado: {estado_texto}",
+        estilo_sub,
+    ))
+    partes.append(Paragraph(f"Generado: {generado_en}", estilo_sub))
+    partes.append(Spacer(1, 0.4*cm))
+    partes.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2c3e50")))
+    partes.append(Spacer(1, 0.4*cm))
+
+    # ── Resumen de totales ───────────────────────────────────────────────────
+    partes.append(Paragraph("Resumen de totales", estilo_seccion))
+    resumen_data = [
+        ["Concepto", "Monto"],
+        ["Efectivo", f"${rendicion.total_efectivo:,.2f}"],
+        ["Digital (transferencia + débito/crédito/QR)", f"${rendicion.total_digital:,.2f}"],
+        ["Total neto a rendir", f"${rendicion.total_neto:,.2f}"],
+    ]
+    tabla_resumen = Table(resumen_data, colWidths=[12*cm, 4*cm])
+    tabla_resumen.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+        ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+        ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE",      (0, 0), (-1, -1), 9),
+        ("ROWBACKGROUNDS",(0, 1), (-1, -2), [colors.white, colors.HexColor("#f5f5f5")]),
+        # Fila de total neto en negrita con fondo destacado
+        ("BACKGROUND",    (0, 3), (-1, 3), colors.HexColor("#e8f5e9")),
+        ("FONTNAME",      (0, 3), (-1, 3), "Helvetica-Bold"),
+        ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
+        ("ALIGN",         (1, 0), (1, -1), "RIGHT"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+    ]))
+    partes.append(tabla_resumen)
+    partes.append(Spacer(1, 0.5*cm))
+
+    # ── Detalle de cierres incluidos ─────────────────────────────────────────
+    cierres = list(
+        rendicion.cierres.select_related("usuario", "certificado_por").order_by("fecha_cierre")
+    )
+
+    if cierres:
+        partes.append(Paragraph(f"Cierres de caja incluidos ({len(cierres)})", estilo_seccion))
+
+        encabezado = ["Usuario", "Fecha cierre", "Período", "Efectivo", "Transferencia", "Digital", "Total"]
+        filas = [encabezado]
+
+        for cierre in cierres:
+            filas.append([
+                cierre.usuario.nombre_completo() if cierre.usuario else "—",
+                timezone.localtime(cierre.fecha_cierre).strftime("%d/%m/%Y"),
+                cierre.get_periodo_display() if cierre.periodo else "—",
+                f"${cierre.total_efectivo:,.0f}",
+                f"${cierre.total_transferencia:,.0f}",
+                f"${cierre.total_digital:,.0f}",
+                f"${cierre.total_cobrado:,.0f}",
+            ])
+
+        anchos = [4.2*cm, 2.2*cm, 1.8*cm, 2.0*cm, 2.5*cm, 1.8*cm, 2.0*cm]
+        tabla_cierres = Table(filas, colWidths=anchos, repeatRows=1)
+        tabla_cierres.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, 0), 8),
+            ("FONTSIZE",      (0, 1), (-1, -1), 7.5),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
+            ("ALIGN",         (3, 0), (-1, -1), "RIGHT"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+        ]))
+        partes.append(tabla_cierres)
+    else:
+        partes.append(Paragraph("Sin cierres de caja vinculados.", estilos["Normal"]))
+
+    # ── Validación de tesorería ──────────────────────────────────────────────
+    if rendicion.tesorero and rendicion.validado_en:
+        partes.append(Spacer(1, 0.5*cm))
+        partes.append(Paragraph("Validación de tesorería", estilo_seccion))
+        validado_en = timezone.localtime(rendicion.validado_en).strftime("%d/%m/%Y %H:%M")
+        partes.append(Paragraph(
+            f"Validada por: <b>{rendicion.tesorero.nombre_completo()}</b> el {validado_en}",
+            estilos["Normal"],
+        ))
+
+    if rendicion.notas_tesorero:
+        partes.append(Spacer(1, 0.3*cm))
+        partes.append(Paragraph(f"Observaciones: {rendicion.notas_tesorero}", estilo_notas))
+
+    # ── Pie ──────────────────────────────────────────────────────────────────
+    partes.append(Spacer(1, 1*cm))
+    partes.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
+    partes.append(Spacer(1, 0.2*cm))
+    partes.append(Paragraph(
+        "Documento generado automáticamente por el Sistema de Estacionamiento Medido Municipal.",
+        estilo_pie,
+    ))
+
+    doc.build(partes)
+    buffer.seek(0)
+    return buffer.read()
+
+
+@require_role("admin", "tesorero")
+def pdf_rendicion(request, rendicion_id):
+    """
+    Descarga el PDF de una rendición específica.
+    Accesible tanto para el admin que la creó como para tesorería.
+    """
+    municipio = getattr(request.user, "municipio", None)
+
+    # El admin solo puede ver las rendiciones de su municipio.
+    # El tesorero también está restringido por municipio.
+    rendicion = get_object_or_404(Rendicion, id=rendicion_id, municipio=municipio)
+
+    pdf_bytes = _generar_pdf_rendicion(rendicion)
+
+    nombre_archivo = (
+        f"rendicion_{rendicion.fecha_desde.strftime('%Y%m%d')}"
+        f"_{rendicion.fecha_hasta.strftime('%Y%m%d')}.pdf"
+    )
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response

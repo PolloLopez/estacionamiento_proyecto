@@ -109,6 +109,7 @@ urlpatterns = [
     path("admin-rendiciones/", views.admin_rendiciones, name="admin_rendiciones"),
     path("admin-rendiciones/crear/", views.crear_rendicion, name="crear_rendicion"),
     path("admin-rendiciones/<int:cierre_id>/certificar/", views.certificar_cierre, name="certificar_cierre"),
+    path("admin-rendiciones/<int:rendicion_id>/pdf/", views.pdf_rendicion, name="pdf_rendicion"),
 
     # =========================
     # ✅ VERIFICACIONES
