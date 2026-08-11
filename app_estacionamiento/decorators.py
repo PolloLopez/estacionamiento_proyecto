@@ -1,9 +1,12 @@
 # app_estacionamiento/decorators.py
 
+import logging
 from functools import wraps
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.db.models import Q
+
+logger = logging.getLogger(__name__)
 
 
 def require_login(view_func):
@@ -107,6 +110,13 @@ def require_role(*roles):
             # 3. BLOQUEAR SI NO TIENE PERMISOS
             # ==========================================
             if not tiene_permiso:
+                logger.warning(
+                    "403 require_role: usuario=%s path=%s roles_requeridos=%s ip=%s",
+                    getattr(usuario, "correo", usuario.pk),
+                    request.path,
+                    roles,
+                    request.META.get("REMOTE_ADDR"),
+                )
                 # Render con template completo: navbar, estilos y botón de volver.
                 return TemplateResponse(request, "403.html", status=403)
 

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Presentar factura{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="panel" style="max-width:500px; margin:0 auto;">
+    <div class="panel-body">
+
+      <h1>🧾 Presentar factura</h1>
+      <p class="text-muted" style="margin-bottom:1.5rem;">
+        Adjuntá la factura correspondiente a tus comisiones del período.
+      </p>
+
+      {# Resumen de la liquidación #}
+      <div class="card" style="border:1px solid var(--color-border); margin-bottom:1.5rem;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
+          <tr>
+            <td style="padding:0.4rem 0; color:var(--color-text-muted);">Período</td>
+            <td style="padding:0.4rem 0; font-weight:600; text-align:right;">
+              {{ liquidacion.fecha_desde|date:"d/m/Y" }} → {{ liquidacion.fecha_hasta|date:"d/m/Y" }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0.4rem 0; color:var(--color-text-muted);">Monto</td>
+            <td style="padding:0.4rem 0; font-size:1.2rem; font-weight:800; color:var(--color-primary); text-align:right;">
+              ${{ liquidacion.monto_total }}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0.4rem 0; color:var(--color-text-muted);">Estado</td>
+            <td style="padding:0.4rem 0; text-align:right;">
+              {% if liquidacion.estado == "depositada" %}
+                <span style="color:#2563eb; font-weight:600;">🏦 Depositada</span>
+              {% else %}
+                <span style="color:var(--color-primary); font-weight:600;">✅ Certificada</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% if liquidacion.factura_presentada %}
+          <tr>
+            <td style="padding:0.4rem 0; color:var(--color-text-muted);">Factura</td>
+            <td style="padding:0.4rem 0; text-align:right; color:var(--color-primary); font-weight:600;">
+              ✅ Ya presentada
+              {% if liquidacion.factura_archivo %}
+                — <a href="{{ liquidacion.factura_archivo.url }}" target="_blank"
+                     style="color:var(--color-primary);">Ver archivo</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endif %}
+        </table>
+      </div>
+
+      {% if liquidacion.factura_presentada %}
+        <p style="font-size:0.9rem; color:var(--color-text-muted); margin-bottom:1rem;">
+          Ya presentaste factura para este período. Podés reemplazarla subiendo un archivo nuevo.
+        </p>
+      {% endif %}
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div style="margin-bottom:1.2rem;">
+          <label for="factura_archivo"
+                 style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.4rem;">
+            Archivo de factura
+            <span style="font-weight:400; color:var(--color-text-muted);">(PDF, JPG, PNG — opcional)</span>
+          </label>
+          <input type="file" id="factura_archivo" name="factura_archivo"
+                 accept=".pdf,.jpg,.jpeg,.png"
+                 style="width:100%; padding:0.4rem; border:1px solid var(--color-border);
+                        border-radius:6px; font-size:0.9rem;">
+        </div>
+
+        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+          <button type="submit" class="btn">
+            🧾 {% if liquidacion.factura_presentada %}Reemplazar factura{% else %}Confirmar presentación{% endif %}
+          </button>
+          <a href="{% url 'mis_comisiones' %}" class="btn btn-outline">Cancelar</a>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

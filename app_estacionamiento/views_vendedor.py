@@ -39,7 +39,7 @@ from .models import (
 from .services_caja import generar_cierre_caja
 from .use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
 from .services.horarios import calcular_opciones_duracion, puede_estacionar_ahora
-from .services.infracciones import calcular_estado_tolerancia
+from .services.infracciones import calcular_estado_tolerancia, MEDIOS_VALIDOS_COBRO
 from .utils import get_subcuadra_default, sanitizar_patente
 
 
@@ -357,6 +357,9 @@ def cobrar_infraccion_vendedor(request):
 
         elif accion == "cobrar":
             infraccion_id = request.POST.get("infraccion_id")
+            medio_pago_cobro = request.POST.get("medio_pago", "efectivo")
+            if medio_pago_cobro not in MEDIOS_VALIDOS_COBRO:
+                medio_pago_cobro = "efectivo"
             if infraccion_id:
                 try:
                     with transaction.atomic():
@@ -372,7 +375,7 @@ def cobrar_infraccion_vendedor(request):
                             # Dentro de la gracia: anular sin cobrar
                             inf.estado = "anulada"
                         else:
-                            # Fuera de la gracia: cobrar en efectivo
+                            # Fuera de la gracia: registrar cobro con el medio de pago elegido
                             inf.estado   = "pagada"
                             comision_pct = municipio.comision_vendedor or 0
                             comision     = round(inf.monto * comision_pct / 100, 2)
@@ -380,9 +383,9 @@ def cobrar_infraccion_vendedor(request):
                                 usuario=vendedor,
                                 monto=inf.monto,
                                 tipo="ingreso",
-                                medio_pago="efectivo",
+                                medio_pago=medio_pago_cobro,
                                 comision_monto=comision,
-                                descripcion=f"Cobro infraccion #{inf.id} — {inf.vehiculo.patente}",
+                                descripcion=f"Cobro infraccion #{inf.id} — {inf.vehiculo.patente} ({medio_pago_cobro})",
                             )
                         inf.fecha_pago = ahora
                         inf.save()
@@ -494,15 +497,21 @@ def cobrar_abono(request):
                         comision_pct   = getattr(municipio, "comision_vendedor", None) or Decimal("0")
                         comision_monto = (precio * comision_pct / 100).quantize(Decimal("0.01"))
 
+                    medio_pago_abono = request.POST.get("medio_pago", "efectivo")
+                    if medio_pago_abono not in MEDIOS_VALIDOS_COBRO:
+                        medio_pago_abono = "efectivo"
+
                     with transaction.atomic():
                         movimiento = MovimientoCaja.objects.create(
                             usuario=vendedor,
                             monto=precio,
                             tipo="ingreso",
-                            descripcion=f"Abono mensual {mes_seleccionado.strftime('%m/%Y')} - {patente}",
-                            medio_pago="efectivo",
+                            descripcion=f"Abono mensual {mes_seleccionado.strftime('%m/%Y')} - {patente} ({medio_pago_abono})",
+                            medio_pago=medio_pago_abono,
                             comision_monto=comision_monto,
                         )
+                        # AbonoMensual.medio_pago tiene choices limitados (efectivo/mercadopago/saldo)
+                        # — se deja 'efectivo' para todos los cobros presenciales del vendedor
                         AbonoMensual.objects.create(
                             vehiculo=vehiculo,
                             municipio=municipio,
@@ -606,6 +615,9 @@ def consultar_deuda(request):
             })
 
         elif accion == "cobrar" and infraccion_id:
+            medio_pago_deuda = request.POST.get("medio_pago", "efectivo")
+            if medio_pago_deuda not in MEDIOS_VALIDOS_COBRO:
+                medio_pago_deuda = "efectivo"
             try:
                 with transaction.atomic():
                     inf = get_object_or_404(
@@ -629,9 +641,9 @@ def consultar_deuda(request):
                             usuario=request.user,
                             monto=inf.monto,
                             tipo="ingreso",
-                            medio_pago="efectivo",
+                            medio_pago=medio_pago_deuda,
                             comision_monto=comision,
-                            descripcion=f"Cobro infracción #{inf.id} — {inf.vehiculo.patente}",
+                            descripcion=f"Cobro infracción #{inf.id} — {inf.vehiculo.patente} ({medio_pago_deuda})",
                         )
                     inf.fecha_pago = ahora
                     inf.save()
@@ -855,5 +867,44 @@ def certificar_comision(request, liquidacion_id):
         return redirect("mis_comisiones")
 
     return render(request, "vendedores/certificar_comision.html", {
+        "liquidacion": liquidacion,
+    })
+
+
+@require_role("vendedor")
+def presentar_factura(request, liquidacion_id):
+    """
+    El vendedor adjunta la factura de sus comisiones.
+
+    - Solo accesible por el vendedor dueño de la liquidación.
+    - Disponible en estados 'depositada' y 'certificada' (la factura
+      puede presentarse antes o después de certificar el recibo).
+    - POST con factura_archivo (file upload, opcional) marca
+      factura_presentada=True y guarda el archivo si se adjuntó.
+    """
+    vendedor    = request.user
+    liquidacion = get_object_or_404(
+        LiquidacionComision, id=liquidacion_id, vendedor=vendedor,
+    )
+
+    # Solo tiene sentido presentar factura después de que tesorería depositó
+    if liquidacion.estado == "pendiente":
+        messages.warning(request, "La factura se puede presentar una vez que tesorería realice el depósito.")
+        return redirect("mis_comisiones")
+
+    if request.method == "POST":
+        archivo = request.FILES.get("factura_archivo")
+        campos_a_guardar = ["factura_presentada"]
+
+        liquidacion.factura_presentada = True
+        if archivo:
+            liquidacion.factura_archivo = archivo
+            campos_a_guardar.append("factura_archivo")
+
+        liquidacion.save(update_fields=campos_a_guardar)
+        messages.success(request, "Factura registrada correctamente.")
+        return redirect("mis_comisiones")
+
+    return render(request, "vendedores/presentar_factura.html", {
         "liquidacion": liquidacion,
     })

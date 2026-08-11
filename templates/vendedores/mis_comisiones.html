@@ -36,7 +36,7 @@
             <th>Período</th>
             <th style="text-align:right;">Monto</th>
             <th style="text-align:center;">Estado</th>
-            <th>Notas tesorería</th>
+            <th style="text-align:center;">Factura</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -58,8 +58,24 @@
                 <span style="color:var(--color-primary); font-weight:600;">✅ Certificada</span>
               {% endif %}
             </td>
-            <td style="font-size:0.85rem; color:var(--color-text-muted);">
-              {{ liq.notas_tesorero|default:"—" }}
+            <td style="text-align:center; font-size:0.85rem;">
+              {% if liq.estado == "pendiente" %}
+                <span class="text-muted">—</span>
+              {% elif liq.factura_presentada %}
+                <a href="{% url 'presentar_factura' liq.id %}" title="Ver o reemplazar"
+                   style="color:var(--color-primary); text-decoration:none;">
+                  ✅ Presentada
+                </a>
+                {% if liq.factura_archivo %}
+                  &nbsp;<a href="{{ liq.factura_archivo.url }}" target="_blank"
+                           style="font-size:0.78rem; color:var(--color-text-muted);">📄</a>
+                {% endif %}
+              {% else %}
+                <a href="{% url 'presentar_factura' liq.id %}" class="btn btn-outline"
+                   style="font-size:0.78rem; padding:0.25rem 0.6rem;">
+                  🧾 Adjuntar
+                </a>
+              {% endif %}
             </td>
             <td>
               {% if liq.estado == "depositada" %}

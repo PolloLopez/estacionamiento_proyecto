@@ -195,10 +195,10 @@
         <th>Hasta</th>
         <th style="text-align:right;">Efectivo</th>
         <th style="text-align:right;">Digital</th>
-        <th style="text-align:right;">Comisiones</th>
         <th style="text-align:right;">Neto</th>
         <th style="text-align:center;">Estado</th>
         <th>Validado por</th>
+        <th style="text-align:center;">PDF</th>
       </tr>
     </thead>
     <tbody>
@@ -210,7 +210,6 @@
         <td style="font-size:0.85rem;">{{ r.fecha_hasta|date:"d/m/Y" }}</td>
         <td style="text-align:right;">${{ r.total_efectivo }}</td>
         <td style="text-align:right;">${{ r.total_digital }}</td>
-        <td style="text-align:right; color:var(--color-text-muted);">${{ r.total_comisiones }}</td>
         <td style="text-align:right; font-weight:700;">${{ r.total_neto }}</td>
         <td style="text-align:center;">
           {% if r.estado == "pendiente" %}
@@ -222,6 +221,13 @@
           {% endif %}
         </td>
         <td style="font-size:0.85rem;">{% if r.tesorero %}{{ r.tesorero.correo }}{% else %}—{% endif %}</td>
+        <td style="text-align:center;">
+          <a href="{% url 'pdf_rendicion' r.id %}"
+             title="Descargar PDF"
+             style="font-size:1.1rem; text-decoration:none; color:var(--color-danger);">
+            📄
+          </a>
+        </td>
       </tr>
       {% if r.notas_tesorero %}
       <tr>

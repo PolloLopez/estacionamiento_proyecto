@@ -21,7 +21,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Max, Min, Q, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -31,7 +31,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .decorators import require_role
-from .services.infracciones import cobrar_infraccion_efectivo
+from .services.infracciones import cobrar_infraccion_efectivo, MEDIOS_VALIDOS_COBRO
 from .services.saldo import cargar_saldo_conductor
 from .utils import sanitizar_patente
 from .models import (
@@ -146,6 +146,7 @@ def panel_admin(request):
         {"label": "🚗 Vehículos",         "url": _reverse("admin_vehiculos"),          "badge": None},
         {"label": "📋 Infracciones",      "url": _reverse("admin_infracciones"),       "badge": None},
         {"label": "🚫 Exenciones",        "url": _reverse("exenciones"),               "badge": None},
+        {"label": "📍 Subcuadras GPS",    "url": _reverse("gestionar_subcuadras"),     "badge": None},
         {"label": "💲 Tarifas",           "url": _reverse("gestionar_tarifas"),        "badge": None},
         {"label": "🕐 Horarios",          "url": _reverse("gestionar_horarios"),       "badge": None},
         {"label": "📅 Días especiales",   "url": _reverse("gestionar_dias_especiales"),"badge": None},
@@ -772,8 +773,11 @@ def admin_infracciones(request):
 
         elif accion == "cobrar" and infraccion_id:
             inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)
+            medio_pago_admin = request.POST.get("medio_pago", "efectivo")
+            if medio_pago_admin not in MEDIOS_VALIDOS_COBRO:
+                medio_pago_admin = "efectivo"
             try:
-                inf = cobrar_infraccion_efectivo(infraccion=inf, cobrador=usuario)
+                inf = cobrar_infraccion_efectivo(infraccion=inf, cobrador=usuario, medio_pago=medio_pago_admin)
             except ValueError as e:
                 messages.warning(request, str(e))
                 return redirect(request.get_full_path())
@@ -1217,72 +1221,123 @@ def admin_rendiciones(request):
 @require_role("admin")
 def crear_rendicion(request):
     """
-    El admin genera una rendición a tesorería con desglose efectivo/digital/comisiones.
-    El total_neto = efectivo + digital − comisiones.
+    El admin genera una rendición a tesorería seleccionando cierres de caja certificados.
+
+    Los totales se calculan automáticamente desde los CierreCaja seleccionados:
+    - total_efectivo    = suma de cierre.total_efectivo
+    - total_digital     = suma de cierre.total_transferencia + cierre.total_digital
+                          (desde la perspectiva de tesorería, transferencia y digital/card
+                           son lo mismo: no es efectivo que el admin manipula físicamente)
+    - total_neto        = total_efectivo + total_digital
+    - El admin NO puede escribir los montos — solo certifica lo que el sistema calculó.
     """
+    from django.db import transaction as db_transaction
+
     municipio = request.user.municipio
 
     if request.method == "POST":
-        periodo         = request.POST.get("periodo", "").strip()
-        fecha_desde_str = request.POST.get("fecha_desde", "").strip()
-        fecha_hasta_str = request.POST.get("fecha_hasta", "").strip()
-        notas           = request.POST.get("notas", "").strip()
+        periodo      = request.POST.get("periodo", "").strip()
+        notas        = request.POST.get("notas", "").strip()
+        cierre_ids   = request.POST.getlist("cierre_ids")
+        comprobante  = request.FILES.get("comprobante_archivo")
+
+        if not periodo:
+            messages.error(request, "Indicá el período.")
+            return redirect("crear_rendicion")
+
+        if not cierre_ids:
+            messages.error(request, "Seleccioná al menos un cierre de caja.")
+            return redirect("crear_rendicion")
 
         try:
-            total_efectivo   = Decimal(request.POST.get("total_efectivo",   "0") or "0")
-            total_digital    = Decimal(request.POST.get("total_digital",    "0") or "0")
-            total_comisiones = Decimal(request.POST.get("total_comisiones", "0") or "0")
-        except Exception:
-            messages.error(request, "Los montos deben ser números válidos.")
+            cierre_ids_int = [int(pk) for pk in cierre_ids]
+        except ValueError:
+            messages.error(request, "IDs de cierres inválidos.")
             return redirect("crear_rendicion")
 
-        if not periodo or not fecha_desde_str or not fecha_hasta_str:
-            messages.error(request, "Completá todos los campos obligatorios.")
-            return redirect("crear_rendicion")
+        with db_transaction.atomic():
+            # Traer solo cierres del municipio, certificados y aún sin rendir.
+            # select_for_update evita race conditions si dos admins operan simultáneamente.
+            cierres = CierreCaja.objects.select_for_update().filter(
+                id__in=cierre_ids_int,
+                usuario__municipio=municipio,
+                certificado=True,
+                rendicion__isnull=True,
+            )
 
-        total_neto = total_efectivo + total_digital - total_comisiones
+            if cierres.count() != len(cierre_ids_int):
+                messages.error(
+                    request,
+                    "Algunos cierres seleccionados no son válidos (ya rendidos, no certificados o de otro municipio)."
+                )
+                return redirect("crear_rendicion")
 
-        Rendicion.objects.create(
-            municipio        = municipio,
-            admin            = request.user,
-            periodo          = periodo,
-            fecha_desde      = fecha_desde_str,
-            fecha_hasta      = fecha_hasta_str,
-            total_efectivo   = total_efectivo,
-            total_digital    = total_digital,
-            total_comisiones = total_comisiones,
-            total_neto       = total_neto,
-            notas_tesorero   = notas,
+            # Calcular totales desde el desglose de cada cierre
+            totales = cierres.aggregate(
+                tefectivo     = Sum("total_efectivo"),
+                ttransferencia = Sum("total_transferencia"),
+                tdigital      = Sum("total_digital"),
+            )
+            suma_efectivo      = totales["tefectivo"]      or Decimal("0")
+            suma_transferencia = totales["ttransferencia"] or Decimal("0")
+            suma_digital       = totales["tdigital"]       or Decimal("0")
+
+            # Para tesorería, transferencia + digital (débito/crédito/QR) se agrupan como "digital"
+            total_efectivo = suma_efectivo
+            total_digital  = suma_transferencia + suma_digital
+            total_neto     = total_efectivo + total_digital
+
+            # Fechas del período: min(fecha_cierre) / max(fecha_cierre) de los cierres elegidos
+            fechas = cierres.aggregate(
+                desde=Min("fecha_cierre"),
+                hasta=Max("fecha_cierre"),
+            )
+
+            cantidad_cierres = cierres.count()
+
+            rendicion = Rendicion.objects.create(
+                municipio           = municipio,
+                admin               = request.user,
+                periodo             = periodo,
+                fecha_desde         = fechas["desde"].date() if fechas["desde"] else date.today(),
+                fecha_hasta         = fechas["hasta"].date() if fechas["hasta"] else date.today(),
+                total_efectivo      = total_efectivo,
+                total_digital       = total_digital,
+                total_neto          = total_neto,
+                notas_tesorero      = notas,
+                comprobante_archivo = comprobante,
+            )
+
+            # Vincular cada cierre a esta rendición (auditoría)
+            cierres.update(rendicion=rendicion)
+
+        messages.success(
+            request,
+            f"Rendición creada con {cantidad_cierres} cierre(s). Total neto: ${total_neto:,.2f}"
         )
-        messages.success(request, f"Rendición generada. Total neto a rendir: ${total_neto}")
         return redirect("admin_rendiciones")
 
-    # Sugerir fecha_desde = día siguiente a la última rendición del admin
-    ultima = Rendicion.objects.filter(admin=request.user).order_by("-fecha_hasta").first()
-    from datetime import timedelta
-    fecha_desde_sugerida = (ultima.fecha_hasta + timedelta(days=1)) if ultima else date.today().replace(day=1)
-    hoy = date.today()
-
-    # Calcular totales de cierres certificados en el período sugerido.
-    # Sirve de referencia para que el admin no tenga que calcular manualmente.
-    cierres_certificados = CierreCaja.objects.filter(
+    # GET: mostrar cierres disponibles (certificados y sin rendir)
+    cierres_pendientes = CierreCaja.objects.filter(
         usuario__municipio=municipio,
         certificado=True,
-        fecha_cierre__date__gte=fecha_desde_sugerida,
-        fecha_cierre__date__lte=hoy,
-    )
-    totales_cierres = cierres_certificados.aggregate(
-        suma_cobrado=Sum("total_cobrado"),
-        suma_comisiones=Sum("ganancia_usuario"),
-        suma_neto=Sum("monto_municipio"),
-        cantidad=Count("id"),
+        rendicion__isnull=True,
+    ).select_related("usuario").order_by("fecha_cierre")
+
+    # Pre-calcular totales de todos los cierres disponibles para mostrar en el resumen
+    totales_disponibles = cierres_pendientes.aggregate(
+        cantidad          = Count("id"),
+        suma_efectivo     = Sum("total_efectivo"),
+        suma_transferencia = Sum("total_transferencia"),
+        suma_digital      = Sum("total_digital"),
+        suma_cobrado      = Sum("total_cobrado"),
     )
 
     return render(request, "admin/crear_rendicion.html", {
-        "periodos":             Rendicion.PERIODOS,
-        "hoy":                  hoy,
-        "fecha_desde_sugerida": fecha_desde_sugerida,
-        "totales_cierres":      totales_cierres,
+        "periodos":            Rendicion.PERIODOS,
+        "cierres_pendientes":  cierres_pendientes,
+        "totales_disponibles": totales_disponibles,
+        "hoy":                 date.today(),
     })
 
 
@@ -2059,3 +2114,306 @@ def estadisticas_inspectores_excel(request):
     )
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
+
+
+# ─── PDF de rendición ────────────────────────────────────────────────────────
+
+def _generar_pdf_rendicion(rendicion):
+    """
+    Genera el PDF de una rendición para tesorería.
+
+    Incluye:
+    - Encabezado: municipio, período, admin, estado
+    - Resumen: efectivo / digital / neto
+    - Tabla de detalle: un fila por CierreCaja incluido en la rendición
+    - Pie: fecha de generación + notas del tesorero si las hay
+
+    Retorna bytes del PDF listos para HttpResponse.
+    """
+    import io
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Spacer, Table, TableStyle, Paragraph, HRFlowable
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=2*cm, leftMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm,
+    )
+
+    estilos = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle(
+        "titulo", parent=estilos["Title"], fontSize=14, alignment=TA_CENTER, spaceAfter=4,
+    )
+    estilo_sub = ParagraphStyle(
+        "sub", parent=estilos["Normal"], fontSize=9,
+        textColor=colors.HexColor("#555555"), alignment=TA_CENTER, spaceAfter=2,
+    )
+    estilo_seccion = ParagraphStyle(
+        "seccion", parent=estilos["Normal"], fontSize=10,
+        textColor=colors.HexColor("#2c3e50"), fontName="Helvetica-Bold", spaceBefore=10, spaceAfter=4,
+    )
+    estilo_pie = ParagraphStyle(
+        "pie", parent=estilos["Normal"], fontSize=8,
+        textColor=colors.HexColor("#888888"), alignment=TA_CENTER,
+    )
+    estilo_notas = ParagraphStyle(
+        "notas", parent=estilos["Normal"], fontSize=9,
+        textColor=colors.HexColor("#664d03"),
+        backColor=colors.HexColor("#fff3cd"),
+        borderPadding=(4, 8, 4, 8),
+    )
+
+    municipio_nombre = rendicion.municipio.nombre if rendicion.municipio else "Municipio"
+    admin_nombre = rendicion.admin.nombre_completo() if rendicion.admin else "—"
+    generado_en = timezone.localtime().strftime("%d/%m/%Y %H:%M")
+
+    # Estado con color de texto (no hay color en PDF inline, usamos texto)
+    estado_texto = {
+        "pendiente": "Pendiente de validación",
+        "validada":  "Validada por tesorería",
+        "observada": "Con observaciones",
+    }.get(rendicion.estado, rendicion.estado)
+
+    partes = []
+
+    # ── Encabezado ──────────────────────────────────────────────────────────
+    partes.append(Paragraph(f"Rendición — {municipio_nombre}", estilo_titulo))
+    partes.append(Paragraph(
+        f"Período: {rendicion.fecha_desde.strftime('%d/%m/%Y')} al {rendicion.fecha_hasta.strftime('%d/%m/%Y')}"
+        f"&nbsp;|&nbsp; Admin: {admin_nombre}"
+        f"&nbsp;|&nbsp; Estado: {estado_texto}",
+        estilo_sub,
+    ))
+    partes.append(Paragraph(f"Generado: {generado_en}", estilo_sub))
+    partes.append(Spacer(1, 0.4*cm))
+    partes.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2c3e50")))
+    partes.append(Spacer(1, 0.4*cm))
+
+    # ── Resumen de totales ───────────────────────────────────────────────────
+    partes.append(Paragraph("Resumen de totales", estilo_seccion))
+    resumen_data = [
+        ["Concepto", "Monto"],
+        ["Efectivo", f"${rendicion.total_efectivo:,.2f}"],
+        ["Digital (transferencia + débito/crédito/QR)", f"${rendicion.total_digital:,.2f}"],
+        ["Total neto a rendir", f"${rendicion.total_neto:,.2f}"],
+    ]
+    tabla_resumen = Table(resumen_data, colWidths=[12*cm, 4*cm])
+    tabla_resumen.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+        ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+        ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE",      (0, 0), (-1, -1), 9),
+        ("ROWBACKGROUNDS",(0, 1), (-1, -2), [colors.white, colors.HexColor("#f5f5f5")]),
+        # Fila de total neto en negrita con fondo destacado
+        ("BACKGROUND",    (0, 3), (-1, 3), colors.HexColor("#e8f5e9")),
+        ("FONTNAME",      (0, 3), (-1, 3), "Helvetica-Bold"),
+        ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
+        ("ALIGN",         (1, 0), (1, -1), "RIGHT"),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+    ]))
+    partes.append(tabla_resumen)
+    partes.append(Spacer(1, 0.5*cm))
+
+    # ── Detalle de cierres incluidos ─────────────────────────────────────────
+    cierres = list(
+        rendicion.cierres.select_related("usuario", "certificado_por").order_by("fecha_cierre")
+    )
+
+    if cierres:
+        partes.append(Paragraph(f"Cierres de caja incluidos ({len(cierres)})", estilo_seccion))
+
+        encabezado = ["Usuario", "Fecha cierre", "Período", "Efectivo", "Transferencia", "Digital", "Total"]
+        filas = [encabezado]
+
+        for cierre in cierres:
+            filas.append([
+                cierre.usuario.nombre_completo() if cierre.usuario else "—",
+                timezone.localtime(cierre.fecha_cierre).strftime("%d/%m/%Y"),
+                cierre.get_periodo_display() if cierre.periodo else "—",
+                f"${cierre.total_efectivo:,.0f}",
+                f"${cierre.total_transferencia:,.0f}",
+                f"${cierre.total_digital:,.0f}",
+                f"${cierre.total_cobrado:,.0f}",
+            ])
+
+        anchos = [4.2*cm, 2.2*cm, 1.8*cm, 2.0*cm, 2.5*cm, 1.8*cm, 2.0*cm]
+        tabla_cierres = Table(filas, colWidths=anchos, repeatRows=1)
+        tabla_cierres.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#2c3e50")),
+            ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),
+            ("FONTNAME",      (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, 0), 8),
+            ("FONTSIZE",      (0, 1), (-1, -1), 7.5),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+            ("GRID",          (0, 0), (-1, -1), 0.4, colors.HexColor("#cccccc")),
+            ("ALIGN",         (3, 0), (-1, -1), "RIGHT"),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+        ]))
+        partes.append(tabla_cierres)
+    else:
+        partes.append(Paragraph("Sin cierres de caja vinculados.", estilos["Normal"]))
+
+    # ── Validación de tesorería ──────────────────────────────────────────────
+    if rendicion.tesorero and rendicion.validado_en:
+        partes.append(Spacer(1, 0.5*cm))
+        partes.append(Paragraph("Validación de tesorería", estilo_seccion))
+        validado_en = timezone.localtime(rendicion.validado_en).strftime("%d/%m/%Y %H:%M")
+        partes.append(Paragraph(
+            f"Validada por: <b>{rendicion.tesorero.nombre_completo()}</b> el {validado_en}",
+            estilos["Normal"],
+        ))
+
+    if rendicion.notas_tesorero:
+        partes.append(Spacer(1, 0.3*cm))
+        partes.append(Paragraph(f"Observaciones: {rendicion.notas_tesorero}", estilo_notas))
+
+    # ── Pie ──────────────────────────────────────────────────────────────────
+    partes.append(Spacer(1, 1*cm))
+    partes.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#cccccc")))
+    partes.append(Spacer(1, 0.2*cm))
+    partes.append(Paragraph(
+        "Documento generado automáticamente por el Sistema de Estacionamiento Medido Municipal.",
+        estilo_pie,
+    ))
+
+    doc.build(partes)
+    buffer.seek(0)
+    return buffer.read()
+
+
+@require_role("admin", "tesorero")
+def pdf_rendicion(request, rendicion_id):
+    """
+    Descarga el PDF de una rendición específica.
+    Accesible tanto para el admin que la creó como para tesorería.
+    """
+    municipio = getattr(request.user, "municipio", None)
+
+    # El admin solo puede ver las rendiciones de su municipio.
+    # El tesorero también está restringido por municipio.
+    rendicion = get_object_or_404(Rendicion, id=rendicion_id, municipio=municipio)
+
+    pdf_bytes = _generar_pdf_rendicion(rendicion)
+
+    nombre_archivo = (
+        f"rendicion_{rendicion.fecha_desde.strftime('%Y%m%d')}"
+        f"_{rendicion.fecha_hasta.strftime('%Y%m%d')}.pdf"
+    )
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
+    return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gestión de subcuadras y coordenadas GPS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def gestionar_subcuadras(request):
+    """
+    Permite al admin ver, crear, editar y eliminar subcuadras del municipio,
+    y asignarles coordenadas GPS haciendo click en un mapa Leaflet/OSM.
+
+    POST accion=guardar_coordenadas: guarda lat/lon para una subcuadra.
+    POST accion=limpiar_coordenadas: elimina lat/lon de una subcuadra.
+    POST accion=crear:              crea una nueva subcuadra.
+    POST accion=eliminar:           elimina una subcuadra sin infracciones.
+    """
+    municipio = getattr(request.user, "municipio", None)
+    if not municipio:
+        return redirect("login")
+
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+
+        if accion == "guardar_coordenadas":
+            subcuadra_id = request.POST.get("subcuadra_id")
+            try:
+                lat = float(request.POST.get("lat", ""))
+                lon = float(request.POST.get("lon", ""))
+            except (TypeError, ValueError):
+                messages.error(request, "Coordenadas inválidas.")
+                return redirect("gestionar_subcuadras")
+
+            sub = get_object_or_404(Subcuadra, id=subcuadra_id, municipio=municipio)
+            sub.lat = round(lat, 6)
+            sub.lon = round(lon, 6)
+            sub.save(update_fields=["lat", "lon"])
+            messages.success(request, f"✅ Coordenadas guardadas para {sub}.")
+
+        elif accion == "limpiar_coordenadas":
+            sub = get_object_or_404(
+                Subcuadra, id=request.POST.get("subcuadra_id"), municipio=municipio
+            )
+            sub.lat = None
+            sub.lon = None
+            sub.save(update_fields=["lat", "lon"])
+            messages.success(request, f"Coordenadas eliminadas de {sub}.")
+
+        elif accion == "crear":
+            calle  = request.POST.get("calle", "").strip()
+            altura = request.POST.get("altura", "").strip()
+            if not calle or not altura.lstrip("-").isdigit():
+                messages.error(request, "Calle y altura son obligatorias.")
+            else:
+                _, creada = Subcuadra.objects.get_or_create(
+                    municipio=municipio,
+                    calle=calle,
+                    altura=int(altura),
+                )
+                if creada:
+                    messages.success(request, f"✅ Subcuadra '{calle} {altura}' creada.")
+                else:
+                    messages.warning(request, f"Ya existía la subcuadra '{calle} {altura}'.")
+
+        elif accion == "eliminar":
+            sub = get_object_or_404(
+                Subcuadra, id=request.POST.get("subcuadra_id"), municipio=municipio
+            )
+            nombre = str(sub)
+            # No eliminar si tiene infracciones, estacionamientos o exenciones asociadas
+            en_uso = (
+                sub.infraccion_set.exists()
+                or sub.estacionamiento_set.exists()
+                or sub.vehiculos_exentos_en.exists()
+            )
+            if en_uso:
+                messages.error(
+                    request,
+                    f"No se puede eliminar '{nombre}' porque tiene registros asociados.",
+                )
+            else:
+                sub.delete()
+                messages.success(request, f"Subcuadra '{nombre}' eliminada.")
+
+        return redirect("gestionar_subcuadras")
+
+    # GET: listar subcuadras del municipio
+    subcuadras = Subcuadra.objects.filter(municipio=municipio).order_by("calle", "altura")
+
+    # Datos para el mapa: solo las que tienen coordenadas cargadas
+    import json as _json
+    marcadores = _json.dumps([
+        {
+            "id":     s.id,
+            "nombre": str(s),
+            "lat":    float(s.lat),
+            "lon":    float(s.lon),
+        }
+        for s in subcuadras if s.lat is not None and s.lon is not None
+    ])
+
+    return render(request, "admin/subcuadras.html", {
+        "subcuadras": subcuadras,
+        "marcadores": marcadores,
+    })

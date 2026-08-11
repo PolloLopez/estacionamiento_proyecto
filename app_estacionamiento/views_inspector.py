@@ -13,7 +13,10 @@ No incluye cobros ni liquidaciones (eso es responsabilidad del vendedor).
 
 from datetime import timedelta
 
+import math
+
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -409,3 +412,56 @@ def pdf_infracciones_hoy(request):
     response = HttpResponse(buffer, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API GPS: subcuadra más cercana
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("inspector")
+def subcuadra_cercana(request):
+    """
+    Endpoint JSON para preseleccionar subcuadra desde el browser del inspector.
+
+    Recibe: GET ?lat=<float>&lon=<float>
+    Devuelve: {"id": <int>, "nombre": "<str>"} con la subcuadra más cercana,
+              o {} si el municipio no tiene subcuadras con coordenadas cargadas.
+
+    La distancia se calcula como distancia euclidiana sobre lat/lon —
+    suficiente para zonas urbanas densas sin necesidad de proyecciones geográficas.
+    El inspector puede corregir manualmente si el GPS es impreciso.
+    """
+    try:
+        lat_inspector = float(request.GET.get("lat", ""))
+        lon_inspector = float(request.GET.get("lon", ""))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "lat y lon son requeridos"}, status=400)
+
+    municipio = getattr(request.user, "municipio", None)
+    if not municipio:
+        return JsonResponse({})
+
+    # Solo subcuadras con coordenadas cargadas (no todas las tienen)
+    subcuadras = Subcuadra.objects.filter(
+        municipio=municipio,
+        lat__isnull=False,
+        lon__isnull=False,
+    )
+
+    if not subcuadras.exists():
+        # Municipio sin coordenadas — el inspector selecciona manualmente
+        return JsonResponse({})
+
+    # Distancia euclidiana al centroide de cada subcuadra.
+    # Para zonas urbanas de pocos km², la distorsión de no usar proyección es mínima.
+    def distancia(s):
+        dlat = float(s.lat) - lat_inspector
+        dlon = float(s.lon) - lon_inspector
+        return math.sqrt(dlat ** 2 + dlon ** 2)
+
+    mas_cercana = min(subcuadras, key=distancia)
+
+    return JsonResponse({
+        "id":     mas_cercana.id,
+        "nombre": str(mas_cercana),
+    })

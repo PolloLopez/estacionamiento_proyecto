@@ -30,6 +30,7 @@ from .views_inspector import (
     gestion_infracciones,
     resumen_infracciones,
     pdf_infracciones_hoy,
+    subcuadra_cercana,
 )
 from .views_tesorero import (
     panel_tesorero,
@@ -51,6 +52,7 @@ from .views_vendedor import (
     cerrar_caja,
     mis_comisiones,
     certificar_comision,
+    presentar_factura,
 )
 from .views_conductor import (
     inicio_usuarios,
@@ -95,6 +97,8 @@ from .views_admin import (
     estadisticas_inspectores,
     estadisticas_inspectores_excel,
     pdf_infracciones_juzgado,
+    pdf_rendicion,
+    gestionar_subcuadras,
 )
 from .views_mp import (
     mp_iniciar_carga,

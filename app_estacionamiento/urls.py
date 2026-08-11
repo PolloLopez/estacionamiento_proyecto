@@ -48,6 +48,7 @@ urlpatterns = [
     path("inspectores/caja/", views.caja_inspector, name="inspectores_caja"),
     path("inspectores/cerrar-caja/", views.cerrar_caja, name="inspectores_cerrar_caja"),
     path("inspectores/pdf-infracciones/", views.pdf_infracciones_hoy, name="inspectores_pdf_infracciones"),
+    path("inspectores/subcuadra-cercana/", views.subcuadra_cercana, name="inspectores_subcuadra_cercana"),
     path("inspectores/ticket/<int:infraccion_id>/", views.ticket_infraccion, name="inspectores_ticket"),
     path("inspectores/ticket-cobro/<int:est_id>/", views.ticket_cobro, name="inspectores_ticket_cobro"),
     path("ticket-pago-multa/<int:infraccion_id>/", views.ticket_pago_multa, name="ticket_pago_multa"),
@@ -93,6 +94,7 @@ urlpatterns = [
     path("admin-vendedores/<int:vendedor_id>/historial/", views.historial_vendedor, name="admin_historial_vendedor"),
     path("admin-vendedores/crear/", views.gestionar_vendedores, name="admin_crear_vendedor"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
+    path("admin-subcuadras/", views.gestionar_subcuadras, name="gestionar_subcuadras"),
     path("admin-usuarios/", views.gestionar_usuarios, name="gestionar_usuarios"),
     path("admin-crear-conductor/", views.crear_conductor, name="crear_conductor"),
     path("admin-usuarios/<int:usuario_id>/", views.detalle_usuario_admin, name="detalle_usuario_admin"),
@@ -109,6 +111,7 @@ urlpatterns = [
     path("admin-rendiciones/", views.admin_rendiciones, name="admin_rendiciones"),
     path("admin-rendiciones/crear/", views.crear_rendicion, name="crear_rendicion"),
     path("admin-rendiciones/<int:cierre_id>/certificar/", views.certificar_cierre, name="certificar_cierre"),
+    path("admin-rendiciones/<int:rendicion_id>/pdf/", views.pdf_rendicion, name="pdf_rendicion"),
 
     # =========================
     # ✅ VERIFICACIONES
@@ -131,6 +134,7 @@ urlpatterns = [
     # =========================
     path("vendedores/comisiones/", views.mis_comisiones, name="mis_comisiones"),
     path("vendedores/comisiones/<int:liquidacion_id>/certificar/", views.certificar_comision, name="certificar_comision"),
+    path("vendedores/comisiones/<int:liquidacion_id>/factura/", views.presentar_factura, name="presentar_factura"),
 
     # =========================
     # 🏦 TESORERÍA

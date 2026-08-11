@@ -9,6 +9,7 @@ Cubre:
 - Comisiones               :: comision_monto se graba en MovimientoCaja
 - Multi-municipio          :: aislamiento de datos entre municipios
 - Tesorero / vendedor      :: depositar_comision → certificar_comision
+- use_cases/acreditar_saldo_mp.py :: idempotencia por mp_payment_id
 
 Correr con:
     python manage.py test app_estacionamiento.tests_servicios --verbosity=2
@@ -159,6 +160,22 @@ class TestCobrarInfraccionEfectivo(TestCase):
         """La función retorna la instancia de Infraccion con estado actualizado."""
         resultado = cobrar_infraccion_efectivo(infraccion=self.infraccion, cobrador=self.admin)
         self.assertEqual(resultado.estado, "pagada")
+
+    def test_medio_pago_personalizado_se_guarda(self):
+        """Pasar medio_pago='transferencia' persiste ese valor en MovimientoCaja."""
+        cobrar_infraccion_efectivo(
+            infraccion=self.infraccion, cobrador=self.admin, medio_pago="transferencia"
+        )
+        mov = MovimientoCaja.objects.filter(usuario=self.admin).first()
+        self.assertEqual(mov.medio_pago, "transferencia")
+
+    def test_medio_pago_invalido_cae_a_efectivo(self):
+        """Un medio_pago no reconocido se normaliza a 'efectivo' antes de persistir."""
+        cobrar_infraccion_efectivo(
+            infraccion=self.infraccion, cobrador=self.admin, medio_pago="cripto"
+        )
+        mov = MovimientoCaja.objects.filter(usuario=self.admin).first()
+        self.assertEqual(mov.medio_pago, "efectivo")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -520,6 +537,101 @@ class TestToleranciaMulta(TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 7. medio_pago en flujos de cobro (vistas vendedor y admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestMedioPagoCobros(TestCase):
+    """
+    Verifica que medio_pago llegue correctamente desde el POST de la vista
+    al MovimientoCaja creado en cada flujo de cobro.
+    """
+
+    def setUp(self):
+        self.municipio  = crear_municipio(comision_pct=10)
+        # tolerancia=0 para que la infracción recién creada no quede dentro
+        # del período de gracia y la view la cobre en vez de anularla
+        self.municipio.tolerancia_multa_minutos = 0
+        self.municipio.save()
+        self.vendedor   = crear_vendedor(self.municipio)
+        self.admin      = crear_admin(self.municipio)
+        self.inspector  = crear_inspector(self.municipio)
+        self.subcuadra  = crear_subcuadra(self.municipio)
+        self.vehiculo   = crear_vehiculo(self.municipio)
+        crear_tarifa(self.municipio)
+
+    def _crear_infraccion(self):
+        return crear_infraccion(
+            self.municipio, self.inspector, self.vehiculo, self.subcuadra, monto=1000
+        )
+
+    # ── Vendedor: cobrar_infraccion_vendedor ──────────────────────────────────
+
+    def test_vendedor_cobro_infraccion_con_debito(self):
+        """El vendedor puede cobrar una infracción con débito y queda en MovimientoCaja."""
+        inf = self._crear_infraccion()
+        client = Client()
+        client.force_login(self.vendedor)
+        client.post(reverse("vendedores_cobrar_infraccion"), {
+            "accion":        "cobrar",
+            "infraccion_id": inf.id,
+            "patente":       self.vehiculo.patente,
+            "medio_pago":    "debito",
+        })
+        inf.refresh_from_db()
+        self.assertEqual(inf.estado, "pagada")
+        mov = MovimientoCaja.objects.filter(usuario=self.vendedor, tipo="ingreso").first()
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov.medio_pago, "debito")
+
+    def test_vendedor_cobro_infraccion_medio_invalido_cae_a_efectivo(self):
+        """Un medio_pago no válido en el POST se normaliza a 'efectivo'."""
+        inf = self._crear_infraccion()
+        client = Client()
+        client.force_login(self.vendedor)
+        client.post(reverse("vendedores_cobrar_infraccion"), {
+            "accion":        "cobrar",
+            "infraccion_id": inf.id,
+            "patente":       self.vehiculo.patente,
+            "medio_pago":    "billetera_magica",
+        })
+        mov = MovimientoCaja.objects.filter(usuario=self.vendedor, tipo="ingreso").first()
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov.medio_pago, "efectivo")
+
+    # ── Admin: admin_infracciones ─────────────────────────────────────────────
+
+    def test_admin_cobro_infraccion_con_transferencia(self):
+        """El admin puede cobrar una infracción con transferencia."""
+        inf = self._crear_infraccion()
+        client = Client()
+        client.force_login(self.admin)
+        client.post(reverse("admin_infracciones"), {
+            "accion":        "cobrar",
+            "infraccion_id": inf.id,
+            "medio_pago":    "transferencia",
+        })
+        inf.refresh_from_db()
+        self.assertEqual(inf.estado, "pagada")
+        mov = MovimientoCaja.objects.filter(usuario=self.admin, tipo="ingreso").first()
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov.medio_pago, "transferencia")
+
+    def test_admin_cobro_infraccion_sin_medio_pago_usa_efectivo(self):
+        """Si el admin no envía medio_pago, el default es 'efectivo'."""
+        inf = self._crear_infraccion()
+        client = Client()
+        client.force_login(self.admin)
+        client.post(reverse("admin_infracciones"), {
+            "accion":        "cobrar",
+            "infraccion_id": inf.id,
+            # sin medio_pago en el POST
+        })
+        mov = MovimientoCaja.objects.filter(usuario=self.admin, tipo="ingreso").first()
+        self.assertIsNotNone(mov)
+        self.assertEqual(mov.medio_pago, "efectivo")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 6. Watermark GPS en foto de infracción
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -705,6 +817,125 @@ class TestExentoParcialFueraDeZona(TestCase):
         self.assertIn("EXP001", resultado.registrar_infraccion_url)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. generar_cierre_caja() — desglose por medio de pago
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestGenerarCierreCajaDesglose(TestCase):
+    """
+    Verifica que generar_cierre_caja() calcule correctamente el desglose
+    total_efectivo / total_transferencia / total_digital según los
+    medios de pago de los MovimientoCaja abiertos del usuario.
+
+    Estrategia: crear MovimientoCaja directamente (sin pasar por vistas)
+    con distintos medios de pago, llamar al service y verificar los campos
+    del CierreCaja resultante.
+    """
+
+    def setUp(self):
+        from app_estacionamiento.services.caja import generar_cierre_caja as _gen
+        self._generar = _gen
+
+        self.municipio = crear_municipio()
+        self.vendedor  = crear_vendedor(self.municipio)
+        # Sin porcentaje_ganancia para simplificar los cálculos de comisión
+        self.vendedor.porcentaje_ganancia = Decimal("0")
+        self.vendedor.save()
+
+    def _mov(self, monto, medio_pago):
+        """Crea un MovimientoCaja abierto para el vendedor."""
+        return MovimientoCaja.objects.create(
+            usuario=self.vendedor,
+            monto=Decimal(str(monto)),
+            tipo="ingreso",
+            medio_pago=medio_pago,
+            cerrado=False,
+        )
+
+    def test_solo_efectivo(self):
+        """Solo movimientos en efectivo → total_efectivo = total, resto 0."""
+        self._mov(1000, "efectivo")
+        self._mov(500, "efectivo")
+        cierre = self._generar(self.vendedor)
+
+        self.assertEqual(cierre.total_cobrado,      Decimal("1500"))
+        self.assertEqual(cierre.total_efectivo,     Decimal("1500"))
+        self.assertEqual(cierre.total_transferencia, Decimal("0"))
+        self.assertEqual(cierre.total_digital,      Decimal("0"))
+
+    def test_efectivo_y_transferencia(self):
+        """Efectivo y transferencia se separan en sus campos."""
+        self._mov(800, "efectivo")
+        self._mov(400, "transferencia")
+        cierre = self._generar(self.vendedor)
+
+        self.assertEqual(cierre.total_cobrado,       Decimal("1200"))
+        self.assertEqual(cierre.total_efectivo,      Decimal("800"))
+        self.assertEqual(cierre.total_transferencia, Decimal("400"))
+        self.assertEqual(cierre.total_digital,       Decimal("0"))
+
+    def test_medios_digitales_van_a_total_digital(self):
+        """Débito, crédito, QR y mercadopago van todos a total_digital."""
+        self._mov(200, "debito")
+        self._mov(150, "credito")
+        self._mov(100, "qr")
+        self._mov(50,  "mercadopago")
+        cierre = self._generar(self.vendedor)
+
+        self.assertEqual(cierre.total_cobrado,       Decimal("500"))
+        self.assertEqual(cierre.total_efectivo,      Decimal("0"))
+        self.assertEqual(cierre.total_transferencia, Decimal("0"))
+        self.assertEqual(cierre.total_digital,       Decimal("500"))
+
+    def test_mix_todos_los_medios(self):
+        """Mezcla de todos los medios: cada campo acumula solo su parte."""
+        self._mov(1000, "efectivo")
+        self._mov(300,  "transferencia")
+        self._mov(200,  "debito")
+        self._mov(100,  "credito")
+        self._mov(50,   "qr")
+        cierre = self._generar(self.vendedor)
+
+        self.assertEqual(cierre.total_cobrado,       Decimal("1650"))
+        self.assertEqual(cierre.total_efectivo,      Decimal("1000"))
+        self.assertEqual(cierre.total_transferencia, Decimal("300"))
+        # digital = debito(200) + credito(100) + qr(50) = 350
+        self.assertEqual(cierre.total_digital,       Decimal("350"))
+
+    def test_sin_movimientos_retorna_none(self):
+        """Si no hay movimientos abiertos, el service devuelve None."""
+        cierre = self._generar(self.vendedor)
+        self.assertIsNone(cierre)
+
+    def test_cierre_marca_movimientos_como_cerrados(self):
+        """Después del cierre, todos los MovimientoCaja quedan con cerrado=True."""
+        self._mov(500, "efectivo")
+        self._mov(300, "debito")
+        self._generar(self.vendedor)
+
+        abiertos = MovimientoCaja.objects.filter(
+            usuario=self.vendedor, tipo="ingreso", cerrado=False
+        ).count()
+        self.assertEqual(abiertos, 0)
+
+    def test_segundo_cierre_sin_movimientos_nuevos_retorna_none(self):
+        """Un segundo cierre inmediato sin movimientos nuevos devuelve None."""
+        self._mov(500, "efectivo")
+        self._generar(self.vendedor)   # primer cierre — cierra los movimientos
+        cierre2 = self._generar(self.vendedor)  # sin movimientos nuevos
+        self.assertIsNone(cierre2)
+
+    def test_total_cobrado_es_suma_de_todos_los_medios(self):
+        """total_cobrado == total_efectivo + total_transferencia + total_digital."""
+        self._mov(600, "efectivo")
+        self._mov(200, "transferencia")
+        self._mov(100, "qr")
+        cierre = self._generar(self.vendedor)
+
+        suma_partes = cierre.total_efectivo + cierre.total_transferencia + cierre.total_digital
+        self.assertEqual(cierre.total_cobrado, suma_partes)
+
+
 class TestWatermarkConSubcuadra(TestCase):
     """
     Verifica que _agregar_marca_de_agua_gps incluye la subcuadra en el overlay.
@@ -763,3 +994,67 @@ class TestWatermarkConSubcuadra(TestCase):
         )
 
         self.assertIsInstance(resultado, InMemoryUploadedFile)
+
+
+class TestAcreditarSaldoMp(TestCase):
+    """
+    Tests de idempotencia de acreditar_saldo_mp.
+
+    El webhook de MercadoPago puede dispararse más de una vez para el mismo pago.
+    El use case debe acreditar el saldo solo la primera vez, ignorando los duplicados.
+    Con el campo mp_payment_id (unique) la verificación es exacta y no depende del
+    formato de la descripción.
+    """
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.conductor = crear_conductor(self.municipio)
+        self.conductor.saldo = Decimal("0.00")
+        self.conductor.save()
+
+    def _ejecutar(self, payment_id="PAY123", monto=Decimal("500.00")):
+        from app_estacionamiento.use_cases.acreditar_saldo_mp import ejecutar
+        ejecutar(usuario=self.conductor, monto=monto, payment_id=payment_id)
+
+    def test_acredita_saldo_correctamente(self):
+        """Primera llamada: acredita el monto al conductor."""
+        self._ejecutar(monto=Decimal("500.00"))
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.saldo, Decimal("500.00"))
+
+    def test_crea_movimiento_con_mp_payment_id(self):
+        """El MovimientoCaja creado guarda el payment_id en el campo dedicado."""
+        from app_estacionamiento.models import MovimientoCaja
+        self._ejecutar(payment_id="PAY_ABC")
+        mov = MovimientoCaja.objects.get(mp_payment_id="PAY_ABC")
+        self.assertEqual(mov.medio_pago, "mercadopago")
+        self.assertEqual(mov.tipo, "ingreso")
+        self.assertEqual(mov.monto, Decimal("500.00"))
+
+    def test_segunda_llamada_no_acredita_de_nuevo(self):
+        """El mismo payment_id no debe acreditarse dos veces (idempotencia)."""
+        self._ejecutar(payment_id="PAY_DOBLE", monto=Decimal("300.00"))
+        self._ejecutar(payment_id="PAY_DOBLE", monto=Decimal("300.00"))
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.saldo, Decimal("300.00"))
+
+    def test_segunda_llamada_no_crea_movimiento_duplicado(self):
+        """Solo existe un MovimientoCaja por payment_id, aunque se llame dos veces."""
+        from app_estacionamiento.models import MovimientoCaja
+        self._ejecutar(payment_id="PAY_UNO")
+        self._ejecutar(payment_id="PAY_UNO")
+        cantidad = MovimientoCaja.objects.filter(mp_payment_id="PAY_UNO").count()
+        self.assertEqual(cantidad, 1)
+
+    def test_payment_ids_distintos_acreditan_independientemente(self):
+        """Dos pagos distintos se acreditan por separado sin interferencia."""
+        self._ejecutar(payment_id="PAY_A", monto=Decimal("100.00"))
+        self._ejecutar(payment_id="PAY_B", monto=Decimal("200.00"))
+        self.conductor.refresh_from_db()
+        self.assertEqual(self.conductor.saldo, Decimal("300.00"))
+
+    def test_monto_invalido_lanza_error(self):
+        """monto <= 0 debe lanzar ValueError antes de tocar la DB."""
+        from app_estacionamiento.use_cases.acreditar_saldo_mp import ejecutar
+        with self.assertRaises(ValueError):
+            ejecutar(usuario=self.conductor, monto=Decimal("0"), payment_id="PAY_CERO")

@@ -43,8 +43,8 @@
             <th>Hasta</th>
             <th style="text-align:right;">Efectivo</th>
             <th style="text-align:right;">Digital</th>
-            <th style="text-align:right;">Comisiones</th>
             <th style="text-align:right;">Neto</th>
+            <th style="text-align:center;">PDF</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -58,8 +58,14 @@
             <td style="font-size:0.85rem;">{{ r.fecha_hasta|date:"d/m/Y" }}</td>
             <td style="text-align:right;">${{ r.total_efectivo }}</td>
             <td style="text-align:right;">${{ r.total_digital }}</td>
-            <td style="text-align:right; color:var(--color-warning);">${{ r.total_comisiones }}</td>
             <td style="text-align:right; font-weight:700; color:var(--color-primary);">${{ r.total_neto }}</td>
+            <td style="text-align:center;">
+              <a href="{% url 'pdf_rendicion' r.id %}"
+                 title="Descargar PDF"
+                 style="font-size:1.1rem; text-decoration:none; color:var(--color-danger);">
+                📄
+              </a>
+            </td>
             <td>
               <form method="post" action="{% url 'validar_rendicion' r.id %}"
                     style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
@@ -146,6 +152,7 @@
             <th>Hasta</th>
             <th style="text-align:right;">Monto</th>
             <th style="text-align:center;">Estado</th>
+            <th style="text-align:center;">Factura</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -165,6 +172,19 @@
                 <span style="color:#2563eb; font-weight:600;">🏦 Depositada</span>
               {% else %}
                 <span style="color:var(--color-primary); font-weight:600;">✅ Certificada</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center; font-size:0.85rem;">
+              {% if liq.factura_presentada %}
+                <span style="color:var(--color-primary); font-weight:600;">✅ Presentada</span>
+                {% if liq.factura_archivo %}
+                  &nbsp;<a href="{{ liq.factura_archivo.url }}" target="_blank"
+                           title="Ver factura" style="color:var(--color-text-muted);">📄</a>
+                {% endif %}
+              {% elif liq.estado == "pendiente" %}
+                <span class="text-muted">—</span>
+              {% else %}
+                <span style="color:var(--color-warning);">⏳ Sin factura</span>
               {% endif %}
             </td>
             <td>

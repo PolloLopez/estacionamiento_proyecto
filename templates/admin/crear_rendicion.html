@@ -11,47 +11,128 @@
 
   {# Los mensajes los muestra base.html — no duplicar aquí #}
 
-  {# Referencia de cierres certificados para el período sugerido #}
-  {% if totales_cierres.cantidad %}
+  {% if not cierres_pendientes %}
+    <div class="card" style="text-align:center; padding:2rem; color:var(--color-text-muted);">
+      <p style="font-size:1.1rem; margin-bottom:0.5rem;">✅ No hay cierres certificados pendientes de rendir.</p>
+      <p style="font-size:0.9rem;">Todos los cierres certificados ya fueron incluidos en una rendición anterior.</p>
+      <a href="{% url 'admin_rendiciones' %}" class="btn btn-outline" style="margin-top:1rem;">Ver rendiciones</a>
+    </div>
+  {% else %}
+
+  {# Resumen de totales disponibles (todos los cierres pendientes) #}
   <div class="card" style="margin-bottom:1.25rem; background:var(--color-surface-2,#f0f7ff);
                             border:1px solid var(--color-primary-light, #bdd7f5);">
     <h3 style="margin:0 0 0.75rem; font-size:0.95rem; color:var(--color-primary);">
-      📊 Cierres certificados en el período sugerido ({{ totales_cierres.cantidad }})
+      📊 Cierres disponibles para rendir ({{ totales_disponibles.cantidad }})
     </h3>
     <div style="display:flex; gap:1.5rem; flex-wrap:wrap; font-size:0.92rem;">
       <div>
-        <span class="text-muted">Total cobrado</span><br>
-        <strong style="font-size:1.15rem;">${{ totales_cierres.suma_cobrado }}</strong>
+        <span class="text-muted">Efectivo total</span><br>
+        <strong>${{ totales_disponibles.suma_efectivo|default:"0.00" }}</strong>
       </div>
       <div>
-        <span class="text-muted">Comisiones vendedores</span><br>
-        <strong style="font-size:1.15rem; color:var(--color-warning);">
-          ${{ totales_cierres.suma_comisiones }}
-        </strong>
+        <span class="text-muted">Transferencia total</span><br>
+        <strong>${{ totales_disponibles.suma_transferencia|default:"0.00" }}</strong>
       </div>
       <div>
-        <span class="text-muted">Neto municipio</span><br>
-        <strong style="font-size:1.15rem; color:var(--color-primary);">
-          ${{ totales_cierres.suma_neto }}
-        </strong>
+        <span class="text-muted">Digital (débito/crédito/QR)</span><br>
+        <strong>${{ totales_disponibles.suma_digital|default:"0.00" }}</strong>
+      </div>
+      <div>
+        <span class="text-muted">Cobrado total</span><br>
+        <strong style="color:var(--color-primary);">${{ totales_disponibles.suma_cobrado|default:"0.00" }}</strong>
       </div>
     </div>
-    <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0.6rem 0 0;">
-      Estos valores son una referencia de los cierres ya certificados. Completá efectivo/digital
-      según el desglose de movimientos de cada vendedor. Las comisiones ya están pre-cargadas abajo.
-    </p>
   </div>
-  {% endif %}
 
-  <form method="post" id="form-rendicion">
+  <form method="post" enctype="multipart/form-data" id="form-rendicion">
     {% csrf_token %}
 
+    {# ── Tabla de cierres para seleccionar ── #}
+    <div class="card" style="margin-bottom:1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <h3 style="margin:0;">Seleccioná los cierres a incluir</h3>
+        <label style="font-size:0.9rem; cursor:pointer; display:flex; align-items:center; gap:0.4rem;">
+          <input type="checkbox" id="seleccionar-todos" onchange="toggleTodos(this)" />
+          Seleccionar todos
+        </label>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--color-border);">
+              <th style="padding:0.5rem; text-align:center; width:40px;"></th>
+              <th style="padding:0.5rem; text-align:left;">Vendedor / Inspector</th>
+              <th style="padding:0.5rem; text-align:left;">Fecha cierre</th>
+              <th style="padding:0.5rem; text-align:right;">Efectivo</th>
+              <th style="padding:0.5rem; text-align:right;">Transferencia</th>
+              <th style="padding:0.5rem; text-align:right;">Digital</th>
+              <th style="padding:0.5rem; text-align:right;">Total cobrado</th>
+              <th style="padding:0.5rem; text-align:right;">Comisión</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-cierres">
+            {% for cierre in cierres_pendientes %}
+            <tr class="fila-cierre" style="border-bottom:1px solid var(--color-border);"
+                data-efectivo="{{ cierre.total_efectivo }}"
+                data-transferencia="{{ cierre.total_transferencia }}"
+                data-digital="{{ cierre.total_digital }}"
+                data-cobrado="{{ cierre.total_cobrado }}">
+              <td style="padding:0.5rem; text-align:center;">
+                <input type="checkbox" name="cierre_ids" value="{{ cierre.id }}"
+                       class="checkbox-cierre" onchange="actualizarTotales()" />
+              </td>
+              <td style="padding:0.5rem;">
+                {{ cierre.usuario.nombre }} {{ cierre.usuario.apellido }}
+                <br><span style="font-size:0.78rem; color:var(--color-text-muted);">{{ cierre.usuario.get_rol_display }}</span>
+              </td>
+              <td style="padding:0.5rem; white-space:nowrap;">
+                {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
+              </td>
+              <td style="padding:0.5rem; text-align:right;">${{ cierre.total_efectivo }}</td>
+              <td style="padding:0.5rem; text-align:right;">${{ cierre.total_transferencia }}</td>
+              <td style="padding:0.5rem; text-align:right;">${{ cierre.total_digital }}</td>
+              <td style="padding:0.5rem; text-align:right; font-weight:600;">${{ cierre.total_cobrado }}</td>
+              <td style="padding:0.5rem; text-align:right; color:var(--color-warning);">${{ cierre.ganancia_usuario }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {# ── Totales calculados automáticamente ── #}
+    <div class="card" style="margin-bottom:1rem; background:var(--color-bg-alt);">
+      <h3 style="margin:0 0 0.75rem;">💵 Totales de la rendición (selección actual)</h3>
+      <div style="display:flex; gap:2rem; flex-wrap:wrap; align-items:flex-end;">
+        <div>
+          <span class="text-muted" style="font-size:0.85rem;">Efectivo a entregar</span><br>
+          <span id="tot-efectivo" style="font-size:1.3rem; font-weight:700;">$0.00</span>
+        </div>
+        <div>
+          <span class="text-muted" style="font-size:0.85rem;">Digital (transf. + tarjeta)</span><br>
+          <span id="tot-digital" style="font-size:1.3rem; font-weight:700;">$0.00</span>
+        </div>
+        <div style="border-left:2px solid var(--color-border); padding-left:2rem;">
+          <span class="text-muted" style="font-size:0.85rem;">Total neto a rendir</span><br>
+          <span id="tot-neto" style="font-size:1.8rem; font-weight:800; color:var(--color-primary);">$0.00</span>
+        </div>
+        <div>
+          <span class="text-muted" style="font-size:0.85rem;">Cierres seleccionados</span><br>
+          <span id="tot-cantidad" style="font-size:1.3rem; font-weight:700;">0</span>
+        </div>
+      </div>
+      <p style="margin:0.75rem 0 0; font-size:0.8rem; color:var(--color-text-muted);">
+        Las comisiones de vendedores son gestionadas por tesorería aparte — no se descuentan acá.
+      </p>
+    </div>
+
+    {# ── Período y opciones ── #}
     <div class="grid grid-2" style="gap:1rem; margin-bottom:1rem;">
 
-      <!-- Período y fechas -->
       <div class="card">
         <h3 style="margin-bottom:1rem;">📅 Período</h3>
-
         <div style="margin-bottom:0.75rem;">
           <label>Tipo de período <span style="color:var(--color-danger);">*</span></label>
           <select name="periodo" required style="width:100%; margin-top:0.3rem;">
@@ -60,97 +141,88 @@
             {% endfor %}
           </select>
         </div>
-
-        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
-          <div style="flex:1; min-width:130px;">
-            <label>Desde <span style="color:var(--color-danger);">*</span></label>
-            <input type="date" name="fecha_desde" required
-                   value="{{ fecha_desde_sugerida|date:'Y-m-d' }}"
-                   style="width:100%; margin-top:0.3rem;" />
-          </div>
-          <div style="flex:1; min-width:130px;">
-            <label>Hasta <span style="color:var(--color-danger);">*</span></label>
-            <input type="date" name="fecha_hasta" required
-                   value="{{ hoy|date:'Y-m-d' }}"
-                   style="width:100%; margin-top:0.3rem;" />
-          </div>
-        </div>
+        <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0;">
+          Las fechas se calculan automáticamente del primer al último cierre seleccionado.
+        </p>
       </div>
 
-      <!-- Montos -->
       <div class="card">
-        <h3 style="margin-bottom:1rem;">💵 Desglose de cobros</h3>
-
-        <div style="margin-bottom:0.75rem;">
-          <label>Efectivo ($)</label>
-          <input type="number" name="total_efectivo" id="id_efectivo"
-                 min="0" step="0.01" value="0" required
-                 style="width:100%; margin-top:0.3rem;"
-                 oninput="calcularNeto()" />
-        </div>
-
-        <div style="margin-bottom:0.75rem;">
-          <label>Digital — sistema / tarjeta / transferencias ($)</label>
-          <input type="number" name="total_digital" id="id_digital"
-                 min="0" step="0.01" value="0" required
-                 style="width:100%; margin-top:0.3rem;"
-                 oninput="calcularNeto()" />
-        </div>
-
-        <div style="margin-bottom:0.75rem;">
-          <label>
-            Comisiones de vendedores ($)
-            {% if totales_cierres.cantidad %}
-              <span style="font-size:0.78rem; color:var(--color-primary); font-weight:400;">
-                (pre-cargado desde cierres)
-              </span>
-            {% endif %}
-          </label>
-          <input type="number" name="total_comisiones" id="id_comisiones"
-                 min="0" step="0.01"
-                 value="{{ totales_cierres.suma_comisiones|default:'0' }}"
-                 style="width:100%; margin-top:0.3rem;"
-                 oninput="calcularNeto()" />
-        </div>
-
-        <!-- Total neto calculado -->
-        <div style="margin-top:1rem; padding:0.75rem; background:var(--color-bg-alt);
-                    border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:0.95rem; color:var(--color-text-muted);">Total neto a rendir</span>
-          <span id="id_neto" style="font-size:1.6rem; font-weight:800; color:var(--color-primary);">$0.00</span>
-        </div>
+        <h3 style="margin-bottom:1rem;">📎 Comprobante (opcional)</h3>
+        <label style="font-size:0.9rem;">Comprobante de transferencia bancaria</label>
+        <input type="file" name="comprobante_archivo" accept=".pdf,.jpg,.jpeg,.png"
+               style="margin-top:0.5rem; width:100%;" />
+        <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0.5rem 0 0;">
+          Si parte del monto se depositó por transferencia, adjuntá el comprobante.
+        </p>
       </div>
 
     </div>
 
-    <!-- Notas opcionales -->
+    {# ── Notas ── #}
     <div class="card" style="margin-bottom:1rem;">
       <label>Notas / observaciones (opcional)</label>
-      <textarea name="notas" rows="3" placeholder="Ej: período con feriado el día 25..."
+      <textarea name="notas" rows="3"
+                placeholder="Ej: incluye recupero de feriado del día 25..."
                 style="width:100%; margin-top:0.3rem; resize:vertical;"></textarea>
     </div>
 
-    <!-- Botón submit -->
-    <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+    {# ── Submit ── #}
+    <div style="display:flex; justify-content:flex-end; gap:0.75rem; align-items:center;">
+      <span id="aviso-seleccion" style="color:var(--color-danger); font-size:0.9rem; display:none;">
+        ⚠ Seleccioná al menos un cierre.
+      </span>
       <a href="{% url 'admin_rendiciones' %}" class="btn btn-outline">Cancelar</a>
-      <button type="submit" class="btn" style="padding:0.7rem 2rem;">
+      <button type="submit" class="btn" id="btn-submit" style="padding:0.7rem 2rem;">
         ✅ Generar rendición
       </button>
     </div>
 
   </form>
+  {% endif %}
 
 </section>
 
 <script>
-function calcularNeto() {
-  const efectivo   = parseFloat(document.getElementById('id_efectivo').value)   || 0;
-  const digital    = parseFloat(document.getElementById('id_digital').value)    || 0;
-  const comisiones = parseFloat(document.getElementById('id_comisiones').value) || 0;
-  const neto = efectivo + digital - comisiones;
-  document.getElementById('id_neto').textContent = '$' + neto.toFixed(2);
+function fmt(n) {
+  return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
-// Calcular al cargar
-calcularNeto();
+
+function actualizarTotales() {
+  const filas = document.querySelectorAll('.checkbox-cierre:checked');
+  let efectivo = 0, digital = 0, cantidad = 0;
+
+  filas.forEach(cb => {
+    const fila = cb.closest('tr');
+    efectivo  += parseFloat(fila.dataset.efectivo)     || 0;
+    // Para tesorería: transferencia + digital se agrupan como "digital"
+    digital   += parseFloat(fila.dataset.transferencia) || 0;
+    digital   += parseFloat(fila.dataset.digital)       || 0;
+    cantidad++;
+  });
+
+  const neto = efectivo + digital;
+
+  document.getElementById('tot-efectivo').textContent = fmt(efectivo);
+  document.getElementById('tot-digital').textContent  = fmt(digital);
+  document.getElementById('tot-neto').textContent     = fmt(neto);
+  document.getElementById('tot-cantidad').textContent = cantidad;
+
+  // Mostrar aviso si no hay nada seleccionado
+  document.getElementById('aviso-seleccion').style.display = cantidad === 0 ? '' : 'none';
+}
+
+function toggleTodos(cb) {
+  document.querySelectorAll('.checkbox-cierre').forEach(c => { c.checked = cb.checked; });
+  actualizarTotales();
+}
+
+// Validar antes de enviar
+document.getElementById('form-rendicion')?.addEventListener('submit', function(e) {
+  const seleccionados = document.querySelectorAll('.checkbox-cierre:checked').length;
+  if (seleccionados === 0) {
+    e.preventDefault();
+    document.getElementById('aviso-seleccion').style.display = '';
+  }
+});
 </script>
 {% endblock %}

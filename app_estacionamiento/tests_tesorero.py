@@ -1,9 +1,9 @@
 # app_estacionamiento/tests_tesorero.py
 """
-Tests del flujo tesorero:
-- Acceso al panel
+Tests del flujo tesorero/rendición:
+- Acceso al panel tesorero
 - Validar / observar rendición
-- Admin: fecha_desde sugerida al crear rendición
+- Admin: crear rendición seleccionando CierreCaja certificados
 - Admin: ve sus rendiciones en la página de rendiciones
 - Vendedor: ve cierres pendientes de certificación en su panel
 """
@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from app_estacionamiento.models import (
     CierreCaja,
@@ -53,7 +54,7 @@ class BaseTesoreroTest(TestCase):
         )
 
     def _crear_rendicion(self, fecha_desde=None, fecha_hasta=None, estado="pendiente"):
-        """Helper para crear una Rendicion de prueba."""
+        """Helper para crear una Rendicion de prueba (totales calculados automáticamente)."""
         hoy = date.today()
         return Rendicion.objects.create(
             municipio=self.municipio,
@@ -63,9 +64,27 @@ class BaseTesoreroTest(TestCase):
             fecha_hasta=fecha_hasta or hoy,
             total_efectivo=Decimal("1000"),
             total_digital=Decimal("500"),
-            total_comisiones=Decimal("100"),
-            total_neto=Decimal("1400"),
+            total_neto=Decimal("1500"),
             estado=estado,
+        )
+
+    def _crear_cierre(self, usuario, certificado=False, rendicion=None,
+                      total_cobrado=Decimal("500"),
+                      total_efectivo=Decimal("300"),
+                      total_transferencia=Decimal("100"),
+                      total_digital=Decimal("100")):
+        """Helper para crear un CierreCaja con desglose."""
+        return CierreCaja.objects.create(
+            usuario=usuario,
+            periodo="diario",
+            total_cobrado=total_cobrado,
+            total_efectivo=total_efectivo,
+            total_transferencia=total_transferencia,
+            total_digital=total_digital,
+            cantidad_movimientos=3,
+            certificado=certificado,
+            fecha_apertura=timezone.now(),
+            rendicion=rendicion,
         )
 
 
@@ -169,48 +188,142 @@ class ValidarRendicionTest(BaseTesoreroTest):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Admin: fecha_desde sugerida al crear rendición
+# Admin: crear rendición seleccionando CierreCaja
 # ─────────────────────────────────────────────────────────────────────────────
 
-class CrearRendicionFechaDesdeTest(BaseTesoreroTest):
+class CrearRendicionTest(BaseTesoreroTest):
+    """
+    La rendición se genera seleccionando cierres certificados.
+    Los totales son calculados por el sistema, no ingresados manualmente.
+    """
 
-    def test_sin_rendiciones_previas_sugiere_primer_dia_del_mes(self):
+    def test_get_muestra_cierres_pendientes(self):
+        """GET lista cierres certificados y sin rendir."""
+        cierre = self._crear_cierre(self.vendedor, certificado=True)
         self.client.force_login(self.admin)
+
         response = self.client.get(reverse("crear_rendicion"))
+
         self.assertEqual(response.status_code, 200)
-        fecha_sugerida = response.context["fecha_desde_sugerida"]
-        self.assertEqual(fecha_sugerida.day, 1)
+        self.assertIn(cierre, response.context["cierres_pendientes"])
 
-    def test_con_rendicion_previa_sugiere_dia_siguiente(self):
-        fecha_hasta_anterior = date.today() - timedelta(days=3)
-        self._crear_rendicion(
-            fecha_desde=fecha_hasta_anterior - timedelta(days=6),
-            fecha_hasta=fecha_hasta_anterior,
+    def test_get_no_muestra_cierres_ya_rendidos(self):
+        """Cierres ya vinculados a una rendición no aparecen como disponibles."""
+        rendicion = self._crear_rendicion()
+        cierre = self._crear_cierre(self.vendedor, certificado=True, rendicion=rendicion)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("crear_rendicion"))
+
+        self.assertNotIn(cierre, response.context["cierres_pendientes"])
+
+    def test_get_no_muestra_cierres_sin_certificar(self):
+        """Cierres no certificados no aparecen en la lista."""
+        self._crear_cierre(self.vendedor, certificado=False)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("crear_rendicion"))
+
+        self.assertEqual(list(response.context["cierres_pendientes"]), [])
+
+    def test_post_crea_rendicion_con_totales_calculados(self):
+        """
+        Al enviar cierres seleccionados, la rendición se crea con totales
+        calculados automáticamente (efectivo + digital).
+        Cierre: efectivo=300, transferencia=100, digital=100 → total_neto=500
+        total_digital en Rendicion = 100 (transferencia) + 100 (digital) = 200
+        """
+        cierre = self._crear_cierre(
+            self.vendedor, certificado=True,
+            total_efectivo=Decimal("300"),
+            total_transferencia=Decimal("100"),
+            total_digital=Decimal("100"),
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("crear_rendicion"),
+            {"periodo": "diario", "cierre_ids": [cierre.id]},
         )
 
+        self.assertRedirects(response, reverse("admin_rendiciones"))
+        rendicion = Rendicion.objects.filter(admin=self.admin).first()
+        self.assertIsNotNone(rendicion)
+        self.assertEqual(rendicion.total_efectivo, Decimal("300"))
+        self.assertEqual(rendicion.total_digital, Decimal("200"))   # 100 + 100
+        self.assertEqual(rendicion.total_neto, Decimal("500"))
+
+    def test_post_vincula_cierre_a_rendicion(self):
+        """Después de crear la rendición, el cierre tiene FK a ella."""
+        cierre = self._crear_cierre(self.vendedor, certificado=True)
         self.client.force_login(self.admin)
-        response = self.client.get(reverse("crear_rendicion"))
+
+        self.client.post(
+            reverse("crear_rendicion"),
+            {"periodo": "diario", "cierre_ids": [cierre.id]},
+        )
+
+        cierre.refresh_from_db()
+        self.assertIsNotNone(cierre.rendicion)
+        self.assertEqual(cierre.rendicion.admin, self.admin)
+
+    def test_post_sin_cierres_seleccionados_redirige_con_error(self):
+        """POST sin cierre_ids seleccionados debe fallar."""
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("crear_rendicion"),
+            {"periodo": "diario"},
+            follow=True,
+        )
+
         self.assertEqual(response.status_code, 200)
+        # No se creó ninguna rendición
+        self.assertFalse(Rendicion.objects.filter(admin=self.admin).exists())
 
-        fecha_sugerida = response.context["fecha_desde_sugerida"]
-        self.assertEqual(fecha_sugerida, fecha_hasta_anterior + timedelta(days=1))
-
-    def test_multiples_rendiciones_usa_la_mas_reciente(self):
-        """Con varias rendiciones, toma la de fecha_hasta más reciente."""
-        hoy = date.today()
-        self._crear_rendicion(
-            fecha_desde=hoy - timedelta(days=14),
-            fecha_hasta=hoy - timedelta(days=8),
+    def test_post_no_acepta_cierre_ya_rendido(self):
+        """No se puede volver a incluir un cierre que ya está en otra rendición."""
+        rendicion_anterior = self._crear_rendicion()
+        cierre = self._crear_cierre(
+            self.vendedor, certificado=True, rendicion=rendicion_anterior
         )
-        rendicion_reciente = self._crear_rendicion(
-            fecha_desde=hoy - timedelta(days=7),
-            fecha_hasta=hoy - timedelta(days=1),
-        )
-
         self.client.force_login(self.admin)
-        response = self.client.get(reverse("crear_rendicion"))
-        fecha_sugerida = response.context["fecha_desde_sugerida"]
-        self.assertEqual(fecha_sugerida, rendicion_reciente.fecha_hasta + timedelta(days=1))
+
+        response = self.client.post(
+            reverse("crear_rendicion"),
+            {"periodo": "diario", "cierre_ids": [cierre.id]},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        # Solo existe la rendición anterior, no se creó una nueva
+        self.assertEqual(Rendicion.objects.count(), 1)
+
+    def test_post_multiples_cierres_suma_totales(self):
+        """Con dos cierres seleccionados, los totales se suman correctamente."""
+        cierre1 = self._crear_cierre(
+            self.vendedor, certificado=True,
+            total_efectivo=Decimal("200"),
+            total_transferencia=Decimal("50"),
+            total_digital=Decimal("0"),
+        )
+        cierre2 = self._crear_cierre(
+            self.admin, certificado=True,
+            total_efectivo=Decimal("100"),
+            total_transferencia=Decimal("0"),
+            total_digital=Decimal("150"),
+        )
+        self.client.force_login(self.admin)
+
+        self.client.post(
+            reverse("crear_rendicion"),
+            {"periodo": "mensual", "cierre_ids": [cierre1.id, cierre2.id]},
+        )
+
+        rendicion = Rendicion.objects.filter(admin=self.admin).first()
+        self.assertEqual(rendicion.total_efectivo, Decimal("300"))    # 200 + 100
+        self.assertEqual(rendicion.total_digital, Decimal("200"))     # 50 + 0 + 0 + 150
+        self.assertEqual(rendicion.total_neto, Decimal("500"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -240,7 +353,6 @@ class MisRendicionesAdminTest(BaseTesoreroTest):
             fecha_hasta=date.today(),
             total_efectivo=Decimal("200"),
             total_digital=Decimal("0"),
-            total_comisiones=Decimal("0"),
             total_neto=Decimal("200"),
         )
 
@@ -254,17 +366,6 @@ class MisRendicionesAdminTest(BaseTesoreroTest):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class VendedorCierresPendientesTest(BaseTesoreroTest):
-
-    def _crear_cierre(self, usuario, certificado=False):
-        from django.utils import timezone
-        return CierreCaja.objects.create(
-            usuario=usuario,
-            periodo="diario",
-            total_cobrado=Decimal("500"),
-            cantidad_movimientos=3,
-            certificado=certificado,
-            fecha_apertura=timezone.now(),
-        )
 
     def test_panel_vendedor_muestra_cierres_sin_certificar(self):
         cierre = self._crear_cierre(self.vendedor, certificado=False)

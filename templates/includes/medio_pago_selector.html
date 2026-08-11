@@ -1,0 +1,59 @@
+{# Selector de medio de pago — incluir en formularios de confirmación de cobro.
+   Emite un <input type="radio" name="medio_pago"> estilizado como botones.
+   Requiere que el form padre incluya el campo y que JS esté habilitado (graceful degradation: radio funciona sin JS). #}
+<div style="margin-bottom:1.2rem;">
+  <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.5rem; color:var(--color-text-muted);">
+    Medio de pago
+  </label>
+  <div class="medio-pago-group" style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+    <label class="medio-btn medio-activo">
+      <input type="radio" name="medio_pago" value="efectivo" checked> 💵 Efectivo
+    </label>
+    <label class="medio-btn">
+      <input type="radio" name="medio_pago" value="transferencia"> 📲 Transferencia
+    </label>
+    <label class="medio-btn">
+      <input type="radio" name="medio_pago" value="debito"> 💳 Débito
+    </label>
+    <label class="medio-btn">
+      <input type="radio" name="medio_pago" value="credito"> 💳 Crédito
+    </label>
+    <label class="medio-btn">
+      <input type="radio" name="medio_pago" value="qr"> 📱 QR
+    </label>
+  </div>
+</div>
+
+<style>
+.medio-btn {
+  cursor: pointer;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  user-select: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.medio-btn input[type="radio"] { display: none; }
+.medio-activo {
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  border-color: var(--color-primary, #2563eb);
+}
+</style>
+
+<script>
+(function () {
+  // Activar botón seleccionado con JS; sin JS los radios ocultos siguen funcionando
+  document.querySelectorAll('.medio-pago-group').forEach(function (grupo) {
+    grupo.querySelectorAll('.medio-btn').forEach(function (lbl) {
+      lbl.addEventListener('click', function () {
+        grupo.querySelectorAll('.medio-btn').forEach(function (l) {
+          l.classList.remove('medio-activo');
+        });
+        this.classList.add('medio-activo');
+      });
+    });
+  });
+})();
+</script>
