@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-10 (sesión: GPS subcuadra — lat/lon en modelo, endpoint subcuadra_cercana, preselección automática en verificar.html. 155 tests OK.)
+Última actualización: 2026-08-10 (sesión: GPS subcuadra completo + admin mapa Leaflet/OSM para coordenadas + fix container max-width. 155 tests OK. Próximo: importación de exenciones desde Excel.)
 
 ---
 
@@ -13,6 +13,29 @@
 ---
 
 ## 🔴 Alta prioridad
+
+### 🔴 Importación de exenciones desde Excel
+El municipio gestiona sus exenciones en una planilla. Hay que importarlas al sistema de forma masiva.
+
+**Planilla esperada (columnas):**
+`Patente | Nombre | Apellido | Correo | Subcuadra 1 | Subcuadra 2 | Subcuadra 3 | Vigencia (DD/MM/AAAA) | Teléfono | Tipo exención`
+
+**Reglas de negocio del import:**
+- Si la patente ya existe → actualizar exenciones (no duplicar).
+- Si hay correo → crear/vincular Usuario como conductor `sin verificar` (`VehiculoUsuario.verificado=False`).
+- Si no hay correo → crear solo el `Vehiculo` con las exenciones; el conductor vincula al registrarse.
+- Subcuadra 1/2/3 → buscar por nombre en las subcuadras del municipio; ignorar vacías.
+- Tipo exención → mapear a los choices del modelo (DISCAPACIDAD/SALUD/RESIDENTE/COMERCIO/OTRO).
+- Registrar fila por fila con resultado: ✅ creado / ⚠️ actualizado / ❌ error (con motivo).
+
+**Prerequisito modelo:** agregar `vigencia_exencion (DateField, null, blank)` a `Vehiculo` → migración 0049.
+El teléfono va en `notas_exencion` por ahora (no hay campo dedicado).
+
+**Implementación:**
+1. `Vehiculo.vigencia_exencion` + migración 0049
+2. Vista `importar_exenciones` en `views_admin.py` (GET: form subir Excel / POST: procesar)
+3. Template `admin/importar_exenciones.html` con preview de resultados fila por fila
+4. URL + exportar en views.py + link desde panel admin
 
 ### 🔴 PRODUCCIÓN: Sin backups automáticos del PostgreSQL de Railway Hobby
 Railway Hobby no incluye backups automáticos. Opciones:
@@ -127,11 +150,10 @@ Template eliminado. La vista `inicio_admin` solo redirige a `panel_admin`, nunca
 ## 💰 Mejoras para vender (Plan Premium)
 
 ### ~~Detección automática de subcuadra por GPS (con lógica de exenciones)~~ ✅ RESUELTO 2026-08-10
-`Subcuadra.lat/lon` (migración 0048) + `subcuadra_cercana` endpoint (distancia euclidiana) +
+`Subcuadra.lat/lon` (migración 0048) + endpoint `subcuadra_cercana` (distancia euclidiana) +
 JS en `verificar.html`: geolocalización silenciosa → preselección automática → indicador "✅ GPS".
+Admin carga coordenadas desde `/admin-subcuadras/` con mapa Leaflet/OSM: click en mapa → asignar subcuadra → guardar.
 Degradación elegante: municipios sin coordenadas siguen con selección manual.
-
-**Pendiente**: cargar las coordenadas desde el panel admin (UI para gestión de subcuadras) o importar desde Excel.
 
 ### Toggle de estadísticas por municipio (desde Django Admin)
 `Municipio.estadisticas_inspectores_activo = BooleanField(default=True)`. 1 migración, 1 chequeo.
