@@ -26,7 +26,7 @@ from django.utils import timezone
 
 from .decorators import require_role
 from .views_admin import _error_password
-from .models import Estacionamiento, ModuloMunicipio, Municipio, Subcuadra, Usuario, Vehiculo
+from .models import Estacionamiento, ModuloMunicipio, Municipio, PlantillaDocumento, Subcuadra, Usuario, Vehiculo
 from .utils import sanitizar_patente
 
 
@@ -444,4 +444,92 @@ def importar_estacionamientos(request, municipio_id):
         "omitidos":   omitidos,
         "errores":    errores,
         "total":      importados + omitidos,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plantillas de documentos por municipio
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Variables disponibles por tipo — se pasan al template para mostrar referencia
+_VARIABLES_POR_TIPO = {
+    "acta":             ["{patente}", "{numero_acta}", "{fecha}", "{hora}", "{subcuadra}", "{monto}", "{inspector}", "{motivo}"],
+    "cobro_hora":       ["{patente}", "{fecha}", "{hora_inicio}", "{hora_fin}", "{duracion}", "{monto}"],
+    "abono":            ["{patente}", "{mes}", "{anio}", "{monto}", "{vendedor}"],
+    "cobro_infraccion": ["{patente}", "{numero_acta}", "{monto}", "{fecha_pago}"],
+    "anulacion":        ["{patente}", "{numero_acta}", "{motivo_anulacion}"],
+}
+
+
+@require_role("superadmin")
+def gestionar_plantillas(request, municipio_id):
+    """
+    El superadmin configura el texto de encabezado/cuerpo/pie de los comprobantes
+    de un municipio.
+
+    GET  → muestra el editor con los 5 tipos; cada tipo tiene sus 3 textareas.
+    POST → guarda o actualiza la plantilla del tipo enviado.
+
+    Si las 3 secciones llegan vacías → elimina la plantilla (vuelve al default).
+    Si al menos una sección tiene texto → crea o actualiza.
+    """
+    municipio = get_object_or_404(Municipio, id=municipio_id)
+
+    if request.method == "POST":
+        tipo  = request.POST.get("tipo", "").strip()
+        tipos_validos = [t[0] for t in PlantillaDocumento.TIPOS]
+
+        if tipo not in tipos_validos:
+            messages.error(request, "Tipo de plantilla inválido.")
+            return redirect("gestionar_plantillas", municipio_id=municipio_id)
+
+        encabezado = request.POST.get("encabezado", "").strip()
+        cuerpo     = request.POST.get("cuerpo",     "").strip()
+        pie        = request.POST.get("pie",         "").strip()
+
+        if not encabezado and not cuerpo and not pie:
+            # Sin contenido → eliminar plantilla (vuelve al default hardcodeado)
+            eliminadas, _ = PlantillaDocumento.objects.filter(
+                municipio=municipio, tipo=tipo
+            ).delete()
+            if eliminadas:
+                messages.success(request, f"Plantilla '{tipo}' eliminada. El sistema usará el texto por defecto.")
+            else:
+                messages.info(request, "No había plantilla guardada para ese tipo.")
+        else:
+            # Crear o actualizar
+            plantilla, creada = PlantillaDocumento.objects.update_or_create(
+                municipio=municipio,
+                tipo=tipo,
+                defaults={
+                    "encabezado": encabezado,
+                    "cuerpo":     cuerpo,
+                    "pie":        pie,
+                },
+            )
+            accion = "guardada" if creada else "actualizada"
+            messages.success(request, f"Plantilla '{plantilla.get_tipo_display()}' {accion}.")
+
+        return redirect("gestionar_plantillas", municipio_id=municipio_id)
+
+    # GET: armar contexto con las plantillas existentes indexadas por tipo
+    plantillas_existentes = {
+        p.tipo: p
+        for p in PlantillaDocumento.objects.filter(municipio=municipio)
+    }
+
+    # Construir lista de tipos con su plantilla (o None) y sus variables disponibles
+    tipos_con_plantilla = [
+        {
+            "tipo":      tipo,
+            "label":     label,
+            "plantilla": plantillas_existentes.get(tipo),
+            "variables": _VARIABLES_POR_TIPO.get(tipo, []),
+        }
+        for tipo, label in PlantillaDocumento.TIPOS
+    ]
+
+    return render(request, "superadmin/plantillas.html", {
+        "municipio":          municipio,
+        "tipos_con_plantilla": tipos_con_plantilla,
     })

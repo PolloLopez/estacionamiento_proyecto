@@ -10,7 +10,7 @@ La lógica de negocio de horarios vive en: services/horarios.py
 
 import re
 
-from app_estacionamiento.models import Subcuadra
+from app_estacionamiento.models import PlantillaDocumento, Subcuadra
 
 # Re-exportaciones para compatibilidad con imports existentes.
 # Las funciones reales ahora viven en services/horarios.py
@@ -41,3 +41,19 @@ def get_subcuadra_default(municipio):
         municipio=municipio,
     )
     return subcuadra
+
+
+def obtener_plantilla(municipio, tipo: str):
+    """
+    Devuelve la PlantillaDocumento para un municipio y tipo, o None si no existe.
+
+    Uso en views:
+        plantilla = obtener_plantilla(request.user.municipio, "acta")
+        texto = plantilla.renderizar(variables) if plantilla else None
+
+    Cuando es None el template sigue usando los textos hardcodeados.
+    """
+    try:
+        return PlantillaDocumento.objects.get(municipio=municipio, tipo=tipo)
+    except PlantillaDocumento.DoesNotExist:
+        return None

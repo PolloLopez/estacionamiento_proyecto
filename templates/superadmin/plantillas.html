@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Plantillas de documentos — {{ municipio }}{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;">
+    <h1 style="margin:0;">📄 Plantillas de documentos</h1>
+    <a href="{% url 'panel_superadmin' %}" class="btn btn-outline" style="font-size:0.85rem;">← Superadmin</a>
+  </div>
+
+  <p style="color:var(--color-text-muted); font-size:0.9rem; margin-bottom:1.5rem;">
+    Municipio: <strong>{{ municipio }}</strong>
+    — Configurá el texto de encabezado, cuerpo y pie de cada comprobante.
+    <br>
+    Si dejás los tres campos en blanco y guardás, se elimina la plantilla y el sistema vuelve al texto por defecto.
+    Las secciones en blanco no se muestran en el comprobante.
+  </p>
+
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-{% if msg.tags == 'error' %}danger{% else %}success{% endif %}"
+           style="margin-bottom:1rem;">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {# ── Tabs de tipo ── #}
+  <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:1.5rem;" id="tab-lista">
+    {% for item in tipos_con_plantilla %}
+    <button
+      class="btn{% if forloop.first %} btn-primary{% else %} btn-outline{% endif %} tab-btn"
+      data-tab="tab-{{ item.tipo }}"
+      style="font-size:0.85rem;"
+    >
+      {% if item.plantilla %}✅{% else %}○{% endif %} {{ item.label }}
+    </button>
+    {% endfor %}
+  </div>
+
+  {# ── Paneles por tipo ── #}
+  {% for item in tipos_con_plantilla %}
+  <div id="tab-{{ item.tipo }}" class="tab-panel" {% if not forloop.first %}style="display:none;"{% endif %}>
+
+    <div class="card" style="padding:1.2rem;">
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem; flex-wrap:wrap;">
+        <h2 style="margin:0; font-size:1.1rem;">{{ item.label }}</h2>
+        {% if item.plantilla %}
+          <span style="background:#d4edda; color:#155724; font-size:0.75rem; font-weight:700;
+                       padding:0.2rem 0.6rem; border-radius:20px;">
+            ✅ Personalizada — última actualización: {{ item.plantilla.actualizado_en|date:"d/m/Y H:i" }}
+          </span>
+        {% else %}
+          <span style="background:#f8f9fa; color:#6c757d; font-size:0.75rem; font-weight:700;
+                       padding:0.2rem 0.6rem; border-radius:20px; border:1px solid #dee2e6;">
+            Sin plantilla — usando texto por defecto
+          </span>
+        {% endif %}
+      </div>
+
+      {# Variables disponibles #}
+      <div style="background:var(--color-surface); border:1px solid var(--color-border);
+                  border-radius:var(--radius); padding:0.6rem 0.8rem; margin-bottom:1rem;
+                  font-size:0.8rem; color:var(--color-text-muted);">
+        <strong>Variables disponibles:</strong>
+        {% for v in item.variables %}
+          <code style="background:#e9ecef; padding:0.1rem 0.3rem; border-radius:3px;
+                       margin:0.1rem; display:inline-block;">{{ v }}</code>
+        {% endfor %}
+        <br>
+        <span style="font-size:0.75rem; margin-top:0.3rem; display:block;">
+          Usá <code>{curly_brackets}</code> en el texto y el sistema las reemplaza automáticamente.
+          Si una variable no está disponible en el contexto, queda en blanco (no da error).
+        </span>
+      </div>
+
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="tipo" value="{{ item.tipo }}">
+
+        <div style="margin-bottom:0.8rem;">
+          <label for="enc-{{ item.tipo }}"
+                 style="font-size:0.78rem; font-weight:700; text-transform:uppercase;
+                        letter-spacing:0.06em; color:var(--color-text-muted); display:block; margin-bottom:0.3rem;">
+            Encabezado
+          </label>
+          <textarea id="enc-{{ item.tipo }}" name="encabezado" rows="3"
+                    placeholder="Texto que aparece arriba del comprobante. Ej: Municipio de {municipio_nombre} — Sistema de Estacionamiento Medido"
+                    style="width:100%; padding:0.5rem 0.65rem; border-radius:8px;
+                           border:1px solid var(--color-border); background:var(--color-surface);
+                           color:var(--color-text); font-size:0.88rem; resize:vertical;">{% if item.plantilla %}{{ item.plantilla.encabezado }}{% endif %}</textarea>
+        </div>
+
+        <div style="margin-bottom:0.8rem;">
+          <label for="cpo-{{ item.tipo }}"
+                 style="font-size:0.78rem; font-weight:700; text-transform:uppercase;
+                        letter-spacing:0.06em; color:var(--color-text-muted); display:block; margin-bottom:0.3rem;">
+            Cuerpo / base legal
+          </label>
+          <textarea id="cpo-{{ item.tipo }}" name="cuerpo" rows="5"
+                    placeholder="Texto principal. Ej: Artículo 45 Ord. 1234/22 — Se labra la presente acta de infracción..."
+                    style="width:100%; padding:0.5rem 0.65rem; border-radius:8px;
+                           border:1px solid var(--color-border); background:var(--color-surface);
+                           color:var(--color-text); font-size:0.88rem; resize:vertical;">{% if item.plantilla %}{{ item.plantilla.cuerpo }}{% endif %}</textarea>
+        </div>
+
+        <div style="margin-bottom:1rem;">
+          <label for="pie-{{ item.tipo }}"
+                 style="font-size:0.78rem; font-weight:700; text-transform:uppercase;
+                        letter-spacing:0.06em; color:var(--color-text-muted); display:block; margin-bottom:0.3rem;">
+            Pie / instrucciones
+          </label>
+          <textarea id="pie-{{ item.tipo }}" name="pie" rows="3"
+                    placeholder="Texto al pie. Ej: Para pagar ingresá a estacionamiento.miciudad.gov.ar — Teléfono: (02XX) XXX-XXXX"
+                    style="width:100%; padding:0.5rem 0.65rem; border-radius:8px;
+                           border:1px solid var(--color-border); background:var(--color-surface);
+                           color:var(--color-text); font-size:0.88rem; resize:vertical;">{% if item.plantilla %}{{ item.plantilla.pie }}{% endif %}</textarea>
+        </div>
+
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+          <button type="submit" class="btn">💾 Guardar plantilla</button>
+          {% if item.plantilla %}
+          <button type="submit" class="btn btn-outline"
+                  style="color:var(--color-danger); border-color:var(--color-danger);"
+                  onclick="document.getElementById('enc-{{ item.tipo }}').value='';
+                           document.getElementById('cpo-{{ item.tipo }}').value='';
+                           document.getElementById('pie-{{ item.tipo }}').value='';"
+          >
+            🗑 Eliminar (volver al default)
+          </button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+
+  </div>
+  {% endfor %}
+
+</div>
+
+<script>
+// Tabs: al hacer click en un botón, mostrar el panel correspondiente
+document.querySelectorAll(".tab-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+        // Ocultar todos los paneles
+        document.querySelectorAll(".tab-panel").forEach(p => p.style.display = "none");
+        // Desactivar todos los botones
+        document.querySelectorAll(".tab-btn").forEach(b => {
+            b.classList.remove("btn-primary");
+            b.classList.add("btn-outline");
+        });
+        // Mostrar el panel clickeado y activar su botón
+        const target = document.getElementById(btn.dataset.tab);
+        if (target) target.style.display = "block";
+        btn.classList.remove("btn-outline");
+        btn.classList.add("btn-primary");
+    });
+});
+</script>
+{% endblock %}

@@ -1,7 +1,7 @@
 # CONTEXT.md — Sistema de Estacionamiento Medido
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-08-07
+Última actualización estructural: 2026-08-10
 
 ---
 
@@ -62,7 +62,7 @@ Admin URL: `/sistema-interno/` (no obvia, reduce bruteforce).
 | Email | django-anymail + Brevo | API transaccional (pendiente verificar remitente) |
 | Frontend | HTML + CSS propio | Sin frameworks JS |
 | Deploy | Railway + Gunicorn + WhiteNoise | PaaS simple |
-| Tests | Django TestCase | 149 tests |
+| Tests | Django TestCase | 155 tests |
 
 ---
 
@@ -78,7 +78,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 **Módulos de vistas:**
 - `views_auth.py` — login, logout, registro, completar_perfil, OAuth
 - `views_conductor.py` — estacionar, historial, infracciones, vehículos
-- `views_inspector.py` — panel, verificar patente, infracciones, PDF
+- `views_inspector.py` — panel, verificar patente, infracciones, PDF, `subcuadra_cercana` (API GPS)
 - `views_vendedor.py` — cobros, abono mensual, caja, comisiones
 - `views_admin.py` — gestión completa del municipio
 - `views_tesorero.py` — panel tesorero, validar/observar rendiciones, depositar comisiones
@@ -120,7 +120,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `ModuloMunicipio` | Feature flags por municipio (activo/inactivo). Gestionado por superadmin. |
 | `Vehiculo` | Patente única. Tipos: `auto`, `moto`. Exenciones: `exento_global`, `exento_parcial`, `subcuadras_exentas`. |
 | `VehiculoUsuario` | Relación N:N entre vehículo y conductor. |
-| `Subcuadra` | Calle + altura + municipio. `unique_together = (calle, altura, municipio)`. |
+| `Subcuadra` | Calle + altura + municipio. `unique_together = (calle, altura, municipio)`. `lat`/`lon` (DecimalField, null) para GPS preselección desde `verificar.html`. El admin las carga desde `/admin-subcuadras/` con mapa Leaflet/OSM (sin API key). |
 | `Estacionamiento` | Estado: `ACTIVO` / `FINALIZADO`. `hora_inicio`, `hora_fin`, `duracion_horas (DecimalField)`, `costo_base`, `costo_final`. Constraint: un ACTIVO por vehículo. |
 | `Infraccion` | Estado: `pendiente` / `pagada` / `anulada`. `monto`, `motivo`, `foto` (ImageField → Cloudinary en Railway), `motivo_anulacion`, `fecha_pago`, `creado_en`. |
 | `MovimientoCaja` | Registro contable de cada cobro. `tipo`: `ingreso`/`egreso`. `medio_pago`: `efectivo`, `transferencia`, `debito`, `credito`, `qr`, `mercadopago` (default `efectivo`). `comision_monto`. `cerrado`: True cuando el movimiento fue incluido en un CierreCaja. |
@@ -134,6 +134,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `Rendicion` | El admin cierra un período seleccionando CierreCaja certificados. Totales **calculados automáticamente** del desglose de los cierres elegidos: `total_efectivo`, `total_digital` (transferencia+débito+crédito+QR agrupados), `total_neto = efectivo + digital`. `comprobante_archivo` para adjuntar comprobante de transferencia. Estado: `pendiente`/`validada`/`observada`. El tesorero registra quién validó y cuándo. |
 | `LiquidacionComision` | Pago de comisiones a un vendedor. Flujo: `pendiente` → `depositada` (tesorero) → `certificada` (vendedor). `factura_presentada (BooleanField)` + `factura_archivo (FileField)` para el comprobante de factura del vendedor. |
 | `DestinatarioInforme` | Personas que reciben el informe mensual por email. |
+| `PlantillaDocumento` | *(pendiente)* Texto personalizable por municipio para cada tipo de comprobante/acta. Tipos: `acta`, `cobro_hora`, `abono`, `cobro_infraccion`, `anulacion`. Campos: `encabezado`, `cuerpo`, `pie`. Si no existe plantilla → usa texto hardcodeado actual. |
 | `Notificacion` | Notificaciones internas al conductor. |
 
 ---
@@ -229,8 +230,10 @@ de `select_for_update()` para evitar race conditions.
 /usuarios/admin-infracciones/                  → infracciones (cobrar / anular / PDF juzgado)
 /usuarios/admin-rendiciones/                   → rendiciones (crear / certificar cierres)
 /usuarios/admin-exenciones/                    → exenciones de vehículos
+/usuarios/admin-subcuadras/                    → gestionar subcuadras + asignar coordenadas GPS (mapa Leaflet)
 /usuarios/inspectores/                         → panel inspector
-/usuarios/inspectores/verificar/               → verificar patente en calle
+/usuarios/inspectores/verificar/               → verificar patente en calle (preselección GPS si hay coordenadas cargadas)
+/usuarios/inspectores/subcuadra-cercana/       → API JSON: subcuadra más cercana por lat/lon (uso interno del template)
 /usuarios/inspectores/infraccion/              → labrar acta
 /usuarios/inspectores/resumen/                 → mis infracciones del día
 /usuarios/vendedores/                          → panel vendedor

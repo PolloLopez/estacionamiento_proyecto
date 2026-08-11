@@ -235,6 +235,23 @@ class Vehiculo(models.Model):
         verbose_name="Notas (nro de documento, certificado, etc.)"
     )
 
+    # Fecha hasta la que rige la exención (opcional; None = indefinida)
+    vigencia_exencion = models.DateField(
+        null=True, blank=True,
+        verbose_name="Vigencia de exención",
+        help_text="Fecha hasta la que rige la exención. Vacío = sin vencimiento.",
+    )
+
+    # Marca si el admin ya revisó y completó los datos de la exención.
+    # Los vehículos importados desde Excel arrancan con False (pendientes de
+    # que el admin contacte al titular para completar email, condición, etc.)
+    # Los cargados manualmente desde panel_exenciones arrancan en True.
+    exencion_verificada = models.BooleanField(
+        default=True,
+        verbose_name="Exención verificada",
+        help_text="False = importado, pendiente de verificación por el admin.",
+    )
+
     TIPOS_VEHICULO = [('auto', 'Auto'), ('moto', 'Moto')]
     tipo = models.CharField(
         max_length=10, choices=TIPOS_VEHICULO, default='auto',
@@ -993,3 +1010,80 @@ class ModuloMunicipio(models.Model):
 
     def __str__(self):
         return f"{self.municipio} — {self.get_modulo_display()}"
+
+
+class PlantillaDocumento(models.Model):
+    """
+    Texto personalizado de comprobantes y actas, configurado por el superadmin
+    para cada municipio.
+
+    Cada tipo de documento tiene un encabezado, cuerpo y pie que el superadmin
+    puede completar libremente usando {variables} que el sistema interpolará al
+    generar el documento.  Si no existe una plantilla para un municipio+tipo,
+    el sistema usa sus textos hardcodeados por defecto (sin romper nada).
+
+    Variables disponibles por tipo:
+      acta:             {patente} {numero_acta} {fecha} {hora} {subcuadra} {monto} {inspector} {motivo}
+      cobro_hora:       {patente} {fecha} {hora_inicio} {hora_fin} {duracion} {monto}
+      abono:            {patente} {mes} {anio} {monto} {vendedor}
+      cobro_infraccion: {patente} {numero_acta} {monto} {fecha_pago}
+      anulacion:        {patente} {numero_acta} {motivo_anulacion}
+    """
+
+    TIPOS = [
+        ("acta",             "Acta de infracción"),
+        ("cobro_hora",       "Comprobante cobro por hora"),
+        ("abono",            "Comprobante abono mensual"),
+        ("cobro_infraccion", "Comprobante pago de infracción"),
+        ("anulacion",        "Comprobante anulación de infracción"),
+    ]
+
+    municipio  = models.ForeignKey(
+        Municipio, on_delete=models.CASCADE,
+        related_name="plantillas_documento",
+    )
+    tipo       = models.CharField(max_length=20, choices=TIPOS)
+    encabezado = models.TextField(
+        blank=True,
+        verbose_name="Encabezado",
+        help_text="Texto que aparece arriba del comprobante. Podés usar variables.",
+    )
+    cuerpo     = models.TextField(
+        blank=True,
+        verbose_name="Cuerpo / base legal",
+        help_text="Texto principal del comprobante. Podés usar variables.",
+    )
+    pie        = models.TextField(
+        blank=True,
+        verbose_name="Pie / instrucciones",
+        help_text="Texto que aparece al pie. Podés usar variables.",
+    )
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [("municipio", "tipo")]
+        verbose_name        = "Plantilla de documento"
+        verbose_name_plural = "Plantillas de documentos"
+        ordering            = ["municipio", "tipo"]
+
+    def __str__(self):
+        return f"{self.municipio} — {self.get_tipo_display()}"
+
+    def renderizar(self, variables: dict) -> dict:
+        """
+        Interpola {variables} en encabezado/cuerpo/pie y devuelve un dict
+        con las tres secciones ya renderizadas.
+
+        Usa str.format_map con un dict que devuelve '' para claves faltantes
+        (nunca lanza KeyError aunque falte una variable en el contexto).
+        """
+        class _Fallback(dict):
+            def __missing__(self, key):
+                return ""
+
+        ctx = _Fallback(variables)
+        return {
+            "encabezado": self.encabezado.format_map(ctx),
+            "cuerpo":     self.cuerpo.format_map(ctx),
+            "pie":        self.pie.format_map(ctx),
+        }

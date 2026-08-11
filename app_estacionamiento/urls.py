@@ -95,6 +95,7 @@ urlpatterns = [
     path("admin-vendedores/crear/", views.gestionar_vendedores, name="admin_crear_vendedor"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
     path("admin-subcuadras/", views.gestionar_subcuadras, name="gestionar_subcuadras"),
+    path("admin-exenciones/importar/", views.importar_exenciones, name="importar_exenciones"),
     path("admin-usuarios/", views.gestionar_usuarios, name="gestionar_usuarios"),
     path("admin-crear-conductor/", views.crear_conductor, name="crear_conductor"),
     path("admin-usuarios/<int:usuario_id>/", views.detalle_usuario_admin, name="detalle_usuario_admin"),
@@ -152,6 +153,7 @@ urlpatterns = [
     path("superadmin/municipio/<int:municipio_id>/admin/nuevo/", views_superadmin.crear_admin,      name="crear_admin"),
     path("superadmin/admin/<int:admin_id>/toggle/",             views_superadmin.toggle_admin,      name="toggle_admin"),
     path("superadmin/municipio/<int:municipio_id>/modulo/",     views_superadmin.gestionar_modulo,      name="gestionar_modulo"),
-    path("superadmin/municipio/<int:municipio_id>/importar/",  views_superadmin.importar_estacionamientos, name="importar_estacionamientos"),
+    path("superadmin/municipio/<int:municipio_id>/importar/",   views_superadmin.importar_estacionamientos, name="importar_estacionamientos"),
+    path("superadmin/municipio/<int:municipio_id>/plantillas/", views_superadmin.gestionar_plantillas,      name="gestionar_plantillas"),
 
 ]

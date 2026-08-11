@@ -28,6 +28,10 @@
     <h3>✅ COMPROBANTE DE PAGO</h3>
     <p>{{ infraccion.municipio.nombre }}</p>
 
+    {% if texto_plantilla.encabezado %}
+    <p style="font-size:0.82rem; white-space:pre-wrap;">{{ texto_plantilla.encabezado }}</p>
+    {% endif %}
+
     <hr>
 
     <p class="titulo">Acta N° {{ infraccion.id }}</p>
@@ -66,7 +70,17 @@
     {% endif %}
 
     <hr>
+
+    {% if texto_plantilla.cuerpo %}
+    <p style="font-size:0.82rem; white-space:pre-wrap;">{{ texto_plantilla.cuerpo }}</p>
+    <hr>
+    {% endif %}
+
+    {% if texto_plantilla.pie %}
+    <p style="font-size:0.8rem; white-space:pre-wrap;">{{ texto_plantilla.pie }}</p>
+    {% else %}
     <p style="font-size:0.8rem;">Conserve este comprobante.</p>
+    {% endif %}
 
   </div>
 

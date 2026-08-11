@@ -260,19 +260,36 @@ def panel_exenciones(request):
             else:
                 messages.error(request, "No se encontró el vehículo con esa patente.")
 
+        elif accion == "verificar":
+            # El admin confirma que contactó al titular y completó los datos.
+            # Marca el vehículo como verificado.
+            patente  = sanitizar_patente(request.POST.get("patente") or "")
+            vehiculo = _buscar_vehiculo(patente)
+            if vehiculo:
+                vehiculo.exencion_verificada = True
+                vehiculo.save()
+                messages.success(request, f"✅ Exención de {patente} marcada como verificada.")
+            else:
+                messages.error(request, "No se encontró el vehículo.")
+
     # Listado global: todos los vehículos con alguna exención en el municipio
-    vehiculos_exentos = Vehiculo.objects.filter(
+    qs_exentos = Vehiculo.objects.filter(
         Q(exento_global=True, municipio=municipio)
         | Q(subcuadras_exentas__municipio=municipio)
     ).distinct().prefetch_related(
         "vehiculousuario_set__usuario", "subcuadras_exentas"
-    ).order_by("patente")
+    )
+
+    # Pendientes de verificación: importados que todavía no se verificaron
+    vehiculos_pendientes = qs_exentos.filter(exencion_verificada=False).order_by("patente")
+    vehiculos_exentos    = qs_exentos.filter(exencion_verificada=True).order_by("patente")
 
     return render(request, "admin/exenciones.html", {
-        "vehiculo":          vehiculo,
-        "subcuadras":        subcuadras,
-        "tipos_exencion":    TIPOS_EXENCION,
-        "vehiculos_exentos": vehiculos_exentos,
+        "vehiculo":             vehiculo,
+        "subcuadras":           subcuadras,
+        "tipos_exencion":       TIPOS_EXENCION,
+        "vehiculos_exentos":    vehiculos_exentos,
+        "vehiculos_pendientes": vehiculos_pendientes,
     })
 
 
@@ -2417,3 +2434,259 @@ def gestionar_subcuadras(request):
         "subcuadras": subcuadras,
         "marcadores": marcadores,
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Importación de exenciones desde Excel
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _procesar_fila_exencion(fila_num, fila_vals, municipio):
+    """
+    Procesa una fila del Excel y devuelve un dict con el resultado del análisis.
+
+    Devuelve:
+        {
+            "num":       int,          # número de fila (para mostrar al usuario)
+            "patente":   str,
+            "nombre":    str,
+            "telefono":  str,
+            "direccion": str,          # texto original de la columna Direccion
+            "subcuadra": Subcuadra | None,
+            "notas":     str,          # texto a guardar en notas_exencion
+            "estado":    "nuevo" | "actualizar" | "error",
+            "mensaje":   str,
+        }
+    """
+    import re
+
+    # ── Leer celdas ───────────────────────────────────────────────────────────
+    def celda(idx):
+        """Devuelve el valor de la celda como string limpio (o vacío)."""
+        val = fila_vals[idx] if idx < len(fila_vals) else None
+        if val is None:
+            return ""
+        return str(val).strip()
+
+    patente   = re.sub(r"[^A-Z0-9]", "", celda(0).upper())
+    nombre    = celda(1)
+    direccion = celda(2)
+    telefono  = celda(3)
+    # columnas Fecha(4), Condicion(5), Vencimiento(6) — las guardamos en notas
+    fecha      = celda(4)
+    condicion  = celda(5)
+    vencimiento = celda(6)
+
+    # ── Validación básica ─────────────────────────────────────────────────────
+    if not patente:
+        return {
+            "num": fila_num, "patente": "", "nombre": nombre,
+            "telefono": telefono, "direccion": direccion,
+            "subcuadra": None, "notas": "",
+            "estado": "error", "mensaje": "Patente vacía — fila ignorada.",
+        }
+
+    # ── Buscar subcuadra por nombre de calle (coincidencia parcial) ───────────
+    # Se filtra solo dentro del municipio para no mezclar con otros.
+    # Si hay más de una coincidencia se toma la primera alfabéticamente.
+    subcuadra = None
+    aviso_subcuadra = ""
+    if direccion:
+        candidatas = Subcuadra.objects.filter(
+            municipio=municipio,
+            calle__icontains=direccion,
+        ).order_by("calle", "altura")
+        if candidatas.exists():
+            subcuadra = candidatas.first()
+            if candidatas.count() > 1:
+                aviso_subcuadra = f" (múltiples coincidencias para '{direccion}', se tomó la primera)"
+        else:
+            aviso_subcuadra = f" (sin subcuadra para '{direccion}')"
+
+    # ── Construir notas_exencion ──────────────────────────────────────────────
+    partes = []
+    if nombre:
+        partes.append(f"Nombre: {nombre}")
+    if telefono:
+        partes.append(f"Tel: {telefono}")
+    if fecha:
+        partes.append(f"Fecha: {fecha}")
+    if direccion:
+        partes.append(f"Dirección: {direccion}")
+    if condicion:
+        partes.append(f"Condición: {condicion}")
+    if vencimiento:
+        partes.append(f"Vencimiento: {vencimiento}")
+    notas = " | ".join(partes)
+
+    # ── Determinar si el vehículo ya existe ───────────────────────────────────
+    vehiculo_existente = Vehiculo.objects.filter(patente=patente).first()
+    estado  = "actualizar" if vehiculo_existente else "nuevo"
+    mensaje = (
+        f"Actualiza vehículo existente.{aviso_subcuadra}"
+        if vehiculo_existente
+        else f"Crea vehículo nuevo.{aviso_subcuadra}"
+    )
+
+    return {
+        "num":       fila_num,
+        "patente":   patente,
+        "nombre":    nombre,
+        "telefono":  telefono,
+        "direccion": direccion,
+        "subcuadra": subcuadra,
+        "notas":     notas,
+        "estado":    estado,
+        "mensaje":   mensaje,
+    }
+
+
+def _guardar_fila_exencion(datos_fila, municipio):
+    """
+    Aplica los datos procesados de una fila al modelo Vehiculo.
+    Se llama solo tras la confirmación del admin.
+
+    Reglas:
+    - get_or_create por patente.
+    - exento_parcial = True, exencion_verificada = False.
+    - tipo_exencion = "vecino_frentista".
+    - Si hay subcuadra → agregarla a subcuadras_exentas (sin borrar las existentes).
+    - notas_exencion: si ya tenía notas, se concatena con " | ".
+    """
+    patente   = datos_fila["patente"]
+    subcuadra = datos_fila["subcuadra"]
+    notas     = datos_fila["notas"]
+
+    vehiculo, _ = Vehiculo.objects.get_or_create(
+        patente=patente,
+        defaults={"tipo": "auto", "municipio": municipio},
+    )
+
+    vehiculo.exento_parcial      = True
+    vehiculo.exencion_verificada = False
+    vehiculo.tipo_exencion       = "vecino_frentista"
+
+    # Concatenar notas sin pisar lo que el admin haya escrito antes
+    if notas:
+        if vehiculo.notas_exencion:
+            vehiculo.notas_exencion = vehiculo.notas_exencion + " | " + notas
+        else:
+            vehiculo.notas_exencion = notas
+
+    vehiculo.save()
+
+    if subcuadra:
+        vehiculo.subcuadras_exentas.add(subcuadra)
+
+
+@require_role("admin")
+def importar_exenciones(request):
+    """
+    Importa exenciones de vecinos frentistas desde un Excel con columnas:
+    Patente | Nombre y Apellido | Direccion | Telefono | Fecha | Condicion | Vencimiento
+
+    Flujo:
+    1. GET             → muestra el formulario de carga.
+    2. POST preview    → lee el Excel, muestra tabla fila x fila sin guardar.
+    3. POST confirmar  → guarda todos los registros en la DB.
+
+    Todos los vehículos importados quedan con exencion_verificada=False
+    para que el admin los contacte individualmente y complete los datos faltantes.
+    """
+    import io
+    import json as _json
+    try:
+        import openpyxl
+    except ImportError:
+        messages.error(request, "Falta instalar openpyxl: pip install openpyxl")
+        return redirect("panel_exenciones")
+
+    usuario   = request.user
+    municipio = getattr(usuario, "municipio", None)
+    if not municipio:
+        return redirect("login")
+
+    accion     = request.POST.get("accion", "")
+    resultados = None  # lista de dicts para mostrar en el template
+
+    if request.method == "POST" and accion == "preview":
+        archivo = request.FILES.get("archivo")
+        if not archivo:
+            messages.error(request, "Seleccioná un archivo Excel.")
+            return render(request, "admin/importar_exenciones.html", {})
+
+        try:
+            wb  = openpyxl.load_workbook(io.BytesIO(archivo.read()), data_only=True)
+            ws  = wb.active
+            filas = list(ws.iter_rows(min_row=2, values_only=True))  # omite encabezado
+        except Exception as exc:
+            messages.error(request, f"No se pudo leer el Excel: {exc}")
+            return render(request, "admin/importar_exenciones.html", {})
+
+        resultados = []
+        for idx, fila in enumerate(filas, start=2):
+            # Ignorar filas completamente vacías
+            if all(v is None or str(v).strip() == "" for v in fila):
+                continue
+            datos = _procesar_fila_exencion(idx, fila, municipio)
+            resultados.append(datos)
+
+        # Serializar para el formulario de confirmación:
+        # no podemos reenviar el archivo, así que guardamos los datos en sesión.
+        # Excluimos el objeto Subcuadra (no serializable) y guardamos solo el id.
+        datos_sesion = []
+        for d in resultados:
+            if d["estado"] == "error":
+                continue
+            datos_sesion.append({
+                "patente":     d["patente"],
+                "subcuadra_id": d["subcuadra"].id if d["subcuadra"] else None,
+                "notas":       d["notas"],
+            })
+        request.session["importar_exenciones_datos"] = datos_sesion
+
+        return render(request, "admin/importar_exenciones.html", {
+            "resultados": resultados,
+            "modo": "preview",
+        })
+
+    elif request.method == "POST" and accion == "confirmar":
+        datos_sesion = request.session.pop("importar_exenciones_datos", None)
+        if not datos_sesion:
+            messages.error(request, "Sesión expirada. Volvé a cargar el archivo.")
+            return render(request, "admin/importar_exenciones.html", {})
+
+        creados    = 0
+        actualizados = 0
+
+        for item in datos_sesion:
+            patente     = item["patente"]
+            subcuadra_id = item.get("subcuadra_id")
+            notas        = item.get("notas", "")
+
+            subcuadra = None
+            if subcuadra_id:
+                try:
+                    subcuadra = Subcuadra.objects.get(id=subcuadra_id)
+                except Subcuadra.DoesNotExist:
+                    pass
+
+            existia = Vehiculo.objects.filter(patente=patente).exists()
+            _guardar_fila_exencion(
+                {"patente": patente, "subcuadra": subcuadra, "notas": notas},
+                municipio,
+            )
+            if existia:
+                actualizados += 1
+            else:
+                creados += 1
+
+        messages.success(
+            request,
+            f"✅ Importación completada: {creados} vehículos nuevos, "
+            f"{actualizados} actualizados. "
+            "Todos quedan pendientes de verificación.",
+        )
+        return redirect("panel_exenciones")
+
+    # GET
+    return render(request, "admin/importar_exenciones.html", {})

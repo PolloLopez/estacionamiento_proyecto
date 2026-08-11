@@ -31,7 +31,7 @@ from .models import (
 from .services_infracciones import ErrorInfraccion, crear_infraccion
 from .services_verificacion import verificar_estado_vehiculo
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
-from .utils import get_subcuadra_default, sanitizar_patente
+from .utils import get_subcuadra_default, obtener_plantilla, sanitizar_patente
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -250,11 +250,28 @@ def ticket_infraccion(request, infraccion_id):
     """
     Muestra el comprobante de un acta recién labrada.
     Solo accesible para el inspector del municipio.
+    Incluye texto personalizado si el superadmin configuró una PlantillaDocumento.
     """
     infraccion = get_object_or_404(Infraccion, id=infraccion_id, municipio=request.user.municipio)
 
+    # Renderizar plantilla personalizada (o None si no existe → template usa defaults)
+    plantilla = obtener_plantilla(infraccion.municipio, "acta")
+    texto_plantilla = None
+    if plantilla:
+        texto_plantilla = plantilla.renderizar({
+            "patente":     infraccion.vehiculo.patente,
+            "numero_acta": infraccion.numero_acta or "",
+            "fecha":       infraccion.creado_en.strftime("%d/%m/%Y") if infraccion.creado_en else "",
+            "hora":        infraccion.creado_en.strftime("%H:%M") if infraccion.creado_en else "",
+            "subcuadra":   str(infraccion.subcuadra) if infraccion.subcuadra else "",
+            "monto":       str(infraccion.monto),
+            "inspector":   str(infraccion.inspector) if infraccion.inspector else "",
+            "motivo":      infraccion.motivo or "",
+        })
+
     return render(request, "ticket_infraccion.html", {
-        "infraccion": infraccion,
+        "infraccion":     infraccion,
+        "texto_plantilla": texto_plantilla,
     })
 
 

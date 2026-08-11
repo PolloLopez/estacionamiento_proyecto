@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-10 (sesión: GPS subcuadra — lat/lon en modelo, endpoint subcuadra_cercana, preselección automática en verificar.html. 155 tests OK.)
+Última actualización: 2026-08-11 (sesión: importación de exenciones desde Excel — vista con preview fila x fila, migración 0050, panel pendientes de verificación con badge naranja + acción verificar.)
 
 ---
 
@@ -12,7 +12,23 @@
 
 ---
 
-## 🔴 Alta prioridad
+### ~~🔴 Importación de exenciones desde Excel~~ ✅ RESUELTO 2026-08-11
+Planilla real: `Patente | Nombre y Apellido | Direccion | Telefono | Fecha | Condicion | Vencimiento`.
+Sin emails → no se crean usuarios. Todos los registros quedan `exencion_verificada=False` para que el admin
+contacte a cada titular por teléfono y complete los datos.
+- `Vehiculo.vigencia_exencion (DateField)` + `exencion_verificada (BooleanField, default=True)` → migración 0050.
+- Vista `importar_exenciones`: preview fila x fila (✅/⚠️/❌) con datos en sesión; confirmación guarda.
+  Dirección → coincidencia parcial de calle en Subcuadra del municipio. Datos en `notas_exencion`.
+- `panel_exenciones`: acción `verificar`; lista separada en pendientes (con badge naranja) y verificados.
+- URL `/admin-exenciones/importar/`, botón 📥 en `exenciones.html`.
+
+### ~~🔴 Plantillas de documentos por municipio (desde superadmin)~~ ✅ RESUELTO 2026-08-11
+Modelo `PlantillaDocumento` (municipio, tipo, encabezado, cuerpo, pie) + migración 0049.
+5 tipos: `acta`, `cobro_hora`, `abono`, `cobro_infraccion`, `anulacion`.
+Helper `obtener_plantilla()` en utils.py. View `gestionar_plantillas(municipio_id)` en views_superadmin.py.
+Template `superadmin/plantillas.html`: tabs por tipo, textareas, referencia de variables disponibles.
+URL `/superadmin/municipio/<id>/plantillas/` + botón en `editar_municipio.html`.
+Integrado en los 5 tickets con `texto_plantilla.encabezado/cuerpo/pie` — degradación elegante: sin plantilla → texto hardcodeado.
 
 ### 🔴 PRODUCCIÓN: Sin backups automáticos del PostgreSQL de Railway Hobby
 Railway Hobby no incluye backups automáticos. Opciones:
@@ -127,11 +143,10 @@ Template eliminado. La vista `inicio_admin` solo redirige a `panel_admin`, nunca
 ## 💰 Mejoras para vender (Plan Premium)
 
 ### ~~Detección automática de subcuadra por GPS (con lógica de exenciones)~~ ✅ RESUELTO 2026-08-10
-`Subcuadra.lat/lon` (migración 0048) + `subcuadra_cercana` endpoint (distancia euclidiana) +
+`Subcuadra.lat/lon` (migración 0048) + endpoint `subcuadra_cercana` (distancia euclidiana) +
 JS en `verificar.html`: geolocalización silenciosa → preselección automática → indicador "✅ GPS".
+Admin carga coordenadas desde `/admin-subcuadras/` con mapa Leaflet/OSM: click en mapa → asignar subcuadra → guardar.
 Degradación elegante: municipios sin coordenadas siguen con selección manual.
-
-**Pendiente**: cargar las coordenadas desde el panel admin (UI para gestión de subcuadras) o importar desde Excel.
 
 ### Toggle de estadísticas por municipio (desde Django Admin)
 `Municipio.estadisticas_inspectores_activo = BooleanField(default=True)`. 1 migración, 1 chequeo.
