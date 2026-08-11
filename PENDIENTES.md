@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-11 (sesión: PlantillaDocumento completo — modelo + migración 0049 + view superadmin + template con tabs + integración en 5 tickets con degradación elegante. Próximo: importación de exenciones desde Excel o vigencia_exencion en Vehiculo.)
+Última actualización: 2026-08-11 (sesión: importación de exenciones desde Excel — vista con preview fila x fila, migración 0050, panel pendientes de verificación con badge naranja + acción verificar.)
 
 ---
 
@@ -12,30 +12,15 @@
 
 ---
 
-## 🔴 Alta prioridad
-
-### 🔴 Importación de exenciones desde Excel
-El municipio gestiona sus exenciones en una planilla. Hay que importarlas al sistema de forma masiva.
-
-**Planilla esperada (columnas):**
-`Patente | Nombre | Apellido | Correo | Subcuadra 1 | Subcuadra 2 | Subcuadra 3 | Vigencia (DD/MM/AAAA) | Teléfono | Tipo exención`
-
-**Reglas de negocio del import:**
-- Si la patente ya existe → actualizar exenciones (no duplicar).
-- Si hay correo → crear/vincular Usuario como conductor `sin verificar` (`VehiculoUsuario.verificado=False`).
-- Si no hay correo → crear solo el `Vehiculo` con las exenciones; el conductor vincula al registrarse.
-- Subcuadra 1/2/3 → buscar por nombre en las subcuadras del municipio; ignorar vacías.
-- Tipo exención → mapear a los choices del modelo (DISCAPACIDAD/SALUD/RESIDENTE/COMERCIO/OTRO).
-- Registrar fila por fila con resultado: ✅ creado / ⚠️ actualizado / ❌ error (con motivo).
-
-**Prerequisito modelo:** agregar `vigencia_exencion (DateField, null, blank)` a `Vehiculo` → migración 0049.
-El teléfono va en `notas_exencion` por ahora (no hay campo dedicado).
-
-**Implementación:**
-1. `Vehiculo.vigencia_exencion` + migración 0049
-2. Vista `importar_exenciones` en `views_admin.py` (GET: form subir Excel / POST: procesar)
-3. Template `admin/importar_exenciones.html` con preview de resultados fila por fila
-4. URL + exportar en views.py + link desde panel admin
+### ~~🔴 Importación de exenciones desde Excel~~ ✅ RESUELTO 2026-08-11
+Planilla real: `Patente | Nombre y Apellido | Direccion | Telefono | Fecha | Condicion | Vencimiento`.
+Sin emails → no se crean usuarios. Todos los registros quedan `exencion_verificada=False` para que el admin
+contacte a cada titular por teléfono y complete los datos.
+- `Vehiculo.vigencia_exencion (DateField)` + `exencion_verificada (BooleanField, default=True)` → migración 0050.
+- Vista `importar_exenciones`: preview fila x fila (✅/⚠️/❌) con datos en sesión; confirmación guarda.
+  Dirección → coincidencia parcial de calle en Subcuadra del municipio. Datos en `notas_exencion`.
+- `panel_exenciones`: acción `verificar`; lista separada en pendientes (con badge naranja) y verificados.
+- URL `/admin-exenciones/importar/`, botón 📥 en `exenciones.html`.
 
 ### ~~🔴 Plantillas de documentos por municipio (desde superadmin)~~ ✅ RESUELTO 2026-08-11
 Modelo `PlantillaDocumento` (municipio, tipo, encabezado, cuerpo, pie) + migración 0049.
