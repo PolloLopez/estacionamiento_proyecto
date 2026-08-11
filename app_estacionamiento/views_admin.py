@@ -146,6 +146,7 @@ def panel_admin(request):
         {"label": "🚗 Vehículos",         "url": _reverse("admin_vehiculos"),          "badge": None},
         {"label": "📋 Infracciones",      "url": _reverse("admin_infracciones"),       "badge": None},
         {"label": "🚫 Exenciones",        "url": _reverse("exenciones"),               "badge": None},
+        {"label": "📍 Subcuadras GPS",    "url": _reverse("gestionar_subcuadras"),     "badge": None},
         {"label": "💲 Tarifas",           "url": _reverse("gestionar_tarifas"),        "badge": None},
         {"label": "🕐 Horarios",          "url": _reverse("gestionar_horarios"),       "badge": None},
         {"label": "📅 Días especiales",   "url": _reverse("gestionar_dias_especiales"),"badge": None},
@@ -2311,3 +2312,108 @@ def pdf_rendicion(request, rendicion_id):
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gestión de subcuadras y coordenadas GPS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def gestionar_subcuadras(request):
+    """
+    Permite al admin ver, crear, editar y eliminar subcuadras del municipio,
+    y asignarles coordenadas GPS haciendo click en un mapa Leaflet/OSM.
+
+    POST accion=guardar_coordenadas: guarda lat/lon para una subcuadra.
+    POST accion=limpiar_coordenadas: elimina lat/lon de una subcuadra.
+    POST accion=crear:              crea una nueva subcuadra.
+    POST accion=eliminar:           elimina una subcuadra sin infracciones.
+    """
+    municipio = getattr(request.user, "municipio", None)
+    if not municipio:
+        return redirect("login")
+
+    if request.method == "POST":
+        accion = request.POST.get("accion")
+
+        if accion == "guardar_coordenadas":
+            subcuadra_id = request.POST.get("subcuadra_id")
+            try:
+                lat = float(request.POST.get("lat", ""))
+                lon = float(request.POST.get("lon", ""))
+            except (TypeError, ValueError):
+                messages.error(request, "Coordenadas inválidas.")
+                return redirect("gestionar_subcuadras")
+
+            sub = get_object_or_404(Subcuadra, id=subcuadra_id, municipio=municipio)
+            sub.lat = round(lat, 6)
+            sub.lon = round(lon, 6)
+            sub.save(update_fields=["lat", "lon"])
+            messages.success(request, f"✅ Coordenadas guardadas para {sub}.")
+
+        elif accion == "limpiar_coordenadas":
+            sub = get_object_or_404(
+                Subcuadra, id=request.POST.get("subcuadra_id"), municipio=municipio
+            )
+            sub.lat = None
+            sub.lon = None
+            sub.save(update_fields=["lat", "lon"])
+            messages.success(request, f"Coordenadas eliminadas de {sub}.")
+
+        elif accion == "crear":
+            calle  = request.POST.get("calle", "").strip()
+            altura = request.POST.get("altura", "").strip()
+            if not calle or not altura.lstrip("-").isdigit():
+                messages.error(request, "Calle y altura son obligatorias.")
+            else:
+                _, creada = Subcuadra.objects.get_or_create(
+                    municipio=municipio,
+                    calle=calle,
+                    altura=int(altura),
+                )
+                if creada:
+                    messages.success(request, f"✅ Subcuadra '{calle} {altura}' creada.")
+                else:
+                    messages.warning(request, f"Ya existía la subcuadra '{calle} {altura}'.")
+
+        elif accion == "eliminar":
+            sub = get_object_or_404(
+                Subcuadra, id=request.POST.get("subcuadra_id"), municipio=municipio
+            )
+            nombre = str(sub)
+            # No eliminar si tiene infracciones, estacionamientos o exenciones asociadas
+            en_uso = (
+                sub.infraccion_set.exists()
+                or sub.estacionamiento_set.exists()
+                or sub.vehiculos_exentos_en.exists()
+            )
+            if en_uso:
+                messages.error(
+                    request,
+                    f"No se puede eliminar '{nombre}' porque tiene registros asociados.",
+                )
+            else:
+                sub.delete()
+                messages.success(request, f"Subcuadra '{nombre}' eliminada.")
+
+        return redirect("gestionar_subcuadras")
+
+    # GET: listar subcuadras del municipio
+    subcuadras = Subcuadra.objects.filter(municipio=municipio).order_by("calle", "altura")
+
+    # Datos para el mapa: solo las que tienen coordenadas cargadas
+    import json as _json
+    marcadores = _json.dumps([
+        {
+            "id":     s.id,
+            "nombre": str(s),
+            "lat":    float(s.lat),
+            "lon":    float(s.lon),
+        }
+        for s in subcuadras if s.lat is not None and s.lon is not None
+    ])
+
+    return render(request, "admin/subcuadras.html", {
+        "subcuadras": subcuadras,
+        "marcadores": marcadores,
+    })

@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-10 (sesión: idempotencia MP via mp_payment_id + PDF rendiciones para admin/tesorero + CONTEXT.md unificado. 155 tests OK.)
+Última actualización: 2026-08-10 (sesión: GPS subcuadra — lat/lon en modelo, endpoint subcuadra_cercana, preselección automática en verificar.html. 155 tests OK.)
 
 ---
 
@@ -86,8 +86,8 @@ es `CierreCaja.objects.filter(certificado=True, rendicion__isnull=True)` — cie
 ya certificó pero todavía no incluyó en ninguna Rendición. El campo `rendicion` FK en CierreCaja
 ahora permite calcular esto de forma precisa.
 
-### 🔐 Logging de eventos de seguridad
-Agregar logueo en `require_role()` cuando devuelve 403, y en `login_view()` cuando falla.
+### ~~🔐 Logging de eventos de seguridad~~ ✅ RESUELTO 2026-08-10
+`require_role()` loguea WARNING en 403 (correo, path, roles, IP). `login_view()` loguea WARNING en fallo de autenticación (correo, IP). Visible en Sentry y logs Railway.
 
 ### 🔐 Límite máximo de monto en MercadoPago
 Validar en `mp_iniciar_carga` que el monto no supere un tope (ej. $50.000).
@@ -119,15 +119,19 @@ Cuando está inactivo: inspector solo verifica y labra actas (comportamiento act
 - Modo alto contraste / uso en exterior con sol.
 - Separar `settings_dev.py` / `settings_prod.py`.
 
-### Limpiar inicio_admin.html
-`templates/admin/inicio_admin.html` existe pero no se usa. Eliminar o redirigir.
+### ~~Limpiar inicio_admin.html~~ ✅ RESUELTO 2026-08-10
+Template eliminado. La vista `inicio_admin` solo redirige a `panel_admin`, nunca lo renderizaba.
 
 ---
 
 ## 💰 Mejoras para vender (Plan Premium)
 
-### Detección automática de subcuadra por GPS
-Inspector ubicado automáticamente. Requiere `Subcuadra.poligono` (JSON) + punto-en-polígono en JS.
+### ~~Detección automática de subcuadra por GPS (con lógica de exenciones)~~ ✅ RESUELTO 2026-08-10
+`Subcuadra.lat/lon` (migración 0048) + `subcuadra_cercana` endpoint (distancia euclidiana) +
+JS en `verificar.html`: geolocalización silenciosa → preselección automática → indicador "✅ GPS".
+Degradación elegante: municipios sin coordenadas siguen con selección manual.
+
+**Pendiente**: cargar las coordenadas desde el panel admin (UI para gestión de subcuadras) o importar desde Excel.
 
 ### Toggle de estadísticas por municipio (desde Django Admin)
 `Municipio.estadisticas_inspectores_activo = BooleanField(default=True)`. 1 migración, 1 chequeo.

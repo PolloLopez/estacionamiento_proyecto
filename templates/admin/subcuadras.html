@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Subcuadras GPS{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<style>
+.layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1.2rem;
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  #mapa { height: 320px; }
+}
+#mapa {
+  height: 520px;
+  border-radius: var(--radius);
+  border: 2px solid var(--color-border);
+}
+.badge-gps {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.badge-gps.ok  { background:#d4edda; color:#155724; }
+.badge-gps.no  { background:#f8f9fa; color:#6c757d; border:1px solid #dee2e6; }
+#panel-asignar {
+  display: none;
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+</style>
+
+<div class="container">
+
+  <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.2rem; flex-wrap:wrap;">
+    <h1 style="margin:0;">📍 Subcuadras</h1>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.85rem;">← Panel admin</a>
+  </div>
+
+  <!-- Instrucciones -->
+  <div class="card" style="padding:0.75rem 1rem; margin-bottom:1.2rem; font-size:0.88rem; color:var(--color-text-muted);">
+    <strong>¿Cómo asignar coordenadas?</strong>
+    Hacé click en el mapa sobre el centro de la cuadra → elegí la subcuadra en el panel que aparece → guardá.
+    Las subcuadras con pin verde ya tienen GPS activo. Las subcuadras sin GPS siguen funcionando con selección manual.
+  </div>
+
+  <div class="layout">
+
+    <!-- ── COLUMNA IZQUIERDA: lista + crear ── -->
+    <div>
+
+      <!-- Panel que aparece al clickear el mapa -->
+      <div id="panel-asignar" class="card">
+        <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0 0 0.5rem;">
+          📍 <span id="coord-texto">—</span>
+        </p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="guardar_coordenadas">
+          <input type="hidden" name="lat" id="inp-lat">
+          <input type="hidden" name="lon" id="inp-lon">
+          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+            <select name="subcuadra_id" id="sel-subcuadra" required
+                    style="flex:1; padding:0.4rem 0.6rem; border-radius:6px;
+                           border:1px solid var(--color-border); font-size:0.88rem;
+                           background:var(--color-surface); color:var(--color-text);">
+              <option value="">— elegí una subcuadra —</option>
+              {% for s in subcuadras %}
+              <option value="{{ s.id }}">{{ s }}{% if s.lat %} ✅{% endif %}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn" style="font-size:0.85rem; white-space:nowrap;">
+              💾 Guardar
+            </button>
+            <button type="button" onclick="cerrarPanel()"
+                    style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:var(--color-text-muted);">
+              ✕
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Tabla de subcuadras -->
+      <div class="card" style="overflow-x:auto; margin-bottom:1rem;">
+        <table>
+          <thead>
+            <tr>
+              <th>Subcuadra</th>
+              <th style="text-align:center;">GPS</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in subcuadras %}
+            <tr id="fila-{{ s.id }}">
+              <td style="font-weight:600;">{{ s }}</td>
+              <td style="text-align:center;">
+                {% if s.lat %}
+                  <span class="badge-gps ok" title="{{ s.lat }}, {{ s.lon }}">✅ GPS</span>
+                {% else %}
+                  <span class="badge-gps no">Sin GPS</span>
+                {% endif %}
+              </td>
+              <td style="white-space:nowrap;">
+                {% if s.lat %}
+                <form method="post" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="accion" value="limpiar_coordenadas">
+                  <input type="hidden" name="subcuadra_id" value="{{ s.id }}">
+                  <button type="submit" class="btn btn-outline"
+                          style="font-size:0.75rem; padding:0.2rem 0.5rem; color:var(--color-danger); border-color:var(--color-danger);"
+                          title="Quitar coordenadas de {{ s }}">
+                    🗑 Pin
+                  </button>
+                </form>
+                {% endif %}
+                <form method="post" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="accion" value="eliminar">
+                  <input type="hidden" name="subcuadra_id" value="{{ s.id }}">
+                  <button type="submit" class="btn btn-outline"
+                          style="font-size:0.75rem; padding:0.2rem 0.5rem;"
+                          onclick="return confirm('¿Eliminar {{ s }}?')"
+                          title="Eliminar subcuadra">
+                    ✕
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-muted" style="padding:1rem; text-align:center;">
+              No hay subcuadras cargadas.
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Crear nueva subcuadra -->
+      <div class="card" style="padding:1rem;">
+        <h3 style="margin:0 0 0.75rem; font-size:1rem;">+ Nueva subcuadra</h3>
+        <form method="post" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="crear">
+          <input type="text" name="calle" placeholder="Calle" required
+                 style="flex:2; min-width:120px; padding:0.4rem 0.6rem; border-radius:6px;
+                        border:1px solid var(--color-border); background:var(--color-surface);
+                        color:var(--color-text); font-size:0.88rem;">
+          <input type="number" name="altura" placeholder="Altura (0=Zona Única)" required
+                 style="flex:1; min-width:90px; padding:0.4rem 0.6rem; border-radius:6px;
+                        border:1px solid var(--color-border); background:var(--color-surface);
+                        color:var(--color-text); font-size:0.88rem;">
+          <button type="submit" class="btn" style="font-size:0.85rem;">Crear</button>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- ── COLUMNA DERECHA: mapa ── -->
+    <div>
+      <p style="font-size:0.82rem; color:var(--color-text-muted); margin-bottom:0.4rem;">
+        Hacé click en el mapa para marcar el centro de una cuadra:
+      </p>
+      <div id="mapa"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// Marcadores con coordenadas ya guardadas (desde el servidor)
+const marcadoresExistentes = {{ marcadores|safe }};
+
+// Centro inicial: promedio de marcadores existentes, o Argentina por defecto
+let centroLat = -38.4;
+let centroLon = -63.6;
+let zoomInicial = 5;
+
+if (marcadoresExistentes.length > 0) {
+  centroLat = marcadoresExistentes.reduce((a, m) => a + m.lat, 0) / marcadoresExistentes.length;
+  centroLon = marcadoresExistentes.reduce((a, m) => a + m.lon, 0) / marcadoresExistentes.length;
+  zoomInicial = 15;
+}
+
+// ── Inicializar mapa ──────────────────────────────────────────────────────
+const mapa = L.map("mapa").setView([centroLat, centroLon], zoomInicial);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+}).addTo(mapa);
+
+// ── Iconos ────────────────────────────────────────────────────────────────
+const iconoVerde = L.divIcon({
+  className: "",
+  html: '<div style="background:#2e7d32;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.5);"></div>',
+  iconAnchor: [7, 7],
+});
+const iconoNaranja = L.divIcon({
+  className: "",
+  html: '<div style="background:#e67e22;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.5);"></div>',
+  iconAnchor: [7, 7],
+});
+
+// ── Marcadores existentes ─────────────────────────────────────────────────
+marcadoresExistentes.forEach(m => {
+  L.marker([m.lat, m.lon], { icon: iconoVerde })
+   .addTo(mapa)
+   .bindPopup(`<b>${m.nombre}</b><br><small>${m.lat}, ${m.lon}</small>`);
+});
+
+// ── Click en el mapa: mostrar panel de asignación ─────────────────────────
+let marcadorTemporal = null;
+
+mapa.on("click", function(e) {
+  const lat = e.latlng.lat.toFixed(6);
+  const lon = e.latlng.lng.toFixed(6);
+
+  // Reemplazar marcador temporal anterior
+  if (marcadorTemporal) mapa.removeLayer(marcadorTemporal);
+  marcadorTemporal = L.marker([lat, lon], { icon: iconoNaranja }).addTo(mapa);
+
+  // Rellenar el panel
+  document.getElementById("inp-lat").value = lat;
+  document.getElementById("inp-lon").value = lon;
+  document.getElementById("coord-texto").textContent = `${lat}, ${lon}`;
+
+  // Mostrar panel
+  const panel = document.getElementById("panel-asignar");
+  panel.style.display = "block";
+  document.getElementById("sel-subcuadra").focus();
+});
+
+function cerrarPanel() {
+  document.getElementById("panel-asignar").style.display = "none";
+  if (marcadorTemporal) {
+    mapa.removeLayer(marcadorTemporal);
+    marcadorTemporal = null;
+  }
+}
+</script>
+{% endblock %}
