@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-10 (sesión: GPS subcuadra completo + admin mapa Leaflet/OSM para coordenadas + fix container max-width. 155 tests OK. Próximo: importación de exenciones desde Excel.)
+Última actualización: 2026-08-11 (sesión: PlantillaDocumento completo — modelo + migración 0049 + view superadmin + template con tabs + integración en 5 tickets con degradación elegante. Próximo: importación de exenciones desde Excel o vigencia_exencion en Vehiculo.)
 
 ---
 
@@ -37,37 +37,13 @@ El teléfono va en `notas_exencion` por ahora (no hay campo dedicado).
 3. Template `admin/importar_exenciones.html` con preview de resultados fila por fila
 4. URL + exportar en views.py + link desde panel admin
 
-### 🔴 Plantillas de documentos por municipio (desde superadmin)
-El superadmin configura el texto de cada tipo de comprobante/acta por municipio.
-Si no hay plantilla → el sistema usa los textos hardcodeados actuales (sin romper nada).
-
-**Modelo nuevo:** `PlantillaDocumento`
-```python
-class PlantillaDocumento(models.Model):
-    municipio   = FK(Municipio)
-    tipo        = CharField(choices=[
-                    'acta', 'cobro_hora', 'abono',
-                    'cobro_infraccion', 'anulacion'
-                  ])
-    encabezado  = TextField(blank=True)   # texto arriba del comprobante
-    cuerpo      = TextField(blank=True)   # texto principal / base legal
-    pie         = TextField(blank=True)   # texto pie / instrucciones
-    unique_together = (municipio, tipo)
-```
-
-**Variables disponibles** (interpolación con `str.format_map`, sin romper si falta una variable):
-- `acta`: `{patente}`, `{numero_acta}`, `{fecha}`, `{hora}`, `{subcuadra}`, `{monto}`, `{inspector}`, `{motivo}`
-- `cobro_hora`: `{patente}`, `{fecha}`, `{hora_inicio}`, `{hora_fin}`, `{duracion}`, `{monto}`
-- `abono`: `{patente}`, `{mes}`, `{anio}`, `{monto}`, `{vendedor}`
-- `cobro_infraccion`: `{patente}`, `{numero_acta}`, `{monto}`, `{fecha_pago}`
-- `anulacion`: `{patente}`, `{numero_acta}`, `{motivo_anulacion}`
-
-**Implementación:**
-1. Modelo `PlantillaDocumento` + migración
-2. Views superadmin: `gestionar_plantillas(municipio_id)` — CRUD de plantillas del municipio
-3. Template superadmin: editor por tipo con referencia de variables disponibles
-4. Helper `obtener_plantilla(municipio, tipo)` → devuelve la plantilla o `None`
-5. Integrar en los templates de tickets: `ticket_infraccion`, `ticket_cobro`, `cobrar_abono.html`, `ticket_pago_multa`, comprobante de anulación
+### ~~🔴 Plantillas de documentos por municipio (desde superadmin)~~ ✅ RESUELTO 2026-08-11
+Modelo `PlantillaDocumento` (municipio, tipo, encabezado, cuerpo, pie) + migración 0049.
+5 tipos: `acta`, `cobro_hora`, `abono`, `cobro_infraccion`, `anulacion`.
+Helper `obtener_plantilla()` en utils.py. View `gestionar_plantillas(municipio_id)` en views_superadmin.py.
+Template `superadmin/plantillas.html`: tabs por tipo, textareas, referencia de variables disponibles.
+URL `/superadmin/municipio/<id>/plantillas/` + botón en `editar_municipio.html`.
+Integrado en los 5 tickets con `texto_plantilla.encabezado/cuerpo/pie` — degradación elegante: sin plantilla → texto hardcodeado.
 
 ### 🔴 PRODUCCIÓN: Sin backups automáticos del PostgreSQL de Railway Hobby
 Railway Hobby no incluye backups automáticos. Opciones:
