@@ -12,8 +12,8 @@
   --color-surface:      #ffffff;
   --color-surface-2:    #e8ece8;
 
-  --color-primary:        #1a7a3c;
-  --color-primary-hover:  #155f2e;
+  --color-primary:        #2cde6acc;
+  --color-primary-hover:  #14883b;
   --color-primary-light:  #d4edda;
 
   --color-text:         #111111;
@@ -80,7 +80,7 @@ img { max-width: 100%; display: block; }
 .container {
   width: 100%;
   max-width: 100%;
-  margin: 0 auto;
+  /*margin: 0 auto;*/
   padding: 1.5rem 1.2rem;
 }
 
@@ -255,7 +255,7 @@ main {
 
 /* Login / registro */
 .auth-panel {
-  max-width: 420px;
+  max-width: 75%;
   margin: 3rem auto;
 }
 
