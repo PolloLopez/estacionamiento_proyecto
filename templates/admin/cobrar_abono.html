@@ -20,6 +20,9 @@
             {% endif %}
             <strong style="font-size:1.1rem;">{{ comprobante.municipio.nombre }}</strong><br>
             <span style="font-size:0.85rem; color:var(--color-text-muted);">Comprobante de abono mensual</span>
+            {% if texto_plantilla.encabezado %}
+            <p style="font-size:0.82rem; margin-top:0.5rem; white-space:pre-wrap; color:var(--color-text-muted);">{{ texto_plantilla.encabezado }}</p>
+            {% endif %}
           </div>
 
           <table style="width:100%; border-collapse:collapse; font-size:0.95rem;">
@@ -55,6 +58,15 @@
               <td style="padding:0.4rem 0; text-align:right;">{{ comprobante.fecha|date:"d/m/Y H:i" }}hs</td>
             </tr>
           </table>
+
+          {% if texto_plantilla.cuerpo %}
+          <p style="font-size:0.82rem; margin-top:0.75rem; white-space:pre-wrap; color:var(--color-text-muted); border-top:1px solid var(--color-border); padding-top:0.6rem;">{{ texto_plantilla.cuerpo }}</p>
+          {% endif %}
+
+          {% if texto_plantilla.pie %}
+          <p style="font-size:0.78rem; margin-top:0.5rem; white-space:pre-wrap; color:var(--color-text-muted);">{{ texto_plantilla.pie }}</p>
+          {% endif %}
+
         </div>
 
         <div style="display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap;" class="no-print">

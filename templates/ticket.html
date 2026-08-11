@@ -121,6 +121,9 @@
     <div class="ticket-header">
       <h2>🅿️ ESTACIONAMIENTO</h2>
       <p>Comprobante de pago</p>
+      {% if texto_plantilla.encabezado %}
+      <p style="font-size:0.78rem; margin-top:0.4rem; opacity:0.9; white-space:pre-wrap;">{{ texto_plantilla.encabezado }}</p>
+      {% endif %}
     </div>
 
     <div class="ticket-body">
@@ -147,8 +150,18 @@
       <div class="monto-valor">${{ monto }}</div>
     </div>
 
+    {% if texto_plantilla.cuerpo %}
+    <div style="padding:0.6rem 1.2rem; font-size:0.78rem; color:#555; border-top:1px solid #eee; white-space:pre-wrap;">
+      {{ texto_plantilla.cuerpo }}
+    </div>
+    {% endif %}
+
     <div class="ticket-footer">
+      {% if texto_plantilla.pie %}
+      {{ texto_plantilla.pie }}
+      {% else %}
       Gracias por su pago · EstacionAR
+      {% endif %}
     </div>
 
   </div>

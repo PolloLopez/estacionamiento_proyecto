@@ -27,6 +27,10 @@
     <h3>🚨 ACTA DE INFRACCIÓN</h3>
     <p>{{ infraccion.municipio.nombre }}</p>
 
+    {% if texto_plantilla.encabezado %}
+    <p style="font-size:0.82rem; white-space:pre-wrap;">{{ texto_plantilla.encabezado }}</p>
+    {% endif %}
+
     <hr>
 
     <p class="acta-num">Acta N° {{ infraccion.id }}</p>
@@ -59,8 +63,18 @@
     {% endif %}
 
     <hr>
+
+    {% if texto_plantilla.cuerpo %}
+    <p style="font-size:0.82rem; white-space:pre-wrap;">{{ texto_plantilla.cuerpo }}</p>
+    <hr>
+    {% endif %}
+
+    {% if texto_plantilla.pie %}
+    <p style="font-size:0.8rem; white-space:pre-wrap;">{{ texto_plantilla.pie }}</p>
+    {% else %}
     <p style="font-size:0.8rem;">Para pagar ingresá a la app con tu patente.
     estacionamiento.up.railway.app/</p>
+    {% endif %}
 
   </div>
 

@@ -40,7 +40,7 @@ from .services_caja import generar_cierre_caja
 from .use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
 from .services.horarios import calcular_opciones_duracion, puede_estacionar_ahora
 from .services.infracciones import calcular_estado_tolerancia, MEDIOS_VALIDOS_COBRO
-from .utils import get_subcuadra_default, sanitizar_patente
+from .utils import get_subcuadra_default, obtener_plantilla, sanitizar_patente
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -532,12 +532,26 @@ def cobrar_abono(request):
                         "municipio": municipio,
                         "fecha":     timezone.localtime(),
                     }
+
+                    # Plantilla personalizada para el comprobante de abono
+                    plantilla_abono = obtener_plantilla(municipio, "abono")
+                    texto_plantilla_abono = None
+                    if plantilla_abono:
+                        texto_plantilla_abono = plantilla_abono.renderizar({
+                            "patente":  patente,
+                            "mes":      mes_label.split()[0],  # "Enero", "Febrero", ...
+                            "anio":     str(mes_seleccionado.year),
+                            "monto":    str(precio),
+                            "vendedor": str(vendedor),
+                        })
+
                     from django.urls import reverse as _reverse
                     volver_url = _reverse("panel_admin") if request.user.es_admin else _reverse("panel_vendedor")
                     return render(request, "admin/cobrar_abono.html", {
-                        "comprobante":    comprobante,
-                        "opciones_mes":   opciones_mes,
-                        "volver_url":     volver_url,
+                        "comprobante":         comprobante,
+                        "opciones_mes":        opciones_mes,
+                        "volver_url":          volver_url,
+                        "texto_plantilla":     texto_plantilla_abono,
                     })
 
     from django.urls import reverse as _reverse
@@ -666,6 +680,7 @@ def ticket_pago_multa(request, infraccion_id):
     """
     Comprobante de pago (o anulación por gracia) de una infracción.
     Solo se muestra si la infracción fue procesada (pagada o anulada).
+    Incluye texto personalizado si el superadmin configuró una PlantillaDocumento.
     """
     infraccion = get_object_or_404(
         Infraccion, id=infraccion_id, municipio=request.user.municipio,
@@ -674,9 +689,23 @@ def ticket_pago_multa(request, infraccion_id):
         messages.warning(request, "Esta infracción aún está pendiente.")
         return redirect("consultar_deuda")
 
+    # Elegir tipo de plantilla según estado
+    tipo_plantilla = "anulacion" if infraccion.estado == "anulada" else "cobro_infraccion"
+    plantilla = obtener_plantilla(infraccion.municipio, tipo_plantilla)
+    texto_plantilla = None
+    if plantilla:
+        texto_plantilla = plantilla.renderizar({
+            "patente":           infraccion.vehiculo.patente,
+            "numero_acta":       infraccion.numero_acta or "",
+            "monto":             str(infraccion.monto),
+            "fecha_pago":        infraccion.pagada_en.strftime("%d/%m/%Y") if infraccion.pagada_en else "",
+            "motivo_anulacion":  infraccion.motivo_anulacion or "",
+        })
+
     return render(request, "ticket_pago_multa.html", {
-        "infraccion":  infraccion,
-        "cobrado_por": request.user,
+        "infraccion":      infraccion,
+        "cobrado_por":     request.user,
+        "texto_plantilla": texto_plantilla,
     })
 
 
@@ -731,15 +760,37 @@ def resumen_cobros(request):
 
 @require_role("vendedor", "admin")
 def ticket_cobro(request, est_id):
-    """Comprobante de cobro de un estacionamiento registrado por el vendedor."""
+    """
+    Comprobante de cobro de un estacionamiento registrado por el vendedor.
+    Incluye texto personalizado si el superadmin configuró una PlantillaDocumento.
+    """
     est = get_object_or_404(
         Estacionamiento, id=est_id, subcuadra__municipio=request.user.municipio
     )
+
+    municipio = request.user.municipio
+    plantilla = obtener_plantilla(municipio, "cobro_hora")
+    texto_plantilla = None
+    if plantilla:
+        hora_fin = None
+        if est.hora_inicio and est.duracion_horas:
+            from datetime import timedelta
+            hora_fin = est.hora_inicio + timedelta(hours=float(est.duracion_horas))
+        texto_plantilla = plantilla.renderizar({
+            "patente":     est.vehiculo.patente,
+            "fecha":       est.hora_inicio.strftime("%d/%m/%Y") if est.hora_inicio else "",
+            "hora_inicio": est.hora_inicio.strftime("%H:%M") if est.hora_inicio else "",
+            "hora_fin":    hora_fin.strftime("%H:%M") if hora_fin else "",
+            "duracion":    str(est.duracion_horas),
+            "monto":       str(est.costo_base),
+        })
+
     return render(request, "ticket.html", {
-        "patente":  est.vehiculo.patente,
-        "duracion": est.duracion_horas,
-        "hora":     est.hora_inicio,
-        "monto":    est.costo_base,
+        "patente":          est.vehiculo.patente,
+        "duracion":         est.duracion_horas,
+        "hora":             est.hora_inicio,
+        "monto":            est.costo_base,
+        "texto_plantilla":  texto_plantilla,
     })
 
 
