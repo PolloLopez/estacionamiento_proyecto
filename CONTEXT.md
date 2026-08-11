@@ -134,6 +134,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `Rendicion` | El admin cierra un período seleccionando CierreCaja certificados. Totales **calculados automáticamente** del desglose de los cierres elegidos: `total_efectivo`, `total_digital` (transferencia+débito+crédito+QR agrupados), `total_neto = efectivo + digital`. `comprobante_archivo` para adjuntar comprobante de transferencia. Estado: `pendiente`/`validada`/`observada`. El tesorero registra quién validó y cuándo. |
 | `LiquidacionComision` | Pago de comisiones a un vendedor. Flujo: `pendiente` → `depositada` (tesorero) → `certificada` (vendedor). `factura_presentada (BooleanField)` + `factura_archivo (FileField)` para el comprobante de factura del vendedor. |
 | `DestinatarioInforme` | Personas que reciben el informe mensual por email. |
+| `PlantillaDocumento` | *(pendiente)* Texto personalizable por municipio para cada tipo de comprobante/acta. Tipos: `acta`, `cobro_hora`, `abono`, `cobro_infraccion`, `anulacion`. Campos: `encabezado`, `cuerpo`, `pie`. Si no existe plantilla → usa texto hardcodeado actual. |
 | `Notificacion` | Notificaciones internas al conductor. |
 
 ---
