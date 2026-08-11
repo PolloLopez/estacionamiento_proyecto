@@ -99,6 +99,7 @@ from .views_admin import (
     pdf_infracciones_juzgado,
     pdf_rendicion,
     gestionar_subcuadras,
+    importar_exenciones,
 )
 from .views_mp import (
     mp_iniciar_carga,

@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Importar exenciones desde Excel{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>📥 Importar exenciones desde Excel</h2>
+    <a href="{% url 'panel_exenciones' %}" class="btn btn-outline" style="font-size:0.9rem;">
+      ← Volver a exenciones
+    </a>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'success' %}alert-success
+                        {% elif message.tags == 'error' %}alert-danger
+                        {% else %}alert-warning{% endif %}"
+           style="margin-bottom:1rem;">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {# ── FORMULARIO DE CARGA (solo cuando no estamos en preview) ─────────────── #}
+  {% if not modo %}
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin-bottom:0.75rem;">Formato esperado del Excel</h3>
+    <p style="font-size:0.9rem; margin-bottom:0.5rem;">
+      La primera fila debe ser el encabezado. Las columnas deben estar en este orden:
+    </p>
+    <div style="overflow-x:auto;">
+      <table style="font-size:0.85rem; border-collapse:collapse; width:100%;">
+        <thead>
+          <tr style="background:var(--color-bg-subtle);">
+            <th style="padding:0.4rem 0.75rem; text-align:left;">A — Patente</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left;">B — Nombre y Apellido</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left;">C — Dirección</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left;">D — Teléfono</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left;">E — Fecha</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left;">F — Condición</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left;">G — Vencimiento</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:0.4rem 0.75rem; font-family:monospace;">ABC123</td>
+            <td style="padding:0.4rem 0.75rem;">Juan Pérez</td>
+            <td style="padding:0.4rem 0.75rem;">San Martín</td>
+            <td style="padding:0.4rem 0.75rem;">2994123456</td>
+            <td style="padding:0.4rem 0.75rem;">01/01/2025</td>
+            <td style="padding:0.4rem 0.75rem;">Propietario</td>
+            <td style="padding:0.4rem 0.75rem; color:var(--color-text-muted);">(vacío)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.75rem;">
+      <strong>Dirección</strong>: se busca como nombre de calle en las subcuadras del municipio.
+      Puede ser una coincidencia parcial (ej. "Martín" encuentra "San Martín 200").<br>
+      Todos los registros quedan <strong>pendientes de verificación</strong> para que el admin
+      contacte a cada titular por teléfono y complete los datos faltantes (correo, etc.).
+    </p>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-bottom:1rem;">Seleccionar archivo</h3>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="preview">
+      <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+        <div style="flex:1; min-width:220px;">
+          <label for="archivo" style="display:block; margin-bottom:0.3rem;">
+            Archivo Excel (.xlsx)
+          </label>
+          <input type="file" id="archivo" name="archivo" accept=".xlsx,.xls" required
+                 style="font-size:0.95rem;">
+        </div>
+        <button type="submit" class="btn">🔍 Vista previa</button>
+      </div>
+    </form>
+  </div>
+
+  {% endif %}{# /not modo #}
+
+  {# ── TABLA DE PREVIEW ──────────────────────────────────────────────────────── #}
+  {% if modo == "preview" %}
+
+    {% if resultados %}
+
+    {# Chips de resumen — contados por JS al cargar la página #}
+    <div id="resumen-chips" style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+      <span id="cnt-nuevo"
+            style="background:#d1fae5; color:#065f46; border-radius:8px;
+                   padding:0.35rem 0.85rem; font-weight:600; font-size:0.88rem;">
+        ✅ Nuevos: —
+      </span>
+      <span id="cnt-actualizar"
+            style="background:#fef3c7; color:#92400e; border-radius:8px;
+                   padding:0.35rem 0.85rem; font-weight:600; font-size:0.88rem;">
+        ⚠️ Actualizarán: —
+      </span>
+      <span id="cnt-error"
+            style="background:#fee2e2; color:#991b1b; border-radius:8px;
+                   padding:0.35rem 0.85rem; font-weight:600; font-size:0.88rem;">
+        ❌ Errores: —
+      </span>
+    </div>
+
+    <div style="overflow-x:auto; margin-bottom:1.5rem;">
+      <table style="width:100%; border-collapse:collapse; font-size:0.88rem;">
+        <thead>
+          <tr style="background:var(--color-bg-subtle); text-align:left;">
+            <th style="padding:0.4rem 0.6rem;">#</th>
+            <th style="padding:0.4rem 0.6rem;">Estado</th>
+            <th style="padding:0.4rem 0.6rem;">Patente</th>
+            <th style="padding:0.4rem 0.6rem;">Nombre</th>
+            <th style="padding:0.4rem 0.6rem;">Teléfono</th>
+            <th style="padding:0.4rem 0.6rem;">Dirección → Subcuadra</th>
+            <th style="padding:0.4rem 0.6rem;">Detalle</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in resultados %}
+          <tr data-estado="{{ r.estado }}"
+              style="border-bottom:1px solid var(--color-border);
+                     {% if r.estado == 'error' %}background:#fff5f5;
+                     {% elif r.estado == 'actualizar' %}background:#fffbeb;
+                     {% endif %}">
+            <td style="padding:0.4rem 0.6rem; color:var(--color-text-muted);">{{ r.num }}</td>
+            <td style="padding:0.4rem 0.6rem; font-size:1.05rem;">
+              {% if r.estado == "nuevo" %}✅
+              {% elif r.estado == "actualizar" %}⚠️
+              {% else %}❌
+              {% endif %}
+            </td>
+            <td style="padding:0.4rem 0.6rem; font-weight:700; font-family:monospace;">
+              {{ r.patente|default:"—" }}
+            </td>
+            <td style="padding:0.4rem 0.6rem;">{{ r.nombre|default:"—" }}</td>
+            <td style="padding:0.4rem 0.6rem;">{{ r.telefono|default:"—" }}</td>
+            <td style="padding:0.4rem 0.6rem;">
+              {{ r.direccion|default:"—" }}
+              {% if r.subcuadra %}
+                <br><span style="font-size:0.8rem; color:#065f46;">→ {{ r.subcuadra }}</span>
+              {% elif r.direccion %}
+                <br><span style="font-size:0.8rem; color:#b45309;">→ sin coincidencia</span>
+              {% endif %}
+            </td>
+            <td style="padding:0.4rem 0.6rem; font-size:0.82rem;
+                       color:var(--color-text-muted);">{{ r.mensaje }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Botones de acción #}
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;">
+      <form method="post" id="form-confirmar">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="confirmar">
+        <button type="submit" class="btn" id="btn-confirmar">
+          ✅ Confirmar importación
+        </button>
+      </form>
+      <a href="{% url 'importar_exenciones' %}" class="btn btn-outline">
+        🔄 Cargar otro archivo
+      </a>
+      <a href="{% url 'panel_exenciones' %}" class="btn btn-outline">
+        ← Cancelar
+      </a>
+    </div>
+
+    {% else %}
+      <div class="alert alert-warning">El archivo no contiene filas válidas.</div>
+      <a href="{% url 'importar_exenciones' %}" class="btn btn-outline"
+         style="margin-top:0.75rem;">← Volver a cargar</a>
+    {% endif %}
+
+  {% endif %}{# /modo preview #}
+
+</section>
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // Contar filas por estado y actualizar los chips de resumen
+  var filas = document.querySelectorAll("tr[data-estado]");
+  var conteos = { nuevo: 0, actualizar: 0, error: 0 };
+  filas.forEach(function (f) {
+    var e = f.dataset.estado;
+    if (conteos[e] !== undefined) conteos[e]++;
+  });
+  var cntNuevo = document.getElementById("cnt-nuevo");
+  var cntAct   = document.getElementById("cnt-actualizar");
+  var cntErr   = document.getElementById("cnt-error");
+  if (cntNuevo) cntNuevo.textContent      = "✅ Nuevos: " + conteos.nuevo;
+  if (cntAct)   cntAct.textContent        = "⚠️ Actualizarán: " + conteos.actualizar;
+  if (cntErr)   cntErr.textContent        = "❌ Errores: " + conteos.error;
+
+  // Confirmación antes de guardar
+  var btnConfirmar = document.getElementById("btn-confirmar");
+  if (btnConfirmar) {
+    btnConfirmar.addEventListener("click", function (e) {
+      var total = conteos.nuevo + conteos.actualizar;
+      if (!confirm("Se importarán " + total + " vehículo(s). ¿Confirmar?")) {
+        e.preventDefault();
+      }
+    });
+  }
+});
+</script>
+{% endblock %}
+
+{% endblock %}
