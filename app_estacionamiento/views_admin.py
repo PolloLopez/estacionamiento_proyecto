@@ -2485,22 +2485,55 @@ def _procesar_fila_exencion(fila_num, fila_vals, municipio):
             "estado": "error", "mensaje": "Patente vacía — fila ignorada.",
         }
 
-    # ── Buscar subcuadra por nombre de calle (coincidencia parcial) ───────────
-    # Se filtra solo dentro del municipio para no mezclar con otros.
-    # Si hay más de una coincidencia se toma la primera alfabéticamente.
+    # ── Buscar subcuadra a partir de la dirección ────────────────────────────
+    # La dirección viene como "CALLE NUMERO" (ej: "29 685", "San Martín 430").
+    # Las subcuadras se organizan en bloques de 50 numerales, así que:
+    #   altura_real = 685 → bloque = (685 // 50) * 50 = 650
+    # Estrategia:
+    #   1. Separar el último token como número (altura real).
+    #   2. Calcular el bloque de 50.
+    #   3. Buscar subcuadra por calle (icontains) + altura exacta del bloque.
+    #   4. Si no hay coincidencia exacta, intentar solo por calle.
     subcuadra = None
     aviso_subcuadra = ""
     if direccion:
-        candidatas = Subcuadra.objects.filter(
-            municipio=municipio,
-            calle__icontains=direccion,
-        ).order_by("calle", "altura")
-        if candidatas.exists():
-            subcuadra = candidatas.first()
-            if candidatas.count() > 1:
-                aviso_subcuadra = f" (múltiples coincidencias para '{direccion}', se tomó la primera)"
+        # Separar calle y número desde la derecha (ej: "San Martín 430" → ["San Martín", "430"])
+        tokens = direccion.strip().rsplit(None, 1)
+        calle_texto = None
+        altura_bloque = None
+
+        if len(tokens) == 2:
+            try:
+                altura_real  = int(tokens[1])
+                calle_texto  = tokens[0].strip()
+                altura_bloque = (altura_real // 50) * 50
+            except ValueError:
+                # El último token no es un número → tratamos toda la cadena como calle
+                calle_texto = direccion
         else:
-            aviso_subcuadra = f" (sin subcuadra para '{direccion}')"
+            calle_texto = direccion
+
+        # Intento 1: calle (icontains) + altura exacta del bloque
+        if calle_texto and altura_bloque is not None:
+            candidatas = Subcuadra.objects.filter(
+                municipio=municipio,
+                calle__icontains=calle_texto,
+                altura=altura_bloque,
+            )
+            if candidatas.exists():
+                subcuadra = candidatas.first()
+
+        # Intento 2 (fallback): solo por calle, sin filtrar altura
+        if subcuadra is None and calle_texto:
+            candidatas = Subcuadra.objects.filter(
+                municipio=municipio,
+                calle__icontains=calle_texto,
+            ).order_by("calle", "altura")
+            if candidatas.exists():
+                subcuadra = candidatas.first()
+                aviso_subcuadra = f" (sin subcuadra en bloque {altura_bloque}, se tomó {subcuadra})"
+            else:
+                aviso_subcuadra = f" (sin subcuadra para '{direccion}')"
 
     # ── Construir notas_exencion ──────────────────────────────────────────────
     partes = []
