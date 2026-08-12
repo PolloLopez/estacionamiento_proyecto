@@ -2485,53 +2485,63 @@ def _procesar_fila_exencion(fila_num, fila_vals, municipio):
             "estado": "error", "mensaje": "Patente vacía — fila ignorada.",
         }
 
+    # ── Detectar tipo de exención ─────────────────────────────────────────────
+    # Si Condicion contiene "global" → exento_global (cubre cualquier subcuadra).
+    # Cualquier otro valor (vacío, "Propietario", etc.) → exento_parcial.
+    es_global = "global" in condicion.lower()
+
     # ── Buscar subcuadra a partir de la dirección ────────────────────────────
     # La dirección viene como "CALLE NUMERO" (ej: "29 685", "San Martín 430").
-    # Las subcuadras se organizan en bloques de 50 numerales, así que:
+    # Las subcuadras se organizan en bloques de 50 numerales:
     #   altura_real = 685 → bloque = (685 // 50) * 50 = 650
     # Estrategia:
-    #   1. Separar el último token como número (altura real).
-    #   2. Calcular el bloque de 50.
+    #   1. Separar el último token como número (altura real del domicilio).
+    #   2. Calcular el bloque de 50 más cercano hacia abajo.
     #   3. Buscar subcuadra por calle (icontains) + altura exacta del bloque.
-    #   4. Si no hay coincidencia exacta, intentar solo por calle.
+    #   4. Si no existe ese bloque, tomar la subcuadra de la misma calle con
+    #      altura más cercana (menor distancia absoluta).
     subcuadra = None
     aviso_subcuadra = ""
     if direccion:
-        # Separar calle y número desde la derecha (ej: "San Martín 430" → ["San Martín", "430"])
+        # Separar calle y número desde la derecha
         tokens = direccion.strip().rsplit(None, 1)
-        calle_texto = None
+        calle_texto  = None
         altura_bloque = None
 
         if len(tokens) == 2:
             try:
-                altura_real  = int(tokens[1])
-                calle_texto  = tokens[0].strip()
+                altura_real   = int(tokens[1])
+                calle_texto   = tokens[0].strip()
                 altura_bloque = (altura_real // 50) * 50
             except ValueError:
-                # El último token no es un número → tratamos toda la cadena como calle
                 calle_texto = direccion
         else:
             calle_texto = direccion
 
-        # Intento 1: calle (icontains) + altura exacta del bloque
+        # Intento 1: calle + bloque exacto
         if calle_texto and altura_bloque is not None:
-            candidatas = Subcuadra.objects.filter(
+            exactas = Subcuadra.objects.filter(
                 municipio=municipio,
                 calle__icontains=calle_texto,
                 altura=altura_bloque,
             )
-            if candidatas.exists():
-                subcuadra = candidatas.first()
+            if exactas.exists():
+                subcuadra = exactas.first()
 
-        # Intento 2 (fallback): solo por calle, sin filtrar altura
+        # Intento 2: misma calle, subcuadra con altura más cercana al bloque
         if subcuadra is None and calle_texto:
-            candidatas = Subcuadra.objects.filter(
+            por_calle = list(Subcuadra.objects.filter(
                 municipio=municipio,
                 calle__icontains=calle_texto,
-            ).order_by("calle", "altura")
-            if candidatas.exists():
-                subcuadra = candidatas.first()
-                aviso_subcuadra = f" (sin subcuadra en bloque {altura_bloque}, se tomó {subcuadra})"
+            ))
+            if por_calle:
+                if altura_bloque is not None:
+                    subcuadra = min(por_calle, key=lambda s: abs(s.altura - altura_bloque))
+                    aviso_subcuadra = (
+                        f" (bloque {altura_bloque} no existe, subcuadra más cercana: {subcuadra})"
+                    )
+                else:
+                    subcuadra = por_calle[0]
             else:
                 aviso_subcuadra = f" (sin subcuadra para '{direccion}')"
 
@@ -2554,10 +2564,10 @@ def _procesar_fila_exencion(fila_num, fila_vals, municipio):
     # ── Determinar si el vehículo ya existe ───────────────────────────────────
     vehiculo_existente = Vehiculo.objects.filter(patente=patente).first()
     estado  = "actualizar" if vehiculo_existente else "nuevo"
+    tipo_label = "🌐 Global" if es_global else "📍 Parcial"
     mensaje = (
-        f"Actualiza vehículo existente.{aviso_subcuadra}"
-        if vehiculo_existente
-        else f"Crea vehículo nuevo.{aviso_subcuadra}"
+        f"{'Actualiza' if vehiculo_existente else 'Crea'} vehículo. "
+        f"{tipo_label}.{aviso_subcuadra}"
     )
 
     return {
@@ -2567,6 +2577,7 @@ def _procesar_fila_exencion(fila_num, fila_vals, municipio):
         "telefono":  telefono,
         "direccion": direccion,
         "subcuadra": subcuadra,
+        "es_global": es_global,
         "notas":     notas,
         "estado":    estado,
         "mensaje":   mensaje,
@@ -2580,21 +2591,30 @@ def _guardar_fila_exencion(datos_fila, municipio):
 
     Reglas:
     - get_or_create por patente.
-    - exento_parcial = True, exencion_verificada = False.
+    - es_global=True  → exento_global=True  (vale en cualquier subcuadra).
+    - es_global=False → exento_parcial=True (solo en subcuadras_exentas).
+    - exencion_verificada = False (pendiente de contacto con el titular).
     - tipo_exencion = "vecino_frentista".
-    - Si hay subcuadra → agregarla a subcuadras_exentas (sin borrar las existentes).
-    - notas_exencion: si ya tenía notas, se concatena con " | ".
+    - Si hay subcuadra → agregarla a subcuadras_exentas con .add() (no borra
+      las existentes, por eso es seguro para vehículos ya registrados).
+    - notas_exencion: se concatena con " | " para no pisar datos anteriores.
     """
     patente   = datos_fila["patente"]
     subcuadra = datos_fila["subcuadra"]
     notas     = datos_fila["notas"]
+    es_global = datos_fila.get("es_global", False)
 
     vehiculo, _ = Vehiculo.objects.get_or_create(
         patente=patente,
         defaults={"tipo": "auto", "municipio": municipio},
     )
 
-    vehiculo.exento_parcial      = True
+    if es_global:
+        vehiculo.exento_global  = True
+        # No tocamos exento_parcial ni subcuadras_exentas si ya tenía parcial
+    else:
+        vehiculo.exento_parcial = True
+
     vehiculo.exencion_verificada = False
     vehiculo.tipo_exencion       = "vecino_frentista"
 
@@ -2671,9 +2691,10 @@ def importar_exenciones(request):
             if d["estado"] == "error":
                 continue
             datos_sesion.append({
-                "patente":     d["patente"],
+                "patente":      d["patente"],
                 "subcuadra_id": d["subcuadra"].id if d["subcuadra"] else None,
-                "notas":       d["notas"],
+                "notas":        d["notas"],
+                "es_global":    d.get("es_global", False),
             })
         request.session["importar_exenciones_datos"] = datos_sesion
 
@@ -2705,7 +2726,12 @@ def importar_exenciones(request):
 
             existia = Vehiculo.objects.filter(patente=patente).exists()
             _guardar_fila_exencion(
-                {"patente": patente, "subcuadra": subcuadra, "notas": notas},
+                {
+                    "patente":   patente,
+                    "subcuadra": subcuadra,
+                    "notas":     notas,
+                    "es_global": item.get("es_global", False),
+                },
                 municipio,
             )
             if existia:
