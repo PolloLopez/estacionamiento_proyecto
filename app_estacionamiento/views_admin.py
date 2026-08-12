@@ -2598,7 +2598,7 @@ def importar_exenciones(request):
         import openpyxl
     except ImportError:
         messages.error(request, "Falta instalar openpyxl: pip install openpyxl")
-        return redirect("panel_exenciones")
+        return redirect("exenciones")
 
     usuario   = request.user
     municipio = getattr(usuario, "municipio", None)
@@ -2686,7 +2686,7 @@ def importar_exenciones(request):
             f"{actualizados} actualizados. "
             "Todos quedan pendientes de verificación.",
         )
-        return redirect("panel_exenciones")
+        return redirect("exenciones")
 
     # GET
     return render(request, "admin/importar_exenciones.html", {})
