@@ -1,36 +1,184 @@
 {% extends "base.html" %}
-{% block title %}Estacionamiento — Ingresar{% endblock %}
+{% load static %}
+{% block title %}EstacionAR — Ingresar{% endblock %}
 
 {% block content %}
-<section class="panel auth-panel">
-  <h2>Iniciar sesión</h2>
-  <form method="post" action="{% url 'login' %}">
-  {% csrf_token %}
+<div class="auth-wrapper">
+  <div class="auth-card">
 
-  <a href="/accounts/google/login/" class="btn btn-google">
-    Ingresar con Google
-  </a>
-  <hr style="margin: 1rem 0;">
+    <!-- Branding -->
+    <div class="auth-logo">
+      {% if municipio_branding and municipio_branding.logo %}
+        <img src="{{ municipio_branding.logo.url }}"
+             alt="{{ municipio_branding.nombre_sistema|default:municipio_branding.nombre }}"
+             style="height:52px; width:auto; margin:0 auto 0.75rem;">
+      {% else %}
+        <div class="auth-logo-icono">🚗</div>
+      {% endif %}
+      <h1>{{ municipio_branding.nombre_sistema|default:"EstacionAR" }}</h1>
+      {% if municipio_branding and municipio_branding.nombre %}
+        <p>{{ municipio_branding.nombre }}</p>
+      {% else %}
+        <p>Sistema municipal de estacionamiento</p>
+      {% endif %}
+    </div>
 
-  <label for="id_correo">Correo</label>
-  <input type="email" id="id_correo" name="correo"
-         value="{{ request.POST.correo|default:'' }}"
-         required placeholder="tucorreo@ejemplo.com">
+    <form method="post" action="{% url 'login' %}">
+      {% csrf_token %}
 
-  <label for="id_password">Contraseña</label>
-  <input type="password" id="id_password" name="password" required>
+      <!-- Google OAuth -->
+      <a href="/accounts/google/login/" class="btn btn-google">
+        Continuar con Google
+      </a>
 
-  <button type="submit" class="btn" style="width:100%;">Entrar</button>
+      <div class="auth-divisor">
+        <span>o ingresá con tu correo</span>
+      </div>
 
-  {% if form.errors %}
-    <p class="error">Correo o contraseña incorrectos</p>
-  {% endif %}
+      <!-- Correo -->
+      <div class="form-group">
+        <label for="id_correo">Correo electrónico</label>
+        <input type="email" id="id_correo" name="correo"
+               value="{{ request.POST.correo|default:'' }}"
+               required
+               placeholder="tucorreo@ejemplo.com"
+               autocomplete="email">
+      </div>
 
-  <div style="margin-top:1rem; font-size:0.9rem; text-align:center; color:var(--color-text-muted);">
-    <a href="{% url 'registro' %}">¿No tenés cuenta? Registrate</a>
-    &nbsp;·&nbsp;
-    <a href="{% url 'account_reset_password' %}">¿Olvidaste tu contraseña?</a>
+      <!-- Contraseña -->
+      <div class="form-group">
+        <label for="id_password">Contraseña</label>
+        <input type="password" id="id_password" name="password"
+               required
+               placeholder="••••••••"
+               autocomplete="current-password">
+      </div>
+
+      {% if form.errors %}
+        <div class="alert alert-danger" style="margin-bottom:0.75rem;">
+          ❌ Correo o contraseña incorrectos
+        </div>
+      {% endif %}
+
+      <button type="submit" class="btn" style="width:100%; margin-top:0.25rem; font-size:1rem; padding:0.75rem 1rem;">
+        Ingresar
+      </button>
+
+      <div class="auth-links">
+        <a href="{% url 'registro' %}">¿No tenés cuenta? Registrate</a>
+        <a href="{% url 'account_reset_password' %}">Olvidé mi contraseña</a>
+      </div>
+    </form>
+
   </div>
-</form>
-</section>
+</div>
+
+<style>
+/* ── Wrapper: centra la card verticalmente en la pantalla ─────── */
+.auth-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100dvh - var(--navbar-h) - 60px);
+  padding: 1.5rem 1rem;
+}
+
+/* ── Card blanca con sombra ───────────────────────────────────── */
+.auth-card {
+  background: var(--color-surface);
+  border-radius: 18px;
+  padding: 2.5rem 2rem 2rem;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.13);
+  border: 1px solid var(--color-border);
+}
+
+/* ── Sección de logo/branding ─────────────────────────────────── */
+.auth-logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.auth-logo-icono {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: 0.6rem;
+  /* Fondo circular verde para darle identidad visual */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  background: #14883b;
+  border-radius: 50%;
+  margin-bottom: 0.75rem;
+}
+
+.auth-logo h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #14883b;
+  letter-spacing: -0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.auth-logo p {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+/* ── Divisor "o ingresá con tu correo" ───────────────────────── */
+.auth-divisor {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.auth-divisor::before,
+.auth-divisor::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* ── Links de registro y recupero ────────────────────────────── */
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.85rem;
+}
+
+.auth-links a {
+  color: var(--color-text-muted);
+  transition: color 0.15s;
+}
+
+.auth-links a:hover {
+  color: #14883b;
+  text-decoration: none;
+}
+
+/* ── Mobile ───────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 2rem 1.25rem 1.5rem;
+    border-radius: 14px;
+  }
+  .auth-links {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+}
+</style>
 {% endblock %}

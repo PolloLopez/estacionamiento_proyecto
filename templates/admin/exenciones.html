@@ -212,7 +212,7 @@
                 {% if subs %}{{ subs|length }} subcuadra{{ subs|length|pluralize }}{% else %}—{% endif %}
               {% endwith %}
             </td>
-            <td style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <td style=" gap:0.4rem; flex-wrap:wrap;">
               {# Editar exención #}
               <form method="POST" style="display:inline;">
                 {% csrf_token %}

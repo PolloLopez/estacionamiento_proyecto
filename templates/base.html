@@ -61,6 +61,16 @@
       {% endif %}
     </a>
 
+    <!-- Botón instalar PWA (aparece solo si Chrome lo soporta en el dispositivo) -->
+    <button id="btn-instalar-pwa"
+            style="display:none; background:rgba(255,255,255,0.18); color:#fff;
+                   border:2px solid rgba(255,255,255,0.55); border-radius:8px;
+                   padding:0.35rem 0.85rem; cursor:pointer; font-size:0.82rem;
+                   font-weight:700; white-space:nowrap; flex-shrink:0;
+                   line-height:1.3; order:1;">
+      📲 Instalar
+    </button>
+
     <!-- Botón hamburguesa (solo mobile) -->
     <button class="menu-toggle"
             id="menuToggle"
@@ -221,6 +231,41 @@
     navigator.serviceWorker.register("{% url 'service_worker' %}", { scope: '/' })
       .catch(function() {}); // fallar silenciosamente si hay error
   }
+  </script>
+
+  <!-- Instalar PWA: capturamos el evento y mostramos el botón cuando Chrome lo permite.
+       Chrome solo dispara beforeinstallprompt si el sitio cumple todos los requisitos
+       (HTTPS + manifest + service worker + no está ya instalado). -->
+  <script>
+  (function () {
+    var promptGuardado = null;
+    var btnInstalar = document.getElementById("btn-instalar-pwa");
+
+    // Chrome dispara este evento cuando la app es instalable.
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();            // evitar el mini-banner automático de Chrome
+      promptGuardado = e;
+      if (btnInstalar) btnInstalar.style.display = "block";
+    });
+
+    // Al hacer click: mostrar el diálogo de instalación nativo de Chrome.
+    if (btnInstalar) {
+      btnInstalar.addEventListener("click", function () {
+        if (!promptGuardado) return;
+        promptGuardado.prompt();
+        promptGuardado.userChoice.then(function () {
+          promptGuardado = null;
+          btnInstalar.style.display = "none";
+        });
+      });
+    }
+
+    // Si el usuario ya instaló la app, ocultar el botón.
+    window.addEventListener("appinstalled", function () {
+      promptGuardado = null;
+      if (btnInstalar) btnInstalar.style.display = "none";
+    });
+  }());
   </script>
 
   {% block extra_scripts %}{% endblock %}
