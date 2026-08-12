@@ -5,7 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   {% load static %}
 
-  <title>{% block title %}Estacionamiento{% endblock %}</title>
+  <title>{% block title %}EstacionAR{% endblock %}</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="{% url 'manifest_json' %}">
+  <link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="EstacionAR">
+  <meta name="theme-color" content="#14883b">
 
   <link rel="stylesheet" href="{% static 'app_estacionamiento/css/global.css' %}">
 
@@ -205,6 +214,16 @@
   });
 
   </script>
+
+  <!-- Registro del Service Worker (PWA) -->
+  <script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register("{% url 'service_worker' %}", { scope: '/' })
+      .catch(function() {}); // fallar silenciosamente si hay error
+  }
+  </script>
+
+  {% block extra_scripts %}{% endblock %}
 
 </body>
 </html>

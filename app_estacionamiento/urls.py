@@ -3,8 +3,16 @@
 from django.urls import path
 from . import views
 from . import views_superadmin
+from . import views_pwa
 
 urlpatterns = [
+
+    # =========================
+    # 📱 PWA
+    # =========================
+    path("manifest.json", views_pwa.manifest_json, name="manifest_json"),
+    path("sw.js",         views_pwa.service_worker, name="service_worker"),
+
 
     # =========================
     # 🔐 AUTH
