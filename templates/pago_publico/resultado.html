@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Resultado del pago — {% if pago %}{{ pago.patente }}{% else %}—{% endif %}{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:center;
+            min-height:calc(100dvh - var(--navbar-h) - 60px); padding:1.5rem 1rem;">
+<div class="card" style="max-width:520px; width:100%; text-align:center; padding:2.5rem 2rem;">
+
+  {% if estado == "aprobado" %}
+    <div style="font-size:4rem; margin-bottom:0.75rem;">✅</div>
+    <h1 style="font-size:1.6rem; font-weight:800; color:#14883b; margin-bottom:0.5rem;">
+      ¡Pago aprobado!
+    </h1>
+    <p class="text-muted" style="font-size:0.95rem; margin-bottom:1.5rem;">
+      Tu pago fue procesado correctamente por MercadoPago.
+    </p>
+
+    <!-- Detalle del pago -->
+    {% if pago %}
+    <div style="background:var(--color-surface-2); border-radius:10px; padding:1rem;
+                text-align:left; margin-bottom:1.5rem; font-size:0.9rem;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span class="text-muted">Patente</span>
+        <strong style="letter-spacing:2px;">{{ pago.patente }}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span class="text-muted">Tipo</span>
+        <strong>{{ pago.get_tipo_display }}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span class="text-muted">Monto</span>
+        <strong style="color:#14883b; font-size:1.1rem;">${{ pago.monto }}</strong>
+      </div>
+      {% if pago.mp_payment_id %}
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span class="text-muted">Comprobante MP</span>
+        <span style="font-family:monospace; font-size:0.8rem;">{{ pago.mp_payment_id }}</span>
+      </div>
+      {% endif %}
+      {% if pago.procesado_en %}
+      <div style="display:flex; justify-content:space-between;">
+        <span class="text-muted">Procesado</span>
+        <span>{{ pago.procesado_en|date:"d/m/Y H:i" }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Detalles adicionales según tipo -->
+    {% if pago.tipo == "estacionamiento" and pago.estacionamiento %}
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                padding:0.85rem 1rem; text-align:left; margin-bottom:1.25rem; font-size:0.88rem;">
+      <div style="font-weight:700; color:#14883b; margin-bottom:0.4rem;">🚗 Estacionamiento activo</div>
+      <div>Duración: <strong>{{ pago.estacionamiento.duracion_horas }}h</strong></div>
+      <div>Vence: <strong>{{ pago.estacionamiento.hora_vencimiento|time:"H:i" }}</strong></div>
+      {% if pago.estacionamiento.subcuadra %}
+      <div>Ubicación: <strong>{{ pago.estacionamiento.subcuadra }}</strong></div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if pago.tipo == "abono" and pago.abono %}
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                padding:0.85rem 1rem; text-align:left; margin-bottom:1.25rem; font-size:0.88rem;">
+      <div style="font-weight:700; color:#14883b; margin-bottom:0.4rem;">🗓️ Abono mensual activo</div>
+      <div>Período: <strong>{{ pago.abono.mes_inicio|date:"F Y" }}</strong></div>
+    </div>
+    {% endif %}
+
+    {% if pago.tipo == "infraccion" and pago.infraccion %}
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                padding:0.85rem 1rem; text-align:left; margin-bottom:1.25rem; font-size:0.88rem;">
+      <div style="font-weight:700; color:#14883b; margin-bottom:0.4rem;">✅ Infracción cancelada</div>
+      <div>Motivo: <strong>{{ pago.infraccion.motivo }}</strong></div>
+    </div>
+    {% endif %}
+
+    <!-- Botón PDF / imprimir -->
+    <button onclick="window.print()" class="btn btn-outline"
+            style="width:100%; margin-bottom:0.75rem;">
+      🖨️ Imprimir comprobante
+    </button>
+
+  {% elif estado == "pendiente" %}
+    <div style="font-size:4rem; margin-bottom:0.75rem;">⏳</div>
+    <h1 style="font-size:1.6rem; font-weight:800; color:#b45309; margin-bottom:0.5rem;">
+      Pago en proceso
+    </h1>
+    <p class="text-muted" style="font-size:0.95rem; margin-bottom:1.5rem;">
+      Tu pago está siendo procesado por MercadoPago.<br>
+      Cuando se confirme, el sistema lo registrará automáticamente.
+    </p>
+    {% if pago %}
+    <div style="background:var(--color-surface-2); border-radius:10px; padding:1rem;
+                text-align:left; margin-bottom:1.5rem; font-size:0.9rem;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+        <span class="text-muted">Patente</span>
+        <strong style="letter-spacing:2px;">{{ pago.patente }}</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span class="text-muted">Tipo</span>
+        <strong>{{ pago.get_tipo_display }}</strong>
+      </div>
+    </div>
+    {% endif %}
+
+  {% else %}{# fallido #}
+    <div style="font-size:4rem; margin-bottom:0.75rem;">❌</div>
+    <h1 style="font-size:1.6rem; font-weight:800; color:var(--color-danger); margin-bottom:0.5rem;">
+      Pago no completado
+    </h1>
+    <p class="text-muted" style="font-size:0.95rem; margin-bottom:1.5rem;">
+      El pago fue cancelado o rechazado. No se realizó ningún cobro.<br>
+      Podés volver a intentarlo cuando quieras.
+    </p>
+  {% endif %}
+
+  <!-- Acciones -->
+  {% if pago %}
+  <a href="{% url 'pago_publico_detalle' pago.patente %}" class="btn"
+     style="width:100%; margin-bottom:0.6rem;">
+    ← Volver a {{ pago.patente }}
+  </a>
+  {% endif %}
+  <a href="{% url 'pago_publico_buscar' %}" class="btn btn-outline"
+     style="width:100%; font-size:0.9rem;">
+    Buscar otra patente
+  </a>
+
+</div>
+</div>
+
+<style>
+@media print {
+  nav, .btn { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+}
+</style>
+{% endblock %}

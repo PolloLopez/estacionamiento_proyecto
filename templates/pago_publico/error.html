@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Error — Pago público{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:center;
+            min-height:calc(100dvh - var(--navbar-h) - 60px); padding:1.5rem 1rem;">
+<div class="card" style="max-width:480px; width:100%; text-align:center; padding:2.5rem 2rem;">
+
+  <div style="font-size:3.5rem; margin-bottom:0.75rem;">⚠️</div>
+  <h1 style="font-size:1.4rem; font-weight:800; margin-bottom:0.5rem;">
+    {{ titulo|default:"Ocurrió un error" }}
+  </h1>
+  <p class="text-muted" style="font-size:0.95rem; margin-bottom:1.75rem;">
+    {{ mensaje|default:"No fue posible procesar la solicitud. Revisá los datos e intentá de nuevo." }}
+  </p>
+
+  {% if patente %}
+  <a href="{% url 'pago_publico_detalle' patente %}" class="btn"
+     style="width:100%; margin-bottom:0.6rem;">
+    ← Volver a {{ patente }}
+  </a>
+  {% endif %}
+
+  <a href="{% url 'pago_publico_buscar' %}" class="btn btn-outline" style="width:100%;">
+    Buscar otra patente
+  </a>
+
+</div>
+</div>
+{% endblock %}

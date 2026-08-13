@@ -3,8 +3,29 @@
 from django.urls import path
 from . import views
 from . import views_superadmin
+from . import views_pwa
+from . import views_pago_publico
 
 urlpatterns = [
+
+    # =========================
+    # 📱 PWA
+    # =========================
+    path("manifest.json", views_pwa.manifest_json,  name="manifest_json"),
+    path("sw.js",         views_pwa.service_worker, name="service_worker"),
+
+    # =========================
+    # 💳 PAGO PÚBLICO (sin registro)
+    # =========================
+    path("pagar/",                                   views_pago_publico.buscar_patente,            name="pago_publico_buscar"),
+    path("pagar/<str:patente>/",                     views_pago_publico.detalle_patente,           name="pago_publico_detalle"),
+    path("pagar/infraccion/<int:infraccion_id>/",    views_pago_publico.iniciar_pago_infraccion,   name="pago_publico_infraccion"),
+    path("pagar/estacionar/",                        views_pago_publico.iniciar_pago_estacionamiento, name="pago_publico_estacionar"),
+    path("pagar/abono/",                             views_pago_publico.iniciar_pago_abono,        name="pago_publico_abono"),
+    path("pagar/mp/exitoso/",                        views_pago_publico.mp_exitoso_publico,        name="pago_publico_mp_exitoso"),
+    path("pagar/mp/fallido/",                        views_pago_publico.mp_fallido_publico,        name="pago_publico_mp_fallido"),
+    path("pagar/mp/pendiente/",                      views_pago_publico.mp_pendiente_publico,      name="pago_publico_mp_pendiente"),
+    path("pagar/subcuadra-cercana/",                 views_pago_publico.subcuadra_cercana_publica, name="pago_publico_subcuadra_cercana"),
 
     # =========================
     # 🔐 AUTH

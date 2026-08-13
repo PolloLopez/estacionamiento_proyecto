@@ -810,6 +810,80 @@ class AbonoMensual(models.Model):
         return f"{self.vehiculo.patente} — {self.mes.strftime('%B %Y')}"
 
 
+# 💳 Pago público anónimo vía MercadoPago
+class PagoPublico(models.Model):
+    """
+    Registra el intento de pago de una infracción, estacionamiento o abono
+    realizado por una persona sin cuenta en el sistema.
+
+    Ciclo de vida:
+    1. Se crea en estado 'pendiente' al iniciar el checkout de MP.
+    2. Al confirmar MP (callback o webhook), pasa a 'aprobado' y se ejecuta
+       la acción: marcar infracción como pagada / crear Estacionamiento / crear AbonoMensual.
+    3. Si MP rechaza o el usuario cancela, pasa a 'fallido'.
+
+    La FK correspondiente al tipo se llena solo al confirmar el pago:
+    - tipo='infraccion'      → infraccion FK
+    - tipo='estacionamiento' → estacionamiento FK (+ subcuadra + duracion_horas en la preferencia)
+    - tipo='abono'           → abono FK (+ mes_abono en la preferencia)
+    """
+    TIPOS = [
+        ('infraccion',      'Infracción'),
+        ('estacionamiento', 'Estacionamiento'),
+        ('abono',           'Abono mensual'),
+    ]
+    ESTADOS = [
+        ('pendiente', 'Pendiente de pago'),
+        ('aprobado',  'Pagado'),
+        ('fallido',   'Fallido o cancelado'),
+    ]
+
+    tipo             = models.CharField(max_length=20, choices=TIPOS)
+    estado           = models.CharField(max_length=20, choices=ESTADOS, default='pendiente')
+    municipio        = models.ForeignKey('Municipio', on_delete=models.PROTECT,
+                                          related_name='pagos_publicos')
+    patente          = models.CharField(max_length=10, verbose_name='Patente del vehículo')
+    monto            = models.DecimalField(max_digits=10, decimal_places=2)
+    email_contacto   = models.CharField(max_length=254, blank=True, default='',
+                                         verbose_name='Email para comprobante (opcional)')
+    mp_preference_id = models.CharField(max_length=100, blank=True, default='',
+                                         verbose_name='ID preferencia MercadoPago')
+    mp_payment_id    = models.CharField(max_length=50, null=True, blank=True, unique=True,
+                                         verbose_name='ID pago MercadoPago')
+    creado_en        = models.DateTimeField(auto_now_add=True)
+    procesado_en     = models.DateTimeField(null=True, blank=True,
+                                             verbose_name='Fecha de procesamiento por MP')
+
+    # FKs opcionales según tipo — solo se llena la correspondiente
+    infraccion      = models.ForeignKey('Infraccion', on_delete=models.SET_NULL,
+                                         null=True, blank=True, related_name='pagos_publicos')
+    estacionamiento = models.ForeignKey('Estacionamiento', on_delete=models.SET_NULL,
+                                         null=True, blank=True, related_name='pagos_publicos')
+    abono           = models.ForeignKey('AbonoMensual', on_delete=models.SET_NULL,
+                                         null=True, blank=True, related_name='pagos_publicos')
+
+    # Datos necesarios para crear el Estacionamiento al confirmar el pago
+    subcuadra      = models.ForeignKey('Subcuadra', on_delete=models.SET_NULL,
+                                        null=True, blank=True)
+    duracion_horas = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
+
+    # Primer día del mes del abono (ej: 2026-08-01)
+    mes_abono = models.DateField(null=True, blank=True,
+                                  verbose_name='Mes del abono (primer día)')
+
+    class Meta:
+        ordering = ['-creado_en']
+        verbose_name = 'Pago público'
+        verbose_name_plural = 'Pagos públicos'
+        indexes = [
+            models.Index(fields=['patente', 'estado'], name='idx_pagopub_patente_estado'),
+            models.Index(fields=['mp_payment_id'],     name='idx_pagopub_payment_id'),
+        ]
+
+    def __str__(self):
+        return f"{self.tipo} {self.patente} — {self.estado} — ${self.monto}"
+
+
 # 📊 Rendición de cuentas del admin a Tesorería
 class Rendicion(models.Model):
     """
