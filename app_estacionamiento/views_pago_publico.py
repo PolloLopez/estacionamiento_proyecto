@@ -576,3 +576,15 @@ def mp_pendiente_publico(request):
         "mensaje": "Tu pago está siendo procesado. Se acreditará automáticamente cuando se confirme.",
         "pago":    pago,
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Landing page del sistema (alojada en la app, sin login)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def landing_sistema(request):
+    """
+    Página de presentación del sistema, accesible sin login.
+    Se sirve desde la propia app para no depender de GitHub Pages.
+    """
+    return render(request, "landing.html")
