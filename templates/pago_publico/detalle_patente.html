@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+{% block title %}Pagar — {{ patente }}{% endblock %}
+
+{% block content %}
+<div style="max-width:680px; margin:0 auto; padding:1.5rem 1rem;">
+
+  <!-- Encabezado -->
+  <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1.5rem; flex-wrap:wrap;">
+    <a href="{% url 'pago_publico_buscar' %}" class="btn btn-outline"
+       style="font-size:0.85rem; padding:0.4rem 0.8rem;">← Cambiar patente</a>
+    <div>
+      <h1 style="font-size:1.5rem; font-weight:800; margin:0;">🅿️ {{ patente }}</h1>
+      <p class="text-muted" style="font-size:0.85rem; margin:0;">Seleccioná qué querés pagar</p>
+    </div>
+  </div>
+
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert {% if m.tags == 'success' %}alert-success{% elif m.tags == 'error' %}alert-danger{% else %}alert-warning{% endif %}"
+           style="margin-bottom:1rem;">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- ══ 1. INFRACCIONES PENDIENTES ══════════════════════════════════════ -->
+  {% if infracciones_pendientes %}
+  <div class="card" style="margin-bottom:1.25rem; border-left:4px solid var(--color-danger);">
+    <h2 style="font-size:1.05rem; margin-bottom:1rem; color:var(--color-danger);">
+      ⚠️ Infracción{{ infracciones_pendientes|length|pluralize:"es" }} pendiente{{ infracciones_pendientes|length|pluralize:"s" }}
+    </h2>
+    {% for inf in infracciones_pendientes %}
+    <div style="border:1px solid var(--color-border); border-radius:10px; padding:1rem; margin-bottom:0.75rem; background:var(--color-surface);">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
+        <div>
+          <div style="font-size:0.82rem; color:var(--color-text-muted);">
+            {{ inf.creado_en|date:"d/m/Y H:i" }} · {{ inf.subcuadra|default:"—" }}
+          </div>
+          <div style="font-weight:600; font-size:0.95rem;">{{ inf.motivo }}</div>
+        </div>
+        <div style="font-size:1.4rem; font-weight:800; color:var(--color-danger);">
+          ${{ inf.monto }}
+        </div>
+      </div>
+      <form method="post" action="{% url 'pago_publico_infraccion' inf.id %}">
+        {% csrf_token %}
+        <div style="margin-bottom:0.5rem;">
+          <label style="font-size:0.82rem; font-weight:600;">Email para comprobante (opcional)</label>
+          <input type="email" name="email" placeholder="tucorreo@ejemplo.com"
+                 style="font-size:0.9rem; margin-top:0.15rem;">
+        </div>
+        <button type="submit" class="btn btn-danger" style="width:100%;">
+          💳 Pagar ${{ inf.monto }} con MercadoPago
+        </button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ══ 2. ESTACIONAR AHORA ═════════════════════════════════════════════ -->
+  {% if estacionamiento_activo %}
+  <div class="card" style="margin-bottom:1.25rem; border-left:4px solid #14883b;">
+    <h2 style="font-size:1.05rem; margin-bottom:0.5rem; color:#14883b;">✅ Estacionamiento activo</h2>
+    <p class="text-muted" style="font-size:0.9rem; margin:0;">
+      Esta patente ya tiene un estacionamiento activo hasta las
+      <strong>{{ estacionamiento_activo.hora_vencimiento|time:"H:i" }}</strong>
+      ({{ estacionamiento_activo.duracion_horas }}h).
+    </p>
+  </div>
+  {% else %}
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2 style="font-size:1.05rem; margin-bottom:1rem;">🚗 Estacionar ahora</h2>
+    <form method="post" action="{% url 'pago_publico_estacionar' %}" id="form-estacionar">
+      {% csrf_token %}
+      <input type="hidden" name="patente" value="{{ patente }}">
+
+      <!-- Tipo de vehículo -->
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.85rem; font-weight:600;">Tipo de vehículo</label>
+        <div style="display:flex; gap:0.5rem; margin-top:0.4rem;">
+          <label style="flex:1; display:flex; align-items:center; justify-content:center;
+                         padding:0.6rem; border:2px solid var(--color-border); border-radius:8px;
+                         cursor:pointer; font-weight:600; gap:0.4rem;" id="lbl-auto">
+            <input type="radio" name="tipo_vehiculo" value="auto" checked
+                   onchange="actualizarPrecio()" style="width:auto; margin:0;"> 🚗 Auto
+          </label>
+          <label style="flex:1; display:flex; align-items:center; justify-content:center;
+                         padding:0.6rem; border:2px solid var(--color-border); border-radius:8px;
+                         cursor:pointer; font-weight:600; gap:0.4rem;" id="lbl-moto">
+            <input type="radio" name="tipo_vehiculo" value="moto"
+                   onchange="actualizarPrecio()" style="width:auto; margin:0;"> 🏍️ Moto
+          </label>
+        </div>
+      </div>
+
+      <!-- Subcuadra con GPS -->
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.85rem; font-weight:600;">Ubicación (subcuadra)</label>
+        <div style="display:flex; gap:0.5rem; align-items:flex-start; margin-top:0.4rem;">
+          <select name="subcuadra_id" id="sel-subcuadra" required
+                  style="flex:1; font-size:0.9rem;">
+            <option value="">— Seleccioná tu calle —</option>
+            {% regroup subcuadras by calle as grupos_calle %}
+            {% for grupo in grupos_calle %}
+              <optgroup label="{{ grupo.grouper }}">
+                {% for s in grupo.list %}
+                  <option value="{{ s.id }}">{{ grupo.grouper }} {{ s.altura }}</option>
+                {% endfor %}
+              </optgroup>
+            {% endfor %}
+          </select>
+          <button type="button" id="btn-gps" onclick="detectarGPS()"
+                  class="btn btn-outline" style="padding:0.6rem 0.8rem; font-size:0.85rem; white-space:nowrap;">
+            📍 GPS
+          </button>
+        </div>
+        <p id="txt-gps" class="text-muted" style="font-size:0.8rem; margin-top:0.3rem; display:none;"></p>
+      </div>
+
+      <!-- Duración -->
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.85rem; font-weight:600;">Duración</label>
+        <div style="display:flex; gap:0.4rem; flex-wrap:wrap; margin-top:0.4rem;">
+          <label style="flex:1; min-width:60px; display:flex; align-items:center; justify-content:center;
+                         padding:0.55rem 0.3rem; border:2px solid var(--color-border);
+                         border-radius:8px; cursor:pointer; font-weight:600; font-size:0.9rem;">
+            <input type="radio" name="duracion_horas" value="1" checked
+                   onchange="actualizarPrecio()" style="display:none;"> 1h
+          </label>
+          <label style="flex:1; min-width:60px; display:flex; align-items:center; justify-content:center;
+                         padding:0.55rem 0.3rem; border:2px solid var(--color-border);
+                         border-radius:8px; cursor:pointer; font-weight:600; font-size:0.9rem;">
+            <input type="radio" name="duracion_horas" value="1.5"
+                   onchange="actualizarPrecio()" style="display:none;"> 1.5h
+          </label>
+          <label style="flex:1; min-width:60px; display:flex; align-items:center; justify-content:center;
+                         padding:0.55rem 0.3rem; border:2px solid var(--color-border);
+                         border-radius:8px; cursor:pointer; font-weight:600; font-size:0.9rem;">
+            <input type="radio" name="duracion_horas" value="2"
+                   onchange="actualizarPrecio()" style="display:none;"> 2h
+          </label>
+          <label style="flex:1; min-width:60px; display:flex; align-items:center; justify-content:center;
+                         padding:0.55rem 0.3rem; border:2px solid var(--color-border);
+                         border-radius:8px; cursor:pointer; font-weight:600; font-size:0.9rem;">
+            <input type="radio" name="duracion_horas" value="3"
+                   onchange="actualizarPrecio()" style="display:none;"> 3h
+          </label>
+          <label style="flex:1; min-width:60px; display:flex; align-items:center; justify-content:center;
+                         padding:0.55rem 0.3rem; border:2px solid var(--color-border);
+                         border-radius:8px; cursor:pointer; font-weight:600; font-size:0.9rem;">
+            <input type="radio" name="duracion_horas" value="4"
+                   onchange="actualizarPrecio()" style="display:none;"> 4h
+          </label>
+        </div>
+      </div>
+
+      <!-- Email opcional -->
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.82rem; font-weight:600;">Email para comprobante (opcional)</label>
+        <input type="email" name="email" placeholder="tucorreo@ejemplo.com"
+               style="font-size:0.9rem; margin-top:0.15rem;">
+      </div>
+
+      <!-- Precio calculado -->
+      <div style="background:var(--color-surface-2); border-radius:8px; padding:0.75rem 1rem;
+                  margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
+        <span class="text-muted" style="font-size:0.9rem;">Total a pagar:</span>
+        <span id="txt-precio" style="font-size:1.4rem; font-weight:800; color:#14883b;">$0</span>
+      </div>
+
+      <button type="submit" class="btn" style="width:100%; font-size:1rem; padding:0.8rem;">
+        💳 Pagar con MercadoPago
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- ══ 3. ABONO MENSUAL ═════════════════════════════════════════════════ -->
+  <div class="card" style="margin-bottom:1.25rem;">
+    <h2 style="font-size:1.05rem; margin-bottom:1rem;">🗓️ Abono mensual</h2>
+
+    {% if abono_activo %}
+    <div class="alert alert-success" style="margin-bottom:0.75rem;">
+      ✅ Ya tiene abono activo para este mes ({{ mes_actual|date:"F Y" }}).
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'pago_publico_abono' %}">
+      {% csrf_token %}
+      <input type="hidden" name="patente" value="{{ patente }}">
+
+      <!-- Tipo de vehículo -->
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.85rem; font-weight:600;">Tipo de vehículo</label>
+        <div style="display:flex; gap:0.5rem; margin-top:0.4rem;">
+          <label style="flex:1; display:flex; align-items:center; justify-content:center;
+                         padding:0.6rem; border:2px solid var(--color-border); border-radius:8px;
+                         cursor:pointer; font-weight:600; gap:0.4rem;">
+            <input type="radio" name="tipo_vehiculo" value="auto" checked
+                   onchange="actualizarPrecioAbono(this)" style="width:auto; margin:0;"> 🚗 Auto
+          </label>
+          <label style="flex:1; display:flex; align-items:center; justify-content:center;
+                         padding:0.6rem; border:2px solid var(--color-border); border-radius:8px;
+                         cursor:pointer; font-weight:600; gap:0.4rem;">
+            <input type="radio" name="tipo_vehiculo" value="moto"
+                   onchange="actualizarPrecioAbono(this)" style="width:auto; margin:0;"> 🏍️ Moto
+          </label>
+        </div>
+      </div>
+
+      <!-- Mes -->
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.85rem; font-weight:600;">Mes del abono</label>
+        <div style="display:flex; gap:0.5rem; margin-top:0.4rem;">
+          <label style="flex:1; display:flex; align-items:center; justify-content:center;
+                         padding:0.6rem; border:2px solid var(--color-border); border-radius:8px;
+                         cursor:pointer; font-weight:600; font-size:0.9rem;
+                         {% if abono_activo %}opacity:0.5; pointer-events:none;{% endif %}">
+            <input type="radio" name="mes_abono" value="{{ mes_actual|date:'Y-m' }}"
+                   {% if not abono_activo %}checked{% endif %}
+                   {% if abono_activo %}disabled{% endif %}
+                   style="display:none;">
+            {{ mes_actual|date:"F Y" }}
+          </label>
+          <label style="flex:1; display:flex; align-items:center; justify-content:center;
+                         padding:0.6rem; border:2px solid var(--color-border); border-radius:8px;
+                         cursor:pointer; font-weight:600; font-size:0.9rem;">
+            <input type="radio" name="mes_abono" value="{{ mes_siguiente|date:'Y-m' }}"
+                   {% if abono_activo %}checked{% endif %}
+                   style="display:none;">
+            {{ mes_siguiente|date:"F Y" }}
+          </label>
+        </div>
+      </div>
+
+      <!-- Email opcional -->
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.82rem; font-weight:600;">Email para comprobante (opcional)</label>
+        <input type="email" name="email" placeholder="tucorreo@ejemplo.com"
+               style="font-size:0.9rem; margin-top:0.15rem;">
+      </div>
+
+      <!-- Precio abono -->
+      <div style="background:var(--color-surface-2); border-radius:8px; padding:0.75rem 1rem;
+                  margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
+        <span class="text-muted" style="font-size:0.9rem;">Precio abono:</span>
+        <span id="txt-precio-abono" style="font-size:1.4rem; font-weight:800; color:#14883b;">
+          ${{ tarifa.precio_abono_auto|default:"—" }}
+        </span>
+      </div>
+
+      <button type="submit" class="btn" style="width:100%; font-size:1rem; padding:0.8rem;">
+        💳 Contratar abono con MercadoPago
+      </button>
+    </form>
+  </div>
+
+</div>
+
+<script>
+var TARIFA_AUTO  = {{ tarifa_auto_json }};
+var TARIFA_MOTO  = {{ tarifa_moto_json|default:"0" }};
+var ABONO_AUTO   = {{ precio_abono_auto_json }};
+var ABONO_MOTO   = {{ precio_abono_moto_json }};
+
+function actualizarPrecio() {
+  var tipoInputs   = document.querySelectorAll('#form-estacionar input[name="tipo_vehiculo"]');
+  var durInputs    = document.querySelectorAll('#form-estacionar input[name="duracion_horas"]');
+  var txtPrecio    = document.getElementById("txt-precio");
+  if (!txtPrecio) return;
+
+  var tipo = "auto";
+  tipoInputs.forEach(function(i) { if (i.checked) tipo = i.value; });
+  var dur = 1;
+  durInputs.forEach(function(i) { if (i.checked) dur = parseFloat(i.value); });
+
+  var tarifa = tipo === "moto" && TARIFA_MOTO > 0 ? TARIFA_MOTO : TARIFA_AUTO;
+  txtPrecio.textContent = "$" + (tarifa * dur).toFixed(0);
+}
+
+function actualizarPrecioAbono(input) {
+  var el = document.getElementById("txt-precio-abono");
+  if (!el) return;
+  el.textContent = input.value === "moto" && ABONO_MOTO > 0
+    ? "$" + ABONO_MOTO.toFixed(0)
+    : "$" + ABONO_AUTO.toFixed(0);
+}
+
+// Resaltar radio buttons seleccionados
+document.querySelectorAll('input[type="radio"]').forEach(function(r) {
+  r.addEventListener("change", function() {
+    var name = r.getAttribute("name");
+    document.querySelectorAll('input[name="' + name + '"]').forEach(function(x) {
+      var lbl = x.closest("label");
+      if (lbl) lbl.style.borderColor = x.checked ? "#14883b" : "var(--color-border)";
+    });
+  });
+  if (r.checked) r.dispatchEvent(new Event("change"));
+});
+
+// GPS para subcuadra
+function detectarGPS() {
+  var btn = document.getElementById("btn-gps");
+  var txt = document.getElementById("txt-gps");
+  if (!navigator.geolocation) {
+    txt.textContent = "Tu navegador no soporta GPS.";
+    txt.style.display = "block";
+    return;
+  }
+  btn.textContent = "📍 Buscando…";
+  btn.disabled = true;
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      fetch("{% url 'pago_publico_subcuadra_cercana' %}?lat=" + pos.coords.latitude + "&lon=" + pos.coords.longitude)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          btn.textContent = "📍 GPS";
+          btn.disabled = false;
+          if (data.id) {
+            document.getElementById("sel-subcuadra").value = data.id;
+            txt.textContent = "📍 GPS: " + data.nombre;
+            txt.style.display = "block";
+          } else {
+            txt.textContent = "No se encontró subcuadra cercana. Seleccioná manualmente.";
+            txt.style.display = "block";
+          }
+        });
+    },
+    function() {
+      btn.textContent = "📍 GPS";
+      btn.disabled = false;
+      txt.textContent = "No se pudo obtener la ubicación. Seleccioná manualmente.";
+      txt.style.display = "block";
+    }
+  );
+}
+
+// Calcular precio inicial
+actualizarPrecio();
+</script>
+{% endblock %}

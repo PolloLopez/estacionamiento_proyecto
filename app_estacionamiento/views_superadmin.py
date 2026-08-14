@@ -107,10 +107,29 @@ def editar_municipio(request, municipio_id):
             messages.success(request, f"Municipio {estado}.")
             return redirect("panel_superadmin")
 
-        # Edición general
-        municipio.nombre              = request.POST.get("nombre", municipio.nombre).strip()
-        municipio.comision_vendedor   = request.POST.get("comision_vendedor", municipio.comision_vendedor)
-        municipio.activo              = request.POST.get("activo") == "on"
+        # ── Campos de texto y número ──────────────────────────────────────
+        municipio.nombre            = request.POST.get("nombre", municipio.nombre).strip()
+        municipio.nombre_sistema    = request.POST.get("nombre_sistema", "").strip()
+        municipio.comision_vendedor = request.POST.get("comision_vendedor", municipio.comision_vendedor)
+        municipio.activo            = request.POST.get("activo") == "on"
+
+        # ── Colores de branding ────────────────────────────────────────────
+        # El input type=color sincroniza el valor con el text input vía JS.
+        # Usamos el text input (que puede estar en blanco para "sin color").
+        color_primario   = request.POST.get("color_primario_hex", "").strip()
+        color_secundario = request.POST.get("color_secundario_hex", "").strip()
+        if color_primario.startswith("#") and len(color_primario) in (4, 7):
+            municipio.color_primario = color_primario
+        if color_secundario.startswith("#") and len(color_secundario) in (4, 7):
+            municipio.color_secundario = color_secundario
+
+        # ── Logo ───────────────────────────────────────────────────────────
+        if request.POST.get("borrar_logo") and municipio.logo:
+            municipio.logo.delete(save=False)   # borra el archivo del storage
+            municipio.logo = None
+        if "logo" in request.FILES:
+            municipio.logo = request.FILES["logo"]
+
         municipio.save()
         messages.success(request, "Municipio actualizado.")
         return redirect("panel_superadmin")

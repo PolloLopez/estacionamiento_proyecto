@@ -70,6 +70,20 @@
       </div>
     </form>
 
+    <!-- Acceso rápido para pago sin registro -->
+    <div style="margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid var(--color-border);
+                text-align:center;">
+      <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.6rem;">
+        ¿Querés pagar sin crear una cuenta?
+      </p>
+      <a href="{% url 'pago_publico_buscar' %}"
+         style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.9rem;
+                font-weight:700; color:#14883b; text-decoration:none; border:2px solid #14883b;
+                border-radius:8px; padding:0.5rem 1.2rem;">
+        🅿️ Pagar con MercadoPago
+      </a>
+    </div>
+
   </div>
 </div>
 

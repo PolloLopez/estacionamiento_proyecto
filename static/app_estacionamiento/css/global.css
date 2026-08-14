@@ -173,6 +173,10 @@ main.container {
   transition: var(--transition);
   flex-shrink: 0;
   z-index: 1101;
+  /* Reset de estilos nativos del <button> — sin esto el browser lo pinta
+     como botón gris sobre el navbar verde. */
+  background: none;
+  border: none;
 }
 
 .menu-toggle:hover { background: rgba(255,255,255,0.15); }

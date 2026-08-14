@@ -335,12 +335,25 @@ def mp_webhook(request):
     if info.get("status") != "approved":
         return HttpResponse(status=200)
 
-    # Recuperar usuario y monto desde la respuesta de MP (no desde metadata directamente)
-    # transaction_amount es el monto real procesado; más seguro que el metadata enviado en la preferencia
+    # El monto real siempre viene de la API de MP (no de metadata, que podría manipularse)
+    monto    = Decimal(str(info.get("transaction_amount", 0)))
+    metadata = info.get("metadata", {})
+
+    # ── Pago público anónimo (sin cuenta de usuario) ───────────────────────
+    # La preferencia incluye pago_publico_id en metadata si fue creada por
+    # views_pago_publico.py en vez del flujo de carga de saldo estándar.
+    pago_publico_id = metadata.get("pago_publico_id")
+    if pago_publico_id:
+        from app_estacionamiento.use_cases.procesar_pago_publico import ejecutar as procesar_publico
+        try:
+            procesar_publico(int(pago_publico_id), payment_id, monto)
+        except Exception:
+            pass  # idempotente: si ya fue procesado, está bien
+        return HttpResponse(status=200)
+
+    # ── Pago de conductor con cuenta (carga de saldo) ──────────────────────
     try:
-        metadata   = info.get("metadata", {})
         usuario_id = metadata.get("usuario_id")
-        monto      = Decimal(str(info.get("transaction_amount", metadata.get("monto", 0))))
         usuario    = Usuario.objects.get(pk=usuario_id)
     except Exception:
         return HttpResponse(status=200)

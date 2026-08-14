@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-11 (sesión: importación de exenciones desde Excel — vista con preview fila x fila, migración 0050, panel pendientes de verificación con badge naranja + acción verificar.)
+Última actualización: 2026-08-13 (sesión: pagos públicos sin registro + mejoras PWA + branding superadmin)
 
 ---
 
@@ -29,6 +29,19 @@ Helper `obtener_plantilla()` en utils.py. View `gestionar_plantillas(municipio_i
 Template `superadmin/plantillas.html`: tabs por tipo, textareas, referencia de variables disponibles.
 URL `/superadmin/municipio/<id>/plantillas/` + botón en `editar_municipio.html`.
 Integrado en los 5 tickets con `texto_plantilla.encabezado/cuerpo/pie` — degradación elegante: sin plantilla → texto hardcodeado.
+
+### ~~🔴 Pagos públicos sin registro (MercadoPago)~~ ✅ RESUELTO 2026-08-13
+Modelo `PagoPublico` (migración 0051) — FK nullable a Infraccion/Estacionamiento/AbonoMensual.
+Use case `procesar_pago_publico.py` — idempotente, con `select_for_update()`.
+Webhook MP actualizado: detecta `metadata.pago_publico_id` antes del flujo de saldo.
+4 templates nuevos: `buscar.html`, `detalle_patente.html`, `resultado.html`, `error.html`.
+QR en ticket de infracción: apunta a `/pagar/<patente>/` via `api.qrserver.com`.
+URLs en `/pagar/...`. Inspector GPS público en `subcuadra_cercana_publica`.
+
+### ~~PWA: botón instalar + hamburguesa + branding superadmin~~ ✅ RESUELTO 2026-08-13
+`beforeinstallprompt` capturado en `base.html` → botón "📲 Instalar" en navbar.
+Hamburguesa: `background:none; border:none` en `.menu-toggle` (global.css).
+Superadmin `editar_municipio`: upload logo, colores primario/secundario, nombre_sistema.
 
 ### 🔴 PRODUCCIÓN: Sin backups automáticos del PostgreSQL de Railway Hobby
 Railway Hobby no incluye backups automáticos. Opciones:
@@ -165,3 +178,6 @@ Leaflet.js + lat/lon de subcuadras. Requiere coordenadas en Subcuadra (ver GPS a
 
 ### Dashboard en TV (pantalla municipal en tiempo real)
 Vista sin login con token de solo lectura. Auto-refresh cada 60s con htmx o JS.
+
+
+Ícono PWA — cuando tengas el PNG listo, reemplazá los 3 archivos en static/icons/: icon-192.png, icon-512.png y apple-touch-icon.png. Con 192×192 y 512×512 es suficiente.

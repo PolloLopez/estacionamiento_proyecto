@@ -23,23 +23,87 @@
       {# Configuración del municipio #}
       <div class="card" style="margin-bottom:1.5rem;">
         <h2 style="font-size:1.05rem; margin-bottom:1rem;">⚙️ Configuración</h2>
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
           {% csrf_token %}
+
           <div style="margin-bottom:0.75rem;">
-            <label style="font-size:0.85rem; font-weight:600;">Nombre</label>
+            <label style="font-size:0.85rem; font-weight:600;">Nombre del municipio</label>
             <input type="text" name="nombre" value="{{ municipio.nombre }}"
                    style="width:100%; margin-top:0.25rem;" required>
           </div>
+
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Nombre del sistema (navbar)</label>
+            <input type="text" name="nombre_sistema"
+                   value="{{ municipio.nombre_sistema|default:'' }}"
+                   placeholder="Ej: Estacionamiento Medido San Martín"
+                   style="width:100%; margin-top:0.25rem;">
+          </div>
+
           <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Comisión vendedor (%)</label>
             <input type="number" name="comision_vendedor" step="0.1" min="0" max="100"
                    value="{{ municipio.comision_vendedor }}"
                    style="width:100%; margin-top:0.25rem;">
           </div>
+
+          {# ── Branding visual ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
+              Identidad visual
+            </p>
+
+            {# Logo #}
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.85rem; font-weight:600;">Logo (PNG/SVG, recomendado 160×40px)</label>
+              {% if municipio.logo %}
+                <div style="margin:0.4rem 0; padding:0.5rem; background:var(--color-primary); border-radius:6px; display:inline-block;">
+                  <img src="{{ municipio.logo.url }}" style="height:36px; width:auto; display:block;">
+                </div>
+                <div style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.25rem;">
+                  Logo actual. Subí uno nuevo para reemplazarlo.
+                </div>
+                <label style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.82rem; font-weight:600; color:var(--color-danger); cursor:pointer; margin-bottom:0.5rem;">
+                  <input type="checkbox" name="borrar_logo"> Eliminar logo actual
+                </label>
+              {% endif %}
+              <input type="file" name="logo" accept="image/*"
+                     style="width:100%; margin-top:0.25rem;">
+            </div>
+
+            {# Colores #}
+            <div class="grid grid-2" style="gap:0.5rem; margin-bottom:0.75rem;">
+              <div>
+                <label style="font-size:0.85rem; font-weight:600;">Color primario</label>
+                <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
+                  <input type="color" name="color_primario"
+                         value="{{ municipio.color_primario|default:'#14883b' }}"
+                         style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
+                  <input type="text" name="color_primario_hex"
+                         value="{{ municipio.color_primario|default:'#14883b' }}"
+                         placeholder="#14883b"
+                         style="flex:1; font-size:0.85rem; font-family:monospace;">
+                </div>
+              </div>
+              <div>
+                <label style="font-size:0.85rem; font-weight:600;">Color secundario (hover)</label>
+                <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
+                  <input type="color" name="color_secundario"
+                         value="{{ municipio.color_secundario|default:'#155f2e' }}"
+                         style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
+                  <input type="text" name="color_secundario_hex"
+                         value="{{ municipio.color_secundario|default:'#155f2e' }}"
+                         placeholder="#155f2e"
+                         style="flex:1; font-size:0.85rem; font-family:monospace;">
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div style="margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
             <input type="checkbox" name="activo" id="id_activo"
                    {% if municipio.activo %}checked{% endif %}>
-            <label for="id_activo" style="font-size:0.9rem;">Municipio activo</label>
+            <label for="id_activo" style="font-size:0.9rem; margin:0;">Municipio activo</label>
           </div>
           <button type="submit" class="btn" style="width:100%;">Guardar cambios</button>
         </form>
@@ -179,4 +243,24 @@
   </div>{# /grid #}
 
 </div>
+
+{# Sincroniza el color picker con el text input de hex cuando el usuario mueve el picker #}
+<script>
+(function () {
+  [
+    ["color_primario",   "color_primario_hex"],
+    ["color_secundario", "color_secundario_hex"],
+  ].forEach(function ([colorName, hexName]) {
+    var picker = document.querySelector('[name="' + colorName + '"]');
+    var texto  = document.querySelector('[name="' + hexName  + '"]');
+    if (!picker || !texto) return;
+    // Picker → texto
+    picker.addEventListener("input", function () { texto.value = picker.value; });
+    // Texto → picker (actualiza al perder foco)
+    texto.addEventListener("change", function () {
+      if (/^#[0-9a-fA-F]{3,6}$/.test(texto.value)) picker.value = texto.value;
+    });
+  });
+}());
+</script>
 {% endblock %}
