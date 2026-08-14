@@ -1,7 +1,7 @@
 # CONTEXT.md — Sistema de Estacionamiento Medido
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-08-10
+Última actualización estructural: 2026-08-14
 
 ---
 
@@ -83,7 +83,9 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 - `views_admin.py` — gestión completa del municipio
 - `views_tesorero.py` — panel tesorero, validar/observar rendiciones, depositar comisiones
 - `views_superadmin.py` — gestión de municipios, admins y módulos (rol superadmin)
-- `views_mp.py` — integración MercadoPago (carga de saldo conductores)
+- `views_mp.py` — integración MercadoPago (carga de saldo conductores + webhook unificado)
+- `views_pago_publico.py` — pago sin registro: buscar por patente, pagar infracción/estacionamiento/abono vía MP
+- `views_pwa.py` — manifest.json y service worker para PWA
 
 **services/:**
 - `services/horarios.py` — `puede_estacionar_ahora()`, `calcular_opciones_duracion()`, `obtener_tarifa_hora()`, `cerrar_estacionamientos_vencidos_por_horario()`
@@ -95,6 +97,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 **use_cases/:** delegan en services/, sin lógica inline.
 - `estacionar_vehiculo.py`, `pagar_infraccion.py`, `cobrar_estacionamiento.py`
 - `finalizar_estacionamiento.py`, `registrar_infraccion.py`, `acreditar_saldo_mp.py`
+- `procesar_pago_publico.py` — idempotente: marca infraccion pagada, crea Estacionamiento o AbonoMensual según tipo. Usa `select_for_update()`.
 
 **domain/:**
 - `vehiculo_policy.py` — warnings por tipo de vehículo
@@ -125,7 +128,8 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `Infraccion` | Estado: `pendiente` / `pagada` / `anulada`. `monto`, `motivo`, `foto` (ImageField → Cloudinary en Railway), `motivo_anulacion`, `fecha_pago`, `creado_en`. |
 | `MovimientoCaja` | Registro contable de cada cobro. `tipo`: `ingreso`/`egreso`. `medio_pago`: `efectivo`, `transferencia`, `debito`, `credito`, `qr`, `mercadopago` (default `efectivo`). `comision_monto`. `cerrado`: True cuando el movimiento fue incluido en un CierreCaja. |
 | `CierreCaja` | Cierre de turno de inspector/vendedor. `total_cobrado`, `ganancia_usuario`, `monto_municipio`. Desglose automático: `total_efectivo`, `total_transferencia`, `total_digital` (débito+crédito+QR). FK `rendicion → Rendicion (SET_NULL)`: null = pendiente de rendir. |
-| `AbonoMensual` | Habilita estacionamiento libre por un mes. `mes`, `vehiculo`, `municipio`, `vendedor`. `medio_pago`: `efectivo` / `mercadopago` / `saldo`. |
+| `AbonoMensual` | Habilita estacionamiento libre por un mes. `mes`, `vehiculo`, `municipio`, `vendedor`. `medio_pago`: `efectivo` / `mercadopago` / `saldo`. `conductor` y `vendedor` nullable (pagos públicos anónimos). |
+| `PagoPublico` | Registro de pagos via MP sin cuenta de usuario. `tipo`: `infraccion`/`estacionamiento`/`abono`. `estado`: `pendiente`/`aprobado`/`fallido`. FK nullable a `Infraccion`, `Estacionamiento`, `AbonoMensual`. `mp_preference_id`, `mp_payment_id (unique)`, `email_contacto`, `patente`, `duracion_horas`, `mes_abono`, `subcuadra`. Webhook MP detecta `metadata.pago_publico_id` para rutear. |
 | `Tarifa` | `precio_por_hora`, `precio_por_hora_moto`, `precio_abono_auto`, `precio_abono_moto`. |
 | `HorarioEstacionamiento` | Horario semanal por día (`dia_semana` 0-6). `hora_inicio`, `hora_fin`. |
 | `DiaEspecial` | Feriados o días sin cobro. `fecha`, `cobro_activo`. |
@@ -244,6 +248,14 @@ de `select_for_update()` para evitar race conditions.
 /usuarios/vendedores/comisiones/<id>/factura/  → presentar factura de comisión
 /usuarios/tesorero/                            → panel tesorero
 /usuarios/mp/cargar/                           → iniciar carga MercadoPago
+/usuarios/pagar/                               → buscar patente (pago público sin registro)
+/usuarios/pagar/<patente>/                     → detalle: infracciones + form estacionar + form abono
+/usuarios/pagar/infraccion/<id>/               → iniciar pago infracción (POST → MP)
+/usuarios/pagar/estacionar/                    → iniciar pago estacionamiento (POST → MP)
+/usuarios/pagar/abono/                         → iniciar pago abono mensual (POST → MP)
+/usuarios/pagar/subcuadra-cercana/             → API GPS pública (sin auth)
+/usuarios/manifest.json                        → PWA manifest
+/usuarios/sw.js                                → PWA service worker
 /usuarios/mis-infracciones/                    → infracciones del conductor
 /usuarios/consultar-deuda/                     → buscar deuda por patente (conductor/vendedor)
 /sistema-interno/                              → Django Admin (URL no obvia, reduce bruteforce)
