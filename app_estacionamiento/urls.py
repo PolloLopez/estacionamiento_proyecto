@@ -15,6 +15,11 @@ urlpatterns = [
     path("sw.js",         views_pwa.service_worker, name="service_worker"),
 
     # =========================
+    # 🌐 LANDING PÚBLICA
+    # =========================
+    path("landing/", views_pago_publico.landing_sistema, name="landing_sistema"),
+
+    # =========================
     # 💳 PAGO PÚBLICO (sin registro)
     # =========================
     path("pagar/",                                   views_pago_publico.buscar_patente,            name="pago_publico_buscar"),

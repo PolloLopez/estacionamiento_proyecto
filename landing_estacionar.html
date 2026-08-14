@@ -426,6 +426,8 @@
     <a href="#features" data-lang-inline="en">Features</a>
     <a href="#roles" data-lang-inline="es">Roles</a>
     <a href="#roles" data-lang-inline="en">Roles</a>
+    <a href="#trazabilidad" data-lang-inline="es">Trazabilidad</a>
+    <a href="#trazabilidad" data-lang-inline="en">Traceability</a>
     <a href="#security" data-lang-inline="es">Seguridad</a>
     <a href="#security" data-lang-inline="en">Security</a>
     <a href="#tech">Tech</a>
@@ -589,86 +591,182 @@
     <div class="section-label">Roles</div>
     <h2 data-lang="es">Cinco roles, un sistema.</h2>
     <h2 data-lang="en">Five roles, one system.</h2>
-    <p class="section-intro" data-lang="es">Cada usuario ve solo lo que necesita. El control de acceso está aplicado en cada vista.</p>
-    <p class="section-intro" data-lang="en">Each user sees only what they need. Access control is enforced on every view.</p>
+    <p class="section-intro" data-lang="es">Cada usuario ve solo lo que necesita. Control de acceso aplicado en cada vista — sin excepciones. Cada rol tiene funciones y parametrizaciones específicas para su operatoria diaria.</p>
+    <p class="section-intro" data-lang="en">Each user sees only what they need. Access control enforced on every view — no exceptions. Each role has specific functions and configuration for its daily operations.</p>
 
-    <div class="grid-3" style="margin-bottom:1rem;">
+    <div class="grid-3" style="margin-bottom:1.5rem;">
+
+      <!-- Conductor -->
       <div class="card role-card">
         <div class="card-icon">👤</div>
         <h3 data-lang="es">Conductor</h3>
         <h3 data-lang="en">Driver</h3>
         <ul>
-          <li data-lang="es">Estacionar y pagar con saldo</li>
-          <li data-lang="en">Park and pay with balance</li>
-          <li data-lang="es">Cargar saldo con MercadoPago</li>
-          <li data-lang="en">Top up via MercadoPago</li>
-          <li data-lang="es">Ver y pagar infracciones</li>
-          <li data-lang="en">View and pay infractions</li>
-          <li data-lang="es">Comprar abono mensual</li>
-          <li data-lang="en">Buy monthly pass</li>
-          <li data-lang="es">Gestionar sus vehículos</li>
-          <li data-lang="en">Manage their vehicles</li>
+          <li data-lang="es">Registrar vehículos propios (auto o moto)</li>
+          <li data-lang="en">Register vehicles (car or motorcycle)</li>
+          <li data-lang="es">Elegir duración: 1h, 1.5h, 2h, 3h o 4h</li>
+          <li data-lang="en">Choose duration: 1h, 1.5h, 2h, 3h or 4h</li>
+          <li data-lang="es">Pagar con saldo digital o recargar vía MercadoPago</li>
+          <li data-lang="en">Pay with digital wallet or top up via MercadoPago</li>
+          <li data-lang="es">Reintegro automático si cancela antes de 30 min</li>
+          <li data-lang="en">Auto-refund if parking ends before 30 min</li>
+          <li data-lang="es">Historial completo de estacionamientos</li>
+          <li data-lang="en">Full parking history</li>
+          <li data-lang="es">Ver, pagar y seguir infracciones pendientes</li>
+          <li data-lang="en">View, pay, and track pending infractions</li>
+          <li data-lang="es">Comprar abono mensual con saldo digital</li>
+          <li data-lang="en">Buy monthly pass with digital balance</li>
+          <li data-lang="es">Login con Google (sin contraseña)</li>
+          <li data-lang="en">Sign in with Google — no password needed</li>
+          <li data-lang="es">Pagar sin registro vía QR o link directo</li>
+          <li data-lang="en">Pay without an account via QR or direct link</li>
+          <li data-lang="es">Notificaciones internas del sistema</li>
+          <li data-lang="en">In-app system notifications</li>
         </ul>
       </div>
-      <div class="card role-card">
+
+      <!-- Inspector -->
+      <div class="card role-card" style="border-top:3px solid #60a5fa;">
         <div class="card-icon">🕵️</div>
         <h3 data-lang="es">Inspector</h3>
         <h3 data-lang="en">Inspector</h3>
         <ul>
-          <li data-lang="es">Verificar patente en calle</li>
-          <li data-lang="en">Look up plates in the street</li>
-          <li data-lang="es">Registrar infracciones con foto + coordenadas</li>
-          <li data-lang="en">Issue infractions with photos</li>
-          <li data-lang="es">PDF de infracciones del turno</li>
-          <li data-lang="en">Shift PDF report</li>
-          <li data-lang="es">Ver exenciones y abonos</li>
-          <li data-lang="en">See exemptions and passes</li>
+          <li data-lang="es">Verificar patente: GPS preselecciona la subcuadra más cercana</li>
+          <li data-lang="en">Look up plates: GPS auto-selects the nearest block</li>
+          <li data-lang="es">Resultado inmediato: pagado / impago / exento / abono activo / fuera de horario</li>
+          <li data-lang="en">Instant result: paid / unpaid / exempt / active pass / out of hours</li>
+          <li data-lang="es">Labrar acta: foto + GPS + subcuadra + motivo personalizable</li>
+          <li data-lang="en">Issue infraction: photo + GPS + block + customizable reason</li>
+          <li data-lang="es">Watermark automático con coordenadas sobre la foto del acta</li>
+          <li data-lang="en">Auto GPS watermark on every infraction photo</li>
+          <li data-lang="es">Ver exenciones y abonos activos al verificar la patente</li>
+          <li data-lang="en">See exemptions and active passes during plate check</li>
+          <li data-lang="es">Resumen de verificaciones e infracciones del turno</li>
+          <li data-lang="en">Shift summary: all checks and infractions</li>
+          <li data-lang="es">PDF de infracciones del turno para juzgado de faltas</li>
+          <li data-lang="en">Shift PDF for traffic court</li>
+          <li data-lang="es">Caja propia y cierre de turno</li>
+          <li data-lang="en">Personal cash register and shift close</li>
+          <li data-lang="es">Cada verificación registrada: inspector + subcuadra + timestamp + resultado</li>
+          <li data-lang="en">Every check logged: inspector + block + timestamp + outcome</li>
         </ul>
       </div>
+
+      <!-- Vendedor -->
       <div class="card role-card">
         <div class="card-icon">🏪</div>
         <h3 data-lang="es">Vendedor</h3>
         <h3 data-lang="en">Vendor</h3>
         <ul>
-          <li data-lang="es">Cobrar estacionamiento</li>
-          <li data-lang="en">Collect cash parking</li>
-          <li data-lang="es">Cobrar infracciones por patente</li>
-          <li data-lang="en">Collect infractions by plate</li>
-          <li data-lang="es">Vende abonos mensuales</li>
-          <li data-lang="en">Sell monthly passes</li>
-          <li data-lang="es">Cierre de caja y rendición</li>
-          <li data-lang="en">Cash close and settlement</li>
+          <li data-lang="es">Cobrar estacionamiento: efectivo, transferencia, débito, crédito o QR</li>
+          <li data-lang="en">Collect parking: cash, transfer, debit, credit, or QR</li>
+          <li data-lang="es">Cobrar infracciones buscando por patente</li>
+          <li data-lang="en">Collect infractions by searching the plate</li>
+          <li data-lang="es">Vender abono mensual (comisión automática por cobro)</li>
+          <li data-lang="en">Sell monthly passes (auto-calculated commission)</li>
+          <li data-lang="es">Ver caja con desglose por medio de pago</li>
+          <li data-lang="en">View register broken down by payment method</li>
+          <li data-lang="es">Cierre de turno y rendición al admin</li>
+          <li data-lang="en">Shift close and submit to admin</li>
+          <li data-lang="es">Historial de liquidaciones de comisión</li>
+          <li data-lang="en">Commission settlement history</li>
+          <li data-lang="es">Presentar factura para cobro de comisión</li>
+          <li data-lang="en">Attach invoice for commission payment</li>
         </ul>
       </div>
     </div>
+
     <div class="grid-2">
+      <!-- Administrador -->
       <div class="card role-card">
         <div class="card-icon">🛠️</div>
         <h3 data-lang="es">Administrador</h3>
         <h3 data-lang="en">Administrator</h3>
+        <p style="font-size:0.78rem;color:rgba(255,255,255,.45);margin-bottom:0.6rem;font-style:italic;" data-lang="es">Gestión completa del municipio — aislado de otros</p>
+        <p style="font-size:0.78rem;color:rgba(255,255,255,.45);margin-bottom:0.6rem;font-style:italic;" data-lang="en">Full municipality management — isolated from others</p>
         <ul>
-          <li data-lang="es">Gestión de usuarios, inspectores y vendedores</li>
-          <li data-lang="en">Manage users, inspectors, and vendors</li>
-          <li data-lang="es">Tarifas, horarios, feriados y exenciones</li>
-          <li data-lang="en">Rates, schedules, holidays, and exemptions</li>
-          <li data-lang="es">Panel con métricas de recaudación</li>
-          <li data-lang="en">Dashboard with collection metrics</li>
-          <li data-lang="es">Anular infracciones y validar rendiciones</li>
-          <li data-lang="en">Void infractions and validate settlements</li>
+          <li data-lang="es">Gestionar conductores, inspectores y vendedores (crear, editar, activar)</li>
+          <li data-lang="en">Manage drivers, inspectors, and vendors (create, edit, enable)</li>
+          <li data-lang="es">Configurar tarifas: precio/hora auto y moto, abono auto y moto</li>
+          <li data-lang="en">Set rates: hourly price by vehicle type, monthly pass prices</li>
+          <li data-lang="es">Horarios de cobro por día de semana (hora inicio y fin)</li>
+          <li data-lang="en">Billing hours per weekday (start and end times)</li>
+          <li data-lang="es">Feriados y días especiales (cobro activo o inactivo)</li>
+          <li data-lang="en">Holidays and special days (billing on or off)</li>
+          <li data-lang="es">Subcuadras: mapa GPS interactivo Leaflet/OSM, sin API key</li>
+          <li data-lang="en">Blocks: interactive GPS map Leaflet/OSM, no API key</li>
+          <li data-lang="es">Exenciones: global, parcial o por subcuadra — individual o importación CSV masiva</li>
+          <li data-lang="en">Exemptions: global, partial, or per block — individual or bulk CSV import</li>
+          <li data-lang="es">Tolerancia de gracia (minutos) y comisión vendedor (%)</li>
+          <li data-lang="en">Grace period (minutes) and vendor commission (%)</li>
+          <li data-lang="es">Infracciones: anular con motivo, cobrar, PDF para juzgado de faltas</li>
+          <li data-lang="en">Infractions: void with reason, collect, PDF for court</li>
+          <li data-lang="es">Estadísticas de inspectores: verificaciones, infracciones, efectividad + exportación Excel</li>
+          <li data-lang="en">Inspector stats: checks, infractions, effectiveness + Excel export</li>
+          <li data-lang="es">Rendiciones: selecciona cierres certificados, el sistema calcula totales automáticamente</li>
+          <li data-lang="en">Settlements: select certified shifts, system auto-calculates totals</li>
+          <li data-lang="es">Branding municipal: logo, nombre del sistema, colores primarios y secundarios</li>
+          <li data-lang="en">Municipal branding: logo, system name, primary and secondary colors</li>
+          <li data-lang="es">Plantillas de documentos personalizables por tipo de comprobante</li>
+          <li data-lang="en">Customizable document templates per receipt type</li>
         </ul>
       </div>
+
+      <!-- Tesorero -->
       <div class="card role-card">
         <div class="card-icon">🏦</div>
         <h3 data-lang="es">Tesorero</h3>
         <h3 data-lang="en">Treasurer</h3>
         <ul>
-          <li data-lang="es">Marca rendiciones como recibidas u observadas</li>
-          <li data-lang="en">Mark settlements as received or flagged</li>
-          <li data-lang="es">Registra el depósito de comisiones a vendedores</li>
-          <li data-lang="en">Records vendor commission deposits</li>
-          <li data-lang="es">Auditoría contable con trazabilidad completa</li>
-          <li data-lang="en">Full accounting audit trail</li>
+          <li data-lang="es">Panel con rendiciones pendientes de validar</li>
+          <li data-lang="en">Dashboard with pending settlements to review</li>
+          <li data-lang="es">Validar o observar rendiciones con comentario</li>
+          <li data-lang="en">Approve or flag settlements with comments</li>
+          <li data-lang="es">Ver desglose: efectivo / digital (transferencia, débito, crédito, QR)</li>
+          <li data-lang="en">View breakdown: cash / digital (transfer, debit, credit, QR)</li>
+          <li data-lang="es">Registrar depósito de comisiones a vendedores</li>
+          <li data-lang="en">Record commission deposits to vendors</li>
+          <li data-lang="es">El vendedor certifica el recibo y adjunta factura</li>
+          <li data-lang="en">Vendor certifies receipt and attaches invoice</li>
+          <li data-lang="es">Auditoría total: quién validó qué y cuándo</li>
+          <li data-lang="en">Full audit trail: who validated what and when</li>
         </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INSPECTOR TRACEABILITY -->
+<section id="trazabilidad" style="background:#f0f7ff; padding:4rem 2rem;">
+  <div class="container">
+    <div class="section-label" data-lang-inline="es">Trazabilidad de inspectores</div>
+    <div class="section-label" data-lang-inline="en">Inspector traceability</div>
+    <h2 data-lang="es">¿Qué hizo cada inspector, dónde y cuándo?</h2>
+    <h2 data-lang="en">What did each inspector do, where, and when?</h2>
+    <p class="section-intro" data-lang="es">Cada verificación en calle queda registrada con inspector, subcuadra y timestamp. El admin puede auditar el recorrido de cada turno, detectar zonas no cubiertas, y comparar el desempeño entre inspectores — sin depender de partes manuales.</p>
+    <p class="section-intro" data-lang="en">Every street check is logged with inspector, block, and timestamp. Admins can audit each shift's coverage, detect uncovered zones, and compare inspector performance — no manual reports needed.</p>
+
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-icon">📍</div>
+        <h3 data-lang="es">Subcuadra por verificación</h3>
+        <h3 data-lang="en">Block per check</h3>
+        <p data-lang="es">Cada patente verificada registra la subcuadra del inspector (autodetectada por GPS o seleccionada manualmente). Se puede determinar qué zonas fueron recorridas y cuáles no en cada turno.</p>
+        <p data-lang="en">Every plate check records the inspector's block (GPS-detected or manually selected). Determine which zones were covered and which weren't each shift.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📊</div>
+        <h3 data-lang="es">Estadísticas comparativas</h3>
+        <h3 data-lang="en">Comparative statistics</h3>
+        <p data-lang="es">El admin ve verificaciones, infracciones y tasa de efectividad por inspector y por período. Ranking automático exportable a Excel para análisis de desempeño.</p>
+        <p data-lang="en">Admins see checks, infractions, and effectiveness rate per inspector and period. Auto-ranked, exportable to Excel for performance analysis.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📸</div>
+        <h3 data-lang="es">Evidencia irrefutable</h3>
+        <h3 data-lang="en">Irrefutable evidence</h3>
+        <p data-lang="es">Cada acta incluye foto con watermark GPS automático, subcuadra exacta y timestamp. Prueba verificable de lugar y momento — clave ante impugnaciones en el juzgado de faltas.</p>
+        <p data-lang="en">Every infraction includes a photo with automatic GPS watermark, exact block, and timestamp. Verifiable proof of place and time — essential for court disputes.</p>
       </div>
     </div>
   </div>
@@ -789,7 +887,7 @@
         <div class="sec-icon">✅</div>
         <div class="sec-content">
           <h4 data-lang="es">155 tests automatizados</h4>
-          <h4 data-lang="en">106 automated tests</h4>
+          <h4 data-lang="en">155 automated tests</h4>
           <p data-lang="es">Cobertura de roles, flujos monetarios, tolerancia de gracia, multi-municipio, comisiones y webhooks. Todo cambio se verifica antes de llegar a producción.</p>
           <p data-lang="en">Coverage of roles, monetary flows, grace tolerance, multi-tenant, commissions, and webhooks. Every change is verified before reaching production.</p>
         </div>
@@ -834,8 +932,8 @@
       <div class="tech-detail-card">
         <h4 data-lang-inline="es">Modelos bien definidos</h4>
         <h4 data-lang-inline="en">Well-defined models</h4>
-        <p data-lang="es">17 modelos con constraints de integridad. Por ejemplo: un vehículo solo puede tener un estacionamiento ACTIVO a la vez — enforced en base de datos.</p>
-        <p data-lang="en">17 models with integrity constraints. For example: a vehicle can only have one ACTIVE parking at a time — enforced at the database level.</p>
+        <p data-lang="es">18 modelos con constraints de integridad. Por ejemplo: un vehículo solo puede tener un estacionamiento ACTIVO a la vez — enforced en base de datos.</p>
+        <p data-lang="en">18 models with integrity constraints. For example: a vehicle can only have one ACTIVE parking at a time — enforced at the database level.</p>
       </div>
       <div class="tech-detail-card">
         <h4 data-lang-inline="es">Deploy simple</h4>

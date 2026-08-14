@@ -105,6 +105,8 @@
         </li>
 
       {% else %}
+        <li><a href="{% url 'landing_sistema' %}">Conoce el sistema</a></li>
+        <li><a href="{% url 'pago_publico_buscar' %}">Pagar sin registrarse</a></li>
         <li><a href="{% url 'login' %}">Ingresar</a></li>
       {% endif %}
 
