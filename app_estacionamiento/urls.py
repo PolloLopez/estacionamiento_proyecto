@@ -17,8 +17,9 @@ urlpatterns = [
     # =========================
     # 💳 PAGO PÚBLICO (sin registro)
     # =========================
+    # IMPORTANTE: pagar/<str:patente>/ va AL FINAL — si va antes captura
+    # pagar/estacionar/, pagar/abono/, pagar/mp/... como si fueran patentes.
     path("pagar/",                                   views_pago_publico.buscar_patente,               name="pago_publico_buscar"),
-    path("pagar/<str:patente>/",                     views_pago_publico.detalle_patente,              name="pago_publico_detalle"),
     path("pagar/infraccion/<int:infraccion_id>/",    views_pago_publico.iniciar_pago_infraccion,      name="pago_publico_infraccion"),
     path("pagar/estacionar/",                        views_pago_publico.iniciar_pago_estacionamiento, name="pago_publico_estacionar"),
     path("pagar/abono/",                             views_pago_publico.iniciar_pago_abono,           name="pago_publico_abono"),
@@ -26,6 +27,7 @@ urlpatterns = [
     path("pagar/mp/fallido/",                        views_pago_publico.mp_fallido_publico,           name="pago_publico_mp_fallido"),
     path("pagar/mp/pendiente/",                      views_pago_publico.mp_pendiente_publico,         name="pago_publico_mp_pendiente"),
     path("pagar/subcuadra-cercana/",                 views_pago_publico.subcuadra_cercana_publica,    name="pago_publico_subcuadra_cercana"),
+    path("pagar/<str:patente>/",                     views_pago_publico.detalle_patente,              name="pago_publico_detalle"),
 
     # =========================
     # 🔐 AUTH

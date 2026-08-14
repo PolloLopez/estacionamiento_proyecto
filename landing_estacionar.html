@@ -133,6 +133,19 @@
       cursor: pointer;
     }
     .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-secondary {
+      background: transparent;
+      color: #fff;
+      padding: 0.85rem 2rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: background .2s;
+      border: 2px solid rgba(255,255,255,0.5);
+      cursor: pointer;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.12); color: #fff; }
     .btn-outline-white {
       background: transparent;
       color: #fff;
@@ -443,8 +456,10 @@
     </p>
 
     <div class="hero-cta">
-      <a href="mailto:leandrolopezalbini@gmail.com?subject=Consulta%20EstacionAR%20-%20Demo&body=Hola%20Leandro%2C%20me%20interesa%20conocer%20el%20sistema%20EstacionAR." class="btn-primary" data-lang-inline="es">Solicitar demo</a>
-      <a href="mailto:leandrolopezalbini@gmail.com?subject=EstacionAR%20Demo%20Request&body=Hi%20Leandro%2C%20I%27m%20interested%20in%20learning%20more%20about%20EstacionAR." class="btn-primary" data-lang-inline="en">Request a demo</a>
+      <a href="https://estacionamiento.up.railway.app/pagar/" class="btn-primary" data-lang-inline="es">Ver sistema en vivo</a>
+      <a href="https://estacionamiento.up.railway.app/pagar/" class="btn-primary" data-lang-inline="en">See live system</a>
+      <a href="mailto:leandrolopezalbini@gmail.com?subject=Consulta%20EstacionAR%20-%20Demo&body=Hola%20Leandro%2C%20me%20interesa%20conocer%20el%20sistema%20EstacionAR." class="btn-secondary" data-lang-inline="es">Solicitar demo</a>
+      <a href="mailto:leandrolopezalbini@gmail.com?subject=EstacionAR%20Demo%20Request&body=Hi%20Leandro%2C%20I%27m%20interested%20in%20learning%20more%20about%20EstacionAR." class="btn-secondary" data-lang-inline="en">Request a demo</a>
     </div>
 
     <div class="hero-stats">
@@ -454,12 +469,12 @@
         <div class="lbl" data-lang-inline="en">User roles</div>
       </div>
       <div class="hero-stat">
-        <div class="num">106</div>
+        <div class="num">155</div>
         <div class="lbl" data-lang-inline="es">Tests automatizados</div>
         <div class="lbl" data-lang-inline="en">Automated tests</div>
       </div>
       <div class="hero-stat">
-        <div class="num">17</div>
+        <div class="num">18</div>
         <div class="lbl" data-lang-inline="es">Modelos de datos</div>
         <div class="lbl" data-lang-inline="en">Data models</div>
       </div>
@@ -485,6 +500,13 @@
     <p class="section-intro" data-lang="en">From the driver paying with their phone to the treasurer auditing every transaction — the system covers the full lifecycle.</p>
 
     <div class="grid-3">
+      <div class="card" style="border-top: 3px solid var(--accent2);">
+        <div class="card-icon">💳</div>
+        <h3 data-lang="es">Pago sin registro</h3>
+        <h3 data-lang="en">Pay without an account</h3>
+        <p data-lang="es">El ciudadano ingresa su patente y paga infracciones, estacionamiento o abono mensual con MercadoPago — sin crear cuenta ni recordar contraseña. El ticket de infracción incluye un QR directo al pago.</p>
+        <p data-lang="en">Citizens enter their plate number and pay infractions, parking, or monthly passes via MercadoPago — no account or password needed. Infraction tickets include a QR code linking directly to payment.</p>
+      </div>
       <div class="card">
         <div class="card-icon">📱</div>
         <h3 data-lang="es">Conductor autogestivo</h3>
@@ -766,7 +788,7 @@
       <div class="security-item">
         <div class="sec-icon">✅</div>
         <div class="sec-content">
-          <h4 data-lang="es">106 tests automatizados</h4>
+          <h4 data-lang="es">155 tests automatizados</h4>
           <h4 data-lang="en">106 automated tests</h4>
           <p data-lang="es">Cobertura de roles, flujos monetarios, tolerancia de gracia, multi-municipio, comisiones y webhooks. Todo cambio se verifica antes de llegar a producción.</p>
           <p data-lang="en">Coverage of roles, monetary flows, grace tolerance, multi-tenant, commissions, and webhooks. Every change is verified before reaching production.</p>
@@ -793,7 +815,7 @@
       <div class="tech-pill"><strong>django-allauth</strong> · Google OAuth</div>
       <div class="tech-pill"><strong>reportlab</strong> · PDF</div>
       <div class="tech-pill"><strong>HTML + CSS propio</strong> · Sin JS frameworks</div>
-      <div class="tech-pill"><strong>106 tests</strong> · Django TestCase</div>
+      <div class="tech-pill"><strong>155 tests</strong> · Django TestCase</div>
     </div>
 
     <div class="tech-details">
