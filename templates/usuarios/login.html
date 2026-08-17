@@ -25,23 +25,16 @@
     <span class="btn-pagar-icono">💳</span>
     <span class="btn-pagar-texto">
       <strong>Pagar sin registrarse</strong>
-      <small>Infracciones · Estacionamiento · Abono</small>
+      <small>Estacionamiento · Infracciones · Abono</small>
     </span>
     <span class="btn-pagar-arrow">›</span>
   </a>
 
   <div class="login-divisor">
-    <span>o ingresá con tu cuenta</span>
+    <span>Ingresá con tu cuenta</span>
   </div>
 
-  <!-- OPCIÓN 2: Google -->
-  <a href="/accounts/google/login/" class="btn-google">
-    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-         alt="Google" width="20" height="20">
-    Continuar con Google
-  </a>
-
-  <!-- OPCIÓN 3: Email -->
+  <!-- OPCIÓN 2: Email -->
   <details class="login-email-section">
     <summary>Ingresar con correo y contraseña</summary>
     <form method="post" action="{% url 'login' %}" class="login-form">
@@ -60,6 +53,13 @@
     </form>
   </details>
 
+  <!-- OPCIÓN 3: Google -->
+  <a href="/accounts/google/login/" class="btn-google">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+         alt="Google" width="20" height="20">
+    Continuar con Google
+  </a>
+
   <!-- Links pie -->
   <div class="login-footer">
     <a href="{% url 'registro' %}">Crear cuenta</a>
@@ -71,213 +71,4 @@
 
 </div>
 
-<style>
-/* ── Página completa centrada ──────────────────────────────────── */
-.login-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-height: calc(100dvh - var(--navbar-h) - 40px);
-  padding: 2rem 1.25rem 2rem;
-  max-width: 400px;
-  margin: 0 auto;
-  gap: 0.75rem;
-}
-
-/* ── Branding ──────────────────────────────────────────────────── */
-.login-brand {
-  text-align: center;
-  margin-bottom: 0.5rem;
-}
-.login-logo-img {
-  height: 56px;
-  width: auto;
-  margin-bottom: 0.6rem;
-}
-.login-logo-icon {
-  font-size: 2.8rem;
-  display: block;
-  margin-bottom: 0.4rem;
-}
-.login-brand h1 {
-  font-size: 1.55rem;
-  font-weight: 800;
-  color: #14883b;
-  margin: 0 0 0.2rem;
-  letter-spacing: -0.3px;
-}
-.login-brand p {
-  font-size: 0.83rem;
-  color: var(--color-text-muted);
-  margin: 0;
-}
-
-/* ── Botón principal: pagar sin registro ───────────────────────── */
-.btn-pagar-publico {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  width: 100%;
-  background: #14883b;
-  color: #fff;
-  text-decoration: none;
-  border-radius: 14px;
-  padding: 1rem 1.1rem;
-  transition: background 0.15s, transform 0.1s;
-  box-shadow: 0 4px 16px rgba(20,136,59,0.25);
-}
-.btn-pagar-publico:hover {
-  background: #117030;
-  color: #fff;
-  text-decoration: none;
-  transform: translateY(-1px);
-}
-.btn-pagar-publico:active { transform: scale(0.98); }
-
-.btn-pagar-icono {
-  font-size: 1.6rem;
-  flex-shrink: 0;
-}
-.btn-pagar-texto {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-.btn-pagar-texto strong {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-.btn-pagar-texto small {
-  font-size: 0.78rem;
-  opacity: 0.82;
-  font-weight: 400;
-}
-.btn-pagar-arrow {
-  font-size: 1.5rem;
-  font-weight: 300;
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-
-/* ── Divisor ──────────────────────────────────────────────────── */
-.login-divisor {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
-  margin: 0.25rem 0;
-}
-.login-divisor::before,
-.login-divisor::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--color-border);
-}
-
-/* ── Botón Google ──────────────────────────────────────────────── */
-.btn-google {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 1.5px solid var(--color-border);
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text);
-  text-decoration: none;
-  background: var(--color-surface);
-  transition: border-color 0.15s, background 0.15s;
-}
-.btn-google:hover {
-  border-color: #aaa;
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  text-decoration: none;
-}
-
-/* ── Sección email colapsable ──────────────────────────────────── */
-.login-email-section {
-  width: 100%;
-  border: 1.5px solid var(--color-border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.login-email-section summary {
-  padding: 0.75rem 1rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: var(--color-text-muted);
-  list-style: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  user-select: none;
-}
-.login-email-section summary::-webkit-details-marker { display: none; }
-.login-email-section summary::after {
-  content: '›';
-  font-size: 1.2rem;
-  transition: transform 0.2s;
-  opacity: 0.5;
-}
-.login-email-section[open] summary::after {
-  transform: rotate(90deg);
-}
-.login-email-section[open] summary {
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text);
-}
-
-.login-form {
-  padding: 0.9rem 1rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.login-form input {
-  font-size: 0.95rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: 8px;
-}
-.login-error {
-  font-size: 0.82rem;
-  color: var(--color-danger);
-  margin: 0;
-}
-.btn-email-submit {
-  background: var(--color-text);
-  color: var(--color-surface);
-  border: none;
-  border-radius: 8px;
-  padding: 0.7rem;
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  margin-top: 0.25rem;
-  transition: opacity 0.15s;
-}
-.btn-email-submit:hover { opacity: 0.85; }
-
-/* ── Pie ───────────────────────────────────────────────────────── */
-.login-footer {
-  display: flex;
-  gap: 0.6rem;
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  margin-top: 0.5rem;
-}
-.login-footer a {
-  color: var(--color-text-muted);
-}
-.login-footer a:hover { color: #14883b; }
-</style>
 {% endblock %}

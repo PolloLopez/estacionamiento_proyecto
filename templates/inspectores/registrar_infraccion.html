@@ -2,80 +2,6 @@
 {% block title %}Registrar Infracción{% endblock %}
 {% block content %}
 
-<style>
-  .inf-wrap {
-    max-width: 520px;
-    margin: 0 auto;
-    padding-top: 0.5rem;
-  }
-  .inf-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.25rem;
-  }
-  .inf-header h2 { margin: 0; font-size: 1.4rem; }
-
-  .inf-patente {
-    font-size: 2.2rem;
-    font-weight: 800;
-    letter-spacing: 6px;
-    text-align: center;
-    background: var(--color-surface-2);
-    border: 2px solid var(--color-border);
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-    color: var(--color-text);
-  }
-
-  .inf-field { margin-bottom: 1rem; }
-  .inf-field label {
-    display: block;
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-    margin-bottom: 0.4rem;
-  }
-  .inf-field select,
-  .inf-field input[type="file"] {
-    width: 100%;
-    padding: 0.6rem 0.75rem;
-    border: 1.5px solid var(--color-border);
-    border-radius: 8px;
-    font-size: 0.97rem;
-    background: var(--color-surface);
-    color: var(--color-text);
-  }
-
-  .gps-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    font-weight: 600;
-    padding: 0.35rem 0.75rem;
-    border-radius: 20px;
-    margin-top: 0.5rem;
-    background: #f0fff4;
-    color: #1b5e20;
-    border: 1px solid #c8e6c9;
-  }
-  .gps-chip.esperando { background: #fffde7; color: #795548; border-color: #ffe0b2; }
-  .gps-chip.error     { background: #fff3e0; color: #e65100; border-color: #ffccbc; }
-
-  .btn-grabar {
-    width: 100%;
-    font-size: 1.15rem;
-    padding: 0.9rem;
-    border-radius: 10px;
-    margin-top: 0.5rem;
-    font-weight: 700;
-  }
-</style>
-
 <div class="inf-wrap">
 
   <div class="inf-header">
@@ -101,17 +27,25 @@
     <div class="inf-patente">{{ patente }}</div>
     <input type="hidden" name="patente" value="{{ patente }}" />
 
-    <!-- Subcuadra -->
+    <!-- Subcuadra: cascade Calle → Altura -->
     <div class="inf-field">
-      <label>📍 Subcuadra</label>
-      <select name="subcuadra_id" required>
-        {% for s in subcuadras %}
-          <option value="{{ s.id }}"
-            {% if s.id == subcuadra_default %}selected{% endif %}>
-            {{ s }}
-          </option>
-        {% endfor %}
-      </select>
+      <label>📍 Ubicación</label>
+      <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+        <select id="sel-calle" class="inf-field select"
+                style="flex:1; min-width:110px; padding:0.6rem 0.75rem;
+                       border:1.5px solid var(--color-border); border-radius:8px;
+                       font-size:0.97rem; background:var(--color-surface); color:var(--color-text);">
+          <option value="">— Calle —</option>
+        </select>
+        <select id="sel-altura" class="inf-field select"
+                style="flex:1; min-width:80px; padding:0.6rem 0.75rem;
+                       border:1.5px solid var(--color-border); border-radius:8px;
+                       font-size:0.97rem; background:var(--color-surface); color:var(--color-text);"
+                disabled>
+          <option value="">— Altura —</option>
+        </select>
+      </div>
+      <input type="hidden" name="subcuadra_id" id="hidden-subcuadra" required>
     </div>
 
     <!-- Foto -->
@@ -184,6 +118,60 @@
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }());
+
+// ── Cascade Calle → Altura ────────────────────────────────────────
+var SUBCUADRAS_INF = [
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}"},
+  {% endfor %}
+];
+
+(function() {
+  var selCalle  = document.getElementById("sel-calle");
+  var selAltura = document.getElementById("sel-altura");
+  var hidden    = document.getElementById("hidden-subcuadra");
+
+  // Poblar calles únicas
+  var callesVistas = {};
+  SUBCUADRAS_INF.forEach(function(s) {
+    if (!callesVistas[s.calle]) {
+      callesVistas[s.calle] = true;
+      var opt = document.createElement("option");
+      opt.value = s.calle;
+      opt.textContent = s.calle;
+      selCalle.appendChild(opt);
+    }
+  });
+
+  selCalle.addEventListener("change", function() {
+    var calle = selCalle.value;
+    selAltura.innerHTML = '<option value="">— Altura —</option>';
+    hidden.value = "";
+    if (!calle) { selAltura.disabled = true; return; }
+    var filtradas = SUBCUADRAS_INF.filter(function(s) { return s.calle === calle; });
+    filtradas.forEach(function(s) {
+      var opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.altura;
+      selAltura.appendChild(opt);
+    });
+    selAltura.disabled = false;
+    if (filtradas.length === 1) { selAltura.value = filtradas[0].id; hidden.value = filtradas[0].id; }
+  });
+
+  selAltura.addEventListener("change", function() { hidden.value = selAltura.value; });
+
+  // Preseleccionar subcuadra_default (viene de sesión del inspector)
+  var defId = "{{ subcuadra_default|default:'' }}";
+  if (defId) {
+    var sub = SUBCUADRAS_INF.find(function(s) { return s.id == defId; });
+    if (sub) {
+      selCalle.value = sub.calle;
+      selCalle.dispatchEvent(new Event("change"));
+      selAltura.value = defId;
+      hidden.value = defId;
+    }
+  }
+})();
 </script>
 
 {% endblock %}
