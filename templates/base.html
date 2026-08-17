@@ -27,8 +27,12 @@
   <style>
     :root {
       --color-primary:       {{ municipio_branding.color_primario }};
-      --color-primary-hover: {{ municipio_branding.color_secundario|default:"#155f2e" }};
+      --color-primary-hover: {{ municipio_branding.color_secundario|default:"#0f6830" }};
       --color-primary-light: color-mix(in srgb, {{ municipio_branding.color_primario }} 15%, white);
+      /* Navbar y footer usan el color del municipio:
+         nav → color primario, footer → color secundario (levemente más oscuro) */
+      --color-nav-bg:    {{ municipio_branding.color_primario }};
+      --color-footer-bg: {{ municipio_branding.color_secundario|default:"#0f6830" }};
     }
   </style>
   {% endif %}
@@ -124,7 +128,6 @@
         </li>
 
       {% else %}
-        <li><a href="{% url 'landing_sistema' %}">Conoce el sistema</a></li>
         <li><a href="{% url 'pago_publico_buscar' %}">Pagar sin registrarse</a></li>
         <li><a href="{% url 'login' %}">Ingresar</a></li>
       {% endif %}

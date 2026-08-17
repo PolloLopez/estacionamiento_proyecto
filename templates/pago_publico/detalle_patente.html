@@ -92,28 +92,40 @@
         </div>
       </div>
 
-      <!-- Subcuadra con GPS -->
+      <!-- Subcuadra: botón GPS + cascade Calle → Altura -->
       <div style="margin-bottom:0.75rem;">
-        <label style="font-size:0.85rem; font-weight:600;">Ubicación (subcuadra)</label>
-        <div style="display:flex; gap:0.5rem; align-items:flex-start; margin-top:0.4rem;">
-          <select name="subcuadra_id" id="sel-subcuadra" required
-                  style="flex:1; font-size:0.9rem;">
-            <option value="">— Seleccioná tu calle —</option>
-            {% regroup subcuadras by calle as grupos_calle %}
-            {% for grupo in grupos_calle %}
-              <optgroup label="{{ grupo.grouper }}">
-                {% for s in grupo.list %}
-                  <option value="{{ s.id }}">{{ grupo.grouper }} {{ s.altura }}</option>
-                {% endfor %}
-              </optgroup>
-            {% endfor %}
+        <label style="font-size:0.85rem; font-weight:600;">Ubicación</label>
+
+        <!-- Botón GPS prominente -->
+        <button type="button" id="btn-gps" onclick="detectarGPS()"
+                style="display:flex; align-items:center; gap:0.5rem; width:100%;
+                       margin-top:0.4rem; padding:0.65rem 1rem;
+                       background:#f0fff4; border:1.5px solid #c8e6c9; border-radius:8px;
+                       color:#1b5e20; font-size:0.9rem; font-weight:600; cursor:pointer;
+                       transition:background 0.15s; text-align:left;">
+          <span id="gps-icono">📍</span>
+          <span id="gps-texto">Estacionar en mi ubicación actual</span>
+        </button>
+        <p id="txt-gps" style="font-size:0.8rem; color:var(--color-text-muted);
+                                margin:0.35rem 0 0; display:none;"></p>
+
+        <!-- Cascade: Calle → Altura -->
+        <div style="display:flex; gap:0.4rem; margin-top:0.5rem;">
+          <select id="sel-calle"
+                  style="flex:1; font-size:0.9rem; padding:0.5rem 0.65rem;
+                         border:1.5px solid var(--color-border); border-radius:8px;
+                         background:var(--color-surface); color:var(--color-text);">
+            <option value="">— Calle —</option>
           </select>
-          <button type="button" id="btn-gps" onclick="detectarGPS()"
-                  class="btn btn-outline" style="padding:0.6rem 0.8rem; font-size:0.85rem; white-space:nowrap;">
-            📍 GPS
-          </button>
+          <select id="sel-altura"
+                  style="flex:1; font-size:0.9rem; padding:0.5rem 0.65rem;
+                         border:1.5px solid var(--color-border); border-radius:8px;
+                         background:var(--color-surface); color:var(--color-text);" disabled>
+            <option value="">— Altura —</option>
+          </select>
         </div>
-        <p id="txt-gps" class="text-muted" style="font-size:0.8rem; margin-top:0.3rem; display:none;"></p>
+        <!-- campo real que recibe el formulario -->
+        <input type="hidden" name="subcuadra_id" id="sel-subcuadra" required>
       </div>
 
       <!-- Duración -->
@@ -249,7 +261,7 @@
       </div>
 
       <button type="submit" class="btn" style="width:100%; font-size:1rem; padding:0.8rem;">
-        💳 Contratar abono con MercadoPago
+        💳 Pagar abono con MercadoPago
       </button>
     </form>
   </div>
@@ -297,40 +309,123 @@ document.querySelectorAll('input[type="radio"]').forEach(function(r) {
   if (r.checked) r.dispatchEvent(new Event("change"));
 });
 
-// GPS para subcuadra
+// ── Cascade Calle → Altura ────────────────────────────────────────
+var SUBCUADRAS = [
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}"},
+  {% endfor %}
+];
+
+(function initCascade() {
+  var selCalle  = document.getElementById("sel-calle");
+  var selAltura = document.getElementById("sel-altura");
+  var hidden    = document.getElementById("sel-subcuadra");
+
+  // Poblar calles únicas (preservando orden del queryset)
+  var callesVistas = {};
+  SUBCUADRAS.forEach(function(s) {
+    if (!callesVistas[s.calle]) {
+      callesVistas[s.calle] = true;
+      var opt = document.createElement("option");
+      opt.value = s.calle;
+      opt.textContent = s.calle;
+      selCalle.appendChild(opt);
+    }
+  });
+
+  selCalle.addEventListener("change", function() {
+    var calle = selCalle.value;
+    selAltura.innerHTML = '<option value="">— Altura —</option>';
+    hidden.value = "";
+    if (!calle) { selAltura.disabled = true; return; }
+
+    var filtradas = SUBCUADRAS.filter(function(s) { return s.calle === calle; });
+    filtradas.forEach(function(s) {
+      var opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.altura;
+      selAltura.appendChild(opt);
+    });
+    selAltura.disabled = false;
+    // Si hay una sola altura, seleccionarla automáticamente
+    if (filtradas.length === 1) {
+      selAltura.value = filtradas[0].id;
+      hidden.value = filtradas[0].id;
+    }
+  });
+
+  selAltura.addEventListener("change", function() {
+    hidden.value = selAltura.value;
+  });
+})();
+
+// Preseleccionar subcuadra por id (usado por GPS)
+function seleccionarSubcuadra(id) {
+  var sub = SUBCUADRAS.find(function(s) { return s.id == id; });
+  if (!sub) return;
+  var selCalle  = document.getElementById("sel-calle");
+  var selAltura = document.getElementById("sel-altura");
+  var hidden    = document.getElementById("sel-subcuadra");
+  selCalle.value = sub.calle;
+  selCalle.dispatchEvent(new Event("change")); // repobla alturas
+  selAltura.value = id;
+  hidden.value = id;
+}
+
+// ── GPS ───────────────────────────────────────────────────────────
 function detectarGPS() {
-  var btn = document.getElementById("btn-gps");
-  var txt = document.getElementById("txt-gps");
+  var icono = document.getElementById("gps-icono");
+  var texto = document.getElementById("gps-texto");
+  var btn   = document.getElementById("btn-gps");
+  var txt   = document.getElementById("txt-gps");
+
   if (!navigator.geolocation) {
-    txt.textContent = "Tu navegador no soporta GPS.";
+    txt.textContent = "Tu navegador no soporta GPS. Seleccioná la calle manualmente.";
     txt.style.display = "block";
     return;
   }
-  btn.textContent = "📍 Buscando…";
+
+  icono.textContent = "📡";
+  texto.textContent = "Detectando ubicación…";
   btn.disabled = true;
+
   navigator.geolocation.getCurrentPosition(
     function(pos) {
       fetch("{% url 'pago_publico_subcuadra_cercana' %}?lat=" + pos.coords.latitude + "&lon=" + pos.coords.longitude)
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+          if (!r.ok) throw new Error("Error de servidor");
+          return r.json();
+        })
         .then(function(data) {
-          btn.textContent = "📍 GPS";
+          icono.textContent = "📍";
           btn.disabled = false;
           if (data.id) {
-            document.getElementById("sel-subcuadra").value = data.id;
-            txt.textContent = "📍 GPS: " + data.nombre;
-            txt.style.display = "block";
+            seleccionarSubcuadra(data.id);
+            texto.textContent = "✅ " + data.nombre;
+            txt.textContent = "Subcuadra detectada automáticamente.";
           } else {
+            texto.textContent = "Estacionar en mi ubicación actual";
             txt.textContent = "No se encontró subcuadra cercana. Seleccioná manualmente.";
-            txt.style.display = "block";
           }
+          txt.style.display = "block";
+        })
+        .catch(function() {
+          icono.textContent = "📍";
+          texto.textContent = "Estacionar en mi ubicación actual";
+          txt.textContent = "Error al detectar subcuadra. Seleccioná manualmente.";
+          txt.style.display = "block";
+          btn.disabled = false;
         });
     },
-    function() {
-      btn.textContent = "📍 GPS";
+    function(err) {
+      icono.textContent = "📍";
+      texto.textContent = "Estacionar en mi ubicación actual";
       btn.disabled = false;
-      txt.textContent = "No se pudo obtener la ubicación. Seleccioná manualmente.";
+      txt.textContent = err.code === 1
+        ? "Permiso de ubicación denegado. Seleccioná la calle manualmente."
+        : "No se pudo obtener la ubicación. Seleccioná manualmente.";
       txt.style.display = "block";
-    }
+    },
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }
 

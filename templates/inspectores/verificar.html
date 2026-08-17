@@ -5,52 +5,6 @@
 
 {% block content %}
 
-<style>
-.pantalla {
-    max-width: 540px;
-    margin: auto;
-    padding-top: 16px;
-    text-align: center;
-}
-.modo-calle {
-    max-width: 100%;
-    padding: 8px;
-}
-.input-patente {
-    font-size: 3rem;
-    text-align: center;
-    letter-spacing: 6px;
-    width: 100%;
-    padding: 1rem;
-    border-radius: 12px;
-    border: 3px solid var(--color-border);
-    background: var(--color-surface);
-    color: var(--color-text);
-    font-weight: 800;
-}
-.box-resultado {
-    margin-top: 20px;
-    padding: 22px;
-    border-radius: 14px;
-    font-size: 1.2rem;
-    border: 3px solid var(--color-border);
-    background: var(--color-surface);
-}
-.box-ok { border-color: var(--color-primary); background: #f0fff4; }
-.box-warn { border-color: var(--color-warning); background: #fffbf0; }
-.box-danger { border-color: var(--color-danger); background: #fff0f0; }
-.btn-big {
-    width: 100%;
-    font-size: 1.5rem;
-    padding: 1.1rem;
-    margin-top: 14px;
-    border-radius: 10px;
-}
-.subcuadra-selector {
-    margin-bottom: 14px;
-    text-align: left;
-}
-</style>
 
 <div class="pantalla {% if modo == 'calle' %}modo-calle{% endif %}">
 
@@ -75,16 +29,23 @@
             📍 Subcuadra actual
             <span id="gps-estado" style="font-weight:400; text-transform:none; margin-left:0.4rem;"></span>
           </label>
-          <select name="subcuadra_id" id="subcuadra_sel"
-                  style="width:100%; padding:0.5rem 0.65rem; border-radius:8px;
-                         border:2px solid var(--color-border); background:var(--color-surface);
-                         color:var(--color-text); font-size:0.9rem; font-weight:600;">
-            {% for s in subcuadras %}
-              <option value="{{ s.id }}" {% if s.id == subcuadra_activa.id %}selected{% endif %}>
-                {% if s.calle == "Zona Única" %}— Sin zona específica —{% else %}{{ s }}{% endif %}
-              </option>
-            {% endfor %}
-          </select>
+          <!-- Cascade Calle → Altura. subcuadra_activa se preselecciona vía JS -->
+          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <select id="sel-calle"
+                    style="flex:1; min-width:110px; padding:0.5rem 0.65rem; border-radius:8px;
+                           border:2px solid var(--color-border); background:var(--color-surface);
+                           color:var(--color-text); font-size:0.9rem; font-weight:600;">
+              <option value="">— Calle —</option>
+            </select>
+            <select id="sel-altura"
+                    style="flex:1; min-width:80px; padding:0.5rem 0.65rem; border-radius:8px;
+                           border:2px solid var(--color-border); background:var(--color-surface);
+                           color:var(--color-text); font-size:0.9rem; font-weight:600;" disabled>
+              <option value="">— Altura —</option>
+            </select>
+          </div>
+          <input type="hidden" name="subcuadra_id" id="subcuadra_sel"
+                 value="{{ subcuadra_activa.id|default:'' }}">
           {% else %}
           {# Municipio con una sola zona: enviar como campo oculto sin mostrar el selector #}
           <input type="hidden" name="subcuadra_id" value="{{ subcuadra_activa.id|default:'' }}">
@@ -92,17 +53,7 @@
         </div>
 
         <!-- Selector tipo: Auto / Moto -->
-        <style>
-          .tipo-btn { display:inline-flex; align-items:center; gap:0.4rem;
-            font-size:1rem; font-weight:600; cursor:pointer;
-            padding:0.5rem 1.2rem; border:2px solid var(--color-border);
-            border-radius:var(--radius); background:transparent;
-            user-select:none; transition:border-color 0.15s, background 0.15s; }
-          .tipo-radio:checked + .tipo-btn {
-            border-color:var(--color-primary);
-            background:rgba(46,125,50,0.08); }
-        </style>
-        <div style="display:flex; justify-content:center; gap:0.6rem; margin-bottom:0.75rem;">
+<div style="display:flex; justify-content:center; gap:0.6rem; margin-bottom:0.75rem;">
           <input type="radio" id="tipo-auto" name="tipo" value="auto"
                  class="tipo-radio" style="display:none;"
                  {% if tipo_seleccionado != 'moto' %}checked{% endif %}>
@@ -297,52 +248,96 @@ window.onload = () => {
     }
 };
 
-// ── GPS: preseleccionar subcuadra más cercana ──────────────────────────────
-// Solo se activa si el selector de subcuadras está visible en la pantalla
-// (municipios con más de 1 subcuadra). En municipios con Zona Única no hay
-// selector, así que no hay nada que preseleccionar.
-(function detectarSubcuadraGPS() {
-    const sel = document.getElementById("subcuadra_sel");
-    if (!sel) return;                          // solo 1 zona, campo oculto
-    if (!navigator.geolocation) return;        // navegador sin soporte GPS
+// ── Cascade Calle → Altura ────────────────────────────────────────
+var SUBCUADRAS_INS = [
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}"},
+  {% endfor %}
+];
 
-    const estadoEl = document.getElementById("gps-estado");
+(function initCascadeInspector() {
+  var selCalle  = document.getElementById("sel-calle");
+  var selAltura = document.getElementById("sel-altura");
+  var hidden    = document.getElementById("subcuadra_sel");
+  if (!selCalle) return; // municipio con zona única — usa campo oculto directo
+
+  // Poblar calles únicas
+  var callesVistas = {};
+  SUBCUADRAS_INS.forEach(function(s) {
+    if (!callesVistas[s.calle]) {
+      callesVistas[s.calle] = true;
+      var opt = document.createElement("option");
+      opt.value = s.calle;
+      opt.textContent = s.calle === "Zona Única" ? "— Sin zona específica —" : s.calle;
+      selCalle.appendChild(opt);
+    }
+  });
+
+  selCalle.addEventListener("change", function() {
+    var calle = selCalle.value;
+    selAltura.innerHTML = '<option value="">— Altura —</option>';
+    hidden.value = "";
+    if (!calle) { selAltura.disabled = true; return; }
+    var filtradas = SUBCUADRAS_INS.filter(function(s) { return s.calle === calle; });
+    filtradas.forEach(function(s) {
+      var opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.altura;
+      selAltura.appendChild(opt);
+    });
+    selAltura.disabled = false;
+    if (filtradas.length === 1) {
+      selAltura.value = filtradas[0].id;
+      hidden.value = filtradas[0].id;
+    }
+  });
+
+  selAltura.addEventListener("change", function() {
+    hidden.value = selAltura.value;
+  });
+
+  // Preseleccionar la subcuadra_activa (guardada en sesión)
+  var idActivo = "{{ subcuadra_activa.id|default:'' }}";
+  if (idActivo) seleccionarSubcuadraInspector(idActivo);
+})();
+
+function seleccionarSubcuadraInspector(id) {
+  var sub = SUBCUADRAS_INS.find(function(s) { return s.id == id; });
+  if (!sub) return;
+  var selCalle  = document.getElementById("sel-calle");
+  var selAltura = document.getElementById("sel-altura");
+  var hidden    = document.getElementById("subcuadra_sel");
+  if (!selCalle) return;
+  selCalle.value = sub.calle;
+  selCalle.dispatchEvent(new Event("change"));
+  selAltura.value = id;
+  hidden.value = id;
+}
+
+// ── GPS: preseleccionar subcuadra más cercana ────────────────────
+// Solo se activa si hay cascade visible (municipios con >1 subcuadra).
+(function detectarSubcuadraGPS() {
+    var selCalle = document.getElementById("sel-calle");
+    if (!selCalle) return;           // zona única — campo oculto, nada que preseleccionar
+    if (!navigator.geolocation) return;
+
+    var estadoEl = document.getElementById("gps-estado");
     if (estadoEl) estadoEl.textContent = "📡 detectando…";
 
     navigator.geolocation.getCurrentPosition(
         function onPos(pos) {
-            const lat = pos.coords.latitude;
-            const lon = pos.coords.longitude;
-
-            fetch(`{% url 'inspectores_subcuadra_cercana' %}?lat=${lat}&lon=${lon}`)
-                .then(r => r.json())
-                .then(data => {
-                    if (!data.id) {
-                        // Municipio sin coordenadas cargadas — silencioso
-                        if (estadoEl) estadoEl.textContent = "";
-                        return;
-                    }
-                    // Preseleccionar si la opción existe en el selector
-                    const opcion = sel.querySelector(`option[value="${data.id}"]`);
-                    if (opcion) {
-                        sel.value = data.id;
-                        if (estadoEl) {
-                            estadoEl.textContent = "✅ GPS";
-                            estadoEl.title = `Detectado por GPS: ${data.nombre}`;
-                        }
-                    } else {
-                        if (estadoEl) estadoEl.textContent = "";
+            fetch("{% url 'inspectores_subcuadra_cercana' %}?lat=" + pos.coords.latitude + "&lon=" + pos.coords.longitude)
+                .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
+                .then(function(data) {
+                    if (!data.id) { if (estadoEl) estadoEl.textContent = ""; return; }
+                    seleccionarSubcuadraInspector(data.id);
+                    if (estadoEl) {
+                        estadoEl.textContent = "✅ GPS";
+                        estadoEl.title = "Detectado por GPS: " + data.nombre;
                     }
                 })
-                .catch(() => {
-                    // Error de red — silencioso, el inspector sigue con selección manual
-                    if (estadoEl) estadoEl.textContent = "";
-                });
+                .catch(function() { if (estadoEl) estadoEl.textContent = ""; });
         },
-        function onError() {
-            // Permiso denegado o GPS no disponible — silencioso
-            if (estadoEl) estadoEl.textContent = "";
-        },
+        function onError() { if (estadoEl) estadoEl.textContent = ""; },
         { timeout: 8000, maximumAge: 30000 }
     );
 })();

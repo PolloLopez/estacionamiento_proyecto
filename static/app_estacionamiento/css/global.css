@@ -12,9 +12,16 @@
   --color-surface:      #ffffff;
   --color-surface-2:    #e8ece8;
 
-  --color-primary:        #2cde6acc;
-  --color-primary-hover:  #14883b;
+  --color-primary:        #14883b;
+  --color-primary-hover:  #0f6830;
   --color-primary-light:  #d4edda;
+
+  /* Variables de marca: navbar y footer usan el color del municipio.
+     Se sobreescriben desde base.html cuando el municipio tiene colores configurados. */
+  --color-nav-bg:     #14883b;   /* fondo de la barra de navegación */
+  --color-footer-bg:  #0f6830;   /* fondo del footer (levemente más oscuro) */
+  --color-nav-text:   rgba(255,255,255,0.92);
+  --color-footer-text: rgba(255,255,255,0.75);
 
   --color-text:         #111111;
   --color-text-muted:   #555555;
@@ -91,7 +98,7 @@ main.container {
 /* ─── NAVBAR ─────────────────────────────────────────────────── */
 .navbar {
   height: var(--navbar-h);
-  background: var(--color-primary);
+  background: var(--color-nav-bg);
   color: var(--color-text-inverse);
   display: flex;
   align-items: center;
@@ -352,38 +359,29 @@ main {
   margin-top: 0.75rem;
 }
 
+/* Colores oficiales de Google — sin ::before porque los templates usan <img> con el logo real */
 .btn-google {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   width: 100%;
-  padding: 0.65rem 1rem;
+  padding: 0.75rem 1rem;
   border-radius: var(--radius);
-  border: 2px solid #d0d5dd;
+  border: 1.5px solid #dadce0;
   background: #ffffff;
-  color: #222;
+  color: #3c4043;
   font-weight: 600;
-  font-size: var(--font-size-base);
+  font-size: 0.95rem;
   cursor: pointer;
-  transition: var(--transition);
+  transition: border-color 0.15s, background 0.15s;
   text-decoration: none;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
 .btn-google:hover {
-  background: #f5f5f5;
-  border-color: #aaa;
+  border-color: #c6c6c6;
+  background: #f8f9fa;
+  color: #3c4043;
   text-decoration: none;
-  color: #111;
-}
-.btn-google::before {
-  content: "";
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath fill='%234285F4' d='M44.5 20H24v8.5h11.7C34.1 33.9 29.5 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 6 1.1 8.2 2.9l6.4-6.4C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.9 0 20.1-7.9 21.7-18.4.2-1.1.3-2.3.3-3.6 0-1.2-.1-2.3-.5-3z'/%3E%3C/svg%3E") no-repeat center;
-  background-size: contain;
-  flex-shrink: 0;
 }
 
 /* Grupo de botones con separación correcta */
@@ -701,13 +699,282 @@ table tr:hover { background: var(--color-surface-2); }
 }
 
 /* ─── FOOTER ─────────────────────────────────────────────────── */
+/* El footer usa el color del municipio para cerrar visualmente la página
+   del mismo color que el navbar (--color-footer-bg es el secundario, levemente más oscuro). */
 .footer {
   padding: 1rem 1.2rem;
   text-align: center;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
+  background: var(--color-footer-bg);
+  color: var(--color-footer-text);
   font-size: var(--font-size-sm);
+}
+.footer a {
+  color: rgba(255,255,255,0.8);
+  text-decoration: underline;
+}
+.footer a:hover {
+  color: #ffffff;
+}
+
+/* ─── LOGIN ──────────────────────────────────────────────────── */
+.login-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: calc(100dvh - var(--navbar-h) - 40px);
+  padding: 2rem 1.25rem;
+  max-width: 400px;
+  margin: 0 auto;
+  gap: 0.75rem;
+}
+
+.login-brand { text-align: center; margin-bottom: 0.5rem; }
+.login-logo-img { height: 56px; width: auto; margin-bottom: 0.6rem; }
+.login-logo-icon { font-size: 2.8rem; display: block; margin-bottom: 0.4rem; }
+.login-brand h1 {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  margin: 0 0 0.2rem;
+  letter-spacing: -0.3px;
+}
+.login-brand p { font-size: 0.83rem; color: var(--color-text-muted); margin: 0; }
+
+.btn-pagar-publico {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  background: var(--color-primary);
+  color: #fff;
+  text-decoration: none;
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  transition: background 0.15s, transform 0.1s;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.20);
+}
+.btn-pagar-publico:hover {
+  background: var(--color-primary-hover);
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+.btn-pagar-publico:active { transform: scale(0.98); }
+.btn-pagar-icono { font-size: 1.6rem; flex-shrink: 0; }
+.btn-pagar-texto { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; }
+.btn-pagar-texto strong { font-size: 1rem; font-weight: 700; line-height: 1.2; }
+.btn-pagar-texto small { font-size: 0.78rem; opacity: 0.82; font-weight: 400; }
+.btn-pagar-arrow { font-size: 1.5rem; font-weight: 300; opacity: 0.7; flex-shrink: 0; }
+
+.login-divisor {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin: 0.25rem 0;
+}
+.login-divisor::before,
+.login-divisor::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+.login-email-section {
+  width: 100%;
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.login-email-section summary {
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+.login-email-section summary::-webkit-details-marker { display: none; }
+.login-email-section summary::after {
+  content: '›';
+  font-size: 1.2rem;
+  transition: transform 0.2s;
+  opacity: 0.5;
+}
+.login-email-section[open] summary::after { transform: rotate(90deg); }
+.login-email-section[open] summary {
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.login-form {
+  padding: 0.9rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.login-form input { font-size: 0.95rem; padding: 0.65rem 0.85rem; border-radius: 8px; }
+.login-error { font-size: 0.82rem; color: var(--color-danger); margin: 0; }
+
+.btn-email-submit {
+  background: var(--color-text);
+  color: var(--color-surface);
+  border: none;
+  border-radius: 8px;
+  padding: 0.7rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 0.25rem;
+  transition: opacity 0.15s;
+}
+.btn-email-submit:hover { opacity: 0.85; }
+
+.login-footer {
+  display: flex;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  margin-top: 0.5rem;
+}
+.login-footer a { color: var(--color-text-muted); }
+.login-footer a:hover { color: var(--color-primary); }
+
+/* ─── INSPECTORES ────────────────────────────────────────────── */
+
+/* Pantalla principal del inspector (verificar.html) */
+.pantalla {
+  max-width: 540px;
+  margin: auto;
+  padding-top: 16px;
+  text-align: center;
+}
+.modo-calle { max-width: 100%; padding: 8px; }
+.subcuadra-selector { margin-bottom: 14px; text-align: left; }
+
+/* El input-patente del inspector es más claro que el del conductor
+   (que tiene fondo negro + texto verde para legibilidad en exteriores) */
+.pantalla .input-patente {
+  font-size: 3rem;
+  border: 3px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+/* Bloques de resultado de verificación */
+.box-resultado {
+  margin-top: 20px;
+  padding: 22px;
+  border-radius: 14px;
+  font-size: 1.2rem;
+  border: 3px solid var(--color-border);
+  background: var(--color-surface);
+}
+.box-ok   { border-color: var(--color-primary); background: #f0fff4; }
+.box-warn { border-color: var(--color-warning); background: #fffbf0; }
+.box-danger { border-color: var(--color-danger); background: #fff0f0; }
+
+/* Botones grandes del inspector: un poco más grandes que el global .btn-big
+   para que sean más fáciles de tocar en calle */
+.pantalla .btn-big {
+  font-size: 1.5rem;
+  padding: 1.1rem;
+  margin-top: 14px;
+}
+
+/* Selector tipo vehículo (radio visualizado como botón) — también usado
+   en verificar.html y en pago público */
+.tipo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.5rem 1.2rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  background: transparent;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.tipo-radio:checked + .tipo-btn {
+  border-color: var(--color-primary);
+  background: rgba(46,125,50,0.08);
+}
+
+/* GPS chip de estado en registrar_infraccion */
+.gps-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  margin-top: 0.5rem;
+  background: #f0fff4;
+  color: #1b5e20;
+  border: 1px solid #c8e6c9;
+}
+.gps-chip.esperando { background: #fffde7; color: #795548; border-color: #ffe0b2; }
+.gps-chip.error     { background: #fff3e0; color: #e65100; border-color: #ffccbc; }
+
+/* Formulario de registrar infracción */
+.inf-wrap { max-width: 520px; margin: 0 auto; padding-top: 0.5rem; }
+.inf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.inf-header h2 { margin: 0; font-size: 1.4rem; }
+.inf-patente {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: 6px;
+  text-align: center;
+  background: var(--color-surface-2);
+  border: 2px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: var(--color-text);
+}
+.inf-field { margin-bottom: 1rem; }
+.inf-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.4rem;
+}
+.inf-field select,
+.inf-field input[type="file"] {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 0.97rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.btn-grabar {
+  width: 100%;
+  font-size: 1.15rem;
+  padding: 0.9rem;
+  border-radius: 10px;
+  margin-top: 0.5rem;
+  font-weight: 700;
 }
 
 /* ─── RESPONSIVE — TABLET (≤ 900px) ─────────────────────────── */
