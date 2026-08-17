@@ -1,5 +1,9 @@
+import logging
+
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class NoUsernameAccountAdapter(DefaultAccountAdapter):
@@ -13,6 +17,27 @@ class NoUsernameAccountAdapter(DefaultAccountAdapter):
     def populate_username(self, request, user):
         # No usar username nunca
         return
+
+    def send_mail(self, template_prefix, email, context):
+        """
+        Envía un email transaccional (ej: recuperación de contraseña).
+
+        Por qué wrapeamos con try-except:
+        - Si el backend de email falla (Brevo rechaza, credenciales incorrectas, etc.),
+          sin este wrapper la excepción llega hasta la vista de allauth y Django
+          devuelve un 500 en lugar de redirigir al usuario a la página de "correo enviado".
+        - Desde el punto de vista del usuario, siempre debe ver la pantalla de confirmación
+          (por seguridad: no revelar si el correo existe o no).
+        - El error real queda logueado para que lo podamos diagnosticar en Railway.
+        """
+        try:
+            super().send_mail(template_prefix, email, context)
+        except Exception as exc:
+            logger.error(
+                "Error enviando email '%s' a '%s': %s",
+                template_prefix, email, exc,
+                exc_info=True,
+            )
 
 
 class SocialAccountAdapter(DefaultSocialAccountAdapter):
