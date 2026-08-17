@@ -1,7 +1,7 @@
 # CONTEXT.md — Sistema de Estacionamiento Medido
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-08-14
+Última actualización estructural: 2026-08-17
 
 ---
 
@@ -60,7 +60,7 @@ Admin URL: `/sistema-interno/` (no obvia, reduce bruteforce).
 | Seguridad | django-axes | Rate limiting en login (5 intentos, 1h cooloff) |
 | Error tracking | Sentry (django-sentry-sdk) | Alertas de errores en Railway |
 | Email | django-anymail + Brevo | API transaccional (pendiente verificar remitente) |
-| Frontend | HTML + CSS propio | Sin frameworks JS |
+| Frontend | HTML + CSS propio (`global.css`) | Sin frameworks JS. Todo CSS en `global.css` — templates sin bloques `<style>` inline. Colores del municipio inyectados como variables CSS en `base.html` vía `{{ municipio_branding.color_primario }}`. |
 | Deploy | Railway + Gunicorn + WhiteNoise | PaaS simple |
 | Tests | Django TestCase | 155 tests |
 

@@ -16,13 +16,6 @@
   --color-primary-hover:  #0f6830;
   --color-primary-light:  #d4edda;
 
-  /* Variables de marca: navbar y footer usan el color del municipio.
-     Se sobreescriben desde base.html cuando el municipio tiene colores configurados. */
-  --color-nav-bg:     #14883b;   /* fondo de la barra de navegación */
-  --color-footer-bg:  #0f6830;   /* fondo del footer (levemente más oscuro) */
-  --color-nav-text:   rgba(255,255,255,0.92);
-  --color-footer-text: rgba(255,255,255,0.75);
-
   --color-text:         #111111;
   --color-text-muted:   #555555;
   --color-text-inverse: #ffffff;
@@ -98,7 +91,7 @@ main.container {
 /* ─── NAVBAR ─────────────────────────────────────────────────── */
 .navbar {
   height: var(--navbar-h);
-  background: var(--color-nav-bg);
+  background: var(--color-primary);
   color: var(--color-text-inverse);
   display: flex;
   align-items: center;
@@ -704,8 +697,8 @@ table tr:hover { background: var(--color-surface-2); }
 .footer {
   padding: 1rem 1.2rem;
   text-align: center;
-  background: var(--color-footer-bg);
-  color: var(--color-footer-text);
+  background: var(--color-primary);
+  color: rgba(255, 255, 255, 0.85);
   font-size: var(--font-size-sm);
 }
 .footer a {
