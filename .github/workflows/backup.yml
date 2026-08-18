@@ -1,0 +1,49 @@
+name: Backup PostgreSQL diario
+
+# Corre todos los días a las 03:00 UTC (00:00 Argentina en horario de verano).
+# También se puede disparar manualmente desde GitHub → Actions → "Run workflow".
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: pg_dump → artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Instalar cliente PostgreSQL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Generar nombre del archivo con fecha
+        id: nombre
+        run: |
+          FECHA=$(date -u +"%Y-%m-%d_%H-%M")
+          echo "archivo=backup_${FECHA}.sql.gz" >> $GITHUB_OUTPUT
+
+      - name: Ejecutar pg_dump y comprimir
+        env:
+          DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
+        run: |
+          # pg_dump lee la conexión desde DATABASE_URL directamente.
+          # La salida se pasa por gzip para reducir el tamaño del artifact.
+          pg_dump "$DATABASE_URL" \
+            --no-owner \
+            --no-acl \
+            --format=plain \
+            | gzip > ${{ steps.nombre.outputs.archivo }}
+
+          # Mostrar tamaño del backup para tener registro en el log
+          echo "Tamaño del backup: $(du -sh ${{ steps.nombre.outputs.archivo }} | cut -f1)"
+
+      - name: Subir backup como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.nombre.outputs.archivo }}
+          path: ${{ steps.nombre.outputs.archivo }}
+          # 30 días de retención: cubre un mes completo de backups diarios.
+          # Si querés más historial, subilo hasta 90 (el máximo de GitHub Actions).
+          retention-days: 30
