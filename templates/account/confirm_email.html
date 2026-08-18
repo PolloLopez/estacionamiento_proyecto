@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Confirmar correo — EstacionAR{% endblock %}
+
+{% block content %}
+<section class="container" style="max-width:440px; margin:3rem auto; padding:0 1rem;">
+  <div class="card" style="padding:2rem; text-align:center;">
+
+    {% if confirmation %}
+      <div style="font-size:3rem; margin-bottom:1rem;">✅</div>
+      <h2 style="margin-bottom:0.75rem;">Confirmar dirección de correo</h2>
+      <p style="color:var(--color-text-muted); margin-bottom:1.5rem; font-size:0.95rem;">
+        ¿Confirmás que <strong>{{ confirmation.email_address.email }}</strong>
+        es tu dirección de correo?
+      </p>
+      <form method="post" action="">
+        {% csrf_token %}
+        <button type="submit" class="btn" style="width:100%;">Confirmar mi correo</button>
+      </form>
+      <div style="margin-top:1rem;">
+        <a href="{% url 'login' %}" style="color:var(--color-primary); font-size:0.9rem;">
+          ← Volver al inicio de sesión
+        </a>
+      </div>
+    {% else %}
+      {# Link inválido o expirado #}
+      <div style="font-size:3rem; margin-bottom:1rem;">⚠️</div>
+      <h2 style="margin-bottom:0.75rem;">Link inválido o expirado</h2>
+      <p style="color:var(--color-text-muted); margin-bottom:1.5rem; font-size:0.95rem;">
+        Este link de confirmación ya no es válido. Puede que hayas usado uno anterior
+        o que el link haya vencido.
+      </p>
+      <a href="{% url 'login' %}" class="btn">Ir al inicio de sesión</a>
+    {% endif %}
+
+  </div>
+</section>
+{% endblock %}

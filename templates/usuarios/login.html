@@ -20,6 +20,15 @@
     {% endif %}
   </div>
 
+  {% if verificacion_pendiente %}
+  <!-- Aviso: email pendiente de verificación -->
+  <div class="alert alert-warning" style="margin-bottom:1rem; text-align:center; font-size:0.93rem;">
+    <strong>Verificá tu correo para ingresar.</strong><br>
+    Te reenviamos el link a <em>{{ correo_pendiente }}</em>.<br>
+    Revisá también la carpeta de spam.
+  </div>
+  {% endif %}
+
   <!-- OPCIÓN 1: Pagar sin registrarse -->
   <a href="{% url 'pago_publico_buscar' %}" class="btn-pagar-publico">
     <span class="btn-pagar-icono">💳</span>

@@ -12,15 +12,21 @@ No incluye lógica de negocio de ningún rol específico.
 """
 
 import logging
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
-
-logger = logging.getLogger(__name__)
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
+logger = logging.getLogger(__name__)
+
 from .forms import RegistroUsuarioForm
 from .models import Municipio
+
+
+def _verificacion_obligatoria():
+    """Devuelve True si ACCOUNT_EMAIL_VERIFICATION está seteado a 'mandatory'."""
+    return getattr(settings, "ACCOUNT_EMAIL_VERIFICATION", "none") == "mandatory"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -78,6 +84,13 @@ def login_view(request):
     """
     Login con email y contraseña.
     Si las credenciales son válidas, redirige al panel del rol.
+
+    Si ACCOUNT_EMAIL_VERIFICATION = "mandatory" y el usuario tiene un EmailAddress
+    registrado pero sin verificar (= se registró por formulario y no confirmó),
+    bloqueamos el acceso y re-enviamos el email de confirmación.
+
+    Los usuarios creados por admin (sin EmailAddress en allauth) no tienen este
+    chequeo: email_entry sería None → entran sin problema.
     """
     if request.method == "POST":
         correo   = request.POST.get("correo")
@@ -86,6 +99,22 @@ def login_view(request):
         usuario = authenticate(request, username=correo, password=password)
 
         if usuario is not None:
+            if _verificacion_obligatoria():
+                from allauth.account.models import EmailAddress
+                email_entry = EmailAddress.objects.filter(user=usuario, primary=True).first()
+                if email_entry and not email_entry.verified:
+                    # Email sin verificar: re-enviar confirmación y bloquear acceso
+                    try:
+                        email_entry.send_confirmation(request, signup=False)
+                    except Exception as exc:
+                        logger.error(
+                            "Error reenviando verificación a '%s': %s", correo, exc, exc_info=True
+                        )
+                    return render(request, "usuarios/login.html", {
+                        "verificacion_pendiente": True,
+                        "correo_pendiente": correo,
+                    })
+
             login(request, usuario)
             return redirect_por_rol(usuario)
 
@@ -119,7 +148,12 @@ def registro_view(request):
     """
     Registro de nuevo conductor con email y contraseña.
     Si el sistema tiene más de un municipio, el usuario elige el suyo en el form.
-    Al registrarse queda logueado y se redirige a su panel.
+
+    Comportamiento según ACCOUNT_EMAIL_VERIFICATION:
+    - "none" (default): login directo post-registro (comportamiento anterior).
+    - "mandatory": crea un EmailAddress sin verificar en allauth, envía el email
+      de confirmación y redirige a la página "revisá tu correo" SIN hacer login.
+      El conductor solo puede ingresar una vez que haga clic en el link del email.
     """
     if request.method == "POST":
         form = RegistroUsuarioForm(request.POST)
@@ -134,9 +168,46 @@ def registro_view(request):
             else:
                 usuario.municipio = Municipio.objects.first()
 
+            # Municipio: validar que exista y esté activo.
+            # Sin el filtro activo=True, un atacante podría POST con el id de un
+            # municipio desactivado y registrarse igualmente.
+            municipio_obj = None
+            if municipio_id:
+                municipio_obj = Municipio.objects.filter(id=municipio_id, activo=True).first()
+                if not municipio_obj:
+                    messages.error(request, "Municipio no válido.")
+                    return render(request, "usuarios/registro.html", {
+                        "form": form,
+                        "municipios": Municipio.objects.filter(activo=True),
+                    })
+            else:
+                municipio_obj = Municipio.objects.filter(activo=True).first()
+
+            usuario.municipio = municipio_obj
             usuario.save()
-            login(request, usuario)
-            return redirect_por_rol(usuario)
+
+            if _verificacion_obligatoria():
+                from allauth.account.models import EmailAddress
+                # Crear el registro de email en allauth (sin verificar).
+                # Esto permite que login_view detecte si el usuario está pendiente.
+                email_address = EmailAddress.objects.create(
+                    user=usuario,
+                    email=usuario.correo,
+                    primary=True,
+                    verified=False,
+                )
+                try:
+                    email_address.send_confirmation(request, signup=True)
+                except Exception as exc:
+                    logger.error(
+                        "Error enviando email de verificación a '%s': %s",
+                        usuario.correo, exc, exc_info=True,
+                    )
+                # Redirigir a la página de "revisá tu correo" SIN hacer login
+                return redirect("account_email_verification_sent")
+            else:
+                login(request, usuario)
+                return redirect_por_rol(usuario)
 
     else:
         form = RegistroUsuarioForm()

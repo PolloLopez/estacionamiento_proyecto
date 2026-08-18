@@ -265,6 +265,25 @@ def _verificar_firma_mp(request, data_id: str) -> bool:
         logger.warning("mp_webhook: x-signature mal formado: %s", firma_header)
         return False
 
+    # Validar que el timestamp sea reciente (anti-replay).
+    # Sin este chequeo, una request interceptada podría re-enviarse días después
+    # con una firma válida. Toleramos 5 minutos de desfase de reloj entre MP y
+    # nuestro servidor — en la práctica los servidores no desfasan más de segundos.
+    import time
+    TOLERANCIA_SEGUNDOS = 300  # 5 minutos
+    try:
+        ts_int = int(ts)
+        desfase = abs(int(time.time()) - ts_int)
+        if desfase > TOLERANCIA_SEGUNDOS:
+            logger.warning(
+                "mp_webhook: timestamp demasiado viejo (desfase=%ds) — posible replay",
+                desfase,
+            )
+            return False
+    except (ValueError, TypeError):
+        logger.warning("mp_webhook: timestamp no es un número: %s", ts)
+        return False
+
     # x-request-id es opcional en el manifest; si MP no lo envía, queda vacío
     request_id = request.headers.get("x-request-id", "")
 

@@ -14,21 +14,15 @@
 
 ## 🔴 Alta prioridad
 
-### 1. PRODUCCIÓN: Sin backups automáticos del PostgreSQL de Railway Hobby
-Railway Hobby no incluye backups automáticos. Opciones:
-- **Railway Pro** ($20/mes): habilita backups diarios desde el dashboard.
-- **Script `pg_dump`** vía scheduled task o GitHub Actions → sube a S3/Backblaze/GCS.
-Verificar que el backup se puede restaurar al menos una vez antes del go-live real.
+### 1. PRODUCCIÓN: Verificar restauración del backup
+El workflow `.github/workflows/backup.yml` corre `pg_dump` diariamente (03:00 UTC) usando
+imagen Docker `postgres:18` (Railway corre PG 18). Artifact de ~52 KB confirmado ✅
+**Pendiente**: ejecutar un restore de prueba antes del go-live real para confirmar que el backup
+es válido y recuperable. Comando para restaurar localmente:
+```bash
+gunzip -c backup_YYYY-MM-DD_HH-MM.sql.gz | psql $DATABASE_URL_LOCAL
+```
 
-### 2. Email transaccional (recuperación de contraseña sin funcionar)
-SMTP bloqueado en Railway (puertos 587/465 no disponibles). Migrado a API transaccional:
-- **Backend**: `django-anymail[brevo,resend]` instalado, `anymail` en INSTALLED_APPS ✅
-- **Brevo** (primera opción): cuenta creada, verificación del remitente incompleta.
-  Completar desde Brevo → Senders & Domains → verificar `leandrolopezalbini@gmail.com`.
-  Luego agregar en Railway: `BREVO_API_KEY=...` + `DEFAULT_FROM_EMAIL=leandrolopezalbini@gmail.com`
-- **Workaround activo**: admin puede cambiar contraseña de cualquier conductor desde `/admin-usuarios/` ✅
-
-Mientras tanto, `ACCOUNT_EMAIL_VERIFICATION = "none"` + recuperación de contraseña desactivada en Railway.
 
 ---
 
@@ -39,13 +33,20 @@ Probar el flujo completo en Railway:
 - Ingresar patente con infracción pendiente → pagar vía MP → verificar que el webhook procesa correctamente.
 - Verificar también el flujo de carga de saldo del conductor.
 
-### 4. Verificación de email al registrarse
-`ACCOUNT_EMAIL_VERIFICATION = "none"` permite registrarse con cualquier email sin verificar.
-Activar cuando email esté configurado (depende de punto 2).
+### 4. Activar verificación de email en Railway (1 variable de entorno)
+El código está implementado. Solo falta setear en Railway:
+```
+ACCOUNT_EMAIL_VERIFICATION = mandatory
+```
+Con eso activo, el registro crea un `EmailAddress` sin verificar, envía el email de confirmación,
+y bloquea el login hasta que el conductor haga clic en el link.
+Los usuarios creados por admin (sin `EmailAddress` en allauth) y los de Google OAuth no se ven afectados.
 
-⚠️ Riesgo: combinado con `SOCIALACCOUNT_AUTO_SIGNUP = True`, permite ataque de pre-registro.
-Mientras no se active verificación mandatoria, evaluar bloquear auto-connect en `SocialAccountAdapter.save_user`.
-[`views_auth.py:110-139`, `forms.py`, `adapters.py`]
+⚠️ Activar solo después de verificar que Brevo está entregando correctamente (ya funciona ✅).
+
+⚠️ Riesgo pendiente: combinado con `SOCIALACCOUNT_AUTO_SIGNUP = True`, sigue permitiendo ataque
+de pre-registro (registrar el email de otra persona antes que ella vía Google). Para mitigarlo,
+evaluar bloquear auto-connect en `SocialAccountAdapter.save_user` (tarea separada).
 
 ### 5. 🔐 Hallazgos menores — auditoría de seguridad 2026-08-03
 - `registro_view`: no valida que el `municipio_id` recibido por POST tenga `activo=True`.
@@ -108,6 +109,30 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 ---
 
 ## ✅ Resuelto recientemente
+
+**Sesión 2026-08-18** — Backups PostgreSQL funcionales:
+- Workflow usa imagen Docker `postgres:18` (fix para version mismatch con Railway).
+- URL pública de Railway con `?sslmode=require` como secret `RAILWAY_DATABASE_URL`.
+- Backup confirmado: ~52 KB. Corre diariamente a las 03:00 UTC desde `main`. ✅
+- Pendiente: restore test antes del go-live real.
+
+**Sesión 2026-08-18** — Verificación de email obligatoria:
+- `views_auth.py`: `registro_view` ahora crea `EmailAddress` y envía confirmación si `ACCOUNT_EMAIL_VERIFICATION = mandatory`.
+  `login_view` bloquea acceso si hay un `EmailAddress` sin verificar, re-enviando el link.
+- `apps.py`: señal `email_confirmed` de allauth → `messages.success()` → aparece en login post-confirmación.
+- Templates nuevos: `account/email_verification_sent.html`, `account/confirm_email.html`.
+- `settings.py`: `ACCOUNT_EMAIL_VERIFICATION` ahora lee de env var (default: "none"). `ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True`.
+- **Para activar en Railway**: agregar `ACCOUNT_EMAIL_VERIFICATION = mandatory`.
+
+**Sesión 2026-08-18** — Backups PostgreSQL + Email transaccional:
+- `.github/workflows/backup.yml`: pg_dump diario (03:00 UTC) → artifact GitHub Actions 30 días.
+- Requiere secret `RAILWAY_DATABASE_URL` en GitHub y verificar restore al menos una vez.
+- Email (Brevo): sender verificado, BREVO_API_KEY en Railway, adapter con manejo de errores. ✅
+
+**Sesión 2026-08-18** — Email transaccional (recuperación de contraseña):
+- Brevo configurado como backend de email (anymail): remitente verificado, API key y `DEFAULT_FROM_EMAIL` en Railway.
+- `adapters.py`: `send_mail()` captura excepciones → usuario ve confirmación aunque el email falle, error logueado en Railway.
+- Activación de cuenta Brevo desbloqueada verificando teléfono → emails llegando correctamente ✅
 
 **Sesión 2026-08-17** — Refactor CSS + color theming + footer:
 - Botón Google: eliminado `::before` pseudo-elemento que duplicaba el logo; colores oficiales Google.
