@@ -37,21 +37,30 @@ from .models import Usuario
 logger = logging.getLogger(__name__)
 
 
+def _contexto_cargar_saldo(usuario):
+    """Contexto base para el formulario de carga de saldo."""
+    municipio = usuario.municipio
+    return {
+        "montos_rapidos": [500, 1000, 2000, 5000],
+        "monto_minimo": municipio.monto_minimo_carga,
+        "monto_maximo": municipio.monto_maximo_carga,
+    }
+
+
 @require_login
 def mp_iniciar_carga(request):
     """
     Paso 1: el conductor elige el monto y se crea una preferencia en MercadoPago.
     MP devuelve una URL de checkout a la que redirigimos al usuario.
 
-    GET  → muestra el formulario con montos rápidos sugeridos.
-    POST → crea la preferencia y redirige al checkout de MP.
+    GET  → muestra el formulario con montos rápidos sugeridos y los límites del municipio.
+    POST → valida límites, crea la preferencia y redirige al checkout de MP.
     """
     import mercadopago
 
     if request.method != "POST":
-        return render(request, "usuarios/mp_cargar_saldo.html", {
-            "montos_rapidos": [500, 1000, 2000, 5000],
-        })
+        return render(request, "usuarios/mp_cargar_saldo.html",
+                      _contexto_cargar_saldo(request.user))
 
     monto_str = request.POST.get("monto", "")
     try:
@@ -59,13 +68,28 @@ def mp_iniciar_carga(request):
         if monto <= 0:
             raise ValueError()
     except (ValueError, TypeError):
-        messages.error(request, "Ingresa un monto valido mayor a 0.")
-        return render(request, "usuarios/mp_cargar_saldo.html")
+        messages.error(request, "Ingresa un monto válido mayor a 0.")
+        return render(request, "usuarios/mp_cargar_saldo.html",
+                      _contexto_cargar_saldo(request.user))
+
+    # Validar límites configurados por el superadmin para el municipio
+    municipio    = request.user.municipio
+    monto_minimo = municipio.monto_minimo_carga
+    monto_maximo = municipio.monto_maximo_carga
+    if monto < monto_minimo:
+        messages.error(request, f"El monto mínimo de carga es ${monto_minimo}.")
+        return render(request, "usuarios/mp_cargar_saldo.html",
+                      _contexto_cargar_saldo(request.user))
+    if monto > monto_maximo:
+        messages.error(request, f"El monto máximo de carga es ${monto_maximo}.")
+        return render(request, "usuarios/mp_cargar_saldo.html",
+                      _contexto_cargar_saldo(request.user))
 
     access_token = settings.MP_ACCESS_TOKEN
     if not access_token:
-        messages.error(request, "MercadoPago no esta configurado en este entorno.")
-        return render(request, "usuarios/mp_cargar_saldo.html")
+        messages.error(request, "MercadoPago no está configurado en este entorno.")
+        return render(request, "usuarios/mp_cargar_saldo.html",
+                      _contexto_cargar_saldo(request.user))
 
     sdk = mercadopago.SDK(access_token)
 
@@ -112,9 +136,8 @@ def mp_iniciar_carga(request):
                 request,
                 "No se pudo crear la preferencia de pago. Revisá los logs del servidor.",
             )
-        return render(request, "usuarios/mp_cargar_saldo.html", {
-            "montos_rapidos": [500, 1000, 2000, 5000],
-        })
+        return render(request, "usuarios/mp_cargar_saldo.html",
+                      _contexto_cargar_saldo(request.user))
 
     respuesta_mp = resultado["response"]
 
@@ -135,9 +158,8 @@ def mp_iniciar_carga(request):
 
     if not checkout_url:
         messages.error(request, "No se pudo obtener la URL de pago de MercadoPago.")
-        return render(request, "usuarios/mp_cargar_saldo.html", {
-            "montos_rapidos": [500, 1000, 2000, 5000],
-        })
+        return render(request, "usuarios/mp_cargar_saldo.html",
+                      _contexto_cargar_saldo(request.user))
 
     return redirect(checkout_url)
 

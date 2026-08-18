@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-17 (sesión: refactor CSS + fix botón Google + footer theming)
+Última actualización: 2026-08-18 (sesión: límites MP por municipio + documentación)
 
 ---
 
@@ -25,29 +25,19 @@ Probar el flujo completo en Railway:
 - Ingresar patente con infracción pendiente → pagar vía MP → verificar que el webhook procesa correctamente.
 - Verificar también el flujo de carga de saldo del conductor.
 
-### 4. Activar verificación de email en Railway (1 variable de entorno)
-El código está implementado. Solo falta setear en Railway:
-```
-ACCOUNT_EMAIL_VERIFICATION = mandatory
-```
-Con eso activo, el registro crea un `EmailAddress` sin verificar, envía el email de confirmación,
-y bloquea el login hasta que el conductor haga clic en el link.
-Los usuarios creados por admin (sin `EmailAddress` en allauth) y los de Google OAuth no se ven afectados.
+### 4. 🔐 Riesgo pre-registro OAuth
+Combinado con `SOCIALACCOUNT_AUTO_SIGNUP = True`, un atacante puede registrar el email de otra
+persona antes que ella vía Google. Para mitigarlo: bloquear auto-connect en `SocialAccountAdapter.save_user`
+cuando el email ya existe en la base sin ser de Google.
 
-⚠️ Activar solo después de verificar que Brevo está entregando correctamente (ya funciona ✅).
+### 5. 📹 Tutorial de uso (alta prioridad visual)
+Mostrar dentro del sistema (y en la landing) un tutorial de los flujos principales:
+- Cómo registrar un estacionamiento (conductor: patente → duración → confirmar)
+- Cómo abonar una infracción (conductor o pago público: buscar patente → pagar con MP)
+- Cómo registrar un abono mensual (vendedor o pago público)
 
-⚠️ Riesgo pendiente: combinado con `SOCIALACCOUNT_AUTO_SIGNUP = True`, sigue permitiendo ataque
-de pre-registro (registrar el email de otra persona antes que ella vía Google). Para mitigarlo,
-evaluar bloquear auto-connect en `SocialAccountAdapter.save_user` (tarea separada).
-
-### 5. 🔐 Hallazgos menores — auditoría de seguridad 2026-08-03
-- `registro_view`: no valida que el `municipio_id` recibido por POST tenga `activo=True`.
-- `importar_estacionamientos`: sin límite de tamaño antes de `openpyxl.load_workbook()`.
-- `mp_webhook`: la firma HMAC no valida que el `ts` del manifest sea reciente (anti-replay).
-- `django-axes`: solo bloquea por IP; evaluar umbral combinado IP+usuario.
-
-### 6. 🔐 Límite máximo de monto en MercadoPago
-Validar en `mp_iniciar_carga` que el monto no supere un tope (ej. $50.000).
+El objetivo es que quede claro que **con pocos clics la operación está realizada**.
+Formato sugerido: GIF animado o secuencia de pantallas con flechas, visible en la landing y en la pantalla de inicio del conductor.
 
 ---
 
@@ -102,6 +92,13 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 
 ## ✅ Resuelto recientemente
 
+**Sesión 2026-08-18** — Límites de carga MercadoPago configurables por municipio:
+- `Municipio.monto_minimo_carga` y `monto_maximo_carga` (PositiveIntegerField, defecto 500/50.000). Migración 0052.
+- `mp_iniciar_carga` rechaza montos fuera del rango con mensaje claro antes de llamar a la API de MP.
+- Superadmin puede configurar los límites en `editar_municipio` (dos inputs numéricos nuevos).
+- `mp_cargar_saldo.html` muestra el rango al conductor (min/max dinámicos desde el contexto).
+- Helper `_contexto_cargar_saldo(usuario)` centraliza el contexto del formulario. ✅
+
 **Sesión 2026-08-18** — Restore test del backup:
 - Restore exitoso con Docker postgres:18: 21 usuarios recuperados, tablas íntegras. ✅
 - Comando: `gunzip -c backup.sql.gz | psql -U postgres -d postgres` (dentro del container).
@@ -112,7 +109,16 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 - Backup confirmado: ~52 KB. Corre diariamente a las 03:00 UTC desde `main`. ✅
 - Pendiente: restore test antes del go-live real.
 
+**Sesión 2026-08-18** — Hallazgos de seguridad (4 fixes + 5 tests):
+- `registro_view`: valida `municipio activo=True` antes de asignar.
+- `importar_estacionamientos`: límite 10 MB antes de `openpyxl.load_workbook()`.
+- `mp_webhook`: valida timestamp reciente (anti-replay, tolerancia 5 min).
+- `django-axes`: `AXES_USERNAME_FORM_FIELD = "correo"` + lockout combinado IP+usuario.
+- Fix adicional: `login()` en registro especifica `backend=` (bug real con múltiples backends).
+- 160 tests, todos OK. ✅
+
 **Sesión 2026-08-18** — Verificación de email obligatoria:
+- `ACCOUNT_EMAIL_VERIFICATION = mandatory` activado en Railway. ✅
 - `views_auth.py`: `registro_view` ahora crea `EmailAddress` y envía confirmación si `ACCOUNT_EMAIL_VERIFICATION = mandatory`.
   `login_view` bloquea acceso si hay un `EmailAddress` sin verificar, re-enviando el link.
 - `apps.py`: señal `email_confirmed` de allauth → `messages.success()` → aparece en login post-confirmación.

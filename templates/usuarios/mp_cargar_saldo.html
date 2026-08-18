@@ -43,11 +43,15 @@
         <label style="font-size:0.82rem; color:var(--color-text-muted);">O ingresá otro monto</label>
         <div style="display:flex; align-items:center; gap:0.4rem;">
           <span style="font-size:1.3rem; font-weight:700; color:var(--color-text-muted);">$</span>
-          <input type="number" id="monto" name="monto" min="100" step="100"
-                 placeholder="500" required
+          <input type="number" id="monto" name="monto"
+                 min="{{ monto_minimo }}" max="{{ monto_maximo }}" step="1"
+                 placeholder="{{ monto_minimo }}" required
                  style="font-size:1.4rem; font-weight:800; letter-spacing:1px; flex:1;"
                  oninput="limpiarSeleccion()">
         </div>
+        <p style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.3rem;">
+          Mínimo: ${{ monto_minimo }} &nbsp;·&nbsp; Máximo: ${{ monto_maximo }}
+        </p>
       </div>
 
       <button type="submit" class="btn" style="width:100%; font-size:1.1rem; padding:0.9rem;">
@@ -82,8 +86,11 @@ function limpiarSeleccion() {
     b.classList.add("btn-outline");
   });
 }
-// Preseleccionar $500 por defecto
-window.addEventListener("DOMContentLoaded", () => setMonto(500));
+// Preseleccionar el primer monto rápido por defecto
+window.addEventListener("DOMContentLoaded", () => {
+  const primero = document.querySelector(".monto-rapido");
+  if (primero) setMonto(parseInt(primero.dataset.monto, 10));
+});
 </script>
 
 {% endblock %}

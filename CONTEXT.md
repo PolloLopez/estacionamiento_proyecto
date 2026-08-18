@@ -1,7 +1,7 @@
 # CONTEXT.md — Sistema de Estacionamiento Medido
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-08-17
+Última actualización estructural: 2026-08-18
 
 ---
 
@@ -62,7 +62,7 @@ Admin URL: `/sistema-interno/` (no obvia, reduce bruteforce).
 | Email | django-anymail + Brevo | API transaccional (pendiente verificar remitente) |
 | Frontend | HTML + CSS propio (`global.css`) | Sin frameworks JS. Todo CSS en `global.css` — templates sin bloques `<style>` inline. Colores del municipio inyectados como variables CSS en `base.html` vía `{{ municipio_branding.color_primario }}`. |
 | Deploy | Railway + Gunicorn + WhiteNoise | PaaS simple |
-| Tests | Django TestCase | 155 tests |
+| Tests | Django TestCase | 160 tests |
 
 ---
 
@@ -119,7 +119,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | Modelo | Descripción |
 |--------|-------------|
 | `Usuario` | AbstractUser con `correo` como USERNAME_FIELD. Flags: `es_admin`, `es_inspector`, `es_vendedor`, `es_conductor`, `es_tesorero`, `es_superadmin`. Campos: `saldo` (wallet digital conductor), `saldo_operativo` (caja del vendedor/inspector), `es_verificado`, `municipio`, `porcentaje_ganancia`. |
-| `Municipio` | Configuración del municipio: `comision_vendedor (%)`, `tolerancia_multa_minutos`, branding (logo, colores). |
+| `Municipio` | Configuración del municipio: `comision_vendedor (%)`, `tolerancia_multa_minutos`, branding (logo, colores). `monto_minimo_carga` y `monto_maximo_carga` (enteros, defecto 500/50.000): límites de carga MercadoPago configurables por superadmin. |
 | `ModuloMunicipio` | Feature flags por municipio (activo/inactivo). Gestionado por superadmin. |
 | `Vehiculo` | Patente única. Tipos: `auto`, `moto`. Exenciones: `exento_global`, `exento_parcial`, `subcuadras_exentas`. |
 | `VehiculoUsuario` | Relación N:N entre vehículo y conductor. |
