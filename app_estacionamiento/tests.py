@@ -758,3 +758,144 @@ class TestHistorialVendedor(TestCase):
         c.force_login(conductor)
         resp = c.get(reverse("admin_historial_vendedor", args=[self.vendedor.id]))
         self.assertNotEqual(resp.status_code, 200)
+
+
+# ═════════════════════════════════════════════
+# Tests de seguridad — hallazgos auditoría
+# ═════════════════════════════════════════════
+
+class TestRegistroMunicipioActivo(TestCase):
+    """
+    registro_view debe rechazar municipios inactivos en el POST.
+    Sin este chequeo, un atacante puede registrarse en un municipio desactivado
+    manipulando el campo municipio_id del formulario.
+    """
+
+    def setUp(self):
+        self.municipio_activo   = Municipio.objects.create(nombre="Activo",   activo=True)
+        self.municipio_inactivo = Municipio.objects.create(nombre="Inactivo", activo=False)
+
+    def _datos_registro(self, correo, municipio_id):
+        """POST mínimo válido para RegistroUsuarioForm."""
+        return {
+            "correo":       correo,
+            "nombre":       "Test",          # campo requerido por RegistroUsuarioForm
+            "password1":    "claveSegura99",
+            "password2":    "claveSegura99",
+            "municipio_id": municipio_id,
+        }
+
+    def test_registro_con_municipio_inactivo_rechazado(self):
+        resp = self.client.post(
+            reverse("registro"),
+            self._datos_registro("nuevo@test.com", self.municipio_inactivo.id),
+        )
+        # Debe quedarse en el formulario (200) con mensaje de error, no redirigir al panel
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(
+            Usuario.objects.filter(correo="nuevo@test.com").exists(),
+            "No debe crearse el usuario si el municipio está inactivo",
+        )
+
+    def test_registro_con_municipio_activo_exitoso(self):
+        resp = self.client.post(
+            reverse("registro"),
+            self._datos_registro("nuevo2@test.com", self.municipio_activo.id),
+        )
+        # Debe crear el usuario y redirigir (302)
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(Usuario.objects.filter(correo="nuevo2@test.com").exists())
+
+
+class TestImportarEstacionamientosTamanio(TestCase):
+    """
+    importar_estacionamientos debe rechazar archivos mayores a 10 MB
+    antes de pasarlos a openpyxl, para evitar agotar memoria del servidor.
+    """
+
+    def setUp(self):
+        self.municipio  = crear_municipio()
+        # importar_estacionamientos requiere @require_role("superadmin"), no alcanza con admin
+        self.superadmin = Usuario.objects.create_user(
+            correo="superadmin@test.com", password="pass1234",
+            es_superadmin=True,
+        )
+        self.client.force_login(self.superadmin)
+
+    def test_archivo_grande_rechazado(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        # Simular un archivo .xlsx que supera el límite de 10 MB
+        LIMITE_BYTES = 10 * 1024 * 1024 + 1
+        archivo_falso = SimpleUploadedFile(
+            name="grande.xlsx",
+            content=b"x" * LIMITE_BYTES,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        resp = self.client.post(
+            reverse("importar_estacionamientos", args=[self.municipio.id]),
+            {"archivo": archivo_falso},
+        )
+        # Debe redirigir de vuelta al formulario con un mensaje de error
+        self.assertEqual(resp.status_code, 302)
+        mensajes = list(resp.wsgi_request._messages)
+        self.assertTrue(
+            any("10 MB" in str(m) for m in mensajes),
+            "Debe haber un mensaje de error mencionando el límite de 10 MB",
+        )
+
+
+class TestMpWebhookTimestamp(TestCase):
+    """
+    _verificar_firma_mp debe rechazar webhooks con timestamp demasiado viejo.
+    Esto previene ataques de replay: un request interceptado no puede re-enviarse
+    días después con la misma firma válida.
+    """
+
+    def _hacer_request_con_ts(self, ts_str, secret="secreto-test", data_id="123"):
+        """Construye una request con x-signature usando el timestamp dado."""
+        import hashlib
+        import hmac as hmac_module
+        from django.test import RequestFactory
+
+        manifest = f"id:{data_id};request-id:;ts:{ts_str};"
+        firma = hmac_module.new(
+            secret.encode(),
+            manifest.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        factory = RequestFactory()
+        req = factory.post(
+            "/webhook/mp/",
+            content_type="application/json",
+            HTTP_X_SIGNATURE=f"ts={ts_str};v1={firma}",
+        )
+        return req
+
+    def test_timestamp_reciente_aceptado(self):
+        import time
+        from unittest.mock import patch
+        from app_estacionamiento.views_mp import _verificar_firma_mp
+
+        ts_ahora = str(int(time.time()))
+        req = self._hacer_request_con_ts(ts_ahora)
+
+        with patch("django.conf.settings.MP_WEBHOOK_SECRET", "secreto-test"):
+            resultado = _verificar_firma_mp(req, "123")
+
+        self.assertTrue(resultado, "Un timestamp reciente debe ser aceptado")
+
+    def test_timestamp_viejo_rechazado(self):
+        import time
+        from unittest.mock import patch
+        from app_estacionamiento.views_mp import _verificar_firma_mp
+
+        # Timestamp de hace 10 minutos (supera la tolerancia de 5 min)
+        ts_viejo = str(int(time.time()) - 600)
+        req = self._hacer_request_con_ts(ts_viejo)
+
+        with patch("django.conf.settings.MP_WEBHOOK_SECRET", "secreto-test"):
+            resultado = _verificar_firma_mp(req, "123")
+
+        self.assertFalse(resultado, "Un timestamp de hace 10 minutos debe ser rechazado")

@@ -206,7 +206,10 @@ def registro_view(request):
                 # Redirigir a la página de "revisá tu correo" SIN hacer login
                 return redirect("account_email_verification_sent")
             else:
-                login(request, usuario)
+                # Especificamos el backend explícitamente porque django-axes agrega
+                # un segundo backend de autenticación. Sin esto, login() no sabe
+                # cuál usar cuando el usuario no pasó por authenticate() primero.
+                login(request, usuario, backend="django.contrib.auth.backends.ModelBackend")
                 return redirect_por_rol(usuario)
 
     else:
