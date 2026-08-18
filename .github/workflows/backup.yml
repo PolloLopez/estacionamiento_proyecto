@@ -13,10 +13,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Instalar cliente PostgreSQL
+      - name: Instalar cliente PostgreSQL 18
         run: |
+          # Ubuntu trae postgresql-client 16 por defecto.
+          # Railway usa PostgreSQL 18, y pg_dump falla si el cliente es más viejo que el server.
+          # Agregamos el repositorio oficial de PostgreSQL para instalar la versión correcta.
+          sudo apt-get install -y curl ca-certificates
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            > /etc/apt/sources.list.d/pgdg.list'
           sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client-18
 
       - name: Generar nombre del archivo con fecha
         id: nombre
@@ -28,8 +38,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
         run: |
-          # pg_dump lee la conexión desde DATABASE_URL directamente.
-          # La salida se pasa por gzip para reducir el tamaño del artifact.
+          # set -o pipefail: hace que el paso falle si pg_dump falla, aunque gzip
+          # no falle. Sin esto, un pg_dump fallido sube un archivo vacío silenciosamente.
+          set -o pipefail
+
           pg_dump "$DATABASE_URL" \
             --no-owner \
             --no-acl \
