@@ -176,15 +176,23 @@ if not DEBUG and _sentry_dsn:
     )
 
 # ─── Rate limiting — django-axes ──────────────────────────────────────────────
-# Bloquea una IP después de AXES_FAILURE_LIMIT intentos fallidos consecutivos.
+# Bloquea después de AXES_FAILURE_LIMIT intentos fallidos consecutivos.
 # El bloqueo dura AXES_COOLOFF_TIME horas y se resetea al entrar exitosamente.
-# Se bloquea solo por IP (no por username) para evitar que un atacante bloquee
-# cuentas legítimas conociendo solo el correo del usuario.
-AXES_FAILURE_LIMIT      = 5     # intentos fallidos antes de bloquear
-AXES_COOLOFF_TIME       = 1     # horas bloqueado (acepta int o timedelta)
-AXES_RESET_ON_SUCCESS   = True  # resetea el contador al loguearse bien
-AXES_LOCKOUT_PARAMETERS = ["ip_address"]   # bloquea por IP, no por username
-AXES_LOCKOUT_TEMPLATE   = "lockout.html"   # template para la pantalla de bloqueo
+#
+# AXES_LOCKOUT_PARAMETERS con lista anidada [["ip_address", "username"]]:
+#   bloquea cuando la MISMA IP intenta entrar con el MISMO correo 5 veces.
+#   → Un atacante que cambia de IP no acumula intentos (protege al usuario legítimo).
+#   → Un atacante que prueba distintos correos desde la misma IP no acumula (no bloquea IPs compartidas).
+#   → Solo bloquea cuando el ataque es dirigido: misma IP + mismo correo.
+#
+# AXES_USERNAME_FORM_FIELD: nuestro form usa "correo" en lugar del estándar "username".
+# Sin esto, axes no puede rastrear intentos por correo y el umbral combinado no funciona.
+AXES_FAILURE_LIMIT      = 5                              # intentos fallidos antes de bloquear
+AXES_COOLOFF_TIME       = 1                              # horas bloqueado (acepta int o timedelta)
+AXES_RESET_ON_SUCCESS   = True                           # resetea el contador al loguearse bien
+AXES_USERNAME_FORM_FIELD = "correo"                      # campo de email en nuestro form de login
+AXES_LOCKOUT_PARAMETERS = [["ip_address", "username"]]  # bloquea por IP + correo combinados
+AXES_LOCKOUT_TEMPLATE   = "lockout.html"                 # template para la pantalla de bloqueo
 
 # ─── CSRF ─────────────────────────────────────────────────────────────────────
 # En Railway: CSRF_TRUSTED_ORIGINS=https://tuapp.up.railway.app
@@ -283,7 +291,10 @@ LOGIN_REDIRECT_URL = "/"
 # ─── Allauth (login solo con email, sin username) ─────────────────────────────
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
-ACCOUNT_EMAIL_VERIFICATION = "none"
+ACCOUNT_EMAIL_VERIFICATION = os.getenv("ACCOUNT_EMAIL_VERIFICATION", "none")
+# Después de confirmar el email, intentar auto-loguear al usuario.
+# Funciona en conjunto con ACCOUNT_EMAIL_VERIFICATION = "mandatory".
+ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_ADAPTER = "app_estacionamiento.adapters.NoUsernameAccountAdapter"
 # Adapter social: mapea email de Google al campo 'correo' de nuestro modelo
@@ -329,3 +340,11 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # True  = modo producción (valida todo, no permite verificar si hay inconsistencias)
 # False = modo desarrollo (permisivo, más rápido para testear)
 VALIDACION_ACTIVA = not DEBUG
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "DEBUG", "propagate": False},
+    },
+}

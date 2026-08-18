@@ -341,6 +341,14 @@ def importar_estacionamientos(request, municipio_id):
         messages.error(request, "El archivo debe ser .xlsx o .xls.")
         return redirect("importar_estacionamientos", municipio_id=municipio_id)
 
+    # Validar tamaño antes de abrir con openpyxl.
+    # Sin este chequeo, un archivo muy grande puede agotar la memoria del servidor
+    # antes de que openpyxl devuelva un error.
+    LIMITE_MB = 10
+    if archivo.size > LIMITE_MB * 1024 * 1024:
+        messages.error(request, f"El archivo no puede superar {LIMITE_MB} MB.")
+        return redirect("importar_estacionamientos", municipio_id=municipio_id)
+
     try:
         wb = openpyxl.load_workbook(archivo, data_only=True)
         ws = wb.active
