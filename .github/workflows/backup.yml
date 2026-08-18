@@ -28,8 +28,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
         run: |
-          # pg_dump lee la conexión desde DATABASE_URL directamente.
-          # La salida se pasa por gzip para reducir el tamaño del artifact.
+          # set -o pipefail: hace que el paso falle si pg_dump falla, aunque gzip
+          # no falle. Sin esto, un pg_dump fallido sube un archivo vacío silenciosamente.
+          set -o pipefail
+
           pg_dump "$DATABASE_URL" \
             --no-owner \
             --no-acl \
