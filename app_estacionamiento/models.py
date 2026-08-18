@@ -177,6 +177,16 @@ class Municipio(models.Model):
         verbose_name='Tolerancia multa (min)',
         help_text='Minutos de gracia: si el conductor paga la multa dentro de este plazo, se cancela automáticamente.',
     )
+    monto_minimo_carga = models.PositiveIntegerField(
+        default=500,
+        verbose_name='Monto mínimo de carga MP ($)',
+        help_text='Monto mínimo que puede cargar un conductor via MercadoPago.',
+    )
+    monto_maximo_carga = models.PositiveIntegerField(
+        default=50000,
+        verbose_name='Monto máximo de carga MP ($)',
+        help_text='Monto máximo que puede cargar un conductor via MercadoPago en una sola operación.',
+    )
 
     # ── Branding por municipio ────────────────────────────────────────────────
     # El admin carga el logo y elige los colores; cada municipio tiene su propia

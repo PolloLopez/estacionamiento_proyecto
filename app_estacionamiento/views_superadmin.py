@@ -110,8 +110,10 @@ def editar_municipio(request, municipio_id):
         # ── Campos de texto y número ──────────────────────────────────────
         municipio.nombre            = request.POST.get("nombre", municipio.nombre).strip()
         municipio.nombre_sistema    = request.POST.get("nombre_sistema", "").strip()
-        municipio.comision_vendedor = request.POST.get("comision_vendedor", municipio.comision_vendedor)
-        municipio.activo            = request.POST.get("activo") == "on"
+        municipio.comision_vendedor  = request.POST.get("comision_vendedor", municipio.comision_vendedor)
+        municipio.monto_minimo_carga = request.POST.get("monto_minimo_carga", municipio.monto_minimo_carga)
+        municipio.monto_maximo_carga = request.POST.get("monto_maximo_carga", municipio.monto_maximo_carga)
+        municipio.activo             = request.POST.get("activo") == "on"
 
         # ── Colores de branding ────────────────────────────────────────────
         # El input type=color sincroniza el valor con el text input vía JS.

@@ -47,6 +47,22 @@
                    style="width:100%; margin-top:0.25rem;">
           </div>
 
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Monto mínimo de carga MP ($)</label>
+            <input type="number" name="monto_minimo_carga" min="1" step="1"
+                   value="{{ municipio.monto_minimo_carga }}"
+                   style="width:100%; margin-top:0.25rem;">
+            <small style="color:var(--color-text-muted);">El conductor no puede cargar menos de este monto.</small>
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Monto máximo de carga MP ($)</label>
+            <input type="number" name="monto_maximo_carga" min="1" step="1"
+                   value="{{ municipio.monto_maximo_carga }}"
+                   style="width:100%; margin-top:0.25rem;">
+            <small style="color:var(--color-text-muted);">El conductor no puede cargar más de este monto en una sola operación.</small>
+          </div>
+
           {# ── Branding visual ── #}
           <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
             <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
