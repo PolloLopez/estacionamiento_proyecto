@@ -14,14 +14,6 @@
 
 ## 🔴 Alta prioridad
 
-### 1. PRODUCCIÓN: Verificar restauración del backup
-El workflow `.github/workflows/backup.yml` corre `pg_dump` diariamente (03:00 UTC) usando
-imagen Docker `postgres:18` (Railway corre PG 18). Artifact de ~52 KB confirmado ✅
-**Pendiente**: ejecutar un restore de prueba antes del go-live real para confirmar que el backup
-es válido y recuperable. Comando para restaurar localmente:
-```bash
-gunzip -c backup_YYYY-MM-DD_HH-MM.sql.gz | psql $DATABASE_URL_LOCAL
-```
 
 
 ---
@@ -109,6 +101,10 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 ---
 
 ## ✅ Resuelto recientemente
+
+**Sesión 2026-08-18** — Restore test del backup:
+- Restore exitoso con Docker postgres:18: 21 usuarios recuperados, tablas íntegras. ✅
+- Comando: `gunzip -c backup.sql.gz | psql -U postgres -d postgres` (dentro del container).
 
 **Sesión 2026-08-18** — Backups PostgreSQL funcionales:
 - Workflow usa imagen Docker `postgres:18` (fix para version mismatch con Railway).
