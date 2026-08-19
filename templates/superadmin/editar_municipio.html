@@ -41,13 +41,6 @@
           </div>
 
           <div style="margin-bottom:0.75rem;">
-            <label style="font-size:0.85rem; font-weight:600;">Comisión vendedor (%)</label>
-            <input type="number" name="comision_vendedor" step="0.1" min="0" max="100"
-                   value="{{ municipio.comision_vendedor }}"
-                   style="width:100%; margin-top:0.25rem;">
-          </div>
-
-          <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Monto mínimo de carga MP ($)</label>
             <input type="number" name="monto_minimo_carga" min="1" step="1"
                    value="{{ municipio.monto_minimo_carga }}"
@@ -61,6 +54,33 @@
                    value="{{ municipio.monto_maximo_carga }}"
                    style="width:100%; margin-top:0.25rem;">
             <small style="color:var(--color-text-muted);">El conductor no puede cargar más de este monto en una sola operación.</small>
+          </div>
+
+          {# ── Información institucional ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
+              Información institucional
+            </p>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.85rem; font-weight:600;">Leyenda de horarios</label>
+              <textarea name="leyenda_horarios" rows="3"
+                        placeholder="Ej: Lunes a viernes de 8 a 20 hs · Sábados de 8 a 13 hs."
+                        style="width:100%; margin-top:0.25rem; padding:0.4rem 0.6rem; border-radius:6px;
+                               border:1px solid var(--color-border); background:var(--color-surface);
+                               color:var(--color-text); font-size:0.88rem; resize:vertical;">{{ municipio.leyenda_horarios }}</textarea>
+              <small style="color:var(--color-text-muted);">Se muestra en el ticket y en la app del conductor.</small>
+            </div>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.85rem; font-weight:600;">Marco legal / Ordenanza</label>
+              <textarea name="texto_ordenanza" rows="4"
+                        placeholder="Ej: Ordenanza N° 1234/2023 — Estacionamiento Medido Municipal."
+                        style="width:100%; margin-top:0.25rem; padding:0.4rem 0.6rem; border-radius:6px;
+                               border:1px solid var(--color-border); background:var(--color-surface);
+                               color:var(--color-text); font-size:0.88rem; resize:vertical;">{{ municipio.texto_ordenanza }}</textarea>
+              <small style="color:var(--color-text-muted);">Texto de la ordenanza municipal que rige el sistema.</small>
+            </div>
           </div>
 
           {# ── Branding visual ── #}

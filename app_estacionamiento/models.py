@@ -214,6 +214,20 @@ class Municipio(models.Model):
         help_text="Texto que aparece en la barra de navegación si no hay logo.",
     )
 
+    # ── Información institucional ────────────────────────────────────────────
+    # Textos que el superadmin puede configurar para cada municipio.
+    # Se muestran en el conductor home y/o la landing pública.
+    leyenda_horarios = models.TextField(
+        blank=True, default="",
+        verbose_name="Leyenda de horarios",
+        help_text="Ej: Lunes a viernes de 8 a 20 hs · Sábados de 8 a 13 hs.",
+    )
+    texto_ordenanza = models.TextField(
+        blank=True, default="",
+        verbose_name="Marco legal / Ordenanza",
+        help_text="Ej: Ordenanza N° 1234/2023 — Estacionamiento Medido Municipal.",
+    )
+
     def __str__(self):
         return self.nombre
     
@@ -341,7 +355,7 @@ class Tarifa(models.Model):
         blank=True
     )
 
-    precio_por_hora = models.DecimalField(max_digits=6, decimal_places=2)
+    precio_por_hora = models.DecimalField(max_digits=10, decimal_places=2)
 
     # Monto fijo que se aplica a cada infracción generada por inspectores.
     # El admin lo configura desde Tarifas. El inspector no puede modificarlo.
