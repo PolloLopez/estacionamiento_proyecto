@@ -113,16 +113,19 @@ function log(msg) {
   logEl.textContent   = msg;
 }
 
-// Al cargar: verificar si ya hay impresora autorizada
+// Al cargar: mostrar la impresora guardada (alias de localStorage o getDevices)
 (async function() {
   if (!navigator.bluetooth) {
     estadoEl.textContent = '⚠️ Web Bluetooth no disponible — usá Chrome en Android';
     return;
   }
+
+  // Primero intentar getDevices() (silencioso)
   if (typeof navigator.bluetooth.getDevices === 'function') {
     try {
       var devs = await navigator.bluetooth.getDevices();
       if (devs.length > 0) {
+        guardarInfoImpresora(devs[0]);
         estadoEl.textContent = '🖨 ' + nombreMostrar(devs[0]) + ' autorizada';
         estadoEl.style.color = 'var(--color-primary)';
         mostrarRenombrado(devs[0]);
@@ -130,7 +133,14 @@ function log(msg) {
       }
     } catch(e) {}
   }
-  estadoEl.textContent = '🖨 Sin impresora vinculada';
+
+  // getDevices() vacío: mostrar info guardada en localStorage (si existe)
+  var info = obtenerInfoImpresora();
+  if (info) {
+    estadoEl.textContent = '🖨 ' + info.alias + ' (sin confirmar)';
+  } else {
+    estadoEl.textContent = '🖨 Sin impresora vinculada';
+  }
 })();
 
 // Muestra el campo de renombrado con el alias actual precargado

@@ -2,70 +2,99 @@
  * impresora_bluetooth.js
  *
  * Conexión con impresora térmica 58mm vía Web Bluetooth API.
- * Soporta los perfiles GATT más comunes para impresoras ESC/POS BLE:
- *   - Genérico 18f0 (el más común en impresoras chinas de 58mm)
- *   - Nordic UART Service / NUS (nRF51822, muy común en módulos BLE baratos)
- *   - Star Micronics BLE
  * Chrome Android 85+ con HTTPS.
  *
- * Alias de impresora:
- *   Los dispositivos BLE a menudo tienen nombres genéricos ("Printer 001").
- *   Se permite guardar un alias personalizado en localStorage, indexado por device.id.
+ * Perfiles soportados (se prueban en orden):
+ *   - Genérico 18f0 (más común en impresoras de 58mm)
+ *   - Nordic UART Service / NUS (nRF51/nRF52)
+ *   - Star Micronics BLE
+ *   - Alternativo genérico
+ *
+ * Persistencia:
+ *   Chrome tiene un bug conocido: getDevices() devuelve vacío al navegar entre páginas.
+ *   Solución: guardar {id, name, alias} en localStorage. Al reconectar, si getDevices()
+ *   falla, se abre requestDevice() con filtro por nombre (diálogo pre-filtrado a UNA impresora).
  */
 
 'use strict';
 
-// ── Alias de impresora ─────────────────────────────────────────────────────
+// ── Perfiles BLE ────────────────────────────────────────────────────────────
 
-var _ALIAS_KEY = 'bleImpresoraAliases';
-
-/** Devuelve el alias guardado para un device.id, o null si no hay. */
-function obtenerAlias(deviceId) {
-  try {
-    var data = JSON.parse(localStorage.getItem(_ALIAS_KEY) || '{}');
-    return data[deviceId] || null;
-  } catch (_) { return null; }
-}
-
-/** Guarda (o sobreescribe) el alias de un dispositivo. */
-function guardarAlias(deviceId, alias) {
-  try {
-    var data = JSON.parse(localStorage.getItem(_ALIAS_KEY) || '{}');
-    data[deviceId] = alias.trim();
-    localStorage.setItem(_ALIAS_KEY, JSON.stringify(data));
-  } catch (_) {}
-}
-
-/** Nombre a mostrar: alias personalizado → nombre del dispositivo → 'Impresora BLE'. */
-function nombreMostrar(device) {
-  return obtenerAlias(device.id) || device.name || 'Impresora BLE';
-}
-
-// Perfiles conocidos: { servicio, caracteristica }
-// Se prueban en orden hasta que uno funcione.
 var PERFILES_BLE = [
-  // Genérico ESC/POS BLE — el más común en impresoras térmicas de 58mm
   { servicio: '000018f0-0000-1000-8000-00805f9b34fb',
     caract:   '00002af1-0000-1000-8000-00805f9b34fb' },
-  // Nordic UART Service (NUS) — módulos nRF51/nRF52 muy usados en impresoras portátiles
   { servicio: '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
     caract:   '6e400002-b5a3-f393-e0a9-e50e24dcca9e' },
-  // Star Micronics BLE
   { servicio: 'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
     caract:   'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f' },
-  // Alternativo genérico
   { servicio: '49535343-fe7d-4ae5-8fa9-9fafd205e455',
     caract:   '49535343-8841-43f4-a8d4-ecbe34729bb3' },
 ];
 
-// Lista de todos los UUIDs de servicio para declarar en requestDevice
 var UUID_SERVICIOS_OPT = PERFILES_BLE.map(function(p) { return p.servicio; });
-
-// Tamaño máximo de chunk BLE (MTU estándar 20 bytes)
 var CHUNK_SIZE = 20;
 
+// ── Persistencia en localStorage ────────────────────────────────────────────
+
+var _ALIAS_KEY = 'bleImpresoraAliases';
+var _INFO_KEY  = 'bleImpresoraActiva';
+
+/** Devuelve el alias guardado para un device.id, o null. */
+function obtenerAlias(deviceId) {
+  try {
+    return JSON.parse(localStorage.getItem(_ALIAS_KEY) || '{}')[deviceId] || null;
+  } catch (_) { return null; }
+}
+
 /**
- * Abre el diálogo para seleccionar impresora.
+ * Guarda alias personalizado para un dispositivo.
+ * También actualiza el nombre en _INFO_KEY si es el dispositivo activo.
+ */
+function guardarAlias(deviceId, alias) {
+  alias = alias.trim();
+  try {
+    var data = JSON.parse(localStorage.getItem(_ALIAS_KEY) || '{}');
+    data[deviceId] = alias;
+    localStorage.setItem(_ALIAS_KEY, JSON.stringify(data));
+    var info = obtenerInfoImpresora();
+    if (info && info.id === deviceId) {
+      info.alias = alias;
+      localStorage.setItem(_INFO_KEY, JSON.stringify(info));
+    }
+  } catch (_) {}
+}
+
+/** Nombre a mostrar: alias → nombre hardware → 'Impresora BLE'. */
+function nombreMostrar(device) {
+  return obtenerAlias(device.id) || device.name || 'Impresora BLE';
+}
+
+/**
+ * Guarda info del dispositivo activo para reconexión posterior.
+ * Se llama siempre que se conecta exitosamente.
+ */
+function guardarInfoImpresora(device) {
+  try {
+    localStorage.setItem(_INFO_KEY, JSON.stringify({
+      id:    device.id,
+      name:  device.name || '',
+      alias: obtenerAlias(device.id) || device.name || 'Impresora BLE',
+    }));
+  } catch (_) {}
+}
+
+/** Devuelve {id, name, alias} del dispositivo guardado, o null. */
+function obtenerInfoImpresora() {
+  try {
+    var data = localStorage.getItem(_INFO_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch (_) { return null; }
+}
+
+// ── Conexión ────────────────────────────────────────────────────────────────
+
+/**
+ * Abre diálogo para seleccionar impresora (primera vez o cambio).
  * Retorna { device, caracteristica, perfil } o lanza error.
  */
 async function conectarImpresora() {
@@ -76,47 +105,79 @@ async function conectarImpresora() {
     acceptAllDevices: true,
     optionalServices: UUID_SERVICIOS_OPT,
   });
-  return _abrirConexion(device);
+  var conexion = await _abrirConexion(device);
+  guardarInfoImpresora(device);   // persiste para reconexiones futuras
+  return conexion;
 }
 
 /**
- * Reconecta a impresora previamente autorizada (sin diálogo).
- * Usa getDevices() — disponible en Chrome 85+.
+ * Reconecta a la impresora guardada SIN mostrar diálogo de selección.
+ *
+ * Estrategia:
+ *   1. getDevices() — silencioso, funciona cuando Chrome mantiene el permiso.
+ *   2. Si falla (bug común en Chrome al navegar entre páginas), usa el nombre
+ *      guardado en localStorage para abrir requestDevice() filtrado a ese nombre.
+ *      Esto muestra el diálogo pero solo con la impresora conocida.
+ *
  * Retorna { device, caracteristica, perfil } o null.
  */
 async function reconectarImpresora() {
-  if (!navigator.bluetooth || typeof navigator.bluetooth.getDevices !== 'function') {
-    return null;
+  if (!navigator.bluetooth) return null;
+
+  // Intento 1: reconexión silenciosa
+  if (typeof navigator.bluetooth.getDevices === 'function') {
+    try {
+      var devs = await navigator.bluetooth.getDevices();
+      if (devs.length) {
+        var conexion = await _abrirConexion(devs[0]);
+        guardarInfoImpresora(devs[0]);
+        return conexion;
+      }
+    } catch (e) {
+      console.warn('[BLE] getDevices falló:', e.message);
+    }
   }
-  var dispositivos = await navigator.bluetooth.getDevices();
-  if (!dispositivos.length) return null;
-  try {
-    return await _abrirConexion(dispositivos[0]);
-  } catch (e) {
-    console.warn('[BLE] Reconexión fallida:', e.message);
-    return null;
+
+  // Intento 2: requestDevice filtrado por nombre conocido
+  // Muestra el diálogo, pero pre-filtrado a la impresora que ya usamos.
+  var info = obtenerInfoImpresora();
+  if (info && info.name) {
+    try {
+      var device = await navigator.bluetooth.requestDevice({
+        filters: [{ name: info.name }],
+        optionalServices: UUID_SERVICIOS_OPT,
+      });
+      var conexion = await _abrirConexion(device);
+      guardarInfoImpresora(device);
+      return conexion;
+    } catch (e) {
+      console.warn('[BLE] reconexión por nombre falló:', e.message);
+      return null;
+    }
   }
+
+  return null;
 }
 
 /**
- * Conecta al GATT server y encuentra la primera característica de escritura disponible.
+ * Conecta al GATT server y encuentra la primera característica de escritura.
  */
 async function _abrirConexion(device) {
   var server = await device.gatt.connect();
 
-  // Probar perfiles conocidos primero (más rápido)
+  // Probar perfiles conocidos primero
   for (var i = 0; i < PERFILES_BLE.length; i++) {
     var perfil = PERFILES_BLE[i];
     try {
       var svc   = await server.getPrimaryService(perfil.servicio);
       var caract = await svc.getCharacteristic(perfil.caract);
-      console.log('[BLE] Perfil encontrado:', perfil.servicio);
+      console.log('[BLE] Perfil:', perfil.servicio);
       return { device: device, caracteristica: caract, perfil: perfil };
     } catch (_) {}
   }
 
-  // Descubrimiento automático: listar todos los servicios y buscar write
-  console.log('[BLE] Perfiles conocidos no encontrados, descubriendo servicios...');
+  // Descubrimiento automático
+  console.log('[BLE] Descubriendo servicios...');
   var servicios = await server.getPrimaryServices();
   for (var s = 0; s < servicios.length; s++) {
     try {
@@ -124,7 +185,7 @@ async function _abrirConexion(device) {
       for (var c = 0; c < caracts.length; c++) {
         var props = caracts[c].properties;
         if (props.write || props.writeWithoutResponse) {
-          console.log('[BLE] Característica descubierta:', servicios[s].uuid, caracts[c].uuid);
+          console.log('[BLE] Encontrado:', servicios[s].uuid, caracts[c].uuid);
           return {
             device: device,
             caracteristica: caracts[c],
@@ -135,11 +196,11 @@ async function _abrirConexion(device) {
     } catch (_) {}
   }
 
-  throw new Error('No se encontró característica de escritura. Revisá los logs de la consola.');
+  throw new Error('No se encontró característica de escritura.');
 }
 
 /**
- * Devuelve un string con los servicios/características del dispositivo (para diagnóstico).
+ * Diagnóstico: lista todos los servicios y características del dispositivo.
  */
 async function diagnosticarImpresora() {
   var device = await navigator.bluetooth.requestDevice({
@@ -157,25 +218,24 @@ async function diagnosticarImpresora() {
       for (var c = 0; c < caracts.length; c++) {
         var p = caracts[c].properties;
         var flags = [];
-        if (p.read)               flags.push('read');
-        if (p.write)              flags.push('write');
+        if (p.read)                 flags.push('read');
+        if (p.write)                flags.push('write');
         if (p.writeWithoutResponse) flags.push('writeNoResp');
-        if (p.notify)             flags.push('notify');
+        if (p.notify)               flags.push('notify');
         resultado += '  Char: ' + caracts[c].uuid + ' [' + flags.join(', ') + ']\n';
       }
     } catch (e) {
-      resultado += '  (sin acceso a características)\n';
+      resultado += '  (sin acceso)\n';
     }
     resultado += '\n';
   }
-
   device.gatt.disconnect();
   return resultado;
 }
 
-/**
- * Envía datos en chunks de CHUNK_SIZE bytes.
- */
+// ── Envío de datos ──────────────────────────────────────────────────────────
+
+/** Envía datos en chunks de CHUNK_SIZE bytes con pausa entre cada uno. */
 async function enviarImpresion(caracteristica, datos) {
   for (var i = 0; i < datos.length; i += CHUNK_SIZE) {
     var chunk = datos.slice(i, i + CHUNK_SIZE);
@@ -184,14 +244,13 @@ async function enviarImpresion(caracteristica, datos) {
     } catch (_) {
       await caracteristica.writeValueWithoutResponse(chunk);
     }
-    // Pequeña pausa entre chunks para no saturar el buffer BLE
     await new Promise(function(r) { setTimeout(r, 20); });
   }
 }
 
-/**
- * Normaliza texto a ASCII puro (las impresoras térmicas básicas no soportan UTF-8).
- */
+// ── Generación de tickets ESC/POS ───────────────────────────────────────────
+
+/** Normaliza texto a ASCII puro (impresoras básicas no soportan UTF-8). */
 function _norm(s) {
   return String(s || '')
     .replace(/[áàâä]/gi, function(m) { return /[A-Z]/.test(m) ? 'A' : 'a'; })
@@ -204,7 +263,51 @@ function _norm(s) {
 }
 
 /**
- * Genera un Uint8Array ESC/POS para el ticket de infracción.
+ * Genera bytes ESC/POS para un código QR nativo (comando GS ( k).
+ * Compatible con la mayoría de impresoras térmicas modernas.
+ * tamano: 1–16 (4 = ~4 dots por módulo, recomendado para 58mm).
+ */
+function _qrEscPos(texto, tamano) {
+  tamano = tamano || 4;
+  var GS = 29, cn = 49;
+  var buf = [];
+
+  // Convertir texto a bytes UTF-8
+  var bytes = [];
+  for (var i = 0; i < texto.length; i++) {
+    var code = texto.charCodeAt(i);
+    if (code < 0x80) {
+      bytes.push(code);
+    } else if (code < 0x800) {
+      bytes.push(0xC0 | (code >> 6), 0x80 | (code & 0x3F));
+    } else {
+      bytes.push(
+        0xE0 | (code >> 12),
+        0x80 | ((code >> 6) & 0x3F),
+        0x80 | (code & 0x3F)
+      );
+    }
+  }
+
+  // 1. Modelo QR 2
+  buf.push(GS, 0x28, 0x6B, 4, 0, cn, 65, 50, 0);
+  // 2. Tamaño del módulo
+  buf.push(GS, 0x28, 0x6B, 3, 0, cn, 67, tamano);
+  // 3. Nivel de corrección L
+  buf.push(GS, 0x28, 0x6B, 3, 0, cn, 69, 48);
+  // 4. Almacenar datos (pL, pH incluyen los 3 bytes de cn+fn+m)
+  var len = bytes.length + 3;
+  buf.push(GS, 0x28, 0x6B, len & 0xFF, (len >> 8) & 0xFF, cn, 80, 48);
+  for (var j = 0; j < bytes.length; j++) buf.push(bytes[j]);
+  // 5. Imprimir
+  buf.push(GS, 0x28, 0x6B, 3, 0, cn, 81, 48);
+
+  return buf;
+}
+
+/**
+ * Genera un Uint8Array ESC/POS para el acta de infracción.
+ * Siempre imprime QR nativo + URL como texto (doble seguridad).
  */
 function generarTicketInfraccion(d) {
   var ESC = 27, GS = 29, LF = 10;
@@ -218,7 +321,7 @@ function generarTicketInfraccion(d) {
   }
 
   function linea(s) {
-    var norm = _norm(s).substring(0, ANCHO * 2);  // máximo 2 líneas
+    var norm = _norm(s).substring(0, ANCHO * 2);
     for (var i = 0; i < norm.length; i++) buf.push(norm.charCodeAt(i));
     buf.push(LF);
   }
@@ -229,12 +332,12 @@ function generarTicketInfraccion(d) {
     return Array(pad + 1).join(' ') + norm;
   }
 
-  // Inicializar
+  // Init
   push(ESC, 0x40);
 
   // Encabezado
-  push(ESC, 0x61, 0x01);          // centro
-  push(ESC, 0x45, 0x01);          // negrita
+  push(ESC, 0x61, 0x01);      // centro
+  push(ESC, 0x45, 0x01);      // negrita
   linea('ACTA DE INFRACCION');
   push(ESC, 0x45, 0x00);
   linea(_norm(d.municipio));
@@ -246,14 +349,14 @@ function generarTicketInfraccion(d) {
   linea(SEP);
 
   // Patente grande
-  push(GS, 0x21, 0x11);           // doble alto+ancho
+  push(GS, 0x21, 0x11);       // doble alto+ancho
   linea(centrar(d.patente));
   push(GS, 0x21, 0x00);
   linea(centrar(_norm(d.tipo_vehiculo)));
   linea(SEP);
 
   // Datos
-  push(ESC, 0x61, 0x00);          // izquierda
+  push(ESC, 0x61, 0x00);      // izquierda
   linea(_norm('Subcuadra: ' + d.subcuadra));
   linea(_norm('Motivo: ' + d.motivo));
   linea(SEP);
@@ -278,9 +381,14 @@ function generarTicketInfraccion(d) {
   if (d.legajo) linea('Legajo: ' + d.legajo);
   linea(SEP);
 
-  // URL pago
-  push(ESC, 0x61, 0x01);
+  // QR nativo ESC/POS + URL como texto de respaldo
+  push(ESC, 0x61, 0x01);      // centro
   linea('Paga online:');
+  var qrBytes = _qrEscPos(d.url_pago, 4);
+  for (var qi = 0; qi < qrBytes.length; qi++) buf.push(qrBytes[qi]);
+  buf.push(LF);
+  // URL en texto (por si el modelo no soporta GS(k)
+  push(ESC, 0x61, 0x01);
   linea(_norm(d.url_pago));
 
   // Avance y corte
@@ -290,23 +398,21 @@ function generarTicketInfraccion(d) {
   return new Uint8Array(buf);
 }
 
-/**
- * Genera un ticket de prueba mínimo para verificar que la impresora recibe datos.
- */
+/** Ticket de prueba mínimo para verificar que la impresora recibe datos. */
 function generarTicketPrueba() {
   var buf = [];
-  function push() { for (var i=0;i<arguments.length;i++) buf.push(arguments[i]); }
-  function linea(s) { for(var i=0;i<s.length;i++) buf.push(s.charCodeAt(i)); buf.push(10); }
+  function push() { for (var i = 0; i < arguments.length; i++) buf.push(arguments[i]); }
+  function linea(s) { for (var i = 0; i < s.length; i++) buf.push(s.charCodeAt(i)); buf.push(10); }
 
-  push(27, 0x40);                  // init
-  push(27, 0x61, 0x01);            // centro
-  push(27, 0x45, 0x01);            // negrita
+  push(27, 0x40);
+  push(27, 0x61, 0x01);
+  push(27, 0x45, 0x01);
   linea('--- PRUEBA ---');
   push(27, 0x45, 0x00);
   linea('Impresora OK');
   linea(new Date().toLocaleTimeString());
   push(10, 10, 10, 10);
-  push(29, 0x56, 0x42, 0x10);     // corte
+  push(29, 0x56, 0x42, 0x10);
 
   return new Uint8Array(buf);
 }

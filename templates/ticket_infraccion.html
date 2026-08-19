@@ -275,17 +275,20 @@ async function imprimirActa() {
   }
 }
 
-// Al cargar: solo mostrar el botón. No auto-imprimir.
-// Razón: en escritorio no hay impresora BLE; en teléfono el inspector
-// debe confirmar con un toque (requerido por Web Bluetooth para reconectar).
+// Al cargar: personalizar el botón con el alias de la impresora guardada.
 window.addEventListener('DOMContentLoaded', function() {
+  var btn    = document.getElementById('btn-imprimir');
   var estado = document.getElementById('estado-impresion');
 
   if (!navigator.bluetooth) {
-    // Navegador sin soporte BLE (Firefox, Safari, etc.)
-    estado.textContent = '⚠️ Impresión BLE no disponible en este navegador. Usá Chrome en Android.';
-  } else {
-    estado.textContent = '';  // Limpio — el estado se muestra al tocar el botón
+    estado.textContent = '⚠️ Impresión BLE no disponible. Usá Chrome en Android.';
+    return;
+  }
+
+  // Mostrar alias en el botón si hay dispositivo guardado
+  var info = obtenerInfoImpresora();
+  if (info && info.alias) {
+    btn.textContent = '🖨 Imprimir con ' + info.alias;
   }
 });
 </script>

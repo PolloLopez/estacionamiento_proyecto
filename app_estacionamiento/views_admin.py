@@ -920,7 +920,18 @@ def gestionar_tarifas(request):
         except Exception as e:
             error = f"Error al guardar: {e}"
 
-    tarifa_actual = Tarifa.objects.filter(municipio=municipio).first()
+    # get_or_create garantiza que el objeto existe: evita que el template muestre
+    # solo placeholders cuando todavía no se configuró ninguna tarifa.
+    tarifa_actual, _ = Tarifa.objects.get_or_create(
+        municipio=municipio,
+        defaults={
+            "precio_por_hora":      Decimal("0"),
+            "precio_por_hora_moto": None,
+            "monto_infraccion":     Decimal("0"),
+            "precio_abono_auto":    Decimal("0"),
+            "precio_abono_moto":    Decimal("0"),
+        }
+    )
     return render(request, "admin/gestionar_tarifas.html", {
         "tarifa_actual": tarifa_actual,
         "municipio":     municipio,
