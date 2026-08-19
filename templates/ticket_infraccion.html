@@ -171,7 +171,9 @@
 
 </body>
 <script>
-  // Después de imprimir, redirige al verificador
+  // Abre el diálogo de impresión automáticamente al cargar el ticket.
+  // onafterprint redirige al verificador para que el inspector siga trabajando.
+  window.onload = function() { window.print(); };
   window.onafterprint = function() {
     window.location.href = "{% url 'inspectores_verificar_vehiculo' %}";
   };
