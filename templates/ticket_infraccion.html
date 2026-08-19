@@ -201,8 +201,10 @@ var DATOS_ACTA = {
   hora:         "{{ infraccion.creado_en|date:'H:i' }}",
   monto:        "{{ infraccion.monto }}",
   inspector:    "{% if infraccion.inspector.nombre %}{{ infraccion.inspector.nombre|escapejs }} {{ infraccion.inspector.apellido|escapejs }}{% else %}{{ infraccion.inspector.correo|escapejs }}{% endif %}",
-  legajo:       "{{ infraccion.inspector.numero_legajo|default:''|escapejs }}",
-  url_pago:     "{{ request.scheme }}://{{ request.get_host }}/pagar/{{ infraccion.vehiculo.patente }}/",
+  legajo:           "{{ infraccion.inspector.numero_legajo|default:''|escapejs }}",
+  url_pago:         "{{ request.scheme }}://{{ request.get_host }}/pagar/{{ infraccion.vehiculo.patente }}/",
+  leyenda_horarios: "{{ infraccion.municipio.leyenda_horarios|default:''|escapejs }}",
+  texto_ordenanza:  "{{ infraccion.municipio.texto_ordenanza|default:''|escapejs }}",
 };
 
 var URL_VERIFICAR = "{% url 'inspectores_verificar_vehiculo' %}";

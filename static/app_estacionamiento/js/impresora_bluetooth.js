@@ -383,6 +383,16 @@ function generarTicketInfraccion(d) {
   if (d.legajo) linea('Legajo: ' + d.legajo);
   linea(SEP);
 
+  // Leyenda de horarios y texto de ordenanza (si el municipio los configuró)
+  if (d.leyenda_horarios) {
+    push(ESC, 0x61, 0x00);
+    linea(SEP);
+    linea(_norm(d.leyenda_horarios));
+  }
+  if (d.texto_ordenanza) {
+    linea(_norm(d.texto_ordenanza));
+  }
+
   // QR nativo ESC/POS + URL como texto de respaldo
   push(ESC, 0x61, 0x01);      // centro
   linea('Paga online:');
