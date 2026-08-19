@@ -14,6 +14,22 @@
 
 ## 🔴 Alta prioridad
 
+### Vista previa HTML del ticket sin leyenda de horarios ni ordenanza
+`ticket_infraccion.html` no muestra `municipio.leyenda_horarios` ni `municipio.texto_ordenanza`.
+Sí salen en la impresión BLE pero no en la vista previa del navegador.
+→ Agregar los bloques en el HTML del ticket (debajo del inspector, antes del QR).
+
+### Texto de ordenanza/leyenda se corta en la impresión BLE
+La función `linea()` en ESC/POS trunca el texto a 64 chars (`ANCHO * 2`).
+Textos largos de ordenanza se cortan. Hay que agregar una función `wrap()` que divida
+el texto en líneas de `ANCHO` chars e imprima cada una por separado.
+
+### admin-tarifas no muestra valores guardados
+Si el fix de `filter().update()` ya llegó a `main` y los valores siguen sin aparecer,
+es probable que haya 2 registros `Tarifa` para el mismo municipio (el GET devuelve el primero
+con defaults y el POST actualiza el segundo). Solución definitiva: desde el Django Admin
+(`/sistema-interno/`) ir a Tarifas → verificar que haya solo una por municipio → eliminar duplicados.
+
 ### Monto $0 en actas de prueba (aclaración — no es un bug)
 Las infracciones creadas cuando `Tarifa.monto_infraccion` estaba en 0 siempre van a mostrar $0,
 porque el monto se fotografia al crear el acta (no se lee en tiempo real).

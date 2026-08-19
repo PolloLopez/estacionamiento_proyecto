@@ -383,14 +383,39 @@ function generarTicketInfraccion(d) {
   if (d.legajo) linea('Legajo: ' + d.legajo);
   linea(SEP);
 
+  // Divide un texto largo en líneas de ancho máximo `ancho` chars.
+  function wrap(s, ancho) {
+    var norm  = _norm(s);
+    var words = norm.split(' ');
+    var lines = [];
+    var cur   = '';
+    for (var wi = 0; wi < words.length; wi++) {
+      var w = words[wi];
+      if (!w) continue;
+      if (cur.length === 0) {
+        cur = w.substring(0, ancho);
+      } else if (cur.length + 1 + w.length <= ancho) {
+        cur += ' ' + w;
+      } else {
+        lines.push(cur);
+        cur = w.substring(0, ancho);
+      }
+    }
+    if (cur.length) lines.push(cur);
+    return lines;
+  }
+
   // Leyenda de horarios y texto de ordenanza (si el municipio los configuró)
   if (d.leyenda_horarios) {
     push(ESC, 0x61, 0x00);
     linea(SEP);
-    linea(_norm(d.leyenda_horarios));
+    var hLines = wrap(d.leyenda_horarios, ANCHO);
+    for (var hi = 0; hi < hLines.length; hi++) linea(hLines[hi]);
   }
   if (d.texto_ordenanza) {
-    linea(_norm(d.texto_ordenanza));
+    linea(SEP);
+    var oLines = wrap(d.texto_ordenanza, ANCHO);
+    for (var oi = 0; oi < oLines.length; oi++) linea(oLines[oi]);
   }
 
   // QR nativo ESC/POS + URL como texto de respaldo
