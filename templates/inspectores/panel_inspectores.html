@@ -43,78 +43,119 @@
     </div>
   </div>
 
-  <!-- Impresora Bluetooth -->
-  <div class="card" style="margin-top:1.2rem;">
-    <h2 style="margin-bottom:0.5rem; font-size:1rem;">🖨 Impresora Bluetooth</h2>
-    <p id="estado-impresora" style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
-      Verificando...
-    </p>
-    <button id="btn-conectar-impresora" class="btn btn-outline"
-            style="width:100%; font-size:0.95rem;"
-            onclick="accionConectarImpresora()">
-      🔌 Conectar impresora
-    </button>
-    <p style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.5rem; text-align:center;">
-      Hacé esto una sola vez por teléfono. El acta se imprimirá automáticamente al registrar una infracción.
-    </p>
+  <!-- Impresora: solo muestra estado, config oculta en details -->
+  <div style="text-align:center; margin-top:1rem;">
+    <span id="estado-impresora" style="font-size:0.82rem; color:var(--color-text-muted);">
+      🖨 Verificando impresora...
+    </span>
   </div>
+
+  <!-- Configuración de impresora (colapsada por defecto) -->
+  <details style="margin-top:0.75rem;">
+    <summary style="font-size:0.82rem; color:var(--color-text-muted); cursor:pointer;
+                    list-style:none; text-align:center; user-select:none;">
+      ⚙️ Configurar impresora
+    </summary>
+    <div class="card" style="margin-top:0.75rem;">
+      <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+        Hacé esto <strong>una sola vez</strong> por teléfono. La impresora se conectará automáticamente al registrar infracciones.
+      </p>
+      <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        <button id="btn-conectar" class="btn btn-outline" style="font-size:0.9rem;"
+                onclick="accionConectar()">
+          🔌 Vincular impresora
+        </button>
+        <button class="btn btn-outline" style="font-size:0.85rem; color:var(--color-text-muted);"
+                onclick="accionDiagnostico()">
+          🔍 Diagnóstico (ver servicios BLE)
+        </button>
+        <button class="btn btn-outline" style="font-size:0.85rem;"
+                onclick="accionPrueba()">
+          🧾 Imprimir ticket de prueba
+        </button>
+      </div>
+      <pre id="log-impresora"
+           style="font-size:0.72rem; background:#f4f4f4; border-radius:6px;
+                  padding:0.6rem; margin-top:0.75rem; white-space:pre-wrap;
+                  word-break:break-all; display:none;"></pre>
+    </div>
+  </details>
 
 </section>
 
 <script src="{% static 'app_estacionamiento/js/impresora_bluetooth.js' %}"></script>
 <script>
-(async function() {
-  var estado = document.getElementById('estado-impresora');
-  var btn    = document.getElementById('btn-conectar-impresora');
+var estadoEl = document.getElementById('estado-impresora');
+var logEl    = document.getElementById('log-impresora');
 
-  // Verificar si Web Bluetooth está disponible
+function log(msg) {
+  logEl.style.display = 'block';
+  logEl.textContent   = msg;
+}
+
+// Al cargar: verificar si ya hay impresora autorizada
+(async function() {
   if (!navigator.bluetooth) {
-    estado.textContent = '⚠️ Web Bluetooth no disponible. Usá Chrome en Android.';
-    btn.disabled = true;
+    estadoEl.textContent = '⚠️ Web Bluetooth no disponible — usá Chrome en Android';
     return;
   }
-
-  // Verificar si ya hay una impresora autorizada
   if (typeof navigator.bluetooth.getDevices === 'function') {
     try {
-      var dispositivos = await navigator.bluetooth.getDevices();
-      if (dispositivos.length > 0) {
-        estado.textContent = '✅ Impresora autorizada: ' + (dispositivos[0].name || 'dispositivo BLE');
-        estado.style.color = 'var(--color-primary)';
-        btn.textContent    = '🔄 Cambiar impresora';
+      var devs = await navigator.bluetooth.getDevices();
+      if (devs.length > 0) {
+        estadoEl.textContent = '🖨 ' + (devs[0].name || 'Impresora BLE') + ' autorizada';
+        estadoEl.style.color = 'var(--color-primary)';
         return;
       }
-    } catch (e) {}
+    } catch(e) {}
   }
-
-  estado.textContent = '⚠️ Sin impresora conectada. Tocá el botón para emparejar.';
-  estado.style.color = 'var(--color-warning)';
+  estadoEl.textContent = '🖨 Sin impresora vinculada';
 })();
 
-async function accionConectarImpresora() {
-  var estado = document.getElementById('estado-impresora');
-  var btn    = document.getElementById('btn-conectar-impresora');
-
+async function accionConectar() {
+  var btn = document.getElementById('btn-conectar');
   btn.disabled    = true;
   btn.textContent = '⏳ Buscando...';
-  estado.textContent = 'Abriendo selector de Bluetooth...';
-
+  log('Abriendo selector Bluetooth...');
   try {
-    var resultado = await conectarImpresora();
-    var nombre    = resultado.device.name || 'dispositivo BLE';
-    // Desconectar enseguida — solo necesitábamos el permiso
-    resultado.device.gatt.disconnect();
-
-    estado.textContent = '✅ Impresora autorizada: ' + nombre;
-    estado.style.color = 'var(--color-primary)';
-    btn.textContent    = '🔄 Cambiar impresora';
-  } catch (e) {
-    estado.textContent = '❌ ' + (e.message || 'No se pudo conectar.');
-    estado.style.color = 'var(--color-danger, red)';
-    btn.textContent    = '🔌 Reintentar';
+    var r = await conectarImpresora();
+    r.device.gatt.disconnect();
+    var nombre = r.device.name || 'dispositivo BLE';
+    log('✅ Vinculada: ' + nombre + '\nPerfil: ' + r.perfil.servicio);
+    estadoEl.textContent = '🖨 ' + nombre + ' autorizada';
+    estadoEl.style.color = 'var(--color-primary)';
+    btn.textContent = '🔄 Cambiar impresora';
+  } catch(e) {
+    log('❌ ' + e.message);
+    btn.textContent = '🔌 Reintentar';
   }
-
   btn.disabled = false;
+}
+
+async function accionDiagnostico() {
+  log('Conectando para diagnóstico...');
+  try {
+    var info = await diagnosticarImpresora();
+    log(info);
+  } catch(e) {
+    log('❌ ' + e.message);
+  }
+}
+
+async function accionPrueba() {
+  log('Conectando...');
+  try {
+    var r = await reconectarImpresora();
+    if (!r) {
+      r = await conectarImpresora();
+    }
+    log('Conectada. Enviando ticket de prueba...');
+    await enviarImpresion(r.caracteristica, generarTicketPrueba());
+    r.device.gatt.disconnect();
+    log('✅ Ticket enviado. Si no imprimió, revisá los servicios con Diagnóstico.');
+  } catch(e) {
+    log('❌ ' + e.message);
+  }
 }
 </script>
 {% endblock %}
