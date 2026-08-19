@@ -899,16 +899,27 @@ def gestionar_tarifas(request):
             comision    = _decimal("comision_vendedor", minimo=0)
             tolerancia  = _entero("tolerancia_multa_minutos", minimo=0)
 
-            Tarifa.objects.update_or_create(
-                municipio=municipio,
-                defaults={
-                    "precio_por_hora":      precio_auto,
-                    "precio_por_hora_moto": precio_moto,
-                    "monto_infraccion":     monto_inf,
-                    "precio_abono_auto":    abono_auto,
-                    "precio_abono_moto":    abono_moto,
-                }
-            )
+            # update_or_create falla con MultipleObjectsReturned si hay duplicados.
+            # Usamos filter().update() que actualiza todos los registros del municipio
+            # de forma segura, y create() solo si no existe ninguno.
+            tarifa_qs = Tarifa.objects.filter(municipio=municipio)
+            if tarifa_qs.exists():
+                tarifa_qs.update(
+                    precio_por_hora=precio_auto,
+                    precio_por_hora_moto=precio_moto,
+                    monto_infraccion=monto_inf,
+                    precio_abono_auto=abono_auto,
+                    precio_abono_moto=abono_moto,
+                )
+            else:
+                Tarifa.objects.create(
+                    municipio=municipio,
+                    precio_por_hora=precio_auto,
+                    precio_por_hora_moto=precio_moto,
+                    monto_infraccion=monto_inf,
+                    precio_abono_auto=abono_auto,
+                    precio_abono_moto=abono_moto,
+                )
 
             municipio.comision_vendedor        = comision
             municipio.tolerancia_multa_minutos = tolerancia
