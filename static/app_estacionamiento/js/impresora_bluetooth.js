@@ -326,9 +326,11 @@ function generarTicketInfraccion(d) {
     buf.push(LF);
   }
 
-  function centrar(s) {
-    var norm = _norm(s).substring(0, ANCHO);
-    var pad  = Math.max(0, Math.floor((ANCHO - norm.length) / 2));
+  // ancho: número de columnas disponibles. Para modo doble-ancho usar ANCHO/2.
+  function centrar(s, ancho) {
+    ancho = ancho !== undefined ? ancho : ANCHO;
+    var norm = _norm(s).substring(0, ancho);
+    var pad  = Math.max(0, Math.floor((ancho - norm.length) / 2));
     return Array(pad + 1).join(' ') + norm;
   }
 
@@ -348,11 +350,11 @@ function generarTicketInfraccion(d) {
   push(ESC, 0x45, 0x00);
   linea(SEP);
 
-  // Patente grande
+  // Patente grande — en modo doble-ancho entran ANCHO/2 columnas
   push(GS, 0x21, 0x11);       // doble alto+ancho
-  linea(centrar(d.patente));
+  linea(centrar(d.patente, Math.floor(ANCHO / 2)));
   push(GS, 0x21, 0x00);
-  linea(centrar(_norm(d.tipo_vehiculo)));
+  linea(centrar(_norm(d.tipo_vehiculo)));    // modo normal: ANCHO completo
   linea(SEP);
 
   // Datos
@@ -363,11 +365,11 @@ function generarTicketInfraccion(d) {
   linea('Fecha: ' + d.fecha + ' ' + d.hora + 'hs');
   linea(SEP);
 
-  // Monto
+  // Monto — también en doble-ancho, idem patente
   push(ESC, 0x61, 0x01);
   push(GS, 0x21, 0x11);
   push(ESC, 0x45, 0x01);
-  linea(centrar('$' + d.monto));
+  linea(centrar('$' + d.monto, Math.floor(ANCHO / 2)));
   push(ESC, 0x45, 0x00);
   push(GS, 0x21, 0x00);
   linea(SEP);
