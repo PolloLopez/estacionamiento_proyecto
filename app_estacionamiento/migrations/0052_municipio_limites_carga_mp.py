@@ -6,14 +6,10 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('app_estacionamiento', '0051_pagopublico'),
+        ('app_estacionamiento', '0052_merge_0051'),
     ]
 
     operations = [
-        migrations.RemoveConstraint(
-            model_name='plantilladocumento',
-            name='unique_plantilla_municipio_tipo',
-        ),
         migrations.AddField(
             model_name='municipio',
             name='monto_maximo_carga',
@@ -23,34 +19,5 @@ class Migration(migrations.Migration):
             model_name='municipio',
             name='monto_minimo_carga',
             field=models.PositiveIntegerField(default=500, help_text='Monto mínimo que puede cargar un conductor via MercadoPago.', verbose_name='Monto mínimo de carga MP ($)'),
-        ),
-        migrations.AlterField(
-            model_name='movimientocaja',
-            name='mp_payment_id',
-            field=models.CharField(blank=True, max_length=50, null=True, unique=True, verbose_name='ID de pago MercadoPago'),
-        ),
-        migrations.AlterField(
-            model_name='plantilladocumento',
-            name='cuerpo',
-            field=models.TextField(blank=True, help_text='Texto principal del comprobante. Podés usar variables.', verbose_name='Cuerpo / base legal'),
-        ),
-        migrations.AlterField(
-            model_name='plantilladocumento',
-            name='encabezado',
-            field=models.TextField(blank=True, help_text='Texto que aparece arriba del comprobante. Podés usar variables.', verbose_name='Encabezado'),
-        ),
-        migrations.AlterField(
-            model_name='plantilladocumento',
-            name='pie',
-            field=models.TextField(blank=True, help_text='Texto que aparece al pie. Podés usar variables.', verbose_name='Pie / instrucciones'),
-        ),
-        migrations.AlterField(
-            model_name='rendicion',
-            name='total_efectivo',
-            field=models.DecimalField(decimal_places=2, default=0, help_text='Suma del efectivo de todos los cierres incluidos.', max_digits=12),
-        ),
-        migrations.AlterUniqueTogether(
-            name='plantilladocumento',
-            unique_together={('municipio', 'tipo')},
         ),
     ]

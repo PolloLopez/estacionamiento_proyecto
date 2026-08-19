@@ -108,11 +108,32 @@ def editar_municipio(request, municipio_id):
             return redirect("panel_superadmin")
 
         # ── Campos de texto y número ──────────────────────────────────────
-        municipio.nombre            = request.POST.get("nombre", municipio.nombre).strip()
-        municipio.nombre_sistema    = request.POST.get("nombre_sistema", "").strip()
-        municipio.comision_vendedor  = request.POST.get("comision_vendedor", municipio.comision_vendedor)
-        municipio.monto_minimo_carga = request.POST.get("monto_minimo_carga", municipio.monto_minimo_carga)
-        municipio.monto_maximo_carga = request.POST.get("monto_maximo_carga", municipio.monto_maximo_carga)
+        # Para campos numéricos usamos helpers que ignoran string vacío:
+        # request.POST.get(key, fallback) devuelve "" si el key existe pero está vacío,
+        # no el fallback → asignar "" a un DecimalField/IntegerField explota en save().
+        def _decimal(nombre, fallback):
+            val = request.POST.get(nombre, "").strip()
+            if not val:
+                return fallback
+            try:
+                return Decimal(val)
+            except (InvalidOperation, TypeError):
+                return fallback
+
+        def _entero(nombre, fallback):
+            val = request.POST.get(nombre, "").strip()
+            if not val:
+                return fallback
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return fallback
+
+        municipio.nombre             = request.POST.get("nombre", municipio.nombre).strip()
+        municipio.nombre_sistema     = request.POST.get("nombre_sistema", "").strip()
+        municipio.comision_vendedor  = _decimal("comision_vendedor",  municipio.comision_vendedor)
+        municipio.monto_minimo_carga = _entero("monto_minimo_carga",  municipio.monto_minimo_carga)
+        municipio.monto_maximo_carga = _entero("monto_maximo_carga",  municipio.monto_maximo_carga)
         municipio.activo             = request.POST.get("activo") == "on"
 
         # ── Colores de branding ────────────────────────────────────────────
