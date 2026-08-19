@@ -159,7 +159,7 @@ def editar_municipio(request, municipio_id):
         return redirect("panel_superadmin")
 
     admins = Usuario.objects.filter(municipio=municipio, es_admin=True).order_by("-is_active", "correo")
-    modulos = ModuloMunicipio.objects.filter(municipio=municipio)
+    modulos = list(ModuloMunicipio.objects.filter(municipio=municipio))
 
     # Módulos disponibles que aún no están asignados
     modulos_asignados = set(modulos.values_list("modulo", flat=True))
@@ -169,11 +169,27 @@ def editar_municipio(request, municipio_id):
         if clave not in modulos_asignados
     ]
 
+    # Descripción de cada módulo para mostrar en el panel
+    descripciones_modulos = {
+        "ocupacion_tiempo_real":      "Mapa o dashboard con vehículos estacionados en este momento.",
+        "reportes_comparativos":      "Comparación de recaudación, infracciones y ocupación entre períodos.",
+        "balance_por_dominio":        "Estado de cuenta por domicilio o patente: historial de pagos e infracciones.",
+        "areas_reservadas":           "Gestión de espacios reservados (discapacidad, carga/descarga, etc.).",
+        "geolocalizacion_inspector":  "Seguimiento en tiempo real de los inspectores en el mapa.",
+        "notificaciones_conductor":   "Alertas por SMS o push cuando se labre un acta o venza el tiempo.",
+        "informes_automaticos":       "Envío programado de reportes por correo a tesorero o autoridades.",
+    }
+
+    # Anotar descripción en cada instancia para poder accederla desde el template
+    for m in modulos:
+        m.descripcion = descripciones_modulos.get(m.modulo, "")
+
     return render(request, "superadmin/editar_municipio.html", {
-        "municipio":          municipio,
-        "admins":             admins,
-        "modulos":            modulos,
-        "modulos_disponibles": modulos_disponibles,
+        "municipio":            municipio,
+        "admins":               admins,
+        "modulos":              modulos,
+        "modulos_disponibles":  modulos_disponibles,
+        "descripciones_modulos": descripciones_modulos,
     })
 
 

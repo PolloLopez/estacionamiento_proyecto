@@ -208,6 +208,9 @@
                     padding:0.6rem 0; border-bottom:1px solid var(--color-border);">
           <div>
             <div style="font-weight:600; font-size:0.9rem;">{{ m.get_modulo_display }}</div>
+            {% if m.descripcion %}
+            <div style="font-size:0.78rem; color:var(--color-text-muted); margin-top:1px;">{{ m.descripcion }}</div>
+            {% endif %}
             <div style="font-size:0.8rem; color:var(--color-text-muted);">
               ${{ m.precio_mensual }}/mes
               {% if m.activado_por %} · activado por {{ m.activado_por.nombre_completo }}{% endif %}
