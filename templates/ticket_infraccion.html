@@ -1,39 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Acta #{{ infraccion.id }}</title>
   <style>
-    body { font-family: monospace; text-align: center; background: #fff; margin: 0; padding: 1rem; }
-    .ticket { width: 280px; margin: auto; }
-    hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
-    .acta-num { font-size: 1.3rem; font-weight: bold; letter-spacing: 2px; }
-    .patente { font-size: 1.6rem; font-weight: 900; letter-spacing: 4px; margin: 6px 0; }
-    .monto { font-size: 1.4rem; font-weight: 900; }
-    p { margin: 4px 0; font-size: 0.9rem; }
+    /* ── Pantalla ─────────────────────────────────────────────────── */
+    body {
+      font-family: monospace;
+      text-align: center;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 1rem;
+    }
+    .ticket {
+      width: 280px;
+      margin: auto;
+      background: #fff;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px dashed #aaa;
+    }
+    hr  { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+    .acta-num { font-size: 1.1rem; font-weight: bold; letter-spacing: 2px; }
+    .patente  { font-size: 1.5rem; font-weight: 900; letter-spacing: 4px; margin: 6px 0; }
+    .monto    { font-size: 1.3rem; font-weight: 900; }
+    p { margin: 3px 0; font-size: 0.88rem; }
+
+    /* ── Botones (solo pantalla) ──────────────────────────────────── */
     .no-print { margin-top: 1.5rem; text-align: center; }
     .no-print button {
-      padding: 0.6rem 1.4rem; font-size: 1rem; cursor: pointer;
-      margin: 0 0.3rem; border-radius: 6px; border: 1px solid #ccc;
+      padding: 0.7rem 1.4rem; font-size: 1rem; cursor: pointer;
+      margin: 0.3rem; border-radius: 8px; border: 1px solid #ccc;
+      display: inline-block;
     }
-    .btn-verde { background: #1a7a3c; color: #fff; border-color: #1a7a3c; }
-    @media print { .no-print { display: none; } }
+    .btn-imprimir { background: #333; color: #fff; border-color: #333; }
+    .btn-verificar { background: #1a7a3c; color: #fff; border-color: #1a7a3c; }
+
+    /* ── Impresión 58mm (papel térmico) ──────────────────────────── */
+    /*
+      @page define el tamaño físico del papel.
+      58mm = ancho del rollo; "auto" = largo variable (sin cortar contenido).
+      Márgenes mínimos para aprovechar el ancho.
+    */
+    @media print {
+      @page {
+        size: 58mm auto;
+        margin: 2mm 1mm;
+      }
+
+      body {
+        background: #fff;
+        padding: 0;
+        margin: 0;
+        font-size: 9pt;          /* fuente pequeña para 58mm */
+      }
+
+      /* El ticket ocupa todo el ancho disponible del papel */
+      .ticket {
+        width: 100%;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        margin: 0;
+      }
+
+      /* QR más chico para entrar en 54mm de área imprimible */
+      .qr-img {
+        width: 90px !important;
+        height: 90px !important;
+      }
+
+      .patente  { font-size: 16pt; letter-spacing: 2px; }
+      .acta-num { font-size: 11pt; }
+      .monto    { font-size: 14pt; }
+      p         { font-size: 8pt; margin: 2px 0; }
+
+      /* Ocultar botones y foto */
+      .no-print { display: none !important; }
+    }
   </style>
 </head>
 <body>
 
   <div class="ticket">
 
-    <h3>🚨 ACTA DE INFRACCIÓN</h3>
+    <p style="font-weight:700; font-size:1rem; margin-bottom:2px;">🚨 ACTA DE INFRACCIÓN</p>
     <p>{{ infraccion.municipio.nombre }}</p>
 
     {% if texto_plantilla.encabezado %}
-    <p style="font-size:0.82rem; white-space:pre-wrap;">{{ texto_plantilla.encabezado }}</p>
+    <p style="font-size:0.8rem; white-space:pre-wrap;">{{ texto_plantilla.encabezado }}</p>
     {% endif %}
 
     <hr>
 
-    <p class="acta-num">Acta N° {{ infraccion.id }}</p>
+    <p class="acta-num">N° {{ infraccion.id }}</p>
 
     <hr>
 
@@ -47,8 +108,7 @@
 
     <hr>
 
-    <p><b>Fecha del acta:</b> {{ infraccion.creado_en|date:"d/m/Y" }}</p>
-    <p><b>Hora:</b> {{ infraccion.creado_en|date:"H:i" }}hs</p>
+    <p><b>Fecha:</b> {{ infraccion.creado_en|date:"d/m/Y" }} {{ infraccion.creado_en|date:"H:i" }}hs</p>
 
     <hr>
 
@@ -57,7 +117,13 @@
     <hr>
 
     <p><b>Inspector:</b></p>
-    <p>{% if infraccion.inspector.nombre %}{{ infraccion.inspector.nombre }} {{ infraccion.inspector.apellido }}{% else %}{{ infraccion.inspector.correo }}{% endif %}</p>
+    <p>
+      {% if infraccion.inspector.nombre %}
+        {{ infraccion.inspector.nombre }} {{ infraccion.inspector.apellido }}
+      {% else %}
+        {{ infraccion.inspector.correo }}
+      {% endif %}
+    </p>
     {% if infraccion.inspector.numero_legajo %}
       <p>Legajo: {{ infraccion.inspector.numero_legajo }}</p>
     {% endif %}
@@ -65,31 +131,31 @@
     <hr>
 
     {% if texto_plantilla.cuerpo %}
-    <p style="font-size:0.82rem; white-space:pre-wrap;">{{ texto_plantilla.cuerpo }}</p>
+    <p style="font-size:0.8rem; white-space:pre-wrap;">{{ texto_plantilla.cuerpo }}</p>
     <hr>
     {% endif %}
 
     {% if texto_plantilla.pie %}
-    <p style="font-size:0.8rem; white-space:pre-wrap;">{{ texto_plantilla.pie }}</p>
+    <p style="font-size:0.78rem; white-space:pre-wrap;">{{ texto_plantilla.pie }}</p>
     {% else %}
-    <p style="font-size:0.8rem;">Escaneá el código para pagar online sin registrarte:</p>
+    <p style="font-size:0.78rem;">Pagá online sin registrarte:</p>
     {% endif %}
 
-    <!-- QR de pago público: apunta a /pagar/<patente>/ -->
+    <!-- QR de pago público -->
     {% with pago_url=request.scheme|add:"://"|add:request.get_host|add:"/pagar/"|add:infraccion.vehiculo.patente|add:"/" %}
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data={{ pago_url|urlencode }}"
-         alt="QR pago online"
-         style="margin: 6px 0; width:130px; height:130px;">
-    <p style="font-size:0.72rem; word-break:break-all; color:#555;">{{ pago_url }}</p>
+    <img class="qr-img"
+         src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data={{ pago_url|urlencode }}"
+         alt="QR pago"
+         style="margin:4px 0; width:120px; height:120px;">
+    <p style="font-size:0.7rem; word-break:break-all; color:#555;">{{ pago_url }}</p>
     {% endwith %}
 
   </div>
 
+  <!-- Botones: solo visibles en pantalla, ocultos al imprimir -->
   <div class="no-print">
-    <button onclick="window.print()" style="background:#555; color:#fff; border-color:#555;">
-      🖨 Imprimir acta
-    </button>
-    <button class="btn-verde"
+    <button class="btn-imprimir" onclick="window.print()">🖨 Imprimir acta</button>
+    <button class="btn-verificar"
             onclick="window.location.href='{% url 'inspectores_verificar_vehiculo' %}'">
       🔍 Verificar otro
     </button>
@@ -105,7 +171,7 @@
 
 </body>
 <script>
-  // Después de imprimir, redirige automáticamente al verificador
+  // Después de imprimir, redirige al verificador
   window.onafterprint = function() {
     window.location.href = "{% url 'inspectores_verificar_vehiculo' %}";
   };
