@@ -35,6 +35,7 @@
             type="number" step="0.01" min="0.01" required
             placeholder="Ej: 150.00"
             value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}"
+            value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}"
           />
         </div>
         <div>
@@ -44,6 +45,7 @@
             name="precio_por_hora_moto"
             type="number" step="0.01" min="0"
             placeholder="Ej: 80.00"
+            value="{{ tarifa_actual.precio_por_hora_moto|default_if_none:'' }}"
             value="{{ tarifa_actual.precio_por_hora_moto|default_if_none:'' }}"
           />
           <p class="text-muted" style="font-size:0.85rem; margin-top:0.25rem;">
