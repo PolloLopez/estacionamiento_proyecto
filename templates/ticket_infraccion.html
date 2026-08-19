@@ -153,14 +153,28 @@
 
   </div>
 
-  <!-- Botones: solo visibles en pantalla, ocultos al imprimir -->
-  <div class="no-print">
-    <button class="btn-imprimir" id="btn-imprimir" onclick="imprimirActa()">🖨 Imprimir acta</button>
-    <button class="btn-verificar"
-            onclick="window.location.href='{% url 'inspectores_verificar_vehiculo' %}'">
-      🔍 Verificar otro
+  <!-- Acciones -->
+  <div class="no-print" style="margin-top:1.5rem; display:flex; flex-direction:column; gap:0.6rem; align-items:center;">
+
+    <button class="btn-imprimir" id="btn-imprimir" onclick="imprimirActa()"
+            style="width:100%; max-width:300px;">
+      🖨 Imprimir acta
     </button>
-    <p id="estado-impresion" style="font-size:0.82rem; margin-top:0.5rem; color:#555;"></p>
+
+    <p id="estado-impresion"
+       style="font-size:0.85rem; margin:0; color:#555; text-align:center; min-height:1.2em;"></p>
+
+    <button class="btn-verificar" id="btn-verificar"
+            style="display:none; width:100%; max-width:300px;"
+            onclick="window.location.href='{% url 'inspectores_verificar_vehiculo' %}'">
+      🔍 Verificar otro vehículo
+    </button>
+
+    <a href="{% url 'inspectores_verificar_vehiculo' %}"
+       style="font-size:0.82rem; color:var(--color-text-muted, #888); margin-top:0.25rem;">
+      Omitir impresión →
+    </a>
+
   </div>
 
   {% if infraccion.foto %}
@@ -193,71 +207,85 @@ var DATOS_ACTA = {
 
 var URL_VERIFICAR = "{% url 'inspectores_verificar_vehiculo' %}";
 
+/*
+ * imprimirActa:
+ * Siempre intenta BLE primero (reconectar silencioso → si falla → diálogo BLE).
+ * NUNCA usa window.print(): ese diálogo del sistema no muestra la impresora
+ * térmica BLE, solo opciones como "Guardar PDF".
+ */
 async function imprimirActa() {
   var btn    = document.getElementById('btn-imprimir');
   var estado = document.getElementById('estado-impresion');
+  var btnVer = document.getElementById('btn-verificar');
 
   btn.disabled    = true;
-  btn.textContent = '⏳ Imprimiendo...';
+  btn.textContent = '⏳ Conectando...';
   estado.textContent = '';
 
-  // Intentar impresión BLE si hay una impresora autorizada
+  // 1. Reconexión silenciosa (sin diálogo)
+  var conexion = null;
   try {
-    var conexion = await reconectarImpresora();
-    if (conexion) {
-      var bytes = generarTicketInfraccion(DATOS_ACTA);
-      await enviarImpresion(conexion.caracteristica, bytes);
-      conexion.device.gatt.disconnect();
-      // Esperar un momento y redirigir
-      estado.textContent = '✅ Acta enviada a la impresora.';
-      setTimeout(function() {
-        window.location.href = URL_VERIFICAR;
-      }, 1500);
+    estado.textContent = '⏳ Buscando impresora...';
+    conexion = await reconectarImpresora();
+  } catch (e) {
+    console.warn('[BLE] reconectar falló:', e.message);
+  }
+
+  // 2. Si la reconexión falló, abrir diálogo para que el inspector elija
+  if (!conexion) {
+    try {
+      estado.textContent = '📡 Seleccioná la impresora en el diálogo...';
+      conexion = await conectarImpresora();
+    } catch (e) {
+      // El inspector canceló el diálogo o el dispositivo no responde
+      estado.textContent = '❌ ' + (e.message || 'No se pudo conectar a la impresora.');
+      btn.disabled    = false;
+      btn.textContent = '🖨 Reintentar';
+      btnVer.style.display = 'block';
       return;
     }
-  } catch (e) {
-    console.warn('[BLE] Falló la impresión BLE:', e.message);
-    estado.textContent = '⚠️ BLE falló — usando impresión del sistema.';
   }
 
-  // Fallback: diálogo de impresión del sistema (Mopria / PDF)
-  btn.disabled    = false;
-  btn.textContent = '🖨 Imprimir acta';
-  window.onafterprint = function() {
-    window.location.href = URL_VERIFICAR;
-  };
-  window.print();
+  // 3. Enviar ticket × 2 (copia inspector + copia conductor)
+  try {
+    var bytes = generarTicketInfraccion(DATOS_ACTA);
+
+    btn.textContent = '⏳ Imprimiendo (1/2)...';
+    estado.textContent = '⏳ Imprimiendo copia 1 de 2...';
+    await enviarImpresion(conexion.caracteristica, bytes);
+
+    // Pausa para que el papel avance y el cutter actúe antes de la segunda copia
+    await new Promise(function(r) { setTimeout(r, 800); });
+
+    btn.textContent = '⏳ Imprimiendo (2/2)...';
+    estado.textContent = '⏳ Imprimiendo copia 2 de 2...';
+    await enviarImpresion(conexion.caracteristica, bytes);
+
+    conexion.device.gatt.disconnect();
+    estado.textContent = '✅ 2 copias enviadas a la impresora.';
+    setTimeout(function() {
+      window.location.href = URL_VERIFICAR;
+    }, 1800);
+  } catch (e) {
+    console.warn('[BLE] envío falló:', e.message);
+    estado.textContent = '❌ Error al enviar datos: ' + e.message;
+    btn.disabled    = false;
+    btn.textContent = '🖨 Reintentar';
+    btnVer.style.display = 'block';
+  }
 }
 
-// Al cargar la página: intentar auto-impresión BLE.
-// Si no hay impresora BLE autorizada, esperar que el inspector toque el botón.
-window.addEventListener('DOMContentLoaded', async function() {
+// Al cargar: solo mostrar el botón. No auto-imprimir.
+// Razón: en escritorio no hay impresora BLE; en teléfono el inspector
+// debe confirmar con un toque (requerido por Web Bluetooth para reconectar).
+window.addEventListener('DOMContentLoaded', function() {
   var estado = document.getElementById('estado-impresion');
 
-  if (!navigator.bluetooth || typeof navigator.bluetooth.getDevices !== 'function') {
-    // Navegador sin Web Bluetooth → auto-print con diálogo del sistema
-    window.onafterprint = function() {
-      window.location.href = URL_VERIFICAR;
-    };
-    window.print();
-    return;
-  }
-
-  var dispositivos = [];
-  try {
-    dispositivos = await navigator.bluetooth.getDevices();
-  } catch (e) {}
-
-  if (dispositivos.length > 0) {
-    // Hay impresora autorizada → auto-impresión BLE
-    estado.textContent = '⏳ Conectando impresora...';
-    await imprimirActa();
+  if (!navigator.bluetooth) {
+    // Navegador sin soporte BLE (Firefox, Safari, etc.)
+    estado.textContent = '⚠️ Impresión BLE no disponible en este navegador. Usá Chrome en Android.';
   } else {
-    // Sin impresora autorizada → mostrar botón y ayuda
-    estado.textContent = '💡 Sin impresora BLE. Tocá "Imprimir acta" para usar el sistema.';
-    var btn = document.getElementById('btn-imprimir');
-    btn.disabled    = false;
-    btn.textContent = '🖨 Imprimir acta';
+    estado.textContent = '';  // Limpio — el estado se muestra al tocar el botón
   }
 });
 </script>

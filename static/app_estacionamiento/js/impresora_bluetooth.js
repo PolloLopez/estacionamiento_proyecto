@@ -7,9 +7,39 @@
  *   - Nordic UART Service / NUS (nRF51822, muy común en módulos BLE baratos)
  *   - Star Micronics BLE
  * Chrome Android 85+ con HTTPS.
+ *
+ * Alias de impresora:
+ *   Los dispositivos BLE a menudo tienen nombres genéricos ("Printer 001").
+ *   Se permite guardar un alias personalizado en localStorage, indexado por device.id.
  */
 
 'use strict';
+
+// ── Alias de impresora ─────────────────────────────────────────────────────
+
+var _ALIAS_KEY = 'bleImpresoraAliases';
+
+/** Devuelve el alias guardado para un device.id, o null si no hay. */
+function obtenerAlias(deviceId) {
+  try {
+    var data = JSON.parse(localStorage.getItem(_ALIAS_KEY) || '{}');
+    return data[deviceId] || null;
+  } catch (_) { return null; }
+}
+
+/** Guarda (o sobreescribe) el alias de un dispositivo. */
+function guardarAlias(deviceId, alias) {
+  try {
+    var data = JSON.parse(localStorage.getItem(_ALIAS_KEY) || '{}');
+    data[deviceId] = alias.trim();
+    localStorage.setItem(_ALIAS_KEY, JSON.stringify(data));
+  } catch (_) {}
+}
+
+/** Nombre a mostrar: alias personalizado → nombre del dispositivo → 'Impresora BLE'. */
+function nombreMostrar(device) {
+  return obtenerAlias(device.id) || device.name || 'Impresora BLE';
+}
 
 // Perfiles conocidos: { servicio, caracteristica }
 // Se prueban en orden hasta que uno funcione.

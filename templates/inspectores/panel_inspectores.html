@@ -61,10 +61,29 @@
         Hacé esto <strong>una sola vez</strong> por teléfono. La impresora se conectará automáticamente al registrar infracciones.
       </p>
       <div style="display:flex; flex-direction:column; gap:0.5rem;">
+
         <button id="btn-conectar" class="btn btn-outline" style="font-size:0.9rem;"
                 onclick="accionConectar()">
           🔌 Vincular impresora
         </button>
+
+        <!-- Renombrar dispositivo: aparece tras vincular o si ya hay uno autorizado -->
+        <div id="cont-renombrar" style="display:none;">
+          <label style="font-size:0.82rem; color:var(--color-text-muted); display:block; margin-bottom:0.2rem;">
+            ✏️ Nombre personalizado
+          </label>
+          <div style="display:flex; gap:0.4rem;">
+            <input id="inp-alias" type="text" maxlength="30"
+                   style="flex:1; padding:0.5rem 0.7rem; border:1.5px solid var(--color-border);
+                          border-radius:8px; font-size:0.9rem; background:var(--color-surface);
+                          color:var(--color-text);">
+            <button class="btn" style="font-size:0.85rem; padding:0.5rem 0.8rem; white-space:nowrap;"
+                    onclick="accionRenombrar()">
+              Guardar
+            </button>
+          </div>
+        </div>
+
         <button class="btn btn-outline" style="font-size:0.85rem; color:var(--color-text-muted);"
                 onclick="accionDiagnostico()">
           🔍 Diagnóstico (ver servicios BLE)
@@ -73,6 +92,7 @@
                 onclick="accionPrueba()">
           🧾 Imprimir ticket de prueba
         </button>
+
       </div>
       <pre id="log-impresora"
            style="font-size:0.72rem; background:#f4f4f4; border-radius:6px;
@@ -103,14 +123,38 @@ function log(msg) {
     try {
       var devs = await navigator.bluetooth.getDevices();
       if (devs.length > 0) {
-        estadoEl.textContent = '🖨 ' + (devs[0].name || 'Impresora BLE') + ' autorizada';
+        estadoEl.textContent = '🖨 ' + nombreMostrar(devs[0]) + ' autorizada';
         estadoEl.style.color = 'var(--color-primary)';
+        mostrarRenombrado(devs[0]);
         return;
       }
     } catch(e) {}
   }
   estadoEl.textContent = '🖨 Sin impresora vinculada';
 })();
+
+// Muestra el campo de renombrado con el alias actual precargado
+function mostrarRenombrado(device) {
+  var cont = document.getElementById('cont-renombrar');
+  var inp  = document.getElementById('inp-alias');
+  if (!cont || !inp) return;
+  inp.value = obtenerAlias(device.id) || '';
+  inp.placeholder = device.name || 'Ej: Impresora entrada';
+  cont.dataset.deviceId = device.id;
+  cont.style.display = 'block';
+}
+
+function accionRenombrar() {
+  var cont = document.getElementById('cont-renombrar');
+  var inp  = document.getElementById('inp-alias');
+  if (!cont || !inp) return;
+  var deviceId = cont.dataset.deviceId;
+  var alias    = inp.value.trim();
+  if (!alias || !deviceId) return;
+  guardarAlias(deviceId, alias);
+  estadoEl.textContent = '🖨 ' + alias + ' autorizada';
+  log('✅ Nombre guardado: "' + alias + '"');
+}
 
 async function accionConectar() {
   var btn = document.getElementById('btn-conectar');
@@ -120,10 +164,11 @@ async function accionConectar() {
   try {
     var r = await conectarImpresora();
     r.device.gatt.disconnect();
-    var nombre = r.device.name || 'dispositivo BLE';
-    log('✅ Vinculada: ' + nombre + '\nPerfil: ' + r.perfil.servicio);
+    var nombre = nombreMostrar(r.device);
+    log('✅ Vinculada: ' + (r.device.name || 'dispositivo BLE') + '\nPerfil: ' + r.perfil.servicio);
     estadoEl.textContent = '🖨 ' + nombre + ' autorizada';
     estadoEl.style.color = 'var(--color-primary)';
+    mostrarRenombrado(r.device);
     btn.textContent = '🔄 Cambiar impresora';
   } catch(e) {
     log('❌ ' + e.message);
