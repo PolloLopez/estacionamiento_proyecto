@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-18 (sesión: límites MP por municipio + documentación)
+Última actualización: 2026-08-19 (sesión: impresora BLE + superadmin + subcuadras)
 
 ---
 
@@ -14,7 +14,11 @@
 
 ## 🔴 Alta prioridad
 
-
+### Monto $0 en actas de prueba (aclaración — no es un bug)
+Las infracciones creadas cuando `Tarifa.monto_infraccion` estaba en 0 siempre van a mostrar $0,
+porque el monto se fotografia al crear el acta (no se lee en tiempo real).
+→ Configurar `monto_infraccion` en `admin-tarifas/` y **crear una infracción nueva** para testearlo.
+El código es correcto: `crear_infraccion()` lee `tarifa.monto_infraccion` al momento de crear.
 
 ---
 
@@ -43,9 +47,7 @@ Formato sugerido: GIF animado o secuencia de pantallas con flechas, visible en l
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-### PWA icons
-Diseñar con GPT o Canva → reemplazar los 3 archivos en `static/icons/`:
-`icon-192.png`, `icon-512.png`, `apple-touch-icon.png`.
+### ~~PWA icons~~ → ✅ resuelto (ver abajo)
 
 ### GitHub Pages: actualizar landing
 `leandrolopezalbini.github.io/estacionar/` — clonar ese repo por separado
@@ -91,6 +93,20 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 ---
 
 ## ✅ Resuelto recientemente
+
+**Sesión 2026-08-19** — Impresora BLE, superadmin y subcuadras:
+- `impresora_bluetooth.js`: persistencia de impresora en `localStorage` (workaround bug `getDevices()` en Chrome Android). Reconexión silenciosa → si falla, `requestDevice()` filtrado por nombre conocido.
+- Renombrado de impresoras por alias (inspectores con múltiples impresoras iguales).
+- Ticket de infracción: doble copia automática (800ms entre copias). Sin `window.print()` — solo BLE.
+- QR nativo ESC/POS via `GS(k)` + URL texto como respaldo.
+- Fix patente cortada: `centrar()` acepta `ancho` opcional. En modo doble-ancho (`GS 0x21 0x11`) se usa `ANCHO/2 = 16` para no desbordar. Mismo fix para el monto en grande.
+- Superadmin `editar_municipio`: eliminado campo `comision_vendedor` (pertenece solo al admin del municipio).
+- Superadmin `editar_municipio`: nuevos campos `leyenda_horarios` y `texto_ordenanza` (migración 0053). Se guardan en `Municipio`.
+- Superadmin `editar_municipio`: descripción de cada módulo de pago visible en el panel.
+- Fix `modulos_asignados.values_list()` sobre lista: cambiado a comprensión de set (`set(m.modulo for m in modulos)`).
+- Admin `gestionar_tarifas`: fix `MultipleObjectsReturned` (usa `filter().first()`). `Tarifa.precio_por_hora` max_digits 6→10.
+- Subcuadras GPS: selector cascade Calle → Altura. Botón "Eliminar" más visible.
+- PWA icons: `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` reemplazados con íconos reales. `<link rel="icon">` agregado en `base.html`. ✅
 
 **Sesión 2026-08-18** — Límites de carga MercadoPago configurables por municipio:
 - `Municipio.monto_minimo_carga` y `monto_maximo_carga` (PositiveIntegerField, defecto 500/50.000). Migración 0052.

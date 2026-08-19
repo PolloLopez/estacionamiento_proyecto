@@ -1,7 +1,7 @@
 # CONTEXT.md — Sistema de Estacionamiento Medido
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-08-18
+Última actualización estructural: 2026-08-19
 
 ---
 
@@ -62,7 +62,8 @@ Admin URL: `/sistema-interno/` (no obvia, reduce bruteforce).
 | Email | django-anymail + Brevo | API transaccional (pendiente verificar remitente) |
 | Frontend | HTML + CSS propio (`global.css`) | Sin frameworks JS. Todo CSS en `global.css` — templates sin bloques `<style>` inline. Colores del municipio inyectados como variables CSS en `base.html` vía `{{ municipio_branding.color_primario }}`. |
 | Deploy | Railway + Gunicorn + WhiteNoise | PaaS simple |
-| Tests | Django TestCase | 160 tests |
+| Tests | Django TestCase | 130 tests (suite estable; 160 era con tests transitorios) |
+| Impresora BLE | Web Bluetooth API (`impresora_bluetooth.js`) | Impresión directa a impresoras térmicas 58mm desde Chrome Android (HTTPS). Protocolo ESC/POS. Persistencia en `localStorage` (workaround `getDevices()` bug). QR nativo `GS(k)`. Doble copia automática. Alias por dispositivo. |
 
 ---
 
@@ -119,7 +120,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | Modelo | Descripción |
 |--------|-------------|
 | `Usuario` | AbstractUser con `correo` como USERNAME_FIELD. Flags: `es_admin`, `es_inspector`, `es_vendedor`, `es_conductor`, `es_tesorero`, `es_superadmin`. Campos: `saldo` (wallet digital conductor), `saldo_operativo` (caja del vendedor/inspector), `es_verificado`, `municipio`, `porcentaje_ganancia`. |
-| `Municipio` | Configuración del municipio: `comision_vendedor (%)`, `tolerancia_multa_minutos`, branding (logo, colores). `monto_minimo_carga` y `monto_maximo_carga` (enteros, defecto 500/50.000): límites de carga MercadoPago configurables por superadmin. |
+| `Municipio` | Configuración del municipio: `comision_vendedor (%)` (solo admin del municipio), `tolerancia_multa_minutos`, branding (logo, colores). `monto_minimo_carga` y `monto_maximo_carga` (enteros, defecto 500/50.000): límites de carga MercadoPago configurables por superadmin. `leyenda_horarios` y `texto_ordenanza` (TextField): texto institucional configurable por superadmin (migración 0053). |
 | `ModuloMunicipio` | Feature flags por municipio (activo/inactivo). Gestionado por superadmin. |
 | `Vehiculo` | Patente única. Tipos: `auto`, `moto`. Exenciones: `exento_global`, `exento_parcial`, `subcuadras_exentas`. |
 | `VehiculoUsuario` | Relación N:N entre vehículo y conductor. |
@@ -130,7 +131,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `CierreCaja` | Cierre de turno de inspector/vendedor. `total_cobrado`, `ganancia_usuario`, `monto_municipio`. Desglose automático: `total_efectivo`, `total_transferencia`, `total_digital` (débito+crédito+QR). FK `rendicion → Rendicion (SET_NULL)`: null = pendiente de rendir. |
 | `AbonoMensual` | Habilita estacionamiento libre por un mes. `mes`, `vehiculo`, `municipio`, `vendedor`. `medio_pago`: `efectivo` / `mercadopago` / `saldo`. `conductor` y `vendedor` nullable (pagos públicos anónimos). |
 | `PagoPublico` | Registro de pagos via MP sin cuenta de usuario. `tipo`: `infraccion`/`estacionamiento`/`abono`. `estado`: `pendiente`/`aprobado`/`fallido`. FK nullable a `Infraccion`, `Estacionamiento`, `AbonoMensual`. `mp_preference_id`, `mp_payment_id (unique)`, `email_contacto`, `patente`, `duracion_horas`, `mes_abono`, `subcuadra`. Webhook MP detecta `metadata.pago_publico_id` para rutear. |
-| `Tarifa` | `precio_por_hora`, `precio_por_hora_moto`, `precio_abono_auto`, `precio_abono_moto`. |
+| `Tarifa` | `precio_por_hora` (max_digits=10), `precio_por_hora_moto`, `precio_abono_auto`, `precio_abono_moto`, `monto_infraccion` (monto fijo fotografiado al crear cada acta — no se calcula en tiempo real). |
 | `HorarioEstacionamiento` | Horario semanal por día (`dia_semana` 0-6). `hora_inicio`, `hora_fin`. |
 | `DiaEspecial` | Feriados o días sin cobro. `fecha`, `cobro_activo`. |
 | `VerificacionInspector` | Resultado de verificar una patente. Índice compuesto `(vehiculo_id, fecha DESC)`. |
