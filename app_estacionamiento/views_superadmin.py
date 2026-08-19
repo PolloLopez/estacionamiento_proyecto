@@ -162,7 +162,7 @@ def editar_municipio(request, municipio_id):
     modulos = list(ModuloMunicipio.objects.filter(municipio=municipio))
 
     # Módulos disponibles que aún no están asignados
-    modulos_asignados = set(modulos.values_list("modulo", flat=True))
+    modulos_asignados = set(m.modulo for m in modulos)
     modulos_disponibles = [
         (clave, nombre)
         for clave, nombre in ModuloMunicipio.MODULOS
