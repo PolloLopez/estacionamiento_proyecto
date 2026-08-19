@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -154,11 +155,12 @@
 
   <!-- Botones: solo visibles en pantalla, ocultos al imprimir -->
   <div class="no-print">
-    <button class="btn-imprimir" onclick="window.print()">🖨 Imprimir acta</button>
+    <button class="btn-imprimir" id="btn-imprimir" onclick="imprimirActa()">🖨 Imprimir acta</button>
     <button class="btn-verificar"
             onclick="window.location.href='{% url 'inspectores_verificar_vehiculo' %}'">
       🔍 Verificar otro
     </button>
+    <p id="estado-impresion" style="font-size:0.82rem; margin-top:0.5rem; color:#555;"></p>
   </div>
 
   {% if infraccion.foto %}
@@ -170,12 +172,93 @@
   {% endif %}
 
 </body>
+
+<script src="{% static 'app_estacionamiento/js/impresora_bluetooth.js' %}"></script>
 <script>
-  // Abre el diálogo de impresión automáticamente al cargar el ticket.
-  // onafterprint redirige al verificador para que el inspector siga trabajando.
-  window.onload = function() { window.print(); };
+// Datos del acta pasados desde Django al contexto JS
+var DATOS_ACTA = {
+  municipio:    "{{ infraccion.municipio.nombre|escapejs }}",
+  acta:         "{{ infraccion.id }}",
+  patente:      "{{ infraccion.vehiculo.patente|escapejs }}",
+  tipo_vehiculo:"{{ infraccion.vehiculo.get_tipo_display|escapejs }}",
+  subcuadra:    "{{ infraccion.subcuadra|default:''|escapejs }}",
+  motivo:       "{{ infraccion.motivo|default:''|escapejs }}",
+  fecha:        "{{ infraccion.creado_en|date:'d/m/Y' }}",
+  hora:         "{{ infraccion.creado_en|date:'H:i' }}",
+  monto:        "{{ infraccion.monto }}",
+  inspector:    "{% if infraccion.inspector.nombre %}{{ infraccion.inspector.nombre|escapejs }} {{ infraccion.inspector.apellido|escapejs }}{% else %}{{ infraccion.inspector.correo|escapejs }}{% endif %}",
+  legajo:       "{{ infraccion.inspector.numero_legajo|default:''|escapejs }}",
+  url_pago:     "{{ request.scheme }}://{{ request.get_host }}/pagar/{{ infraccion.vehiculo.patente }}/",
+};
+
+var URL_VERIFICAR = "{% url 'inspectores_verificar_vehiculo' %}";
+
+async function imprimirActa() {
+  var btn    = document.getElementById('btn-imprimir');
+  var estado = document.getElementById('estado-impresion');
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Imprimiendo...';
+  estado.textContent = '';
+
+  // Intentar impresión BLE si hay una impresora autorizada
+  try {
+    var conexion = await reconectarImpresora();
+    if (conexion) {
+      var bytes = generarTicketInfraccion(DATOS_ACTA);
+      await enviarImpresion(conexion.caracteristica, bytes);
+      conexion.device.gatt.disconnect();
+      // Esperar un momento y redirigir
+      estado.textContent = '✅ Acta enviada a la impresora.';
+      setTimeout(function() {
+        window.location.href = URL_VERIFICAR;
+      }, 1500);
+      return;
+    }
+  } catch (e) {
+    console.warn('[BLE] Falló la impresión BLE:', e.message);
+    estado.textContent = '⚠️ BLE falló — usando impresión del sistema.';
+  }
+
+  // Fallback: diálogo de impresión del sistema (Mopria / PDF)
+  btn.disabled    = false;
+  btn.textContent = '🖨 Imprimir acta';
   window.onafterprint = function() {
-    window.location.href = "{% url 'inspectores_verificar_vehiculo' %}";
+    window.location.href = URL_VERIFICAR;
   };
+  window.print();
+}
+
+// Al cargar la página: intentar auto-impresión BLE.
+// Si no hay impresora BLE autorizada, esperar que el inspector toque el botón.
+window.addEventListener('DOMContentLoaded', async function() {
+  var estado = document.getElementById('estado-impresion');
+
+  if (!navigator.bluetooth || typeof navigator.bluetooth.getDevices !== 'function') {
+    // Navegador sin Web Bluetooth → auto-print con diálogo del sistema
+    window.onafterprint = function() {
+      window.location.href = URL_VERIFICAR;
+    };
+    window.print();
+    return;
+  }
+
+  var dispositivos = [];
+  try {
+    dispositivos = await navigator.bluetooth.getDevices();
+  } catch (e) {}
+
+  if (dispositivos.length > 0) {
+    // Hay impresora autorizada → auto-impresión BLE
+    estado.textContent = '⏳ Conectando impresora...';
+    await imprimirActa();
+  } else {
+    // Sin impresora autorizada → mostrar botón y ayuda
+    estado.textContent = '💡 Sin impresora BLE. Tocá "Imprimir acta" para usar el sistema.';
+    var btn = document.getElementById('btn-imprimir');
+    btn.disabled    = false;
+    btn.textContent = '🖨 Imprimir acta';
+  }
+});
 </script>
 </html>

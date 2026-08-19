@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Panel Inspector{% endblock %}
 
 {% block content %}
@@ -42,5 +43,78 @@
     </div>
   </div>
 
+  <!-- Impresora Bluetooth -->
+  <div class="card" style="margin-top:1.2rem;">
+    <h2 style="margin-bottom:0.5rem; font-size:1rem;">🖨 Impresora Bluetooth</h2>
+    <p id="estado-impresora" style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      Verificando...
+    </p>
+    <button id="btn-conectar-impresora" class="btn btn-outline"
+            style="width:100%; font-size:0.95rem;"
+            onclick="accionConectarImpresora()">
+      🔌 Conectar impresora
+    </button>
+    <p style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.5rem; text-align:center;">
+      Hacé esto una sola vez por teléfono. El acta se imprimirá automáticamente al registrar una infracción.
+    </p>
+  </div>
+
 </section>
+
+<script src="{% static 'app_estacionamiento/js/impresora_bluetooth.js' %}"></script>
+<script>
+(async function() {
+  var estado = document.getElementById('estado-impresora');
+  var btn    = document.getElementById('btn-conectar-impresora');
+
+  // Verificar si Web Bluetooth está disponible
+  if (!navigator.bluetooth) {
+    estado.textContent = '⚠️ Web Bluetooth no disponible. Usá Chrome en Android.';
+    btn.disabled = true;
+    return;
+  }
+
+  // Verificar si ya hay una impresora autorizada
+  if (typeof navigator.bluetooth.getDevices === 'function') {
+    try {
+      var dispositivos = await navigator.bluetooth.getDevices();
+      if (dispositivos.length > 0) {
+        estado.textContent = '✅ Impresora autorizada: ' + (dispositivos[0].name || 'dispositivo BLE');
+        estado.style.color = 'var(--color-primary)';
+        btn.textContent    = '🔄 Cambiar impresora';
+        return;
+      }
+    } catch (e) {}
+  }
+
+  estado.textContent = '⚠️ Sin impresora conectada. Tocá el botón para emparejar.';
+  estado.style.color = 'var(--color-warning)';
+})();
+
+async function accionConectarImpresora() {
+  var estado = document.getElementById('estado-impresora');
+  var btn    = document.getElementById('btn-conectar-impresora');
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Buscando...';
+  estado.textContent = 'Abriendo selector de Bluetooth...';
+
+  try {
+    var resultado = await conectarImpresora();
+    var nombre    = resultado.device.name || 'dispositivo BLE';
+    // Desconectar enseguida — solo necesitábamos el permiso
+    resultado.device.gatt.disconnect();
+
+    estado.textContent = '✅ Impresora autorizada: ' + nombre;
+    estado.style.color = 'var(--color-primary)';
+    btn.textContent    = '🔄 Cambiar impresora';
+  } catch (e) {
+    estado.textContent = '❌ ' + (e.message || 'No se pudo conectar.');
+    estado.style.color = 'var(--color-danger, red)';
+    btn.textContent    = '🔌 Reintentar';
+  }
+
+  btn.disabled = false;
+}
+</script>
 {% endblock %}
