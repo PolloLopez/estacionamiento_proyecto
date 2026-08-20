@@ -931,10 +931,14 @@ def gestionar_tarifas(request):
         except Exception as e:
             error = f"Error al guardar: {e}"
 
-    # Obtener la tarifa del municipio. Si no existe, crear una con valores cero
-    # para que el template muestre el formulario pre-poblado (y no solo placeholders).
-    # Usamos filter().first() para evitar MultipleObjectsReturned si hubiera duplicados.
-    tarifa_actual = Tarifa.objects.filter(municipio=municipio).first()
+    # Obtener la tarifa del municipio. Si hay duplicados (pueden existir por bugs anteriores),
+    # conservamos la que tiene precio_por_hora más alto (la que el admin editó) y eliminamos el resto.
+    tarifas = list(Tarifa.objects.filter(municipio=municipio).order_by("-precio_por_hora"))
+    if len(tarifas) > 1:
+        # Quedarse con la primera (mayor precio, la real) y borrar las demás
+        for dup in tarifas[1:]:
+            dup.delete()
+    tarifa_actual = tarifas[0] if tarifas else None
     if tarifa_actual is None:
         tarifa_actual = Tarifa.objects.create(
             municipio=municipio,
