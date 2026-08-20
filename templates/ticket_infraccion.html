@@ -136,6 +136,18 @@
     <hr>
     {% endif %}
 
+    {% if infraccion.municipio.leyenda_horarios %}
+    <hr>
+    <p style="font-size:0.78rem; white-space:pre-wrap;">{{ infraccion.municipio.leyenda_horarios }}</p>
+    {% endif %}
+
+    {% if infraccion.municipio.texto_ordenanza %}
+    <hr>
+    <p style="font-size:0.75rem; white-space:pre-wrap; color:#666;">{{ infraccion.municipio.texto_ordenanza }}</p>
+    {% endif %}
+
+    <hr>
+
     {% if texto_plantilla.pie %}
     <p style="font-size:0.78rem; white-space:pre-wrap;">{{ texto_plantilla.pie }}</p>
     {% else %}
