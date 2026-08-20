@@ -3,6 +3,25 @@
 
 {% block content %}
 
+<!-- ── Tutorial conductor (colapsable) ───────────────────────────── -->
+<details style="margin-bottom:1.2rem;">
+  <summary style="cursor:pointer; font-size:0.88rem; font-weight:700;
+                  color:var(--color-text-muted); list-style:none; user-select:none;
+                  display:flex; align-items:center; gap:0.4rem;">
+    📖 ¿Cómo usar la aplicación?
+  </summary>
+  <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+    <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+               font-size:0.88rem; line-height:1.4;">
+      <li>💰 <strong>Cargá saldo</strong> con MercadoPago desde "Cargar saldo", o acercate a un punto de venta autorizado.</li>
+      <li>🅿️ <strong>Estacioná</strong> tocando "Estacionar" → ingresá la patente y la duración → confirmá. El sistema debita el costo de tu saldo.</li>
+      <li>⏱ <strong>Seguí el tiempo</strong> desde esta pantalla: ves cuánto falta y podés renovar antes de que venza.</li>
+      <li>⚠️ <strong>Si tenés una infracción</strong>, pagala desde "Mis infracciones" o en <em>/pagar/[patente]/</em> sin registrarte.</li>
+      <li>📅 <strong>Abono mensual</strong>: si usás el estacionamiento a diario, preguntá a un vendedor por el abono — es más económico.</li>
+    </ol>
+  </div>
+</details>
+
 <div class="grid grid-2">
 
   <!-- 👤 PERFIL -->

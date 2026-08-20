@@ -4,9 +4,27 @@
 {% block content %}
 <div class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
     <h1>🏦 Tesorería</h1>
   </div>
+
+  <!-- ── Tutorial tesorero (colapsable) ─────────────────────────── -->
+  <details style="margin-bottom:1.4rem;">
+    <summary style="cursor:pointer; font-size:0.88rem; font-weight:700;
+                    color:var(--color-text-muted); list-style:none; user-select:none;
+                    display:flex; align-items:center; gap:0.4rem;">
+      📖 ¿Cómo usar el panel?
+    </summary>
+    <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+      <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+                 font-size:0.88rem; line-height:1.4;">
+        <li>📋 <strong>Revisá las rendiciones pendientes</strong>: son los cierres de caja de inspectores y vendedores que el admin ya certificó. Aparecen en la tabla superior.</li>
+        <li>✅ <strong>Validá cada rendición</strong>: revisá el monto de efectivo y digital, y confirmá que los números coincidan con lo recaudado físicamente.</li>
+        <li>💼 <strong>Depositá las comisiones</strong>: una vez validada la rendición, registrá el depósito de la comisión del vendedor. El vendedor lo certifica desde su panel.</li>
+        <li>📊 <strong>Historial</strong>: accedé al historial de rendiciones ya procesadas para auditoría o consultas de períodos anteriores.</li>
+      </ol>
+    </div>
+  </details>
 
   {# Los mensajes los muestra base.html — no duplicar aquí #}
 

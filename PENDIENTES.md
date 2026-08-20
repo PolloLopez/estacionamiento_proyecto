@@ -34,14 +34,13 @@ Combinado con `SOCIALACCOUNT_AUTO_SIGNUP = True`, un atacante puede registrar el
 persona antes que ella vía Google. Para mitigarlo: bloquear auto-connect en `SocialAccountAdapter.save_user`
 cuando el email ya existe en la base sin ser de Google.
 
-### 5. 📹 Tutorial de uso (alta prioridad visual)
-Mostrar dentro del sistema (y en la landing) un tutorial de los flujos principales:
-- Cómo registrar un estacionamiento (conductor: patente → duración → confirmar)
-- Cómo abonar una infracción (conductor o pago público: buscar patente → pagar con MP)
-- Cómo registrar un abono mensual (vendedor o pago público)
-
-El objetivo es que quede claro que **con pocos clics la operación está realizada**.
-Formato sugerido: GIF animado o secuencia de pantallas con flechas, visible en la landing y en la pantalla de inicio del conductor.
+### 5. 📹 Tutorial de uso — landing
+El tutorial por rol ya está en cada panel (ver ✅ abajo).
+Falta: versión visual para la landing (GIF animado o secuencia de capturas con flechas).
+Flujos clave a mostrar en la landing:
+- Conductor: registrar estacionamiento (patente → duración → confirmar)
+- Inspector: verificar + registrar infracción + imprimir acta BLE
+- Vendedor: cobrar abono / infracción
 
 ---
 
@@ -93,6 +92,9 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 ---
 
 ## ✅ Resuelto recientemente
+
+**Sesión 2026-08-20** — Tutorial por rol + fixes:
+- Tutorial colapsable (`<details>`) agregado en los 4 paneles: conductor (`inicio_usuarios.html`), inspector (`panel_inspectores.html`), vendedor (`vendedores/panel.html`), admin (`panel_admin.html`) y tesorero (`panel_tesorero.html`). Pasos numerados con íconos, sin JS ni localStorage. ✅
 
 **Sesión 2026-08-20** — Vista previa ticket + tarifas:
 - `ticket_infraccion.html`: agregada vista previa de `leyenda_horarios` y `texto_ordenanza` en HTML (debajo del inspector, antes del QR). ✅
