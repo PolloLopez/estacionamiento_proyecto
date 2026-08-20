@@ -5,6 +5,25 @@
 {% block content %}
 <section class="container">
 
+  <!-- ── Tutorial inspector (colapsable) ─────────────────────────── -->
+  <details style="margin-bottom:1.2rem;">
+    <summary style="cursor:pointer; font-size:0.88rem; font-weight:700;
+                    color:var(--color-text-muted); list-style:none; user-select:none;
+                    display:flex; align-items:center; gap:0.4rem;">
+      📖 ¿Cómo usar el panel?
+    </summary>
+    <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+      <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+                 font-size:0.88rem; line-height:1.4;">
+        <li>🔍 <strong>Verificá el vehículo</strong>: tocá "Verificar vehículo" → ingresá la patente. El sistema indica si está al día o tiene infracción pendiente.</li>
+        <li>🚨 <strong>Registrá una infracción</strong>: si el vehículo no está habilitado, completá el acta (subcuadra, motivo, foto opcional) y confirmá.</li>
+        <li>🖨 <strong>Imprimí el acta</strong>: conectá la impresora BLE desde "Configurar impresora" (una sola vez). Luego el acta se imprime en 2 copias automáticamente.</li>
+        <li>🧾 <strong>Cerrá tu turno</strong>: al terminar el día usá "Cerrar caja" para generar la rendición. El admin la recibe y la certifica.</li>
+        <li>📑 <strong>Revisá tu historial</strong> de infracciones del día desde "Mis infracciones".</li>
+      </ol>
+    </div>
+  </details>
+
   <!-- Resumen de actividad -->
   <div class="card" style="text-align:center; margin-bottom:1.2rem;">
     <div class="text-muted" style="font-size:0.85rem;">Infracciones hoy</div>
