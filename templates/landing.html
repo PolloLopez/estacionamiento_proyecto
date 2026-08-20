@@ -528,8 +528,8 @@
         <div class="card-icon">⚖️</div>
         <h3 data-lang="es">Tolerancia configurable</h3>
         <h3 data-lang="en">Configurable tolerance</h3>
-        <p data-lang="es">El "Admin" define un período de gracia. Si el conductor estaciona dentro de ese plazo, la infracción se anula automáticamente. Con margen de "X" segundos para evitar cobros injustos.</p>
-        <p data-lang="en">The "Admin" defines a grace period. If the driver parks within that window, the infraction is automatically voided. A "X"-second buffer prevents unfair charges.</p>
+        <p data-lang="es">El "Admin" define un período de gracia. Si el conductor estaciona dentro de ese plazo, la infracción se anula automáticamente.</p>
+        <p data-lang="en">The "Admin" defines a grace period. If the driver parks within that window, the infraction is automatically voided.</p>
       </div>
       <div class="card">
         <div class="card-icon">🏪</div>
@@ -570,8 +570,12 @@
         <div class="card-icon">📲</div>
         <h3 data-lang="es">Instalable como app</h3>
         <h3 data-lang="en">Installable as an app</h3>
-        <p data-lang="es">El sistema es una PWA (Progressive Web App). El conductor puede instalarlo en el celular desde el navegador — sin pasar por el Play Store. Funciona como app nativa: acceso desde la pantalla de inicio, ícono propio.</p>
-        <p data-lang="en">The system is a PWA (Progressive Web App). Drivers can install it on their phone directly from the browser — no app store needed. Works like a native app: home screen icon, instant launch.</p>
+        <p data-lang="es">El sistema corre en el navegador — no requiere instalación. Es un acceso web directo, no una app nativa.<br><br>
+          <strong>Android</strong> (Chrome, Edge, Samsung Browser): aparece un botón automático para agregar el ícono a la pantalla de inicio.<br>
+          <strong>iOS</strong>: abrí la página en Safari → tocá el botón Compartir (⬆️) → "Agregar a pantalla de inicio".</p>
+        <p data-lang="en">The system runs in the browser — no installation required. It's a web shortcut, not a native app.<br><br>
+          <strong>Android</strong> (Chrome, Edge, Samsung Browser): an automatic prompt appears to add the icon to the home screen.<br>
+          <strong>iOS</strong>: open in Safari → tap Share (⬆️) → "Add to Home Screen".</p>
       </div>
       <div class="card">
         <div class="card-icon">📊</div>
@@ -593,6 +597,13 @@
         <h3 data-lang="en">BLE printing from the phone</h3>
         <p data-lang="es">El inspector imprime el acta directamente desde su celular Android a una impresora térmica de 58mm via Bluetooth (Web Bluetooth API). Doble copia automática, QR nativo y persistencia de dispositivo. Sin cables, sin app extra.</p>
         <p data-lang="en">Inspectors print the infraction ticket directly from their Android phone to a 58mm thermal printer via Bluetooth (Web Bluetooth API). Automatic double copy, native QR code, and device persistence. No cables, no extra app.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📖</div>
+        <h3 data-lang="es">Tutorial por rol incluido</h3>
+        <h3 data-lang="en">Built-in role tutorial</h3>
+        <p data-lang="es">Cada usuario ve en su panel de inicio un tutorial colapsable con los pasos clave de su rol: conductor, inspector, vendedor, admin y tesorero. Sin manuales externos ni videos.</p>
+        <p data-lang="en">Each user sees a collapsible step-by-step guide in their home panel, tailored to their role: driver, inspector, vendor, admin, and treasurer. No external manuals or videos needed.</p>
       </div>
     </div>
   </div>
@@ -903,8 +914,8 @@
       <div class="security-item">
         <div class="sec-icon">✅</div>
         <div class="sec-content">
-          <h4 data-lang="es">160 tests automatizados</h4>
-          <h4 data-lang="en">155 automated tests</h4>
+          <h4 data-lang="es">130+ tests automatizados</h4>
+          <h4 data-lang="en">130+ automated tests</h4>
           <p data-lang="es">Cobertura de roles, flujos monetarios, tolerancia de gracia, multi-municipio, comisiones y webhooks. Todo cambio se verifica antes de llegar a producción.</p>
           <p data-lang="en">Coverage of roles, monetary flows, grace tolerance, multi-tenant, commissions, and webhooks. Every change is verified before reaching production.</p>
         </div>
@@ -930,7 +941,7 @@
       <div class="tech-pill"><strong>django-allauth</strong> · Google OAuth</div>
       <div class="tech-pill"><strong>reportlab</strong> · PDF</div>
       <div class="tech-pill"><strong>HTML + CSS propio</strong> · Sin JS frameworks</div>
-      <div class="tech-pill"><strong>160 tests</strong> · Django TestCase</div>
+      <div class="tech-pill"><strong>130+ tests</strong> · Django TestCase</div>
     </div>
 
     <div class="tech-details">
