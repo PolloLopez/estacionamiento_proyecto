@@ -469,43 +469,52 @@ function cerrarModalSia() {
     document.getElementById("modal-sia").style.display = "none";
 }
 
+var _siaFrames = 0; // contador de frames procesados (para debug visible)
+
+function _siaLog(msg) {
+    var el = document.getElementById("sia-estado");
+    if (el) el.textContent = msg;
+    console.log("[SIA]", msg);
+}
+
 // Abre la cámara trasera y arranca el loop de escaneo
 function iniciarCamaraSia() {
+    _siaLog("Solicitando permiso de cámara…");
+    _siaFrames = 0;
+
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        mostrarFallbackSia("Este navegador no soporta acceso a la cámara.");
+        mostrarFallbackSia("Este navegador no soporta getUserMedia.");
         return;
     }
+
     navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }
     })
     .then(function(stream) {
+        _siaLog("Cámara obtenida. Iniciando video…");
         _siaStream   = stream;
         _siaScanning = true;
         var video = document.getElementById("sia-video");
         video.srcObject = stream;
 
-        // Usamos el evento 'playing' en lugar de 'loadedmetadata' o readyState.
-        // 'playing' se dispara cuando el video realmente está mostrando frames,
-        // lo cual es lo único que importa para capturar con canvas.
-        // iOS Safari y varios Android nunca llegan a readyState=4 en este contexto.
+        // 'playing' es el evento más confiable: indica que hay frames reales.
+        // 'loadedmetadata' y readyState pueden no llegar nunca en iOS/Android.
         video.addEventListener("playing", function _onPlaying() {
             video.removeEventListener("playing", _onPlaying);
             _siaVideoListo = true;
+            _siaLog("Video activo (" + video.videoWidth + "×" + video.videoHeight + "). Escaneando…");
         });
 
-        // play() es async en browsers modernos; el catch captura el rechazo si
-        // el browser bloquea autoplay (raro pero posible en desktop con políticas estrictas).
-        video.play().catch(function() {
-            mostrarFallbackSia("El browser bloqueó el inicio automático de la cámara.");
+        video.play().catch(function(e) {
+            mostrarFallbackSia("play() rechazado: " + e.name + ". Ingresá la URL.");
         });
 
-        // Arrancar el loop ahora; el flag _siaVideoListo controla cuándo empieza a escanear
         escanearFrameSia();
     })
     .catch(function(err) {
         var msg = err.name === "NotAllowedError"
-            ? "Permiso de cámara denegado. Ingresá la URL manualmente."
-            : "No se pudo abrir la cámara. Ingresá la URL manualmente.";
+            ? "Permiso denegado (" + err.name + "). Ingresá la URL."
+            : "Error de cámara: " + err.name + ". Ingresá la URL.";
         mostrarFallbackSia(msg);
     });
 }
@@ -522,34 +531,25 @@ function detenerCamaraSia() {
 }
 
 // Loop: captura un frame del video y lo analiza con jsQR.
-// El flag _siaVideoListo garantiza que el video esté reproduciendo antes de capturar.
 function escanearFrameSia() {
     if (!_siaScanning) return;
 
     var video  = document.getElementById("sia-video");
     var canvas = document.getElementById("sia-canvas");
 
-    // Si el video todavía no empezó a reproducir, seguir esperando.
-    // _siaVideoListo lo pone en true el evento 'playing' — más confiable
-    // que readyState en iOS Safari y Android WebView.
     if (!_siaVideoListo || !video || video.videoWidth === 0) {
         requestAnimationFrame(escanearFrameSia);
         return;
     }
 
     var ahora = Date.now();
-    // Throttle: 150ms entre intentos (~6 fps para jsQR).
-    // Más rápido que 250ms para no perder el QR si la mano tiembla,
-    // pero sin saturar el hilo principal.
     if (ahora - _siaUltimoScan < 150) {
         requestAnimationFrame(escanearFrameSia);
         return;
     }
     _siaUltimoScan = ahora;
+    _siaFrames++;
 
-    // Limitar el canvas a 640px de ancho máximo.
-    // Con cámaras de alta resolución (ej. 1920px), pasar el imageData completo
-    // a jsQR tarda varios segundos; con 640px alcanza y es mucho más rápido.
     var escala = Math.min(1, 640 / video.videoWidth);
     canvas.width  = Math.round(video.videoWidth  * escala);
     canvas.height = Math.round(video.videoHeight * escala);
@@ -562,10 +562,16 @@ function escanearFrameSia() {
         inversionAttempts: "attemptBoth"
     });
 
+    // Cada 10 frames mostrar el estado para confirmar que jsQR está corriendo
+    if (_siaFrames % 10 === 0) {
+        _siaLog("Buscando QR… frame " + _siaFrames +
+                " (" + canvas.width + "×" + canvas.height + "px)");
+    }
+
     if (code && code.data && !_siaVerificando) {
         _siaVerificando = true;
         detenerCamaraSia();
-        document.getElementById("sia-estado").textContent = "QR detectado, consultando ANDIS…";
+        _siaLog("✅ QR detectado en frame " + _siaFrames);
         enviarVerificacionSia(code.data);
         return;
     }
