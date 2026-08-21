@@ -611,6 +611,22 @@ class Infraccion(models.Model):
     # Motivo requerido cuando el admin anula una infracción desde el panel
     motivo_anulacion = models.TextField(blank=True, default="")
 
+    # ── Verificación SIA (Símbolo Internacional de Acceso / ANDIS) ──────────
+    # Se completan cuando el inspector escanea el QR del SIA durante la fiscalización.
+    # Permite auditar si el SIA fue presentado, verificado y con qué resultado.
+    sia_presentado    = models.BooleanField(default=False)
+    sia_verificado    = models.BooleanField(default=False)
+    sia_estado        = models.CharField(max_length=40, blank=True, default="")
+    sia_url           = models.CharField(max_length=500, blank=True, default="")
+    sia_code          = models.CharField(max_length=100, blank=True, default="")
+    sia_patente_sia   = models.CharField(max_length=20, blank=True, default="")
+    sia_vencimiento   = models.DateField(null=True, blank=True)
+    sia_nci           = models.CharField(max_length=30, blank=True, default="")
+    sia_titular       = models.CharField(max_length=200, blank=True, default="")
+    sia_verificado_en = models.DateTimeField(null=True, blank=True)
+    # Observación automática generada cuando el SIA no pudo verificarse
+    sia_observacion   = models.TextField(blank=True, default="")
+
     def save(self, *args, **kwargs):
         if not self.municipio:
             if self.inspector and self.inspector.municipio:

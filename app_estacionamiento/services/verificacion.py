@@ -73,13 +73,18 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
         resultado="verificado",
     )
 
-    # 1. EXENTO TOTAL
+    # 1. EXENTO TOTAL — solo si la vigencia no expiró
+    # vigencia_exencion=None significa sin vencimiento (indefinida).
+    # Si la fecha venció, el vehículo cae al flujo normal y puede recibir infracción.
     if getattr(vehiculo, "exento_global", False):
-        return ResultadoVerificacion(
-            patente=patente,
-            estado=EstadoVehiculo.EXENTO_TOTAL,
-            estacionamiento_activo=True,
-        )
+        vigencia = getattr(vehiculo, "vigencia_exencion", None)
+        if vigencia is None or vigencia >= date.today():
+            return ResultadoVerificacion(
+                patente=patente,
+                estado=EstadoVehiculo.EXENTO_TOTAL,
+                estacionamiento_activo=True,
+                tipo_exencion=getattr(vehiculo, "tipo_exencion", None),
+            )
 
     # 2. ESTACIONAMIENTO ACTIVO
     estacionamiento = Estacionamiento.objects.filter(
@@ -106,8 +111,10 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
                 estacionamiento_activo=True,
             )
 
-    # 4. EXENTO PARCIAL
-    if hasattr(vehiculo, "subcuadras_exentas") and vehiculo.subcuadras_exentas.exists():
+    # 4. EXENTO PARCIAL — solo si la vigencia no expiró
+    vigencia_parcial = getattr(vehiculo, "vigencia_exencion", None)
+    exencion_parcial_activa = (vigencia_parcial is None or vigencia_parcial >= date.today())
+    if exencion_parcial_activa and hasattr(vehiculo, "subcuadras_exentas") and vehiculo.subcuadras_exentas.exists():
         subcuadras_del_vehiculo = list(vehiculo.subcuadras_exentas.all())
         if subcuadra and vehiculo.subcuadras_exentas.filter(id=subcuadra.id).exists():
             # El vehiculo esta en su zona exenta -> libre, no infraccionar

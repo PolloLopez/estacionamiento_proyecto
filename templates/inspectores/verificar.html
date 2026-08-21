@@ -166,6 +166,12 @@
                     {% endfor %}
                   </div>
                 {% endif %}
+                <!-- SIA: el inspector puede verificar antes de infraccionar -->
+                <button type="button" class="btn btn-outline btn-big"
+                        onclick="abrirModalSia('{{ resultado.patente }}')"
+                        style="margin-bottom:0.5rem; border-color:var(--color-text-muted); color:var(--color-text-muted);">
+                    ♿ Verificar SIA (discapacidad)
+                </button>
                 {% if resultado.necesita_infraccion %}
                     <a class="btn btn-danger btn-big"
                        href="{{ resultado.registrar_infraccion_url }}">
@@ -341,6 +347,171 @@ function seleccionarSubcuadraInspector(id) {
         { timeout: 8000, maximumAge: 30000 }
     );
 })();
+</script>
+
+<!-- ── Modal de verificación SIA ──────────────────────────────────── -->
+<div id="modal-sia" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6);
+     z-index:1000; align-items:center; justify-content:center; padding:1rem;">
+  <div style="background:var(--color-surface); border-radius:12px; padding:1.5rem;
+               max-width:420px; width:100%; box-shadow:0 4px 24px rgba(0,0,0,0.3);">
+    <h3 style="margin:0 0 0.8rem; font-size:1.1rem;">♿ Verificar SIA — ANDIS</h3>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:1rem;">
+      Escaneá el código QR del certificado de discapacidad con tu cámara.
+      El sistema consultará ANDIS y registrará la exención si es válido.
+    </p>
+
+    <!-- Patente (prellenada, editable por si el inspector la cargó diferente) -->
+    <label style="font-size:0.82rem; font-weight:700; display:block; margin-bottom:0.3rem;">
+      Patente del vehículo
+    </label>
+    <input id="sia-patente" type="text" maxlength="8"
+           style="width:100%; padding:0.5rem 0.7rem; font-size:1rem; font-weight:700;
+                  letter-spacing:2px; border:1px solid var(--color-border);
+                  border-radius:6px; margin-bottom:0.8rem; box-sizing:border-box;
+                  background:var(--color-bg); color:var(--color-text);">
+
+    <!-- Input de imagen QR -->
+    <label style="font-size:0.82rem; font-weight:700; display:block; margin-bottom:0.3rem;">
+      Foto del código QR
+    </label>
+    <input id="sia-qr-input" type="file" accept="image/*" capture="environment"
+           onchange="procesarImagenSia(this)"
+           style="font-size:0.85rem; margin-bottom:0.8rem;">
+
+    <!-- URL leída del QR (editable como fallback) -->
+    <label style="font-size:0.82rem; font-weight:700; display:block; margin-bottom:0.3rem;">
+      URL del QR <span style="font-weight:400; color:var(--color-text-muted);">(se completa automáticamente)</span>
+    </label>
+    <input id="sia-qr-url" type="url" placeholder="https://apps.andis.gob.ar/qr-simbolo?code=..."
+           style="width:100%; padding:0.5rem 0.7rem; font-size:0.8rem;
+                  border:1px solid var(--color-border); border-radius:6px;
+                  margin-bottom:1rem; box-sizing:border-box;
+                  background:var(--color-bg); color:var(--color-text);">
+
+    <!-- Resultado -->
+    <div id="sia-resultado" style="display:none; padding:0.8rem; border-radius:8px;
+         margin-bottom:1rem; font-size:0.88rem; line-height:1.5;"></div>
+
+    <!-- Acciones -->
+    <div style="display:flex; gap:0.6rem;">
+      <button type="button" onclick="enviarVerificacionSia()"
+              style="flex:1; padding:0.7rem; font-weight:700; font-size:0.9rem;
+                     background:var(--color-primary); color:white; border:none;
+                     border-radius:8px; cursor:pointer;">
+        🔍 Verificar
+      </button>
+      <button type="button" onclick="cerrarModalSia()"
+              style="padding:0.7rem 1rem; font-size:0.9rem;
+                     background:transparent; border:1px solid var(--color-border);
+                     border-radius:8px; cursor:pointer; color:var(--color-text);">
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- jsQR para leer el QR desde la imagen -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"
+        crossorigin="anonymous"></script>
+<script>
+// ── SIA: modal y verificación ────────────────────────────────────────────────
+
+function abrirModalSia(patente) {
+    document.getElementById("sia-patente").value = patente || "";
+    document.getElementById("sia-qr-url").value = "";
+    document.getElementById("sia-qr-input").value = "";
+    document.getElementById("sia-resultado").style.display = "none";
+    document.getElementById("modal-sia").style.display = "flex";
+}
+
+function cerrarModalSia() {
+    document.getElementById("modal-sia").style.display = "none";
+}
+
+// Lee la imagen con jsQR y extrae la URL del QR
+function procesarImagenSia(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+            var canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            var ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            var code = jsQR(imageData.data, imageData.width, imageData.height);
+            if (code && code.data) {
+                document.getElementById("sia-qr-url").value = code.data;
+                mostrarResultadoSia(
+                    "info",
+                    "QR leído: <code style='word-break:break-all;'>" + code.data + "</code><br>Tocá <strong>Verificar</strong> para consultar ANDIS."
+                );
+            } else {
+                mostrarResultadoSia("warn", "⚠️ No se pudo leer el código QR de la imagen. Intentá con mejor iluminación o ingresá la URL manualmente.");
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function mostrarResultadoSia(tipo, html) {
+    var colores = {
+        "ok":   { bg: "#d4edda", border: "#28a745", color: "#155724" },
+        "warn": { bg: "#fff3cd", border: "#ffc107", color: "#856404" },
+        "error":{ bg: "#f8d7da", border: "#dc3545", color: "#721c24" },
+        "info": { bg: "#d1ecf1", border: "#17a2b8", color: "#0c5460" },
+    };
+    var c = colores[tipo] || colores["info"];
+    var el = document.getElementById("sia-resultado");
+    el.style.display = "block";
+    el.style.background = c.bg;
+    el.style.border = "1px solid " + c.border;
+    el.style.color = c.color;
+    el.innerHTML = html;
+}
+
+function enviarVerificacionSia() {
+    var patente = (document.getElementById("sia-patente").value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    var qrUrl   = (document.getElementById("sia-qr-url").value || "").trim();
+
+    if (!patente) { mostrarResultadoSia("warn", "⚠️ Ingresá la patente del vehículo."); return; }
+    if (!qrUrl)   { mostrarResultadoSia("warn", "⚠️ Escaneá el QR o ingresá la URL manualmente."); return; }
+
+    mostrarResultadoSia("info", "⏳ Consultando ANDIS…");
+
+    fetch("{% url 'inspectores_verificar_sia' %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token }}",
+        },
+        body: JSON.stringify({ patente: patente, qr_url: qrUrl }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        var tipo = data.es_valido ? "ok" : (data.estado.startsWith("ANDIS") ? "warn" : "error");
+        var detalles = "";
+        if (data.titular) detalles += "<br>Titular: <strong>" + data.titular + "</strong>";
+        if (data.vencimiento) detalles += "<br>Vencimiento: <strong>" + data.vencimiento + "</strong>";
+        if (data.patente_sia && data.patente_sia !== patente)
+            detalles += "<br>Patente del SIA: <strong>" + data.patente_sia + "</strong>";
+        if (data.url_andis)
+            detalles += "<br><a href='" + data.url_andis + "' target='_blank' rel='noopener' style='color:inherit;'>Ver en ANDIS ↗</a>";
+        mostrarResultadoSia(tipo, data.mensaje + detalles);
+    })
+    .catch(function() {
+        mostrarResultadoSia("error", "❌ Error de red al contactar el servidor.");
+    });
+}
+
+// Cerrar modal al tocar el fondo
+document.getElementById("modal-sia").addEventListener("click", function(e) {
+    if (e.target === this) cerrarModalSia();
+});
 </script>
 
 {% endblock %}

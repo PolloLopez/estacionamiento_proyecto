@@ -79,6 +79,7 @@ urlpatterns = [
     path("inspectores/subcuadra-cercana/", views.subcuadra_cercana, name="inspectores_subcuadra_cercana"),
     path("inspectores/ticket/<int:infraccion_id>/", views.ticket_infraccion, name="inspectores_ticket"),
     path("inspectores/ticket-cobro/<int:est_id>/", views.ticket_cobro, name="inspectores_ticket_cobro"),
+    path("inspectores/verificar-sia/", views.verificar_sia, name="inspectores_verificar_sia"),
     path("ticket-pago-multa/<int:infraccion_id>/", views.ticket_pago_multa, name="ticket_pago_multa"),
 
     # =========================
