@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-20 (sesión: fixes vista previa ticket + tarifas duplicadas)
+Última actualización: 2026-08-21 (sesión: SIA ANDIS + bloqueo infracciones fuera de horario)
 
 ---
 
@@ -34,14 +34,16 @@ Combinado con `SOCIALACCOUNT_AUTO_SIGNUP = True`, un atacante puede registrar el
 persona antes que ella vía Google. Para mitigarlo: bloquear auto-connect en `SocialAccountAdapter.save_user`
 cuando el email ya existe en la base sin ser de Google.
 
-### 5. 📹 Tutorial de uso (alta prioridad visual)
-Mostrar dentro del sistema (y en la landing) un tutorial de los flujos principales:
-- Cómo registrar un estacionamiento (conductor: patente → duración → confirmar)
-- Cómo abonar una infracción (conductor o pago público: buscar patente → pagar con MP)
-- Cómo registrar un abono mensual (vendedor o pago público)
+### 5. 📹 Tutorial de uso — GIFs en landing
+El tutorial por rol ya está implementado dentro del sistema (collapsible `<details>` en cada panel).
+Pendiente: versión con GIF animado o screenshots para la landing pública.
 
-El objetivo es que quede claro que **con pocos clics la operación está realizada**.
-Formato sugerido: GIF animado o secuencia de pantallas con flechas, visible en la landing y en la pantalla de inicio del conductor.
+### 6. 📊 Reportes de subcuadras (dashboard de cobertura)
+Dashboard para el admin mostrando por subcuadra:
+- Cuántas verificaciones tuvo en el período (inspeccionada / sin inspeccionar)
+- Cantidad de infracciones generadas
+- Cantidad de vehículos exentos registrados en esa zona
+Usa los datos de `VerificacionInspector` + `Infraccion` + `Vehiculo.subcuadras_exentas` que ya existen.
 
 ---
 
@@ -93,6 +95,18 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 ---
 
 ## ✅ Resuelto recientemente
+
+**Sesión 2026-08-21** — SIA ANDIS + bloqueo de infracciones fuera de horario:
+- `services/sia_verificacion.py`: servicio completo de verificación SIA contra ANDIS. Validación SSRF, parseo HTML tolerante, 8 estados posibles. ✅
+- `models.py`: campos `sia_*` en `Infraccion` para trazabilidad de verificaciones. Migración 0054. ✅
+- `services/verificacion.py`: exención global y parcial respetan `vigencia_exencion`. Si venció → IMPAGO. ✅
+- `domain/verificacion.py`: `tipo_exencion` agregado a `ResultadoVerificacion`. ✅
+- `views_inspector.py`: vista `verificar_sia` (POST JSON) — crea/actualiza `Vehiculo` con exención si SIA válido. ✅
+- `views_inspector.py`: `registrar_infraccion` y `verificar_vehiculo` bloquean infraccionamiento fuera del horario de cobro. Reutiliza `puede_estacionar_ahora()`. ✅
+- `templates/inspectores/verificar.html`: botón "♿ Verificar SIA" + modal con cámara (jsQR), oculta INFRACCIONAR fuera de horario con mensaje explicativo. ✅
+- `views.py`: exporta `verificar_sia` (fix AttributeError en urls.py). ✅
+- `tests_sia.py`: 20 tests cubriendo servicio, parseo, estados y vista. ✅
+- `MANUAL_SISTEMA.md`: actualizado con flujo SIA, vigencia automática, bloqueo por horario. ✅
 
 **Sesión 2026-08-20** — Vista previa ticket + tarifas:
 - `ticket_infraccion.html`: agregada vista previa de `leyenda_horarios` y `texto_ordenanza` en HTML (debajo del inspector, antes del QR). ✅

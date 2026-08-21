@@ -31,6 +31,7 @@ from .views_inspector import (
     resumen_infracciones,
     pdf_infracciones_hoy,
     subcuadra_cercana,
+    verificar_sia,
 )
 from .views_tesorero import (
     panel_tesorero,

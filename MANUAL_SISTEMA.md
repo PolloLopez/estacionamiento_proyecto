@@ -46,15 +46,29 @@ Conductor paga una infracción:
 ### Ciclo de vida de una exención
 
 ```
-Admin busca vehículo por patente (desde detalle_usuario o panel_exenciones)
-  → Carga tipo_exencion (discapacitado / vecino_frentista / jubilado / fuerza / vehiculo_oficial)
-  → Carga notas_exencion (nro de documento, fecha de vencimiento, resolución)
-  → Marca exento_global=True (no paga en ningún lado)
-    OR
-  → Selecciona subcuadras_exentas (paga en el resto, pero no en esas)
+VÍAS DE REGISTRO:
 
-Inspector escanea vehículo con exención:
-  EXENTO_TOTAL → ✅ OK, no hay acción
+A) Admin carga manualmente:
+   Admin busca vehículo por patente (detalle_usuario o panel_exenciones)
+     → Carga tipo_exencion (discapacitado / vecino_frentista / jubilado / fuerza / vehiculo_oficial)
+     → Carga notas_exencion (nro de documento, fecha de vencimiento, resolución)
+     → Marca exento_global=True (no paga en ningún lado)
+       OR
+     → Selecciona subcuadras_exentas (paga en el resto, pero no en esas)
+
+B) Inspector registra vía SIA (solo para tipo "discapacitado"):
+   Inspector escanea QR del SIA (Símbolo Internacional de Acceso) en la app
+     → El sistema consulta ANDIS en tiempo real
+     → Si el SIA es válido y la patente coincide:
+         - Se crea o actualiza el Vehiculo con exento_global=True
+         - tipo_exencion = 'discapacitado'
+         - vigencia_exencion = fecha de vencimiento del SIA en ANDIS
+     → Si el SIA venció: se informa al inspector (no se registra la exención)
+     → Si la patente no coincide: se avisa — el inspector decide cómo proceder
+
+Inspector verifica vehículo con exención en circulación:
+  EXENTO_TOTAL (vigencia activa o indefinida) → ✅ OK, no hay acción
+  EXENTO_TOTAL (vigencia vencida) → 🚨 IMPAGO — tratar como sin exención
   EXENTO_PARCIAL en su subcuadra → ✅ OK
   EXENTO_PARCIAL fuera de su subcuadra → 🚨 INFRACCIONAR (paga igual en esa zona)
 ```
@@ -89,19 +103,28 @@ Inspector escanea vehículo con exención:
 ### Flujo de verificación e infracción
 
 ```
+0. REQUISITO PREVIO: solo se puede infraccionar dentro del horario de cobro
+   configurado por el admin. Fuera de horario (o en feriados sin cobro):
+   - El botón INFRACCIONAR no aparece
+   - Si el inspector llega directo a la URL de infracción, es redirigido con un aviso
+
 1. Inspector abre "Verificar vehículo"
 2. Ingresa patente (teclado o escáner)
 3. Sistema evalúa:
-   - ¿Exento total? → ✅ libre
+   - ¿Exento total y vigencia activa? → ✅ libre
+   - ¿Exento total pero vigencia vencida? → 🚨 IMPAGO (tratar como sin exención)
    - ¿Pago activo o abono mensual vigente? → ✅ OK
-   - ¿Exento parcial en esta subcuadra? → ✅ libre
+   - ¿Exento parcial (vigente) en esta subcuadra? → ✅ libre
    - ¿Exento parcial fuera de su subcuadra? → 🚨 INFRACCIONAR
    - ¿Tolerancia (15 min desde última verificación)? → ⏳ esperar
    - ¿Impago / No registrado? → 🚨 INFRACCIONAR
-4. Si infracción: inspector confirma, puede sacar foto
+4. Si aparece INFRACCIONAR: puede escanear el QR del SIA antes de labrar el acta
+   - Si el SIA es válido → se registra la exención automáticamente y el vehículo pasa a EXENTO
+   - Si no tiene SIA o el SIA no es válido → continúa con la infracción
+5. Inspector confirma la infracción, puede sacar foto
    (el sistema captura las coordenadas GPS automáticamente)
-5. Se genera Infraccion (estado=pendiente) con geoposición registrada
-6. Conductor puede resolver la infracción de dos formas (ver abajo)
+6. Se genera Infraccion (estado=pendiente) con geoposición registrada
+7. Conductor puede resolver la infracción de dos formas (ver abajo)
 ```
 
 ### Flujo de resolución de infracción — conductor estaciona
@@ -200,7 +223,8 @@ por más tiempo del que quedaba disponible.
 - La exención **parcial** exime en subcuadras específicas (ej: frente a la casa del vecino frentista).
 - Si el vehículo exento parcial es escaneado fuera de sus subcuadras exentas → **paga igual**.
 - El admin debe registrar siempre el **número de documento o certificado** en el campo `notas_exencion`.
-- Las exenciones **no tienen vencimiento automático** — el admin debe revisarlas periódicamente.
+- Las exenciones registradas por el inspector vía SIA tienen **vencimiento automático** (fecha del SIA en ANDIS). Al vencer, el vehículo aparece como IMPAGO — no hay que revocar manualmente.
+- Las exenciones cargadas manualmente por el admin **no vencen solas** — el admin debe revisarlas y revocarlas cuando corresponda.
 
 ---
 
@@ -216,6 +240,11 @@ Busco al conductor en "Conductores" → "Ver" → sección "Agregar vehículo" �
 
 **¿Cómo exento un vehículo?**
 Desde el detalle del conductor → "Gestionar exenciones" junto al vehículo. O directamente desde "Panel → Exenciones" buscando la patente. Elijo el tipo, anoto el número de documento y marco exento global o selecciono las subcuadras.
+
+Para exenciones por discapacidad también podés dejar que el **inspector lo registre en el momento** usando el QR del SIA ANDIS — el sistema lo crea automáticamente con la vigencia del certificado. No hace falta carga previa del admin.
+
+**¿Las exenciones vencen solas?**
+Depende del tipo: las registradas por inspector vía SIA (discapacidad) vencen en la fecha del certificado ANDIS — al vencer, el vehículo aparece como IMPAGO. Las exenciones cargadas manualmente no vencen solas; revisalas periódicamente.
 
 **¿Cómo configuro los horarios?**
 Panel Admin → "🕐 Horarios". Marco cada día como activo/inactivo y defino la franja horaria. Guardo.
@@ -257,11 +286,22 @@ Desde mi panel → "🚓 Verificar vehículo". Ingreso la patente directamente. 
 **¿Tengo que seleccionar subcuadra antes de verificar?**
 Sí. El dropdown de subcuadra está en la parte superior de "Verificar vehículo". Elegís en qué zona estás patrullando antes de verificar. El sistema la recuerda durante todo el turno; solo hay que cambiarla si te movés de zona.
 
+**¿Puedo infraccionar en cualquier horario?**
+No. El botón INFRACCIONAR solo aparece dentro del horario de cobro configurado para el municipio. Si estás fuera del horario (o es feriado sin cobro), la pantalla muestra el horario habilitado en lugar del botón. Si intentás entrar directo a la URL de infracción, el sistema te redirige con un aviso.
+
 **¿Cómo registro una infracción?**
 Si el resultado es 🚨 INFRACCIONAR, aparece el formulario de infracción. La foto es opcional — si la subís, el sistema le agrega automáticamente una marca de agua con patente, nombre del inspector, subcuadra, GPS (o "sin señal" si no está disponible) y fecha/hora. Confirmás y se genera el acta. Antes de imprimir el ticket podés revisar la foto; el ticket no se imprime solo.
 
+**¿Cómo verifico el SIA (certificado de discapacidad)?**
+En la pantalla de resultado del vehículo (estado IMPAGO o NO REGISTRADO) aparece el botón "♿ Verificar SIA". Al tocarlo, se abre un panel donde podés sacar una foto del QR del certificado. El sistema consulta ANDIS en tiempo real:
+- Si el SIA es válido y la patente coincide → la exención se registra automáticamente y el vehículo pasa a EXENTO. No se labra infracción.
+- Si el SIA está vencido, o la patente no coincide, o ANDIS no está disponible → el sistema te avisa con el detalle. Vos decidís cómo proceder.
+
 **¿Qué pasa si el vehículo tiene exención parcial?**
 Si está en una de sus subcuadras exentas → aparece ✅ OK. Si está fuera de ellas → aparece 🚨 INFRACCIONAR — el vehículo igual debe pagar en esa zona.
+
+**¿Qué pasa si el vehículo tiene exención por discapacidad pero la vigencia venció?**
+El sistema lo trata como IMPAGO — la exención vencida no lo protege. El inspector puede re-verificar el SIA en ese momento: si el conductor tiene un SIA renovado y vigente, la exención se actualiza automáticamente.
 
 **¿Qué significa "En plazo de tolerancia"?**
 Que el vehículo fue escaneado recientemente (menos de 15 minutos). No podés infraccionar todavía. Volvé en unos minutos.
