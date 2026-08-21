@@ -15,10 +15,12 @@ from django.utils import timezone
 
 from app_estacionamiento.domain.enums import EstadoVehiculo
 from app_estacionamiento.domain.verificacion import ResultadoVerificacion
+from app_estacionamiento.domain.enums import MINUTOS_ENTRE_INFRACCIONES
 from app_estacionamiento.models import (
     AbonoMensual,
     Estado,
     Estacionamiento,
+    Infraccion,
     VerificacionInspector,
     Vehiculo,
 )
@@ -38,13 +40,14 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
     Verifica el estado de un vehículo para el inspector.
 
     Orden de evaluación:
-    1. Vehículo no registrado   → NO_REGISTRADO
-    2. Exento total             → EXENTO_TOTAL
-    3. Estacionamiento activo   → PAGADO
-    4. Abono mensual vigente    → ABONO_ACTIVO
-    5. Exento parcial en subcuadra → EXENTO_PARCIAL
-    6. Dentro de tolerancia     → PENDIENTE_PAGO
-    7. Sin pago                 → IMPAGO
+    1. Vehículo no registrado       → NO_REGISTRADO
+    2. Exento total                 → EXENTO_TOTAL
+    3. Estacionamiento activo       → PAGADO
+    4. Abono mensual vigente        → ABONO_ACTIVO
+    5. Exento parcial en subcuadra  → EXENTO_PARCIAL
+    6. Dentro de tolerancia         → PENDIENTE_PAGO
+    7. Infracción reciente (<15min) → INFRACCION_RECIENTE
+    8. Sin pago                     → IMPAGO
 
     Registra siempre la verificación para trazabilidad.
     """
@@ -149,7 +152,28 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
                 estacionamiento_activo=False,
             )
 
-    # 6. IMPAGO
+    # 6. INFRACCIÓN RECIENTE — ya existe un acta en los últimos N minutos.
+    # Sin este chequeo el inspector vería el botón INFRACCIONAR y recién
+    # descubriría el duplicado al enviar el formulario (mala UX).
+    if municipio:
+        hace_n_min = timezone.now() - timedelta(minutes=MINUTOS_ENTRE_INFRACCIONES)
+        infraccion_reciente = (
+            Infraccion.objects
+            .filter(vehiculo=vehiculo, municipio=municipio, creado_en__gte=hace_n_min)
+            .order_by("-creado_en")
+            .first()
+        )
+        if infraccion_reciente:
+            segundos_transcurridos = (timezone.now() - infraccion_reciente.creado_en).total_seconds()
+            minutos_hasta = max(1, int((MINUTOS_ENTRE_INFRACCIONES * 60 - segundos_transcurridos) / 60) + 1)
+            return ResultadoVerificacion(
+                patente=patente,
+                estado=EstadoVehiculo.INFRACCION_RECIENTE,
+                estacionamiento_activo=False,
+                minutos_hasta_siguiente=minutos_hasta,
+            )
+
+    # 7. IMPAGO
     return ResultadoVerificacion(
         patente=patente,
         estado=EstadoVehiculo.IMPAGO,

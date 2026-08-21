@@ -52,6 +52,33 @@ git checkout develop        # 7. Volvés a develop para seguir trabajando
 
 > **Recordatorio:** cada vez que haya que subir a producción, leé esta sección antes de ejecutar.
 
+## Desarrollo local vs producción
+
+Railway solo despliega cuando se hace push a `main`. Mientras estés en `develop`, podés testear todo localmente sin tocar producción.
+
+```powershell
+# Arrancás el servidor local (en la rama develop)
+python manage.py runserver
+```
+
+Luego abrís `http://127.0.0.1:8000` en tu navegador. Railway no se entera de nada hasta que mergees a `main`.
+
+**Regla práctica:**
+- Cambios en `develop` + `python manage.py runserver` → solo vos lo ves, en tu PC.
+- `git checkout main` + `git merge develop` + `git push` → Railway lo despliega.
+- Nunca toques `main` directamente para desarrollar.
+
+**Flujo completo para deployar** (recordatorio compacto):
+```powershell
+git add -A
+git commit -m "feat: descripción del cambio"
+git push                  # sube develop a GitHub (Railway no reacciona)
+git checkout main
+git merge develop
+git push                  # esto sí dispara el deploy en Railway
+git checkout develop      # volvés a trabajar en develop
+```
+
 ## Migraciones — cuándo y por qué
 
 Cada vez que modificás un modelo (`models.py`), Django necesita actualizar la base de datos.

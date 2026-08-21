@@ -130,6 +130,20 @@
                 </p>
             </div>
 
+        {% elif resultado.estado.name == "INFRACCION_RECIENTE" %}
+            <div class="box-resultado box-warn">
+                <div style="font-size:2rem;">⏱️</div>
+                <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
+                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.1rem 0;">
+                  {% if tipo_seleccionado == 'moto' %}🏍️ Moto{% else %}🚗 Auto{% endif %}
+                </p>
+                <h3>Ya fue infraccionado</h3>
+                <p style="font-size:0.9rem; color:var(--color-text-muted);">
+                    Tiene un acta reciente. Podés volver a infraccionar
+                    en aproximadamente <strong>{{ resultado.minutos_hasta_siguiente }} min</strong>.
+                </p>
+            </div>
+
         {% else %}
             <!-- IMPAGO / NO_REGISTRADO / EXENTO_PARCIAL fuera de su subcuadra -->
             <div class="box-resultado box-danger">
@@ -429,6 +443,7 @@ function seleccionarSubcuadraInspector(id) {
 var _siaStream = null;       // MediaStream activo de la cámara
 var _siaScanning = false;    // flag para detener el loop de escaneo
 var _siaVerificando = false; // evita envíos múltiples si detecta el QR varias veces
+var _siaUltimoScan = 0;      // timestamp del último intento de jsQR (throttle)
 
 function abrirModalSia(patente) {
     document.getElementById("sia-patente").value = patente || "";
@@ -488,23 +503,40 @@ function detenerCamaraSia() {
 function escanearFrameSia() {
     if (!_siaScanning) return;
 
+    var ahora = Date.now();
+    // Throttle: jsQR es lento, no tiene sentido correrlo 60 veces por segundo.
+    // Escaneamos cada 250ms; el resto del tiempo solo pedimos el próximo frame.
+    if (ahora - _siaUltimoScan < 250) {
+        requestAnimationFrame(escanearFrameSia);
+        return;
+    }
+    _siaUltimoScan = ahora;
+
     var video = document.getElementById("sia-video");
     var canvas = document.getElementById("sia-canvas");
 
-    // Espera a que el video tenga dimensiones reales
-    if (video.readyState < 2 || video.videoWidth === 0) {
+    // readyState 4 = HAVE_ENOUGH_DATA: el video tiene datos reales para renderizar.
+    // Con readyState 2 (HAVE_CURRENT_DATA) el frame puede estar incompleto.
+    if (video.readyState < 4 || video.videoWidth === 0) {
         requestAnimationFrame(escanearFrameSia);
         return;
     }
 
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // jsQR necesita al menos ~400px en el lado menor para detectar bien.
+    // Si la cámara entrega menos (ej. 320px), escalamos antes de pasar el imageData.
+    var escala = Math.max(1, 400 / Math.min(video.videoWidth, video.videoHeight));
+    canvas.width  = Math.round(video.videoWidth  * escala);
+    canvas.height = Math.round(video.videoHeight * escala);
+
     var ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // "attemptBoth" prueba el QR normal e invertido; mejora la detección en
+    // distintas condiciones de luz sin costo significativo.
     var code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "dontInvert"
+        inversionAttempts: "attemptBoth"
     });
 
     if (code && code.data && !_siaVerificando) {
