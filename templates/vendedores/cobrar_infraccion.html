@@ -144,7 +144,11 @@
       {% endif %}
 
       <div style="margin-top:1rem;">
-        <a href="{% url 'panel_vendedor' %}" class="btn btn-outline">← Volver al panel</a>
+        {% if request.user.es_admin %}
+          <a href="{% url 'panel_admin' %}" class="btn btn-outline">← Volver al panel</a>
+        {% else %}
+          <a href="{% url 'panel_vendedor' %}" class="btn btn-outline">← Volver al panel</a>
+        {% endif %}
       </div>
 
     </div>

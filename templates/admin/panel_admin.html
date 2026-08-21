@@ -108,8 +108,8 @@
       <div class="card" style="display:flex; flex-direction:column; max-height:calc(100vh - 7rem);">
         <h3 style="margin-bottom:0.75rem; flex-shrink:0;">⚠️ Infracciones recientes</h3>
         {% if infracciones_recientes %}
-          <div style="overflow-y:auto; flex:1;">
-            <table style="font-size:0.87rem;">
+          <div style="overflow-y:auto; overflow-x:auto; flex:1;">
+            <table style="font-size:0.87rem; min-width:360px;">
               <thead>
                 <tr>
                   <th>Patente</th>
@@ -157,8 +157,8 @@
           <span style="font-size:0.82rem; color:var(--color-text-muted);">{{ estacionamientos_activos|length }} ahora</span>
         </div>
         {% if estacionamientos_activos %}
-          <div style="overflow-y:auto; flex:1;">
-            <table style="font-size:0.87rem;">
+          <div style="overflow-y:auto; overflow-x:auto; flex:1;">
+            <table style="font-size:0.87rem; min-width:280px;">
               <thead>
                 <tr>
                   <th>Patente</th>
