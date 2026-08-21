@@ -93,7 +93,8 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 - `services/infracciones.py` — `crear_infraccion()`, `cobrar_infraccion_efectivo(medio_pago='efectivo')`, `calcular_estado_tolerancia()` (con `MARGEN_TOLERANCIA_SEGUNDOS = 60`). Constante exportada: `MEDIOS_VALIDOS_COBRO = frozenset({"efectivo","transferencia","debito","credito","qr"})`. Normaliza valores inválidos a `'efectivo'`.
 - `services/saldo.py` — `cargar_saldo_conductor()`, `debitar_saldo_conductor()`
 - `services/caja.py` — `generar_cierre_caja()` (calcula desglose por medio de pago en una sola query de agregación condicional), `registrar_cobro_efectivo()`
-- `services/verificacion.py` — `verificar_estado_vehiculo()`
+- `services/verificacion.py` — `verificar_estado_vehiculo()`. Respeta `vigencia_exencion` (DateField en Vehiculo): si venció, EXENTO_TOTAL/PARCIAL cae a IMPAGO.
+- `services/sia_verificacion.py` — verificación de SIA (Símbolo Internacional de Acceso) contra ANDIS. Función principal: `verificar_sia(qr_url, patente_inspector) → ResultadoSia`. Valida URL (SSRF prevention), parsea HTML con regex tolerante, 8 estados posibles. Estados: `VALIDO_PATENTE_COINCIDENTE`, `PATENTE_NO_COINCIDE`, `SIA_VENCIDO`, `SIA_SIN_DOMINIO`, `QR_URL_INVALIDA`, `ANDIS_NO_DISPONIBLE`, `ANDIS_ERROR`, `RESPUESTA_INVALIDA`.
 
 **use_cases/:** delegan en services/, sin lógica inline.
 - `estacionar_vehiculo.py`, `pagar_infraccion.py`, `cobrar_estacionamiento.py`
@@ -122,7 +123,8 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `Usuario` | AbstractUser con `correo` como USERNAME_FIELD. Flags: `es_admin`, `es_inspector`, `es_vendedor`, `es_conductor`, `es_tesorero`, `es_superadmin`. Campos: `saldo` (wallet digital conductor), `saldo_operativo` (caja del vendedor/inspector), `es_verificado`, `municipio`, `porcentaje_ganancia`. |
 | `Municipio` | Configuración del municipio: `comision_vendedor (%)` (solo admin del municipio), `tolerancia_multa_minutos`, branding (logo, colores). `monto_minimo_carga` y `monto_maximo_carga` (enteros, defecto 500/50.000): límites de carga MercadoPago configurables por superadmin. `leyenda_horarios` y `texto_ordenanza` (TextField): texto institucional configurable por superadmin (migración 0053). |
 | `ModuloMunicipio` | Feature flags por municipio (activo/inactivo). Gestionado por superadmin. |
-| `Vehiculo` | Patente única. Tipos: `auto`, `moto`. Exenciones: `exento_global`, `exento_parcial`, `subcuadras_exentas`. |
+| `Vehiculo` | Patente única. Tipos: `auto`, `moto`. Exenciones: `exento_global` (bool), `tipo_exencion` (discapacitado/vecino_frentista/jubilado/fuerza/vehiculo_oficial), `vigencia_exencion` (DateField, null=indefinida), `exencion_verificada` (bool), `notas_exencion` (TextField). Exención parcial: `subcuadras_exentas` (M2M). El inspector puede registrar exención 'discapacitado' automáticamente vía SIA ANDIS con vigencia del certificado. |
+| `Infraccion` (campos SIA) | `sia_presentado`, `sia_verificado` (bool), `sia_estado` (CharField), `sia_url`, `sia_code`, `sia_patente_sia`, `sia_nci`, `sia_titular` (CharField), `sia_vencimiento` (DateField), `sia_verificado_en` (DateTimeField), `sia_observacion` (TextField). Migración 0054. |
 | `VehiculoUsuario` | Relación N:N entre vehículo y conductor. |
 | `Subcuadra` | Calle + altura + municipio. `unique_together = (calle, altura, municipio)`. `lat`/`lon` (DecimalField, null) para GPS preselección desde `verificar.html`. El admin las carga desde `/admin-subcuadras/` con mapa Leaflet/OSM (sin API key). |
 | `Estacionamiento` | Estado: `ACTIVO` / `FINALIZADO`. `hora_inicio`, `hora_fin`, `duracion_horas (DecimalField)`, `costo_base`, `costo_final`. Constraint: un ACTIVO por vehículo. |
