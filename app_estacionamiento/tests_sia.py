@@ -14,7 +14,7 @@ Cubren:
 from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
-from django.test import TestCase, Client
+from django.test import TestCase, RequestFactory
 from django.urls import reverse
 
 from .models import Municipio, Usuario, Vehiculo
@@ -256,6 +256,12 @@ class VerificarSiaTest(TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class VistaSiaTest(TestCase):
+    """
+    Tests de la vista verificar_sia usando RequestFactory.
+    Se evita el middleware stack (incluyendo axes) que interfiere con force_login
+    en el entorno de tests de este proyecto.
+    """
+
     def setUp(self):
         self.municipio = Municipio.objects.create(nombre="Test")
         self.inspector = Usuario.objects.create_user(
@@ -264,67 +270,58 @@ class VistaSiaTest(TestCase):
             es_inspector=True,
             municipio=self.municipio,
         )
-        self.client = Client()
-        self.client.force_login(self.inspector)
+        self.factory = RequestFactory()
         self.url = reverse("inspectores_verificar_sia")
 
+    def _hacer_request(self, method, body=None, usuario=None):
+        """Crea un Request con usuario autenticado, saltando el middleware."""
+        import json
+        from app_estacionamiento.views_inspector import verificar_sia as vista
+
+        if method == "GET":
+            req = self.factory.get(self.url)
+        else:
+            req = self.factory.post(
+                self.url,
+                data=json.dumps(body or {}),
+                content_type="application/json",
+            )
+        # Adjuntar usuario directamente (RequestFactory no usa sesiones)
+        req.user = usuario or self.inspector
+        return vista(req)
+
     def test_get_devuelve_405(self):
-        resp = self.client.get(self.url)
+        resp = self._hacer_request("GET")
         self.assertEqual(resp.status_code, 405)
 
     def test_post_sin_patente_devuelve_400(self):
-        import json
-        resp = self.client.post(
-            self.url,
-            data=json.dumps({"qr_url": QR_URL}),
-            content_type="application/json",
-        )
+        resp = self._hacer_request("POST", {"qr_url": QR_URL})
         self.assertEqual(resp.status_code, 400)
 
     def test_post_sin_qr_url_devuelve_400(self):
-        import json
-        resp = self.client.post(
-            self.url,
-            data=json.dumps({"patente": PATENTE}),
-            content_type="application/json",
-        )
+        resp = self._hacer_request("POST", {"patente": PATENTE})
         self.assertEqual(resp.status_code, 400)
 
     def test_post_url_invalida_no_crea_exencion(self):
-        """Si el QR es inválido, no debe crearse ni actualizarse ningún Vehiculo con exención.
-        No necesita mock: validar_url_andis rechaza sin llamar a requests.get."""
-        import json
-        resp = self.client.post(
-            self.url,
-            data=json.dumps({"patente": PATENTE, "qr_url": "https://malicious.com/?x=1"}),
-            content_type="application/json",
-        )
+        """Si el QR es inválido, no debe crearse ni actualizarse ningún Vehiculo con exención."""
+        resp = self._hacer_request("POST", {"patente": PATENTE, "qr_url": "https://malicious.com/?x=1"})
         self.assertEqual(resp.status_code, 200)
-        data = resp.json()
+        import json
+        data = json.loads(resp.content)
         self.assertEqual(data["estado"], "QR_URL_INVALIDA")
         self.assertFalse(data["es_valido"])
-        # No debe haber creado un Vehiculo exento
-        self.assertFalse(
-            Vehiculo.objects.filter(patente=PATENTE, exento_global=True).exists()
-        )
+        self.assertFalse(Vehiculo.objects.filter(patente=PATENTE, exento_global=True).exists())
 
     @patch("app_estacionamiento.services.sia_verificacion.requests.get")
     def test_post_valido_crea_exencion_en_bd(self, mock_get):
         """Un SIA válido debe registrar la exención en el Vehiculo."""
-        import json
         vencimiento = date(2027, 6, 30)
-        mock_get.return_value = _mock_respuesta(
-            _html_andis(dominio=PATENTE, vencimiento="2027-06-30")
-        )
-        resp = self.client.post(
-            self.url,
-            data=json.dumps({"patente": PATENTE, "qr_url": QR_URL}),
-            content_type="application/json",
-        )
+        mock_get.return_value = _mock_respuesta(_html_andis(dominio=PATENTE, vencimiento="2027-06-30"))
+        resp = self._hacer_request("POST", {"patente": PATENTE, "qr_url": QR_URL})
         self.assertEqual(resp.status_code, 200)
-        data = resp.json()
+        import json
+        data = json.loads(resp.content)
         self.assertTrue(data["es_valido"])
-        # El Vehiculo debe quedar exento en la BD
         vehiculo = Vehiculo.objects.get(patente=PATENTE)
         self.assertTrue(vehiculo.exento_global)
         self.assertEqual(vehiculo.tipo_exencion, "discapacitado")
@@ -334,28 +331,16 @@ class VistaSiaTest(TestCase):
     @patch("app_estacionamiento.services.sia_verificacion.requests.get")
     def test_post_valido_actualiza_vehiculo_existente(self, mock_get):
         """Si el Vehiculo ya existe, la vista actualiza sus campos de exención."""
-        import json
         Vehiculo.objects.create(patente=PATENTE, municipio=self.municipio)
-        mock_get.return_value = _mock_respuesta(
-            _html_andis(dominio=PATENTE, vencimiento="2027-06-30")
-        )
-        resp = self.client.post(
-            self.url,
-            data=json.dumps({"patente": PATENTE, "qr_url": QR_URL}),
-            content_type="application/json",
-        )
+        mock_get.return_value = _mock_respuesta(_html_andis(dominio=PATENTE, vencimiento="2027-06-30"))
+        resp = self._hacer_request("POST", {"patente": PATENTE, "qr_url": QR_URL})
         self.assertEqual(resp.status_code, 200)
         vehiculo = Vehiculo.objects.get(patente=PATENTE)
         self.assertTrue(vehiculo.exento_global)
 
     def test_requiere_login(self):
-        import json
-        # Crear un cliente sin sesión activa para probar el bloqueo
-        cliente_anonimo = Client()
-        resp = cliente_anonimo.post(
-            self.url,
-            data=json.dumps({"patente": PATENTE, "qr_url": QR_URL}),
-            content_type="application/json",
-        )
-        # El decorator @require_role redirige al login
+        """Usuario anónimo debe ser rechazado por el decorator."""
+        from django.contrib.auth.models import AnonymousUser
+        resp = self._hacer_request("POST", {"patente": PATENTE, "qr_url": QR_URL},
+                                   usuario=AnonymousUser())
         self.assertIn(resp.status_code, [302, 403])
