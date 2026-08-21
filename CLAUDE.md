@@ -23,10 +23,34 @@ Ver CONTEXT.md para arquitectura completa. Ver PENDIENTES.md para tareas.
 - `main` → producción (Railway despliega desde acá). Solo recibe merges desde `develop`.
 - `develop` → rama de trabajo activa. Todo feature nuevo va acá.
 
-Flujo de trabajo:
-1. Desarrollar y commitear en `develop`
-2. Cuando el feature está listo y probado localmente: `git checkout main && git merge develop && git push`
-3. Railway despliega automáticamente desde `main`
+### Flujo completo — paso a paso
+
+**Durante la sesión de trabajo (en `develop`):**
+
+```powershell
+git add -A                  # 1. Marca todos los archivos modificados para incluir en el commit
+git commit -m "mensaje"     # 2. Guarda el snapshot en tu máquina (local, no sube nada todavía)
+git push                    # 3. Sube los commits al servidor remoto (GitHub)
+```
+
+**Cuando querés que Railway lo deploye (merge a main):**
+
+```powershell
+git checkout main           # 4. Te movés a la rama main
+git merge develop           # 5. Traés todos los commits de develop a main
+git push                    # 6. Subís main → Railway detecta y deploya automático
+git checkout develop        # 7. Volvés a develop para seguir trabajando
+```
+
+**Por qué cada comando:**
+- `git add -A` → Git no trackea cambios automáticamente. Tenés que decirle qué incluir.
+- `git commit` → Crea el "foto" del estado del código. Solo existe en tu PC hasta el push.
+- `git push` → Sube esa foto al servidor remoto. Ahí queda respaldado.
+- `git checkout main` → Cambiás de rama (de develop a main).
+- `git merge develop` → Fusionás el trabajo de develop dentro de main.
+- El último `git push` es el que dispara el deploy en Railway.
+
+> **Recordatorio:** cada vez que haya que subir a producción, leé esta sección antes de ejecutar.
 
 ## Tests
 
