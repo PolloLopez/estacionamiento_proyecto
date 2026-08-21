@@ -33,7 +33,7 @@ from .services.sia_verificacion import (
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _html_andis(dominio="AA123BB", nombre="Juan", apellido="Pérez",
-                nci="NCI-001", vencimiento="2027-12-31"):
+                nci="987654", vencimiento="2027-12-31"):
     """Genera un HTML de respuesta ANDIS mínimo pero realista."""
     return f"""
     <html><body>
@@ -126,13 +126,14 @@ class ValidarUrlAndisTest(TestCase):
 class ParsearRespuestaTest(TestCase):
 
     def test_parsea_campos_tabla(self):
+        # NCI sin guión para no confundir el regex con un separador "campo: valor"
         html = _html_andis(dominio="AA123BB", nombre="Juan", apellido="Pérez",
-                           nci="NCI-001", vencimiento="2027-12-31")
+                           nci="987654", vencimiento="2027-12-31")
         datos = _parsear_respuesta(html)
         self.assertEqual(datos["dominio"], "AA123BB")
         self.assertEqual(datos["nombre"], "Juan")
         self.assertEqual(datos["apellido"], "Pérez")
-        self.assertEqual(datos["nci"], "NCI-001")
+        self.assertEqual(datos["nci"], "987654")
         self.assertEqual(datos["vencimiento"], "2027-12-31")
 
     def test_html_vacio_devuelve_strings_vacios(self):
@@ -256,19 +257,15 @@ class VerificarSiaTest(TestCase):
 
 class VistaSiaTest(TestCase):
     def setUp(self):
-        self.municipio = Municipio.objects.create(
-            nombre="Test",
-            slug="test",
-            tarifa_por_hora="10.00",
-        )
+        self.municipio = Municipio.objects.create(nombre="Test")
         self.inspector = Usuario.objects.create_user(
             correo="inspector@test.com",
             password="pass1234",
-            rol="inspector",
+            es_inspector=True,
             municipio=self.municipio,
         )
         self.client = Client()
-        self.client.login(username="inspector@test.com", password="pass1234")
+        self.client.force_login(self.inspector)
         self.url = reverse("inspectores_verificar_sia")
 
     def test_get_devuelve_405(self):
@@ -353,8 +350,9 @@ class VistaSiaTest(TestCase):
 
     def test_requiere_login(self):
         import json
-        self.client.logout()
-        resp = self.client.post(
+        # Crear un cliente sin sesión activa para probar el bloqueo
+        cliente_anonimo = Client()
+        resp = cliente_anonimo.post(
             self.url,
             data=json.dumps({"patente": PATENTE, "qr_url": QR_URL}),
             content_type="application/json",
