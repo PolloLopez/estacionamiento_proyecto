@@ -135,29 +135,41 @@
             <small style="color:var(--color-text-muted);">PNG cuadrado, mínimo 192×192px. Aparece como ícono al instalar la app en el celular.</small>
           </div>
 
-            {# Colores #}
-            <div class="grid grid-2" style="gap:0.5rem; margin-bottom:0.75rem;">
+            {# Colores — 3 campos: primario, secundario, acento #}
+            <div class="grid grid-3" style="gap:0.5rem; margin-bottom:0.75rem;">
               <div>
                 <label style="font-size:0.85rem; font-weight:600;">Color primario</label>
                 <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
                   <input type="color" name="color_primario"
-                         value="{{ municipio.color_primario|default:'#14883b' }}"
+                         value="{{ municipio.color_primario|default:'#91d5e2' }}"
                          style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
                   <input type="text" name="color_primario_hex"
-                         value="{{ municipio.color_primario|default:'#14883b' }}"
-                         placeholder="#14883b"
+                         value="{{ municipio.color_primario|default:'#91d5e2' }}"
+                         placeholder="#91d5e2"
                          style="flex:1; font-size:0.85rem; font-family:monospace;">
                 </div>
               </div>
               <div>
-                <label style="font-size:0.85rem; font-weight:600;">Color secundario (hover)</label>
+                <label style="font-size:0.85rem; font-weight:600;">Color secundario</label>
                 <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
                   <input type="color" name="color_secundario"
-                         value="{{ municipio.color_secundario|default:'#155f2e' }}"
+                         value="{{ municipio.color_secundario|default:'#444444' }}"
                          style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
                   <input type="text" name="color_secundario_hex"
-                         value="{{ municipio.color_secundario|default:'#155f2e' }}"
-                         placeholder="#155f2e"
+                         value="{{ municipio.color_secundario|default:'#444444' }}"
+                         placeholder="#444444"
+                         style="flex:1; font-size:0.85rem; font-family:monospace;">
+                </div>
+              </div>
+              <div>
+                <label style="font-size:0.85rem; font-weight:600;">Color acento</label>
+                <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
+                  <input type="color" name="color_acento"
+                         value="{{ municipio.color_acento|default:'#bed630' }}"
+                         style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
+                  <input type="text" name="color_acento_hex"
+                         value="{{ municipio.color_acento|default:'#bed630' }}"
+                         placeholder="#bed630"
                          style="flex:1; font-size:0.85rem; font-family:monospace;">
                 </div>
               </div>
@@ -317,6 +329,7 @@
   [
     ["color_primario",   "color_primario_hex"],
     ["color_secundario", "color_secundario_hex"],
+    ["color_acento",     "color_acento_hex"],
   ].forEach(function ([colorName, hexName]) {
     var picker = document.querySelector('[name="' + colorName + '"]');
     var texto  = document.querySelector('[name="' + hexName  + '"]');

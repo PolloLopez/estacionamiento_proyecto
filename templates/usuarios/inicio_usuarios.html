@@ -2,6 +2,7 @@
 {% block title %}Inicio{% endblock %}
 
 {% block content %}
+<div class="container">
 
 <!-- ── Tutorial conductor (colapsable) ───────────────────────────── -->
 <details style="margin-bottom:1.2rem;">
@@ -143,7 +144,8 @@
     Tu vehículo tenía una infracción pendiente de <strong>${{ notif_infraccion.monto }}</strong>
     cuando registraste el estacionamiento. El período de gracia ya venció.
   </p>
-  <table style="font-size:0.88rem; margin-bottom:1rem; border-collapse:collapse;">
+  <div style="overflow-x:auto;">
+  <table style="font-size:0.88rem; margin-bottom:1rem; border-collapse:collapse; min-width:300px;">
     <tr>
       <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">🔍 Verificado por inspector</td>
       <td><strong>{{ notif_infraccion.hora_verificacion|date:"d/m/Y H:i:s" }}</strong></td>
@@ -157,6 +159,7 @@
       <td><strong>{{ notif_infraccion.hora_estacionamiento|date:"d/m/Y H:i:s" }}</strong></td>
     </tr>
   </table>
+  </div>
   <a href="{% url 'mis_infracciones' %}" class="btn btn-sm"
      style="background:var(--color-danger, #c0392b); color:#fff; font-size:0.9rem;">
     Ir a pagar la infracción (${{ notif_infraccion.monto }})
@@ -318,5 +321,5 @@
 })();
 </script>
 
-</section>
+</div>
 {% endblock %}

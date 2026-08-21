@@ -214,9 +214,15 @@ class Municipio(models.Model):
         help_text="Color principal de la barra de navegación y botones (ej: #1a7a3c).",
     )
     color_secundario = models.CharField(
-        max_length=7, default="#155f2e",
+        max_length=7, default="#444444",
         verbose_name="Color secundario",
-        help_text="Color de hover y acento (ej: #155f2e). Suele ser el primario más oscuro.",
+        help_text="Color del footer y textos de soporte (ej: #444444).",
+    )
+    color_acento = models.CharField(
+        max_length=7, default="#bed630",
+        verbose_name="Color acento",
+        help_text="Color de botones secundarios y highlights (ej: #bed630).",
+        blank=True,
     )
     nombre_sistema = models.CharField(
         max_length=200, blank=True,
