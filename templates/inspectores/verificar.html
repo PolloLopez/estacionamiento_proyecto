@@ -441,15 +441,18 @@ function seleccionarSubcuadraInspector(id) {
 </div>
 
 <!-- jsQR para decodificar frames del video -->
-<script src="{% static 'app_estacionamiento/js/jsQR.min.js' %}"></script>
+<!-- jsQR: fallback para browsers sin BarcodeDetector (iOS Safari, Firefox).
+     Chrome en Android usa BarcodeDetector nativo — no necesita esta librería. -->
+<script src="{% static 'app_estacionamiento/js/jsQR.min.js' %}" onerror="window._jsqrFailed=true"></script>
 <script>
 // ── SIA: escaneo QR con cámara en tiempo real ────────────────────────────────
 
 var _siaStream      = null;  // MediaStream activo de la cámara
 var _siaScanning    = false; // flag para detener el loop de escaneo
-var _siaVerificando = false; // evita envíos múltiples si detecta el QR varias veces
+var _siaVerificando = false; // evita envíos múltiples si el QR se detecta varias veces
 var _siaVideoListo  = false; // true cuando el video está realmente reproduciendo
-var _siaUltimoScan  = 0;     // timestamp del último intento de jsQR (throttle)
+var _siaDetector    = null;  // instancia de BarcodeDetector (nativo, si está disponible)
+var _siaFrames      = 0;
 
 function abrirModalSia(patente) {
     document.getElementById("sia-patente").value = patente || "";
@@ -468,29 +471,42 @@ function cerrarModalSia() {
     document.getElementById("modal-sia").style.display = "none";
 }
 
-var _siaFrames = 0; // contador de frames procesados (para debug visible)
-
 function _siaLog(msg) {
     var el = document.getElementById("sia-estado");
     if (el) el.textContent = msg;
     console.log("[SIA]", msg);
 }
 
-// Abre la cámara trasera y arranca el loop de escaneo
+// Abre la cámara trasera. Elige el motor de escaneo en este orden:
+//   1. BarcodeDetector (nativo en Chrome Android/Edge) — sin librerías, más rápido
+//   2. jsQR sobre canvas (fallback para iOS Safari, Firefox, etc.)
+//   3. Input manual si ninguno funciona
 function iniciarCamaraSia() {
-    _siaLog("Solicitando permiso de cámara…");
-    _siaFrames = 0;
+    _siaFrames   = 0;
+    _siaDetector = null;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        mostrarFallbackSia("Este navegador no soporta getUserMedia.");
+        mostrarFallbackSia("Este navegador no soporta cámara.");
         return;
+    }
+
+    // Detectar motor disponible antes de abrir la cámara
+    if (typeof BarcodeDetector !== "undefined") {
+        try {
+            _siaDetector = new BarcodeDetector({ formats: ["qr_code"] });
+            _siaLog("Motor: BarcodeDetector nativo. Abriendo cámara…");
+        } catch (e) {
+            _siaDetector = null;
+        }
+    }
+    if (!_siaDetector) {
+        _siaLog("Motor: jsQR. Abriendo cámara…");
     }
 
     navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }
     })
     .then(function(stream) {
-        _siaLog("Cámara obtenida. Iniciando video…");
         _siaStream   = stream;
         _siaScanning = true;
         var video = document.getElementById("sia-video");
@@ -505,15 +521,15 @@ function iniciarCamaraSia() {
         });
 
         video.play().catch(function(e) {
-            mostrarFallbackSia("play() rechazado: " + e.name + ". Ingresá la URL.");
+            mostrarFallbackSia("No se pudo iniciar el video: " + e.name);
         });
 
         escanearFrameSia();
     })
     .catch(function(err) {
         var msg = err.name === "NotAllowedError"
-            ? "Permiso denegado (" + err.name + "). Ingresá la URL."
-            : "Error de cámara: " + err.name + ". Ingresá la URL.";
+            ? "Permiso de cámara denegado. Ingresá la URL."
+            : "Error de cámara (" + err.name + "). Ingresá la URL.";
         mostrarFallbackSia(msg);
     });
 }
@@ -529,73 +545,83 @@ function detenerCamaraSia() {
     video.srcObject = null;
 }
 
-// Loop: captura un frame del video y lo analiza con jsQR.
+// Loop principal de escaneo.
+// Motor 1 (BarcodeDetector): async, opera directo sobre el <video>, sin canvas.
+// Motor 2 (jsQR): canvas con recorte central del frame para mejorar detección.
 function escanearFrameSia() {
     if (!_siaScanning) return;
 
-    var video  = document.getElementById("sia-video");
-    var canvas = document.getElementById("sia-canvas");
-
+    var video = document.getElementById("sia-video");
     if (!_siaVideoListo || !video || video.videoWidth === 0) {
         requestAnimationFrame(escanearFrameSia);
         return;
     }
 
-    var ahora = Date.now();
-    if (ahora - _siaUltimoScan < 150) {
-        requestAnimationFrame(escanearFrameSia);
-        return;
-    }
-    _siaUltimoScan = ahora;
     _siaFrames++;
 
-    // Recortar solo el cuadrado central del video (la zona del marco guía).
-    // Sin este recorte, jsQR procesa el frame entero (562×1280) y el QR
-    // ocupa ~10% de la imagen → difícil de detectar.
-    // Con el recorte, el QR ocupa casi todo el canvas → detección confiable.
-    var lado = Math.min(video.videoWidth, video.videoHeight) * 0.8;
-    var ox   = (video.videoWidth  - lado) / 2;  // offset X para centrar
-    var oy   = (video.videoHeight - lado) / 2;  // offset Y para centrar
-    canvas.width  = 400;
-    canvas.height = 400;
+    if (_siaDetector) {
+        // ── Motor 1: BarcodeDetector (Chrome Android, Edge) ──────────────
+        // detect() recibe el <video> directamente; es async y más confiable.
+        _siaDetector.detect(video)
+        .then(function(codigos) {
+            if (!_siaScanning) return;
+            if (codigos.length > 0 && !_siaVerificando) {
+                _siaVerificando = true;
+                detenerCamaraSia();
+                _siaLog("✅ QR detectado (frame " + _siaFrames + ")");
+                enviarVerificacionSia(codigos[0].rawValue);
+                return;
+            }
+            if (_siaFrames % 10 === 0) {
+                _siaLog("Escaneando… frame " + _siaFrames + " (BarcodeDetector)");
+            }
+            if (_siaScanning) setTimeout(escanearFrameSia, 200);
+        })
+        .catch(function() {
+            // detect() puede fallar en un frame si el video no está listo aún
+            if (_siaScanning) setTimeout(escanearFrameSia, 200);
+        });
 
-    var ctx = canvas.getContext("2d");
-    // drawImage con 9 parámetros: fuente, recorte (ox,oy,lado,lado) → canvas (0,0,400,400)
-    ctx.drawImage(video, ox, oy, lado, lado, 0, 0, 400, 400);
+    } else {
+        // ── Motor 2: jsQR con recorte central del frame ───────────────────
+        if (typeof jsQR === "undefined" || window._jsqrFailed) {
+            mostrarFallbackSia("Escáner no disponible en este browser. Ingresá la URL.");
+            return;
+        }
 
-    // Verificar que jsQR cargó. Si el CDN falla, jsQR es undefined y lanza
-    // ReferenceError sin catch → el loop para silenciosamente.
-    if (typeof jsQR === "undefined") {
-        _siaLog("❌ jsQR no cargó (CDN sin internet?). Ingresá la URL.");
-        mostrarFallbackSia("jsQR no disponible. Ingresá la URL manualmente.");
-        return;
+        var canvas = document.getElementById("sia-canvas");
+        // Recortar cuadrado central del 80%: el QR ocupa casi todo → mejor detección
+        var lado = Math.min(video.videoWidth, video.videoHeight) * 0.8;
+        var ox   = (video.videoWidth  - lado) / 2;
+        var oy   = (video.videoHeight - lado) / 2;
+        canvas.width  = 400;
+        canvas.height = 400;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(video, ox, oy, lado, lado, 0, 0, 400, 400);
+
+        var imageData = ctx.getImageData(0, 0, 400, 400);
+        var code;
+        try {
+            code = jsQR(imageData.data, 400, 400, { inversionAttempts: "attemptBoth" });
+        } catch (e) {
+            if (_siaScanning) requestAnimationFrame(escanearFrameSia);
+            return;
+        }
+
+        if (_siaFrames % 10 === 0) {
+            _siaLog("Escaneando… frame " + _siaFrames + " (jsQR)");
+        }
+
+        if (code && code.data && !_siaVerificando) {
+            _siaVerificando = true;
+            detenerCamaraSia();
+            _siaLog("✅ QR detectado (frame " + _siaFrames + ")");
+            enviarVerificacionSia(code.data);
+            return;
+        }
+
+        if (_siaScanning) requestAnimationFrame(escanearFrameSia);
     }
-
-    var imageData = ctx.getImageData(0, 0, 400, 400);
-    var code;
-    try {
-        code = jsQR(imageData.data, 400, 400, { inversionAttempts: "attemptBoth" });
-    } catch (e) {
-        _siaLog("❌ Error en jsQR: " + e.message);
-        requestAnimationFrame(escanearFrameSia);
-        return;
-    }
-
-    // Cada 10 frames mostrar el estado para confirmar que jsQR está corriendo
-    if (_siaFrames % 10 === 0) {
-        _siaLog("Buscando QR… frame " + _siaFrames +
-                " (recorte " + Math.round(lado) + "px → 400×400)");
-    }
-
-    if (code && code.data && !_siaVerificando) {
-        _siaVerificando = true;
-        detenerCamaraSia();
-        _siaLog("✅ QR detectado en frame " + _siaFrames);
-        enviarVerificacionSia(code.data);
-        return;
-    }
-
-    requestAnimationFrame(escanearFrameSia);
 }
 
 // Muestra el input de URL como fallback cuando no hay cámara
