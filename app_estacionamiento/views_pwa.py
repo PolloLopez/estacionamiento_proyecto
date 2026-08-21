@@ -25,6 +25,20 @@ def manifest_json(request):
     nombre    = (getattr(municipio, "nombre_sistema", None) or "Estacionamiento").strip() or "Estacionamiento"
     color     = getattr(municipio, "color_primario", None) or "#14883b"
 
+    # Si el municipio tiene ícono propio lo usamos; si no, los íconos estáticos del repo.
+    icono = getattr(municipio, "icono_app", None)
+    if icono:
+        icono_url = request.build_absolute_uri(icono.url)
+        icons = [
+            {"src": icono_url, "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": icono_url, "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+        ]
+    else:
+        icons = [
+            {"src": request.build_absolute_uri(static("icons/icon-192.png")), "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": request.build_absolute_uri(static("icons/icon-512.png")), "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+        ]
+
     manifest = {
         "name":             nombre,
         "short_name":       nombre,
@@ -34,20 +48,7 @@ def manifest_json(request):
         "background_color": "#ffffff",
         "theme_color":      color,
         "lang":             "es-AR",
-        "icons": [
-            {
-                "src":     request.build_absolute_uri(static("icons/icon-192.png")),
-                "sizes":   "192x192",
-                "type":    "image/png",
-                "purpose": "any maskable",
-            },
-            {
-                "src":     request.build_absolute_uri(static("icons/icon-512.png")),
-                "sizes":   "512x512",
-                "type":    "image/png",
-                "purpose": "any maskable",
-            },
-        ],
+        "icons":            icons,
     }
 
     return HttpResponse(

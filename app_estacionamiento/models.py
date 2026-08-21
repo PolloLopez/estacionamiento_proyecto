@@ -202,6 +202,12 @@ class Municipio(models.Model):
         verbose_name="Logo del municipio",
         help_text="Imagen PNG/SVG con fondo transparente. Altura recomendada: 80px.",
     )
+    icono_app = models.ImageField(
+        upload_to="municipios/iconos/",
+        null=True, blank=True,
+        verbose_name="Ícono de la app (acceso directo)",
+        help_text="PNG cuadrado, mínimo 192×192px. Aparece como ícono al instalar la PWA en el celular.",
+    )
     color_primario = models.CharField(
         max_length=7, default="#1a7a3c",
         verbose_name="Color primario",
