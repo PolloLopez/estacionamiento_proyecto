@@ -550,22 +550,29 @@ function escanearFrameSia() {
     _siaUltimoScan = ahora;
     _siaFrames++;
 
-    var escala = Math.min(1, 640 / video.videoWidth);
-    canvas.width  = Math.round(video.videoWidth  * escala);
-    canvas.height = Math.round(video.videoHeight * escala);
+    // Recortar solo el cuadrado central del video (la zona del marco guía).
+    // Sin este recorte, jsQR procesa el frame entero (562×1280) y el QR
+    // ocupa ~10% de la imagen → difícil de detectar.
+    // Con el recorte, el QR ocupa casi todo el canvas → detección confiable.
+    var lado = Math.min(video.videoWidth, video.videoHeight) * 0.8;
+    var ox   = (video.videoWidth  - lado) / 2;  // offset X para centrar
+    var oy   = (video.videoHeight - lado) / 2;  // offset Y para centrar
+    canvas.width  = 400;
+    canvas.height = 400;
 
     var ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // drawImage con 9 parámetros: fuente, recorte (ox,oy,lado,lado) → canvas (0,0,400,400)
+    ctx.drawImage(video, ox, oy, lado, lado, 0, 0, 400, 400);
 
-    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    var code = jsQR(imageData.data, imageData.width, imageData.height, {
+    var imageData = ctx.getImageData(0, 0, 400, 400);
+    var code = jsQR(imageData.data, 400, 400, {
         inversionAttempts: "attemptBoth"
     });
 
     // Cada 10 frames mostrar el estado para confirmar que jsQR está corriendo
     if (_siaFrames % 10 === 0) {
         _siaLog("Buscando QR… frame " + _siaFrames +
-                " (" + canvas.width + "×" + canvas.height + "px)");
+                " (recorte central " + Math.round(lado) + "px → 400×400)");
     }
 
     if (code && code.data && !_siaVerificando) {
