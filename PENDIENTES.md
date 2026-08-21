@@ -29,10 +29,7 @@ Probar el flujo completo en Railway:
 - Ingresar patente con infracción pendiente → pagar vía MP → verificar que el webhook procesa correctamente.
 - Verificar también el flujo de carga de saldo del conductor.
 
-### 4. 🔐 Riesgo pre-registro OAuth
-Combinado con `SOCIALACCOUNT_AUTO_SIGNUP = True`, un atacante puede registrar el email de otra
-persona antes que ella vía Google. Para mitigarlo: bloquear auto-connect en `SocialAccountAdapter.save_user`
-cuando el email ya existe en la base sin ser de Google.
+### ~~4. 🔐 Riesgo pre-registro OAuth~~ → ✅ resuelto (ver abajo)
 
 ### 5. 📹 Tutorial de uso — GIFs en landing
 El tutorial por rol ya está implementado dentro del sistema (collapsible `<details>` en cada panel).
@@ -95,6 +92,9 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 ---
 
 ## ✅ Resuelto recientemente
+
+**Sesión 2026-08-21** — OAuth account takeover + SIA ANDIS + bloqueo fuera de horario:
+- `adapters.py`: `pre_social_login()` en `SocialAccountAdapter` bloquea auto-connect si el email ya existe sin cuenta Google → previene account takeover. Template `email_conflicto_google.html` explica al usuario qué hacer. ✅
 
 **Sesión 2026-08-21** — SIA ANDIS + bloqueo de infracciones fuera de horario:
 - `services/sia_verificacion.py`: servicio completo de verificación SIA contra ANDIS. Validación SSRF, parseo HTML tolerante, 8 estados posibles. ✅
