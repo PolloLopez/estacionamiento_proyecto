@@ -177,6 +177,11 @@ class Municipio(models.Model):
         verbose_name='Tolerancia multa (min)',
         help_text='Minutos de gracia: si el conductor paga la multa dentro de este plazo, se cancela automáticamente.',
     )
+    minutos_entre_infracciones = models.PositiveIntegerField(
+        default=15,
+        verbose_name='Minutos entre infracciones (mismo vehículo)',
+        help_text='Tiempo mínimo antes de poder infraccionar de nuevo al mismo vehículo. Defecto: 15 min.',
+    )
     monto_minimo_carga = models.PositiveIntegerField(
         default=500,
         verbose_name='Monto mínimo de carga MP ($)',

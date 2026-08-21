@@ -373,36 +373,42 @@ function seleccionarSubcuadraInspector(id) {
 </script>
 
 <!-- ── Modal de verificación SIA (cámara en tiempo real) ─────────── -->
-<div id="modal-sia" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7);
-     z-index:1000; align-items:center; justify-content:center; padding:1rem;">
-  <div style="background:var(--color-surface); border-radius:12px; padding:1.2rem;
-               max-width:320px; width:100%; box-shadow:0 4px 24px rgba(0,0,0,0.4);">
+<div id="modal-sia" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85);
+     z-index:1000; align-items:center; justify-content:center; padding:0.5rem;">
+  <!-- El modal usa flex-column para que el video llene el espacio disponible -->
+  <div style="background:var(--color-surface); border-radius:12px; padding:0.8rem;
+               max-width:480px; width:100%; box-shadow:0 4px 24px rgba(0,0,0,0.5);
+               display:flex; flex-direction:column;
+               max-height:calc(100dvh - 1rem); overflow:hidden;">
 
     <!-- Encabezado compacto -->
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.8rem;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.5rem; flex-shrink:0;">
       <span style="font-size:0.95rem; font-weight:700;">♿ Verificar SIA</span>
       <button type="button" onclick="cerrarModalSia()"
-              style="background:none; border:none; font-size:1.2rem; cursor:pointer;
-                     color:var(--color-text-muted); line-height:1;">✕</button>
+              style="background:none; border:none; font-size:1.3rem; cursor:pointer;
+                     color:var(--color-text-muted); line-height:1; padding:0.2rem 0.4rem;">✕</button>
     </div>
 
-    <!-- Patente (prellenada, editable) -->
-    <input id="sia-patente" type="text" maxlength="8" placeholder="Patente"
-           style="width:100%; padding:0.4rem 0.6rem; font-size:0.95rem; font-weight:700;
+    <!-- Patente (prellenada; readonly para que no abra el teclado automáticamente) -->
+    <input id="sia-patente" type="text" maxlength="8" placeholder="Patente" readonly
+           style="width:100%; padding:0.35rem 0.6rem; font-size:0.95rem; font-weight:700;
                   letter-spacing:2px; border:1px solid var(--color-border);
-                  border-radius:6px; margin-bottom:0.8rem; box-sizing:border-box;
-                  background:var(--color-bg); color:var(--color-text); text-align:center;">
+                  border-radius:6px; margin-bottom:0.5rem; box-sizing:border-box;
+                  background:var(--color-bg); color:var(--color-text); text-align:center;
+                  cursor:default;"
+           onclick="this.removeAttribute('readonly'); this.focus();"
+           onblur="this.setAttribute('readonly', '')">
 
-    <!-- Video en tiempo real -->
+    <!-- Video en tiempo real — flex:1 para que ocupe todo el espacio libre del modal -->
     <div style="position:relative; background:#000; border-radius:8px; overflow:hidden;
-                margin-bottom:0.6rem; aspect-ratio:4/3; width:100%;">
+                margin-bottom:0.5rem; flex:1; min-height:240px;">
       <video id="sia-video" autoplay playsinline muted
              style="width:100%; height:100%; object-fit:cover; display:block;"></video>
-      <!-- Línea guía central -->
+      <!-- Marco guía: ocupa el 70% del ancho del video para que el QR entre cómodo -->
       <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
                   pointer-events:none;">
-        <div style="width:55%; aspect-ratio:1; border:2px solid rgba(255,255,255,0.6);
-                    border-radius:8px; box-shadow:0 0 0 9999px rgba(0,0,0,0.25);"></div>
+        <div style="width:70%; aspect-ratio:1; border:2px solid rgba(255,255,255,0.7);
+                    border-radius:8px; box-shadow:0 0 0 9999px rgba(0,0,0,0.3);"></div>
       </div>
     </div>
 
@@ -411,11 +417,11 @@ function seleccionarSubcuadraInspector(id) {
 
     <!-- Estado del escaneo -->
     <p id="sia-estado" style="text-align:center; font-size:0.8rem; color:var(--color-text-muted);
-       margin:0 0 0.6rem;">Apuntá el QR del certificado de discapacidad</p>
+       margin:0 0 0.5rem; flex-shrink:0;">Apuntá el QR del certificado de discapacidad</p>
 
     <!-- Resultado -->
     <div id="sia-resultado" style="display:none; padding:0.7rem 0.8rem; border-radius:8px;
-         margin-bottom:0.6rem; font-size:0.82rem; line-height:1.5;"></div>
+         margin-bottom:0.5rem; font-size:0.82rem; line-height:1.5; flex-shrink:0;"></div>
 
     <!-- Fallback: URL manual (visible solo si la cámara no está disponible) -->
     <div id="sia-fallback" style="display:none;">
@@ -440,18 +446,21 @@ function seleccionarSubcuadraInspector(id) {
 <script>
 // ── SIA: escaneo QR con cámara en tiempo real ────────────────────────────────
 
-var _siaStream = null;       // MediaStream activo de la cámara
-var _siaScanning = false;    // flag para detener el loop de escaneo
+var _siaStream      = null;  // MediaStream activo de la cámara
+var _siaScanning    = false; // flag para detener el loop de escaneo
 var _siaVerificando = false; // evita envíos múltiples si detecta el QR varias veces
-var _siaUltimoScan = 0;      // timestamp del último intento de jsQR (throttle)
+var _siaVideoListo  = false; // true cuando el video está realmente reproduciendo
+var _siaUltimoScan  = 0;     // timestamp del último intento de jsQR (throttle)
 
 function abrirModalSia(patente) {
     document.getElementById("sia-patente").value = patente || "";
     document.getElementById("sia-resultado").style.display = "none";
     document.getElementById("sia-estado").textContent = "Apuntá el QR del certificado de discapacidad";
     document.getElementById("sia-fallback").style.display = "none";
+    document.getElementById("sia-video").style.display = "block";
     document.getElementById("modal-sia").style.display = "flex";
     _siaVerificando = false;
+    _siaVideoListo  = false;
     iniciarCamaraSia();
 }
 
@@ -463,25 +472,37 @@ function cerrarModalSia() {
 // Abre la cámara trasera y arranca el loop de escaneo
 function iniciarCamaraSia() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        // El browser no soporta getUserMedia → mostrar fallback con input de URL
         mostrarFallbackSia("Este navegador no soporta acceso a la cámara.");
         return;
     }
     navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 640 } }
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }
     })
     .then(function(stream) {
-        _siaStream = stream;
+        _siaStream   = stream;
         _siaScanning = true;
         var video = document.getElementById("sia-video");
         video.srcObject = stream;
-        video.onloadedmetadata = function() {
-            video.play();
-            escanearFrameSia();
-        };
+
+        // Usamos el evento 'playing' en lugar de 'loadedmetadata' o readyState.
+        // 'playing' se dispara cuando el video realmente está mostrando frames,
+        // lo cual es lo único que importa para capturar con canvas.
+        // iOS Safari y varios Android nunca llegan a readyState=4 en este contexto.
+        video.addEventListener("playing", function _onPlaying() {
+            video.removeEventListener("playing", _onPlaying);
+            _siaVideoListo = true;
+        });
+
+        // play() es async en browsers modernos; el catch captura el rechazo si
+        // el browser bloquea autoplay (raro pero posible en desktop con políticas estrictas).
+        video.play().catch(function() {
+            mostrarFallbackSia("El browser bloqueó el inicio automático de la cámara.");
+        });
+
+        // Arrancar el loop ahora; el flag _siaVideoListo controla cuándo empieza a escanear
+        escanearFrameSia();
     })
     .catch(function(err) {
-        // El usuario denegó el permiso o no hay cámara disponible
         var msg = err.name === "NotAllowedError"
             ? "Permiso de cámara denegado. Ingresá la URL manualmente."
             : "No se pudo abrir la cámara. Ingresá la URL manualmente.";
@@ -490,7 +511,8 @@ function iniciarCamaraSia() {
 }
 
 function detenerCamaraSia() {
-    _siaScanning = false;
+    _siaScanning   = false;
+    _siaVideoListo = false;
     if (_siaStream) {
         _siaStream.getTracks().forEach(function(t) { t.stop(); });
         _siaStream = null;
@@ -499,32 +521,36 @@ function detenerCamaraSia() {
     video.srcObject = null;
 }
 
-// Loop: captura un frame del video y lo analiza con jsQR
+// Loop: captura un frame del video y lo analiza con jsQR.
+// El flag _siaVideoListo garantiza que el video esté reproduciendo antes de capturar.
 function escanearFrameSia() {
     if (!_siaScanning) return;
 
+    var video  = document.getElementById("sia-video");
+    var canvas = document.getElementById("sia-canvas");
+
+    // Si el video todavía no empezó a reproducir, seguir esperando.
+    // _siaVideoListo lo pone en true el evento 'playing' — más confiable
+    // que readyState en iOS Safari y Android WebView.
+    if (!_siaVideoListo || !video || video.videoWidth === 0) {
+        requestAnimationFrame(escanearFrameSia);
+        return;
+    }
+
     var ahora = Date.now();
-    // Throttle: jsQR es lento, no tiene sentido correrlo 60 veces por segundo.
-    // Escaneamos cada 250ms; el resto del tiempo solo pedimos el próximo frame.
-    if (ahora - _siaUltimoScan < 250) {
+    // Throttle: 150ms entre intentos (~6 fps para jsQR).
+    // Más rápido que 250ms para no perder el QR si la mano tiembla,
+    // pero sin saturar el hilo principal.
+    if (ahora - _siaUltimoScan < 150) {
         requestAnimationFrame(escanearFrameSia);
         return;
     }
     _siaUltimoScan = ahora;
 
-    var video = document.getElementById("sia-video");
-    var canvas = document.getElementById("sia-canvas");
-
-    // readyState 4 = HAVE_ENOUGH_DATA: el video tiene datos reales para renderizar.
-    // Con readyState 2 (HAVE_CURRENT_DATA) el frame puede estar incompleto.
-    if (video.readyState < 4 || video.videoWidth === 0) {
-        requestAnimationFrame(escanearFrameSia);
-        return;
-    }
-
-    // jsQR necesita al menos ~400px en el lado menor para detectar bien.
-    // Si la cámara entrega menos (ej. 320px), escalamos antes de pasar el imageData.
-    var escala = Math.max(1, 400 / Math.min(video.videoWidth, video.videoHeight));
+    // Limitar el canvas a 640px de ancho máximo.
+    // Con cámaras de alta resolución (ej. 1920px), pasar el imageData completo
+    // a jsQR tarda varios segundos; con 640px alcanza y es mucho más rápido.
+    var escala = Math.min(1, 640 / video.videoWidth);
     canvas.width  = Math.round(video.videoWidth  * escala);
     canvas.height = Math.round(video.videoHeight * escala);
 
@@ -532,15 +558,11 @@ function escanearFrameSia() {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-    // "attemptBoth" prueba el QR normal e invertido; mejora la detección en
-    // distintas condiciones de luz sin costo significativo.
     var code = jsQR(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: "attemptBoth"
     });
 
     if (code && code.data && !_siaVerificando) {
-        // QR detectado → detener cámara y verificar automáticamente
         _siaVerificando = true;
         detenerCamaraSia();
         document.getElementById("sia-estado").textContent = "QR detectado, consultando ANDIS…";
@@ -548,7 +570,6 @@ function escanearFrameSia() {
         return;
     }
 
-    // Nada detectado aún → seguir escaneando
     requestAnimationFrame(escanearFrameSia);
 }
 

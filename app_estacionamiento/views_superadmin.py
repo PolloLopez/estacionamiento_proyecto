@@ -131,8 +131,9 @@ def editar_municipio(request, municipio_id):
 
         municipio.nombre             = request.POST.get("nombre", municipio.nombre).strip()
         municipio.nombre_sistema     = request.POST.get("nombre_sistema", "").strip()
-        municipio.monto_minimo_carga = _entero("monto_minimo_carga",  municipio.monto_minimo_carga)
-        municipio.monto_maximo_carga = _entero("monto_maximo_carga",  municipio.monto_maximo_carga)
+        municipio.monto_minimo_carga        = _entero("monto_minimo_carga",        municipio.monto_minimo_carga)
+        municipio.monto_maximo_carga        = _entero("monto_maximo_carga",        municipio.monto_maximo_carga)
+        municipio.minutos_entre_infracciones = _entero("minutos_entre_infracciones", municipio.minutos_entre_infracciones)
         municipio.activo             = request.POST.get("activo") == "on"
         municipio.leyenda_horarios   = request.POST.get("leyenda_horarios", "").strip()
         municipio.texto_ordenanza    = request.POST.get("texto_ordenanza", "").strip()
