@@ -17,12 +17,17 @@ class ResultadoVerificacion:
     exento_en_subcuadra_actual: Optional[bool] = None
     # Tipo de exención del vehículo (ej. "discapacitado") — para mostrar botón SIA
     tipo_exencion: Optional[str] = None
+    # Minutos restantes hasta poder infraccionar de nuevo (solo en INFRACCION_RECIENTE)
+    minutos_hasta_siguiente: Optional[int] = None
 
     # 🔴 IMPORTANTE: método, no property
     def necesita_infraccion(self) -> bool:
         # EXENTO_PARCIAL: solo infraccionar si NO está en su subcuadra exenta
         if self.estado == EstadoVehiculo.EXENTO_PARCIAL:
             return self.exento_en_subcuadra_actual is False
+        # INFRACCION_RECIENTE: el acta ya existe, no mostrar el botón INFRACCIONAR
+        if self.estado == EstadoVehiculo.INFRACCION_RECIENTE:
+            return False
         return self.estado in [
             EstadoVehiculo.NO_REGISTRADO,
             EstadoVehiculo.IMPAGO,
@@ -30,11 +35,12 @@ class ResultadoVerificacion:
 
     def css_class(self) -> str:
         return {
-            EstadoVehiculo.NO_REGISTRADO: "danger",
-            EstadoVehiculo.IMPAGO: "danger",
-            EstadoVehiculo.PAGADO: "success",
-            EstadoVehiculo.EXENTO_TOTAL: "info",
-            EstadoVehiculo.EXENTO_PARCIAL: "warning",
+            EstadoVehiculo.NO_REGISTRADO:       "danger",
+            EstadoVehiculo.IMPAGO:              "danger",
+            EstadoVehiculo.PAGADO:              "success",
+            EstadoVehiculo.EXENTO_TOTAL:        "info",
+            EstadoVehiculo.EXENTO_PARCIAL:      "warning",
+            EstadoVehiculo.INFRACCION_RECIENTE: "warn",
         }.get(self.estado, "info")  # fallback seguro
 
     def estado_label(self) -> str:

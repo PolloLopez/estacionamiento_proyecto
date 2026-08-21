@@ -16,6 +16,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db import transaction
 from django.utils import timezone
 
+from app_estacionamiento.domain.enums import MINUTOS_ENTRE_INFRACCIONES
 from app_estacionamiento.models import (
     Estacionamiento,
     Infraccion,
@@ -181,11 +182,13 @@ def crear_infraccion(
     if estacionamiento:
         raise ErrorInfraccion("Tiene estacionamiento activo")
 
-    hace_15_min = timezone.now() - timedelta(minutes=15)
+    # Segunda barrera anti-duplicado (la primera es verificar_estado_vehiculo).
+    # Protege si alguien llama al endpoint directamente sin pasar por la verificación.
+    hace_n_min = timezone.now() - timedelta(minutes=MINUTOS_ENTRE_INFRACCIONES)
     ultima = Infraccion.objects.filter(
         vehiculo=vehiculo, municipio=municipio
     ).order_by("-creado_en").first()
-    if ultima and ultima.creado_en >= hace_15_min:
+    if ultima and ultima.creado_en >= hace_n_min:
         raise ErrorInfraccion("Ya existe una infraccion reciente")
 
     tarifa = Tarifa.objects.filter(municipio=municipio).first()
