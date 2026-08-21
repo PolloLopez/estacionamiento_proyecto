@@ -52,12 +52,79 @@ git checkout develop        # 7. Volvés a develop para seguir trabajando
 
 > **Recordatorio:** cada vez que haya que subir a producción, leé esta sección antes de ejecutar.
 
+## Migraciones — cuándo y por qué
+
+Cada vez que modificás un modelo (`models.py`), Django necesita actualizar la base de datos.
+Son dos pasos distintos y siempre en ese orden:
+
+```powershell
+python manage.py makemigrations   # 1. Genera el archivo de migración (en migrations/)
+python manage.py migrate          # 2. Aplica la migración a la base de datos real
+```
+
+- `makemigrations` → lee tus modelos y crea un archivo Python con los cambios (ej: `0054_infraccion_sia_fields.py`). No toca la BD.
+- `migrate` → ejecuta esos archivos contra la BD. Railway lo corre automático al deployar.
+- Si creás un campo nuevo y no corrés `makemigrations`, Django tira error al arrancar.
+- Si el campo tiene `default=` o `null=True`, la migración no requiere datos previos.
+
+> **Regla práctica:** ¿Cambié `models.py`? → `makemigrations` + `migrate` antes de correr el servidor.
+
+## Django Shell — explorar el código en vivo
+
+Cuando no entendés por qué algo falla o querés probar una query antes de escribirla en el código:
+
+```powershell
+python manage.py shell
+```
+
+Dentro del shell podés importar cualquier cosa y probarla:
+
+```python
+from app_estacionamiento.models import Vehiculo, Infraccion
+from app_estacionamiento.services.sia_verificacion import verificar_sia
+
+# Ver un objeto real
+v = Vehiculo.objects.get(patente="AA123BB")
+print(v.exento_global, v.vigencia_exencion)
+
+# Probar una query
+Infraccion.objects.filter(inspector__correo="inspector@test.com").count()
+```
+
+Es la forma más directa de entender qué tiene la BD y cómo responden las funciones sin tener que correr el servidor completo.
+
+## Arquitectura — por qué el código está separado así
+
+```
+views_*.py   → recibe la request HTTP, valida el formulario, devuelve la respuesta
+use_cases/   → orquesta una operación completa (ej: "estacionar un vehículo")
+services/    → lógica de negocio reutilizable (ej: verificar estado, calcular tarifa)
+domain/      → reglas puras sin DB (ej: ¿este vehículo puede estacionar?)
+models.py    → estructura de la base de datos
+```
+
+**Por qué importa aprenderlo:** si necesitás cambiar cómo se calcula la tolerancia,
+sabés que es en `services/infracciones.py`, no en una vista. Si algo falla en la
+verificación de vehículos, buscás en `services/verificacion.py`. El error te dice
+dónde mirar.
+
+**Regla para leer código nuevo:** empezá por la vista (`views_*.py`) para entender
+el flujo, seguí al use_case o service que llama, y llegás a la lógica real.
+
 ## Tests
 
 ```powershell
 python manage.py test app_estacionamiento --verbosity=2
-# Resultado esperado: 130 tests, OK
+# Resultado esperado: 130+ tests, OK
 ```
+
+**Cuándo correr los tests:**
+- Después de cualquier cambio en `models.py`, `services/`, o `use_cases/`.
+- Antes de mergear a `main` (antes de deployar).
+- Si algo se rompe en producción y no sabés qué fue.
+
+Un test que falla te dice exactamente qué función rompiste y cómo se esperaba que se comportara.
+Leerlos también es una forma de entender cómo funciona el código.
 
 ## Gotchas conocidos
 
