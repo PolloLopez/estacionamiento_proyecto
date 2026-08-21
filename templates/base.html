@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   {% load static %}
 
+  <!-- Previene flash de tema incorrecto: aplica data-theme ANTES de pintar.
+       Lee localStorage sincrónicamente (no hay otra forma de evitar el FOUC). -->
+  <script>
+    (function() {
+      var t = localStorage.getItem("tema");
+      if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    })();
+  </script>
+
   <title>{% block title %}EstacionAR{% endblock %}</title>
 
   <!-- Favicon e ícono de acceso directo.
@@ -38,16 +47,26 @@
   {% if municipio_branding.color_primario %}
   <style>
     :root {
+      /* Color primario: navbar, botones principales */
       --color-primary:       {{ municipio_branding.color_primario }};
-      --color-primary-hover: {{ municipio_branding.color_secundario|default:"#0f6830" }};
+      --color-primary-hover: color-mix(in srgb, {{ municipio_branding.color_primario }} 82%, black);
       --color-primary-light: color-mix(in srgb, {{ municipio_branding.color_primario }} 15%, white);
-      /* Navbar y footer usan el color del municipio:
-         nav → color primario, footer → color secundario (levemente más oscuro) */
+
+      /* Color acento: botones secundarios, highlights */
+      --color-acento:        {{ municipio_branding.color_acento|default:"#bed630" }};
+      --color-acento-hover:  color-mix(in srgb, {{ municipio_branding.color_acento|default:"#bed630" }} 82%, black);
+
+      /* Color secundario: footer, texto de soporte */
+      --color-secondary:     {{ municipio_branding.color_secundario|default:"#444444" }};
+
+      /* Navbar (primario) y footer (secundario) */
       --color-nav-bg:    {{ municipio_branding.color_primario }};
-      --color-footer-bg: {{ municipio_branding.color_secundario|default:"#0f6830" }};
+      --color-footer-bg: {{ municipio_branding.color_secundario|default:"#444444" }};
     }
   </style>
   {% endif %}
+
+  {% block extra_head %}{% endblock %}
 
 </head>
 
@@ -85,6 +104,15 @@
                    font-weight:700; white-space:nowrap; flex-shrink:0;
                    line-height:1.3; order:1;">
       📲 Instalar
+    </button>
+
+    <!-- Botón dark mode -->
+    <button id="btn-dark-toggle"
+            class="dark-toggle"
+            type="button"
+            aria-label="Cambiar modo oscuro/claro"
+            title="Modo oscuro / claro">
+      🌙
     </button>
 
     <!-- Botón hamburguesa (solo mobile) -->
@@ -282,6 +310,35 @@
       promptGuardado = null;
       if (btnInstalar) btnInstalar.style.display = "none";
     });
+  }());
+  </script>
+
+  <!-- Dark mode toggle: lee el tema guardado, actualiza el ícono y maneja el click -->
+  <script>
+  (function () {
+    var btn = document.getElementById("btn-dark-toggle");
+
+    function aplicarTema(t) {
+      if (t === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+        if (btn) btn.textContent = "☀️";
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+        if (btn) btn.textContent = "🌙";
+      }
+    }
+
+    // Sincronizar el ícono con el tema que ya aplicó el inline script del <head>
+    aplicarTema(localStorage.getItem("tema") || "light");
+
+    if (btn) {
+      btn.addEventListener("click", function () {
+        var actual = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        var nuevo  = actual === "dark" ? "light" : "dark";
+        localStorage.setItem("tema", nuevo);
+        aplicarTema(nuevo);
+      });
+    }
   }());
   </script>
 

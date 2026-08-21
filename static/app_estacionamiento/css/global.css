@@ -12,9 +12,17 @@
   --color-surface:      #ffffff;
   --color-surface-2:    #e8ece8;
 
+  /* Color primario (navbar, botones principales) — municipio lo sobreescribe */
   --color-primary:        #14883b;
   --color-primary-hover:  #0f6830;
   --color-primary-light:  #d4edda;
+
+  /* Color acento (botones secundarios, highlights) — municipio lo sobreescribe */
+  --color-acento:        #bed630;
+  --color-acento-hover:  #a8be1e;
+
+  /* Color secundario (footer, texto, secundario) — municipio lo sobreescribe */
+  --color-secondary:     #444444;
 
   --color-text:         #111111;
   --color-text-muted:   #555555;
@@ -39,6 +47,35 @@
 
   /* Altura del navbar — usada para compensar position:sticky */
   --navbar-h: 62px;
+}
+
+/* ─── MODO OSCURO ────────────────────────────────────────────── */
+/* Activado con data-theme="dark" en <html> (toggle en navbar).
+   Los colores primario/acento los define el municipio: no los tocamos acá.
+   Solo cambiamos fondos, textos, bordes y colores de estado. */
+[data-theme="dark"] {
+  --color-bg:           #0d1117;
+  --color-surface:      #161b22;
+  --color-surface-2:    #21262d;
+
+  --color-text:         #e6edf3;
+  --color-text-muted:   #8b949e;
+  --color-text-inverse: #ffffff;
+
+  --color-border:       #30363d;
+
+  --color-danger:       #ff7b72;
+  --color-danger-bg:    #2d1212;
+  --color-warning:      #e3b341;
+  --color-warning-bg:   #2d2100;
+  --color-success:      #56d364;
+  --color-success-bg:   #0e2818;
+
+  /* primary-light como overlay translúcido sobre el fondo oscuro */
+  --color-primary-light: rgba(145, 213, 226, 0.12);
+
+  --shadow-sm:   0 2px 6px rgba(0,0,0,0.35);
+  --shadow-md:   0 6px 20px rgba(0,0,0,0.50);
 }
 
 /* ─── RESET ──────────────────────────────────────────────────── */
@@ -84,8 +121,13 @@ img { max-width: 100%; display: block; }
   padding: 1.5rem 1.2rem;
 }
 
+/* main.container NO agrega padding propio: el padding viene siempre del .container
+   interno de cada template. Así se evita el doble padding en los ~60 templates
+   que tienen ambos niveles anidados. Para los templates sin .container interno
+   (panel_admin, panel_tesorero, vendedores), el padding lo dan sus cards/layouts. */
 main.container {
   flex: 1;
+  padding: 0;
 }
 
 /* ─── NAVBAR ─────────────────────────────────────────────────── */
@@ -1062,3 +1104,145 @@ table tr:hover { background: var(--color-surface-2); }
   .container { padding: 0.8rem 0.7rem; }
   .navbar { padding: 0 0.8rem; }
 }
+
+/* ─── BOTÓN ACENTO ────────────────────────────────────────────── */
+/* Para acciones secundarias o highlights del municipio */
+.btn-acento {
+  background: var(--color-acento);
+  border-color: var(--color-acento);
+  color: #111111;   /* texto oscuro — los acentos tienden a ser claros */
+}
+.btn-acento:hover {
+  background: var(--color-acento-hover);
+  border-color: var(--color-acento-hover);
+  color: #111111;
+}
+
+/* ─── DARK MODE TOGGLE ───────────────────────────────────────── */
+/* Botón ☀️/🌙 en la navbar. Apariencia igual al botón Instalar. */
+.dark-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.35);
+  cursor: pointer;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  transition: background var(--transition);
+  color: #fff;
+  line-height: 1;
+  padding: 0;
+}
+.dark-toggle:hover { background: rgba(255,255,255,0.28); }
+
+/* ─── LAYOUT ADMIN (sidebar + contenido) ────────────────────── */
+/* En desktop: sidebar 260px fija + contenido flex.
+   En tablet/mobile: se apila verticalmente. */
+.admin-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  padding: 1.5rem 1.2rem;
+}
+
+.admin-sidebar {
+  position: sticky;
+  top: 1rem;
+}
+
+@media (max-width: 900px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+    margin: 0;
+  }
+  .admin-sidebar {
+    position: static;
+  }
+  /* El sidebar en mobile muestra los botones en grilla 2 columnas */
+  .admin-sidebar .card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+  }
+  /* Los separadores y labels ocupan toda la fila */
+  .admin-sidebar .card hr,
+  .admin-sidebar .card p {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-sidebar .card {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── TABLAS RESPONSIVAS ─────────────────────────────────────── */
+/* Wrapper obligatorio para tablas anchas en mobile.
+   Uso: <div class="tabla-scroll"><table>...</table></div> */
+.tabla-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-sm);
+}
+
+/* Indicador de scroll horizontal (solo visible si la tabla desborda) */
+.tabla-scroll::after {
+  content: '';
+  display: none; /* activado via JS si scrollWidth > clientWidth */
+}
+
+/* ─── MODO OSCURO — ajustes de componentes específicos ────────── */
+[data-theme="dark"] .card {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .panel {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--color-surface-2);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+[data-theme="dark"] .input-patente {
+  background: #111;
+  border-color: var(--color-primary);
+  color: #00e676;
+}
+
+[data-theme="dark"] .box-ok     { background: #0e2818; border-color: var(--color-primary); color: var(--color-success); }
+[data-theme="dark"] .box-warn   { background: #2d2100; border-color: var(--color-warning); color: var(--color-warning); }
+[data-theme="dark"] .box-danger { background: #2d1212; border-color: var(--color-danger);  color: var(--color-danger);  }
+
+[data-theme="dark"] .box.danger  { background: var(--color-danger-bg);  border-left-color: var(--color-danger);  color: var(--color-danger); }
+[data-theme="dark"] .box.success { background: var(--color-success-bg); border-left-color: var(--color-success); color: var(--color-success); }
+[data-theme="dark"] .box.warning { background: var(--color-warning-bg); border-left-color: var(--color-warning); color: var(--color-warning); }
+[data-theme="dark"] .box.info    { background: #0f2440;                 border-left-color: #3b82f6;              color: #93c5fd; }
+
+[data-theme="dark"] .alert-info    { background: #0f2440; border-color: #1d4ed8; color: #93c5fd; }
+[data-theme="dark"] .alert-warning { background: var(--color-warning-bg); border-color: var(--color-warning); color: var(--color-warning); }
+[data-theme="dark"] .alert-danger  { background: var(--color-danger-bg);  border-color: var(--color-danger);  color: var(--color-danger);  }
+[data-theme="dark"] .alert-success { background: var(--color-success-bg); border-color: var(--color-success); color: var(--color-success); }
+
+[data-theme="dark"] table tr:hover { background: var(--color-surface-2); }
+[data-theme="dark"] .resumen { background: var(--color-surface-2); border-color: var(--color-border); }
+
+[data-theme="dark"] .gps-chip         { background: #0e2818; color: var(--color-success); border-color: #1a4a2a; }
+[data-theme="dark"] .gps-chip.esperando { background: #2d2100; color: var(--color-warning); border-color: #4a3800; }
+[data-theme="dark"] .gps-chip.error     { background: #2d1212; color: var(--color-danger);  border-color: #4a1e1e; }
+
+[data-theme="dark"] .nav-items { background: var(--color-surface); }
+[data-theme="dark"] .nav-items a { color: var(--color-text); }
+[data-theme="dark"] .nav-items a:hover { background: var(--color-surface-2); color: var(--color-text); }

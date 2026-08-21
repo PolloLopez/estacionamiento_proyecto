@@ -143,10 +143,13 @@ def editar_municipio(request, municipio_id):
         # Usamos el text input (que puede estar en blanco para "sin color").
         color_primario   = request.POST.get("color_primario_hex", "").strip()
         color_secundario = request.POST.get("color_secundario_hex", "").strip()
+        color_acento     = request.POST.get("color_acento_hex", "").strip()
         if color_primario.startswith("#") and len(color_primario) in (4, 7):
             municipio.color_primario = color_primario
         if color_secundario.startswith("#") and len(color_secundario) in (4, 7):
             municipio.color_secundario = color_secundario
+        if color_acento.startswith("#") and len(color_acento) in (4, 7):
+            municipio.color_acento = color_acento
 
         # ── Logo ───────────────────────────────────────────────────────────
         if request.POST.get("borrar_logo") and municipio.logo:
