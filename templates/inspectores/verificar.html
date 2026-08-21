@@ -564,15 +564,28 @@ function escanearFrameSia() {
     // drawImage con 9 parámetros: fuente, recorte (ox,oy,lado,lado) → canvas (0,0,400,400)
     ctx.drawImage(video, ox, oy, lado, lado, 0, 0, 400, 400);
 
+    // Verificar que jsQR cargó. Si el CDN falla, jsQR es undefined y lanza
+    // ReferenceError sin catch → el loop para silenciosamente.
+    if (typeof jsQR === "undefined") {
+        _siaLog("❌ jsQR no cargó (CDN sin internet?). Ingresá la URL.");
+        mostrarFallbackSia("jsQR no disponible. Ingresá la URL manualmente.");
+        return;
+    }
+
     var imageData = ctx.getImageData(0, 0, 400, 400);
-    var code = jsQR(imageData.data, 400, 400, {
-        inversionAttempts: "attemptBoth"
-    });
+    var code;
+    try {
+        code = jsQR(imageData.data, 400, 400, { inversionAttempts: "attemptBoth" });
+    } catch (e) {
+        _siaLog("❌ Error en jsQR: " + e.message);
+        requestAnimationFrame(escanearFrameSia);
+        return;
+    }
 
     // Cada 10 frames mostrar el estado para confirmar que jsQR está corriendo
     if (_siaFrames % 10 === 0) {
         _siaLog("Buscando QR… frame " + _siaFrames +
-                " (recorte central " + Math.round(lado) + "px → 400×400)");
+                " (recorte " + Math.round(lado) + "px → 400×400)");
     }
 
     if (code && code.data && !_siaVerificando) {

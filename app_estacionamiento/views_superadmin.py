@@ -150,10 +150,17 @@ def editar_municipio(request, municipio_id):
 
         # ── Logo ───────────────────────────────────────────────────────────
         if request.POST.get("borrar_logo") and municipio.logo:
-            municipio.logo.delete(save=False)   # borra el archivo del storage
+            municipio.logo.delete(save=False)
             municipio.logo = None
         if "logo" in request.FILES:
             municipio.logo = request.FILES["logo"]
+
+        # ── Ícono de app (PWA / acceso directo) ────────────────────────────
+        if request.POST.get("borrar_icono_app") and municipio.icono_app:
+            municipio.icono_app.delete(save=False)
+            municipio.icono_app = None
+        if "icono_app" in request.FILES:
+            municipio.icono_app = request.FILES["icono_app"]
 
         municipio.save()
         messages.success(request, "Municipio actualizado.")

@@ -115,6 +115,26 @@
                      style="width:100%; margin-top:0.25rem;">
             </div>
 
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Ícono de la app (acceso directo PWA)</label>
+            {% if municipio.icono_app %}
+              <div style="margin:0.4rem 0;">
+                <img src="{{ municipio.icono_app.url }}" alt="Ícono app"
+                     style="width:64px; height:64px; object-fit:cover; border-radius:12px;
+                            border:1px solid var(--color-border);">
+              </div>
+              <div style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.25rem;">
+                Ícono actual. Subí uno nuevo para reemplazarlo.
+              </div>
+              <label style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.82rem; font-weight:600; color:var(--color-danger); cursor:pointer; margin-bottom:0.5rem;">
+                <input type="checkbox" name="borrar_icono_app"> Eliminar ícono actual
+              </label>
+            {% endif %}
+            <input type="file" name="icono_app" accept="image/*"
+                   style="width:100%; margin-top:0.25rem;">
+            <small style="color:var(--color-text-muted);">PNG cuadrado, mínimo 192×192px. Aparece como ícono al instalar la app en el celular.</small>
+          </div>
+
             {# Colores #}
             <div class="grid grid-2" style="gap:0.5rem; margin-bottom:0.75rem;">
               <div>
