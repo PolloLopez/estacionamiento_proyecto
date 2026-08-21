@@ -15,6 +15,8 @@ class ResultadoVerificacion:
     subcuadras_exentas: Optional[list] = None
     # True si el vehículo tiene exención parcial Y está en una subcuadra exenta
     exento_en_subcuadra_actual: Optional[bool] = None
+    # Tipo de exención del vehículo (ej. "discapacitado") — para mostrar botón SIA
+    tipo_exencion: Optional[str] = None
 
     # 🔴 IMPORTANTE: método, no property
     def necesita_infraccion(self) -> bool:

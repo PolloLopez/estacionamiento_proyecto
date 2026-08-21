@@ -48,7 +48,66 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
     pero nuestro modelo usa 'correo' como USERNAME_FIELD.
     Este adapter copia el email de Google al campo 'correo' al crear el usuario,
     y tambien copia nombre y apellido del perfil de Google.
+
+    Seguridad: `pre_social_login` bloquea el auto-connect cuando el email ya
+    existe en la BD sin una cuenta Google asociada. Sin esta protección, un
+    atacante podría crear una cuenta Google con el email de otra persona y
+    tomar control de su cuenta (account takeover vía SOCIALACCOUNT_AUTO_SIGNUP).
     """
+
+    def pre_social_login(self, request, sociallogin):
+        """
+        Bloquea el intento de login si el email de Google ya pertenece
+        a un usuario registrado por otra vía (ej: email + contraseña).
+
+        Flujo normal (no bloquea):
+        - El sociallogin ya está conectado a un usuario existente.
+        - El email no existe en la BD (usuario nuevo → auto-signup).
+        - El email existe Y ya tiene cuenta Google asociada (re-login).
+
+        Flujo bloqueado:
+        - El email existe en la BD sin cuenta Google → posible takeover.
+        """
+        from allauth.exceptions import ImmediateHttpResponse
+        from allauth.socialaccount.models import SocialAccount
+        from django.shortcuts import render
+
+        # Ya conectado a un usuario: flujo normal de re-login
+        if sociallogin.is_existing:
+            return
+
+        # Obtener el email que Google devuelve
+        email = (sociallogin.account.extra_data or {}).get("email", "")
+        if not email and sociallogin.email_addresses:
+            email = sociallogin.email_addresses[0].email
+        if not email:
+            # Sin email no podemos verificar — dejamos que allauth maneje
+            return
+
+        from .models import Usuario
+        try:
+            usuario_existente = Usuario.objects.get(correo__iexact=email)
+        except Usuario.DoesNotExist:
+            # Email nuevo → auto-signup normal
+            return
+
+        # El email existe: verificar si ya tiene cuenta Google vinculada
+        tiene_google = SocialAccount.objects.filter(
+            user=usuario_existente, provider="google"
+        ).exists()
+
+        if not tiene_google:
+            # Email registrado sin Google → bloquear para prevenir takeover
+            logger.warning(
+                "pre_social_login bloqueado: correo='%s' ya existe sin cuenta Google. ip=%s",
+                email,
+                request.META.get("REMOTE_ADDR", "-"),
+            )
+            raise ImmediateHttpResponse(
+                render(request, "account/email_conflicto_google.html", {
+                    "correo": email,
+                })
+            )
 
     def populate_user(self, request, sociallogin, data):
         # Llamar al adapter base para rellenar los campos estandar

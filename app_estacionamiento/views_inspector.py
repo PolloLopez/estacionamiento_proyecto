@@ -11,7 +11,7 @@ Responsabilidades:
 No incluye cobros ni liquidaciones (eso es responsabilidad del vendedor).
 """
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 import math
 
@@ -28,6 +28,7 @@ from .models import (
     Subcuadra,
     Vehiculo,
 )
+from .services.horarios import puede_estacionar_ahora
 from .services_infracciones import ErrorInfraccion, crear_infraccion
 from .services_verificacion import verificar_estado_vehiculo
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
@@ -150,6 +151,8 @@ def verificar_vehiculo(request):
             historial.insert(0, patente)
             request.session["historial"] = historial[:5]
 
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
+
     return render(request, "inspectores/verificar.html", {
         "resultado": resultado,
         "historial": historial,
@@ -157,6 +160,8 @@ def verificar_vehiculo(request):
         "subcuadras": subcuadras,
         "subcuadra_activa": subcuadra_activa,
         "tipo_seleccionado": tipo_seleccionado,
+        "horario_activo": horario_activo,
+        "mensaje_horario": mensaje_horario,
     })
 
 
@@ -201,6 +206,16 @@ def registrar_infraccion(request):
     if not subcuadra:
         messages.error(request, "No existe subcuadra configurada.")
         return redirect("panel_inspectores")
+
+    # Bloquear infraccionamiento fuera del horario de cobro
+    # (misma lógica que para estacionar — si no hay cobro, no hay infracción)
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
+    if not horario_activo:
+        messages.warning(
+            request,
+            f"No se puede infraccionar fuera del horario de cobro. {mensaje_horario}"
+        )
+        return redirect("inspectores_verificar_vehiculo")
 
     # Pre-seleccionar subcuadra en el dropdown: primero sesion, luego ultima infraccion
     ultima_infraccion = Infraccion.objects.filter(inspector=usuario).order_by("-creado_en").first()
@@ -482,3 +497,98 @@ def subcuadra_cercana(request):
         "id":     mas_cercana.id,
         "nombre": str(mas_cercana),
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Verificación SIA (Símbolo Internacional de Acceso — ANDIS)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("inspector")
+def verificar_sia(request):
+    """
+    Endpoint AJAX para verificar el SIA de ANDIS desde la app del inspector.
+
+    Recibe: POST JSON { patente, qr_url }
+    Devuelve: JSON con el resultado de la verificación.
+
+    Si el SIA es válido y la patente coincide:
+    - Crea o actualiza el Vehiculo con exencion_tipo='discapacitado'
+      y vigencia_exencion = vencimiento del SIA.
+    - A partir de ese momento, el vehículo aparece como EXENTO_TOTAL
+      (siempre que la vigencia no expire).
+
+    Si la verificación falla por cualquier razón, deja constancia del intento
+    sin marcar el SIA como falso — el inspector decide cómo continuar.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+    import json
+    from django.utils import timezone
+    from .services.sia_verificacion import verificar_sia as _verificar_sia
+    from .utils import sanitizar_patente
+
+    try:
+        body = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "JSON inválido"}, status=400)
+
+    patente = sanitizar_patente(body.get("patente", ""))
+    qr_url  = (body.get("qr_url", "") or "").strip()
+
+    if not patente:
+        return JsonResponse({"error": "Patente requerida"}, status=400)
+    if not qr_url:
+        return JsonResponse({"error": "URL del QR requerida"}, status=400)
+
+    resultado = _verificar_sia(qr_url=qr_url, patente_inspector=patente)
+
+    # Si el SIA es válido: registrar la exención en la BD
+    if resultado.es_valido:
+        vehiculo, _ = Vehiculo.objects.get_or_create(
+            patente=patente,
+            defaults={"municipio": request.user.municipio},
+        )
+        vehiculo.exento_global      = True
+        vehiculo.tipo_exencion      = "discapacitado"
+        vehiculo.vigencia_exencion  = resultado.vencimiento
+        vehiculo.exencion_verificada = True
+        # Guardar NCI en notas para auditoría (no el DNI del titular)
+        vehiculo.notas_exencion = (
+            f"SIA verificado vía ANDIS. NCI: {resultado.nci}. "
+            f"Titular: {resultado.titular}. "
+            f"Verificado por inspector {request.user.correo} el {date.today()}."
+        )
+        vehiculo.save(update_fields=[
+            "exento_global", "tipo_exencion", "vigencia_exencion",
+            "exencion_verificada", "notas_exencion",
+        ])
+
+    # Construir respuesta para el frontend
+    respuesta = {
+        "estado":      resultado.estado,
+        "es_valido":   resultado.es_valido,
+        "patente_sia": resultado.patente_sia,
+        "titular":     resultado.titular,
+        "nci":         resultado.nci,
+        "vencimiento": resultado.vencimiento.strftime("%d/%m/%Y") if resultado.vencimiento else "",
+    }
+
+    # Mensajes según el estado
+    mensajes_inspector = {
+        "VALIDO_PATENTE_COINCIDENTE": "✅ SIA verificado correctamente. La exención fue registrada.",
+        "PATENTE_NO_COINCIDE":        "⚠️ El SIA corresponde a una patente diferente al vehículo controlado.",
+        "SIA_VENCIDO":                "⚠️ El SIA presentado está vencido.",
+        "SIA_SIN_DOMINIO":            "⚠️ El SIA no tiene patente/dominio registrado.",
+        "QR_URL_INVALIDA":            "❌ El QR escaneado no es un SIA oficial de ANDIS.",
+        "ANDIS_NO_DISPONIBLE":        "⚠️ No fue posible verificar: el servicio de ANDIS no está disponible.",
+        "ANDIS_ERROR":                "⚠️ No fue posible verificar: error en el servicio de ANDIS.",
+        "RESPUESTA_INVALIDA":         "⚠️ No fue posible verificar: respuesta inesperada de ANDIS.",
+    }
+    respuesta["mensaje"] = mensajes_inspector.get(resultado.estado, "Estado desconocido.")
+
+    # URL para fallback manual (solo cuando el QR se leyó correctamente)
+    if resultado.sia_url and resultado.estado not in ("QR_URL_INVALIDA",):
+        respuesta["url_andis"] = resultado.sia_url
+
+    return JsonResponse(respuesta)
