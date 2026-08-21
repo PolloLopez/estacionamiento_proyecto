@@ -41,6 +41,14 @@
           </div>
 
           <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Minutos entre infracciones (mismo vehículo)</label>
+            <input type="number" name="minutos_entre_infracciones" min="1" max="120" step="1"
+                   value="{{ municipio.minutos_entre_infracciones }}"
+                   style="width:100%; margin-top:0.25rem;">
+            <small style="color:var(--color-text-muted);">Tiempo mínimo antes de poder infraccionar de nuevo al mismo vehículo. Defecto: 15 min.</small>
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Monto mínimo de carga MP ($)</label>
             <input type="number" name="monto_minimo_carga" min="1" step="1"
                    value="{{ municipio.monto_minimo_carga }}"

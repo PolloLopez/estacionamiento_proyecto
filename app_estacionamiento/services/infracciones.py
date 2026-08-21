@@ -184,7 +184,9 @@ def crear_infraccion(
 
     # Segunda barrera anti-duplicado (la primera es verificar_estado_vehiculo).
     # Protege si alguien llama al endpoint directamente sin pasar por la verificación.
-    hace_n_min = timezone.now() - timedelta(minutes=MINUTOS_ENTRE_INFRACCIONES)
+    # El plazo lo configura el superadmin en Municipio.minutos_entre_infracciones.
+    minutos = getattr(municipio, "minutos_entre_infracciones", MINUTOS_ENTRE_INFRACCIONES)
+    hace_n_min = timezone.now() - timedelta(minutes=minutos)
     ultima = Infraccion.objects.filter(
         vehiculo=vehiculo, municipio=municipio
     ).order_by("-creado_en").first()

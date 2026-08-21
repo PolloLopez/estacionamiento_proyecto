@@ -155,8 +155,10 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
     # 6. INFRACCIÓN RECIENTE — ya existe un acta en los últimos N minutos.
     # Sin este chequeo el inspector vería el botón INFRACCIONAR y recién
     # descubriría el duplicado al enviar el formulario (mala UX).
+    # El plazo lo configura el superadmin en editar_municipio; fallback al default.
     if municipio:
-        hace_n_min = timezone.now() - timedelta(minutes=MINUTOS_ENTRE_INFRACCIONES)
+        minutos = getattr(municipio, "minutos_entre_infracciones", MINUTOS_ENTRE_INFRACCIONES)
+        hace_n_min = timezone.now() - timedelta(minutes=minutos)
         infraccion_reciente = (
             Infraccion.objects
             .filter(vehiculo=vehiculo, municipio=municipio, creado_en__gte=hace_n_min)
@@ -165,7 +167,7 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
         )
         if infraccion_reciente:
             segundos_transcurridos = (timezone.now() - infraccion_reciente.creado_en).total_seconds()
-            minutos_hasta = max(1, int((MINUTOS_ENTRE_INFRACCIONES * 60 - segundos_transcurridos) / 60) + 1)
+            minutos_hasta = max(1, int((minutos * 60 - segundos_transcurridos) / 60) + 1)
             return ResultadoVerificacion(
                 patente=patente,
                 estado=EstadoVehiculo.INFRACCION_RECIENTE,
