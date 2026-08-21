@@ -28,6 +28,7 @@ from .models import (
     Subcuadra,
     Vehiculo,
 )
+from .services.horarios import puede_estacionar_ahora
 from .services_infracciones import ErrorInfraccion, crear_infraccion
 from .services_verificacion import verificar_estado_vehiculo
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
@@ -150,6 +151,8 @@ def verificar_vehiculo(request):
             historial.insert(0, patente)
             request.session["historial"] = historial[:5]
 
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
+
     return render(request, "inspectores/verificar.html", {
         "resultado": resultado,
         "historial": historial,
@@ -157,6 +160,8 @@ def verificar_vehiculo(request):
         "subcuadras": subcuadras,
         "subcuadra_activa": subcuadra_activa,
         "tipo_seleccionado": tipo_seleccionado,
+        "horario_activo": horario_activo,
+        "mensaje_horario": mensaje_horario,
     })
 
 
@@ -201,6 +206,16 @@ def registrar_infraccion(request):
     if not subcuadra:
         messages.error(request, "No existe subcuadra configurada.")
         return redirect("panel_inspectores")
+
+    # Bloquear infraccionamiento fuera del horario de cobro
+    # (misma lógica que para estacionar — si no hay cobro, no hay infracción)
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
+    if not horario_activo:
+        messages.warning(
+            request,
+            f"No se puede infraccionar fuera del horario de cobro. {mensaje_horario}"
+        )
+        return redirect("inspectores_verificar_vehiculo")
 
     # Pre-seleccionar subcuadra en el dropdown: primero sesion, luego ultima infraccion
     ultima_infraccion = Infraccion.objects.filter(inspector=usuario).order_by("-creado_en").first()

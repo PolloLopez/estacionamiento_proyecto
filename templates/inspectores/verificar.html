@@ -167,16 +167,24 @@
                   </div>
                 {% endif %}
                 <!-- SIA: el inspector puede verificar antes de infraccionar -->
+                {% if horario_activo %}
                 <button type="button" class="btn btn-outline btn-big"
                         onclick="abrirModalSia('{{ resultado.patente }}')"
                         style="margin-bottom:0.5rem; border-color:var(--color-text-muted); color:var(--color-text-muted);">
                     ♿ Verificar SIA (discapacidad)
                 </button>
+                {% endif %}
                 {% if resultado.necesita_infraccion %}
-                    <a class="btn btn-danger btn-big"
-                       href="{{ resultado.registrar_infraccion_url }}">
-                        🚨 INFRACCIONAR
-                    </a>
+                    {% if horario_activo %}
+                        <a class="btn btn-danger btn-big"
+                           href="{{ resultado.registrar_infraccion_url }}">
+                            🚨 INFRACCIONAR
+                        </a>
+                    {% else %}
+                        <p style="font-size:0.85rem; color:var(--color-text-muted); margin-top:0.6rem;">
+                            ⏰ {{ mensaje_horario }}
+                        </p>
+                    {% endif %}
                 {% endif %}
             </div>
         {% endif %}
