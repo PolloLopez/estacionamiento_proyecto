@@ -101,6 +101,7 @@ from .views_admin import (
     pdf_rendicion,
     gestionar_subcuadras,
     importar_exenciones,
+    auditoria_staff,
 )
 from .views_mp import (
     mp_iniciar_carga,

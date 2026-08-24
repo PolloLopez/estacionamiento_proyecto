@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Auditoría de staff{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <!-- Encabezado + navegación -->
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>🔍 Auditoría de staff</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+  </div>
+
+  <!-- Filtro de fechas -->
+  <form method="get" style="margin-bottom:1.5rem;">
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+      <div>
+        <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Desde</label>
+        <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}"
+               style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}"
+               style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);">
+      </div>
+      <button type="submit" class="btn" style="font-size:0.9rem;">Filtrar</button>
+      {% if desde != hoy or hasta != hoy %}
+        <a href="{% url 'auditoria_staff' %}" class="btn btn-outline" style="font-size:0.9rem;">Hoy</a>
+      {% endif %}
+    </div>
+    {% if desde == hasta %}
+      <p style="margin-top:0.5rem; font-size:0.82rem; color:var(--color-text-muted);">
+        Mostrando actividad del {{ desde|date:"d/m/Y" }}
+      </p>
+    {% else %}
+      <p style="margin-top:0.5rem; font-size:0.82rem; color:var(--color-text-muted);">
+        Mostrando actividad del {{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}
+      </p>
+    {% endif %}
+  </form>
+
+  <!-- ── VENDEDORES ──────────────────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
+    <h3 style="margin-bottom:0.75rem;">💰 Vendedores</h3>
+
+    {% if vendedores %}
+      <table style="min-width:600px;">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th style="text-align:right;">Cobrado en período</th>
+            <th style="text-align:right;">Comisión</th>
+            <th style="text-align:center;">Mov. abiertos</th>
+            <th>Último cierre</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in vendedores %}
+          <tr>
+            <td>
+              <strong>{{ v.nombre|default:v.correo }}</strong>
+              {% if v.apellido %} {{ v.apellido }}{% endif %}
+            </td>
+
+            <td style="text-align:right; font-weight:700;">
+              {% if v.cobrado_periodo %}
+                ${{ v.cobrado_periodo|floatformat:2 }}
+              {% else %}
+                <span style="color:var(--color-text-muted);">—</span>
+              {% endif %}
+            </td>
+
+            <td style="text-align:right; color:var(--color-text-muted); font-size:0.88rem;">
+              {% if v.comisiones_periodo %}
+                ${{ v.comisiones_periodo|floatformat:2 }}
+              {% else %}—{% endif %}
+            </td>
+
+            <td style="text-align:center;">
+              {% if v.movimientos_abiertos %}
+                <span style="background:var(--color-warning); color:#fff; font-size:0.75rem;
+                             font-weight:700; border-radius:99px; padding:2px 8px;">
+                  {{ v.movimientos_abiertos }}
+                </span>
+              {% else %}
+                <span style="color:var(--color-text-muted); font-size:0.85rem;">—</span>
+              {% endif %}
+            </td>
+
+            <td style="font-size:0.85rem;">
+              {% if v.ultimo_cierre %}
+                {{ v.ultimo_cierre|date:"d/m/Y H:i" }}
+              {% else %}
+                <span style="color:var(--color-danger); font-size:0.82rem;">Sin cierres</span>
+              {% endif %}
+            </td>
+
+            <td>
+              <a href="{% url 'admin_historial_vendedor' v.id %}"
+                 class="btn btn-outline" style="font-size:0.8rem; padding:0.3rem 0.75rem;">
+                Ver historial
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">No hay vendedores registrados en este municipio.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── INSPECTORES ─────────────────────────────────────────────────────── -->
+  <div class="card" style="overflow-x:auto;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+      <h3 style="margin:0;">👮 Inspectores</h3>
+      <a href="{% url 'estadisticas_inspectores' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}"
+         class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.75rem;">
+        Ver estadísticas completas →
+      </a>
+    </div>
+
+    {% if inspectores %}
+      <table style="min-width:500px;">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th style="text-align:center;">Verificaciones</th>
+            <th style="text-align:center;">Infracciones</th>
+            <th style="text-align:right;">Monto acumulado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ins in inspectores %}
+          <tr>
+            <td><strong>{{ ins.nombre|default:ins.correo }}</strong>{% if ins.apellido %} {{ ins.apellido }}{% endif %}</td>
+
+            <td style="text-align:center;">
+              {% if ins.verificaciones_periodo %}
+                <strong>{{ ins.verificaciones_periodo }}</strong>
+              {% else %}
+                <span style="color:var(--color-text-muted);">—</span>
+              {% endif %}
+            </td>
+
+            <td style="text-align:center;">
+              {% if ins.infracciones_periodo %}
+                <span style="color:var(--color-danger); font-weight:700;">
+                  {{ ins.infracciones_periodo }}
+                </span>
+              {% else %}
+                <span style="color:var(--color-text-muted);">—</span>
+              {% endif %}
+            </td>
+
+            <td style="text-align:right; font-size:0.88rem;">
+              {% if ins.monto_infracciones %}
+                ${{ ins.monto_infracciones|floatformat:2 }}
+              {% else %}
+                <span style="color:var(--color-text-muted);">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">No hay inspectores registrados en este municipio.</p>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}

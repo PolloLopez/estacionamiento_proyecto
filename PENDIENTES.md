@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-21 (sesión: SIA ANDIS + bloqueo infracciones fuera de horario)
+Última actualización: 2026-08-23 (sesión: dark mode, responsive, SIA parser fix, auditoría staff, cierre de caja admin)
 
 ---
 
@@ -23,6 +23,35 @@ El código es correcto: `crear_infraccion()` lee `tarifa.monto_infraccion` al mo
 ---
 
 ## 🟡 Media prioridad
+
+### Tesorero como fallback para certificar cierres de admin
+
+En el flujo multi-admin, los admins se certifican mutuamente (Admin A certifica cierre de Admin B
+y viceversa). Pero si el único admin disponible no puede autocertificarse, el tesorero necesita
+poder certificar cierres de rol admin como válvula de escape.
+
+Hoy `certificar_cierre` es `@require_role("admin")`. Falta agregar en el panel del tesorero
+un listado de cierres de admin sin certificar + acción para certificarlos.
+
+### Cierre de caja configurable por período
+
+- Frecuencia esperada configurable (diaria/semanal/mensual) por municipio o por vendedor.
+- Panel admin muestra semáforo: vendedores atrasados en cerrar caja.
+- Admin puede forzar el cierre de un vendedor (por ausencia o imprevisto).
+
+### Panel de auditoría del superadmin
+
+Vista global por municipio: total recaudado, rendido, pendiente de validación.
+Admins de cada municipio: sus rendiciones, montos rendidos, estado de validación.
+(El panel de auditoría del admin ya está implementado: `auditoria_staff`)
+
+### Ícono PWA dinámico (logo del municipio)
+
+El ícono que aparece al agregar el app a la pantalla de inicio (PWA, enlace directo)
+es actualmente un archivo estático. Debería usar el logo del municipio configurado por el superadmin.
+Requiere servir el `manifest.json` de forma dinámica (o un endpoint que devuelva el logo del municipio
+como `icon-192` e `icon-512`) en lugar de los archivos estáticos fijos.
+No se puede testear fácilmente en local — requiere HTTPS (Railway o ngrok).
 
 ### 3. Test MercadoPago end-to-end en Railway
 Probar el flujo completo en Railway:
@@ -92,6 +121,15 @@ Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 ---
 
 ## ✅ Resuelto recientemente
+
+**Sesión 2026-08-23** — Dark mode, responsive, SIA parser fix, auditoría staff, cierre de caja admin:
+- Dark mode toggle en navbar (botón 🌙/☀️, persiste en `localStorage`). FOUC prevention con inline `<script>` en `<head>`. Variable `--color-acento` + `--color-acento-hover` en CSS. ✅
+- `Municipio.color_acento` (migración 0055). Superadmin puede configurar los 3 colores desde `editar_municipio`. ✅
+- Responsive completo: `main.container { padding:0 }` para evitar doble padding en ~60 templates. `.admin-layout` grid colapsable (260px + 1fr → 1fr en mobile). `@media (max-width:768px) { .card { overflow-x:auto } }` — fix global para tablas. ✅
+- Bug "Volver al panel rompe": `registrar_estacionamiento.html` y `cobrar_infraccion.html` tenían `href="panel_vendedor"` hardcodeado. Corregido con `{% if request.user.es_admin %}`. ✅
+- SIA `_parsear_respuesta` parser fix: soporta tabla header/valores (estructura real de ANDIS) y clave-valor por fila (tests). El bug capturaba "Vencimiento" como valor de Dominio con la estructura real. Nuevo test `test_parsea_campos_tabla_horizontal` como regresión. 38 tests OK. ✅
+- `auditoria_staff`: vista unificada admin — vendedores (cobrado, comisiones, mov. abiertos, último cierre) + inspectores (verificaciones, infracciones, monto). URL `admin-staff/`. ✅
+- Cierre de caja para el rol admin: URL `admin/cerrar-caja/`, link "🧾 Mi caja" en sidebar, `usuarios_con_cierres` en `admin_rendiciones` ahora incluye admins, `caja.html` con caso `es_admin`. ✅
 
 **Sesión 2026-08-21** — OAuth account takeover + SIA ANDIS + bloqueo fuera de horario:
 - `adapters.py`: `pre_social_login()` en `SocialAccountAdapter` bloquea auto-connect si el email ya existe sin cuenta Google → previene account takeover. Template `email_conflicto_google.html` explica al usuario qué hacer. ✅
