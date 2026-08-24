@@ -90,31 +90,86 @@ def validar_url_andis(qr_url: str) -> tuple:
 
 def _parsear_respuesta(html: str) -> dict:
     """
-    Extrae los campos del HTML de respuesta de ANDIS.
-    Usa regex tolerante para no romperse con cambios menores de formato.
-    Si ANDIS cambia el HTML, actualizar solo esta función.
+    Extrae campos del HTML de ANDIS. Soporta dos estructuras de tabla:
+
+    A) Clave-valor por fila — cada <tr> tiene 2 celdas: label y valor.
+       Es el formato de los tests y un posible formato alternativo de ANDIS.
+         <tr><td>Dominio</td><td>AA123BB</td></tr>
+
+    B) Encabezados en fila 1, valores en fila 2 — N columnas.
+       Es el formato real que devuelve ANDIS actualmente.
+         <tr><th>NCI</th><th>Dominio</th><th>Vencimiento</th></tr>
+         <tr><td>123</td><td>AA123BB</td><td>2027-12-31</td></tr>
+
+    El parser detecta automáticamente cuál usar.
+    Como último recurso intenta "Campo: valor" en texto plano.
+
+    Bug que esto corrige: con estructura B, el regex original
+    "Dominio</td><td>Vencimiento" capturaba "Vencimiento" como valor de Dominio.
     """
-    def extraer(campo: str) -> str:
-        patrones = [
-            # "Campo: valor" en texto plano o dentro de HTML
-            rf"{re.escape(campo)}\s*[:\-]\s*([^\n<]{{1,100}})",
-            # "Campo</td><td>valor" en tabla HTML
-            rf"{re.escape(campo)}</\w+>\s*<\w+[^>]*>\s*([^<]{{1,100}})",
-        ]
-        for patron in patrones:
-            m = re.search(patron, html, re.IGNORECASE)
-            if m:
-                return m.group(1).strip()
+    # Extraer todas las filas con sus celdas (texto limpio, sin tags internos)
+    def es_encabezado(fila_html: str) -> bool:
+        """True si la fila tiene al menos un <th> (encabezado de tabla)."""
+        return bool(re.search(r"<th[^>]*>", fila_html, re.IGNORECASE))
+
+    def celdas_de(fila_html: str) -> list:
+        celdas = re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", fila_html, re.IGNORECASE | re.DOTALL)
+        return [re.sub(r"<[^>]+>", "", c).strip() for c in celdas]
+
+    filas_html = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.IGNORECASE | re.DOTALL)
+    tabla = {}
+
+    # Estrategia B: hay filas <th> → encabezados en esa fila, valores en la siguiente.
+    # ANDIS real usa <th>Dominio</th><th>Vencimiento</th> + <td>ABC123</td><td>...</td>.
+    # Nota: si usáramos Strategy A con 2 columnas, trataría la fila de encabezados como
+    # par ("Dominio", "Vencimiento"), poniendo "Vencimiento" como valor de "dominio" — bug original.
+    if any(es_encabezado(f) for f in filas_html):
+        encabezados = []
+        for fila_html in filas_html:
+            if es_encabezado(fila_html):
+                encabezados = celdas_de(fila_html)
+            elif encabezados:
+                valores = celdas_de(fila_html)
+                for enc, val in zip(encabezados, valores):
+                    if enc and val:
+                        tabla[enc.lower()] = val
+                break  # solo la primera fila de datos
+
+    # Estrategia A: todas las filas son <td> con 2 celdas → clave-valor por fila.
+    # Usada por los tests y posibles formatos alternativos de ANDIS.
+    if not tabla:
+        for fila_html in filas_html:
+            celdas = celdas_de(fila_html)
+            if len(celdas) == 2 and celdas[0] and celdas[1]:
+                tabla[celdas[0].lower()] = celdas[1]
+
+    def buscar_tabla(campo: str) -> str:
+        """Busca el campo en la tabla por substring, case-insensitive."""
+        campo_l = campo.lower()
+        for clave, valor in tabla.items():
+            if campo_l in clave:
+                return valor
+        return ""
+
+    def extraer_texto(campo: str) -> str:
+        """Fallback: 'Campo: valor' en texto plano (sin tags HTML)."""
+        patron = rf"{re.escape(campo)}\s*[:\-]\s*([^\n<]{{1,100}})"
+        m = re.search(patron, html, re.IGNORECASE)
+        return m.group(1).strip() if m else ""
+
+    def buscar(campo: str, alternativas: list = None) -> str:
+        for c in [campo] + (alternativas or []):
+            v = buscar_tabla(c) or extraer_texto(c)
+            if v:
+                return v
         return ""
 
     return {
-        "nci":        extraer("NCI"),
-        "nombre":     extraer("Nombre"),
-        "apellido":   extraer("Apellido"),
-        # "Dominio" es el campo principal; "Patente" como alternativa
-        "dominio":    extraer("Dominio") or extraer("Patente"),
-        # "Vencimiento" del dominio; "Expira En" como alternativa
-        "vencimiento": extraer("Vencimiento") or extraer("Expira En"),
+        "nci":         buscar("NCI", ["Trámite", "Caso"]),
+        "nombre":      buscar("Nombre"),
+        "apellido":    buscar("Apellido"),
+        "dominio":     buscar("Dominio", ["Patente"]),
+        "vencimiento": buscar("Vencimiento", ["Vigencia", "Expira"]),
     }
 
 

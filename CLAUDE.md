@@ -155,6 +155,13 @@ Leerlos también es una forma de entender cómo funciona el código.
 
 ## Gotchas conocidos
 
+- **SIA parser — estructura real vs. tests**: `_parsear_respuesta()` soporta dos formatos de tabla.
+  ANDIS real usa `<th>` en la fila de encabezados (Dominio, Vencimiento) y `<td>` en la de valores → Strategy B.
+  Los tests usan filas `<td>` clave-valor (2 celdas por fila) → Strategy A.
+  La distinción clave es `<th>` vs `<td>`: si hay `<th>`, es Strategy B; si todo es `<td>` con 2 celdas, Strategy A.
+  Bug resuelto: con 2 columnas, Strategy A trataba la fila de encabezados como par y ponía "Vencimiento" como valor de "dominio".
+  Si ANDIS cambia su HTML, actualizar solo `_parsear_respuesta()` en `services/sia_verificacion.py`.
+
 - **Null bytes en archivos**: editar archivos del repo desde herramientas externas (Edit/Write tools
   de Claude vía mount Linux→Windows) puede corromper archivos con null bytes. Si ocurre:
   `git show HEAD:archivo.py` → aplicar cambios vía Python string replace → verificar con `ast.parse()`.

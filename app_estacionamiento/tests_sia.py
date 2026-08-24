@@ -34,7 +34,10 @@ from .services.sia_verificacion import (
 
 def _html_andis(dominio="AA123BB", nombre="Juan", apellido="Pérez",
                 nci="987654", vencimiento="2027-12-31"):
-    """Genera un HTML de respuesta ANDIS mínimo pero realista."""
+    """
+    Genera HTML de respuesta ANDIS con estructura clave-valor por fila.
+    Cada <tr> tiene 2 celdas: label y valor.
+    """
     return f"""
     <html><body>
     <table>
@@ -43,6 +46,35 @@ def _html_andis(dominio="AA123BB", nombre="Juan", apellido="Pérez",
       <tr><td>Apellido</td><td>{apellido}</td></tr>
       <tr><td>Dominio</td><td>{dominio}</td></tr>
       <tr><td>Vencimiento</td><td>{vencimiento}</td></tr>
+    </table>
+    </body></html>
+    """
+
+
+def _html_andis_horizontal(dominio="AA123BB", nombre="Juan", apellido="Pérez",
+                            nci="987654", vencimiento="2027-12-31"):
+    """
+    Genera HTML de respuesta ANDIS con estructura encabezados/valores en filas separadas.
+    Es el formato real que devuelve ANDIS actualmente: fila 1 = headers, fila 2 = valores.
+    El bug original capturaba 'Vencimiento' como valor de 'Dominio' con esta estructura.
+    """
+    return f"""
+    <html><body>
+    <table>
+      <tr>
+        <th>NCI</th>
+        <th>Nombre</th>
+        <th>Apellido</th>
+        <th>Dominio</th>
+        <th>Vencimiento</th>
+      </tr>
+      <tr>
+        <td>{nci}</td>
+        <td>{nombre}</td>
+        <td>{apellido}</td>
+        <td>{dominio}</td>
+        <td>{vencimiento}</td>
+      </tr>
     </table>
     </body></html>
     """
@@ -135,6 +167,21 @@ class ParsearRespuestaTest(TestCase):
         self.assertEqual(datos["apellido"], "Pérez")
         self.assertEqual(datos["nci"], "987654")
         self.assertEqual(datos["vencimiento"], "2027-12-31")
+
+    def test_parsea_campos_tabla_horizontal(self):
+        """
+        Regresión: estructura real de ANDIS (encabezados en fila 1, valores en fila 2).
+        Bug original: el regex capturaba 'Vencimiento' como valor de 'Dominio'
+        porque ambos estaban en la misma fila de encabezados, en celdas adyacentes.
+        """
+        html = _html_andis_horizontal(dominio="AA123BB", nombre="Juan", apellido="Pérez",
+                                      nci="987654", vencimiento="2027-12-31")
+        datos = _parsear_respuesta(html)
+        self.assertEqual(datos["dominio"], "AA123BB")   # no debe ser "VENCIMIENTO"
+        self.assertEqual(datos["vencimiento"], "2027-12-31")
+        self.assertEqual(datos["nci"], "987654")
+        self.assertEqual(datos["nombre"], "Juan")
+        self.assertEqual(datos["apellido"], "Pérez")
 
     def test_html_vacio_devuelve_strings_vacios(self):
         datos = _parsear_respuesta("<html></html>")

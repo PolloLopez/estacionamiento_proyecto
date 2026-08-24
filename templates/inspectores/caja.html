@@ -7,7 +7,9 @@
   <div style="display:flex; justify-content:space-between; align-items:center;
               margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
     <h2>🧾 Mi caja</h2>
-    {% if request.user.es_inspector %}
+    {% if request.user.es_admin %}
+      <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+    {% elif request.user.es_inspector %}
       <a href="{% url 'panel_inspectores' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
     {% elif request.user.es_vendedor %}
       <a href="{% url 'panel_vendedor' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
@@ -137,7 +139,7 @@
     </p>
 
     <form method="post"
-          action="{% if request.user.es_vendedor %}{% url 'vendedores_cerrar_caja' %}{% else %}{% url 'inspectores_cerrar_caja' %}{% endif %}">
+          action="{% if request.user.es_admin %}{% url 'admin_cerrar_caja' %}{% elif request.user.es_vendedor %}{% url 'vendedores_cerrar_caja' %}{% else %}{% url 'inspectores_cerrar_caja' %}{% endif %}">
       {% csrf_token %}
 
       <div style="margin-bottom:1rem;">

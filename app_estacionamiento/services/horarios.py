@@ -83,10 +83,12 @@ def puede_estacionar_ahora(municipio):
         cache.set(cache_key, resultado, timeout=3600)
         return resultado
 
-    # Horario semanal para el día actual
+    # Horario semanal para el día actual.
+    # order_by('-id') → si hay duplicados (update_or_create creó más de uno),
+    # siempre usamos el registro más reciente.
     horario = HorarioEstacionamiento.objects.filter(
         municipio=municipio, dia_semana=hoy_dia, activo=True
-    ).first()
+    ).order_by("-id").first()
 
     if horario is None:
         # Sin horario configurado → libre de cobro todo el día

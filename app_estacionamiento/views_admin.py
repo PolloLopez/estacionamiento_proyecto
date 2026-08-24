@@ -143,6 +143,7 @@ def panel_admin(request):
         {"label": "👤 Usuarios",         "url": _reverse("gestionar_usuarios"),       "badge": None},
         {"label": "👮 Inspectores",       "url": _reverse("gestionar_inspectores"),    "badge": None},
         {"label": "💰 Vendedores",        "url": _reverse("gestionar_vendedores"),     "badge": None},
+        {"label": "🔍 Auditoría staff",   "url": _reverse("auditoria_staff"),          "badge": None},
         {"label": "🚗 Vehículos",         "url": _reverse("admin_vehiculos"),          "badge": None},
         {"label": "📋 Infracciones",      "url": _reverse("admin_infracciones"),       "badge": None},
         {"label": "🚫 Exenciones",        "url": _reverse("exenciones"),               "badge": None},
@@ -152,6 +153,7 @@ def panel_admin(request):
         {"label": "📅 Días especiales",   "url": _reverse("gestionar_dias_especiales"),"badge": None},
         {"label": "✅ Verificaciones",    "url": _reverse("gestionar_verificaciones"), "badge": verificaciones_pendientes or None},
         {"label": "💼 Rendiciones",       "url": _reverse("admin_rendiciones"),        "badge": rendiciones_pendientes or None},
+        {"label": "🧾 Mi caja",           "url": _reverse("admin_cerrar_caja"),        "badge": None},
     ]
 
     return render(request, "admin/panel_admin.html", {
@@ -966,15 +968,27 @@ def gestionar_horarios(request):
             hora_inicio = request.POST.get(f"hora_inicio_{dia_num}", "").strip()
             hora_fin    = request.POST.get(f"hora_fin_{dia_num}", "").strip()
 
-            HorarioEstacionamiento.objects.update_or_create(
+            # delete+create en vez de update_or_create para garantizar un único
+            # registro por (municipio, dia_semana) y evitar duplicados.
+            HorarioEstacionamiento.objects.filter(
+                municipio=municipio, dia_semana=dia_num
+            ).delete()
+            HorarioEstacionamiento.objects.create(
                 municipio=municipio,
                 dia_semana=dia_num,
-                defaults={
-                    "hora_inicio": hora_inicio or "08:00",
-                    "hora_fin":    hora_fin    or "15:00",
-                    "activo":      activo and bool(hora_inicio) and bool(hora_fin),
-                }
+                hora_inicio=hora_inicio or "08:00",
+                hora_fin=hora_fin    or "15:00",
+                activo=activo and bool(hora_inicio) and bool(hora_fin),
             )
+
+        # Limpiar caché de horario para que el cambio se aplique de inmediato.
+        # La función puede_estacionar_ahora() cachea por municipio+fecha+hora;
+        # al guardar invalidamos todas las horas del día actual para este municipio.
+        from django.core.cache import cache
+        hoy = timezone.localtime().date()
+        for hora in range(24):
+            cache.delete(f"puede_estacionar_{municipio.id}_{hoy}_{hora}")
+
         return redirect("gestionar_horarios")
 
     horarios_existentes = {
@@ -1018,6 +1032,12 @@ def gestionar_dias_especiales(request):
         elif accion == "eliminar":
             dia_id = request.POST.get("dia_id")
             DiaEspecial.objects.filter(id=dia_id, municipio=municipio).delete()
+
+        # Invalidar caché de horario — un día especial afecta puede_estacionar_ahora()
+        from django.core.cache import cache
+        hoy = timezone.localtime().date()
+        for hora in range(24):
+            cache.delete(f"puede_estacionar_{municipio.id}_{hoy}_{hora}")
 
         return redirect("gestionar_dias_especiales")
 
@@ -1068,10 +1088,14 @@ def admin_rendiciones(request):
     paginator = Paginator(cierres, 20)
     page_obj  = paginator.get_page(request.GET.get("page", 1))
 
+    # Incluye inspectores, vendedores y admins (estos últimos también pueden
+    # cerrar su propia caja para que otro admin o el tesorero la certifique).
     usuarios_con_cierres = Usuario.objects.filter(
         municipio=municipio,
         cierrecaja__isnull=False,
-    ).filter(Q(es_inspector=True) | Q(es_vendedor=True)).distinct().order_by("first_name", "correo")
+    ).filter(
+        Q(es_inspector=True) | Q(es_vendedor=True) | Q(es_admin=True)
+    ).distinct().order_by("first_name", "correo")
 
     # Rendiciones propias del admin a tesorería (para que vea cuáles están pendientes de validación)
     mis_rendiciones = Rendicion.objects.filter(
@@ -1394,6 +1418,11 @@ def certificar_cierre(request, cierre_id):
     )
 
     if request.method != "POST":
+        return redirect("admin_rendiciones")
+
+    # Un admin no puede certificar su propio cierre — debe hacerlo otro admin o el tesorero.
+    if cierre.usuario == request.user:
+        messages.error(request, "No podés certificar tu propio cierre. Pedile a otro admin que lo certifique.")
         return redirect("admin_rendiciones")
 
     if cierre.certificado:
@@ -2775,3 +2804,106 @@ def importar_exenciones(request):
 
     # GET
     return render(request, "admin/importar_exenciones.html", {})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Auditoría de staff
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def auditoria_staff(request):
+    """
+    Vista unificada de actividad del staff del municipio: vendedores e inspectores.
+
+    Vendedores: cuánto cobraron en el período, comisiones, movimientos sin cerrar,
+    fecha del último cierre. Link a historial_vendedor para el detalle.
+
+    Inspectores: verificaciones e infracciones en el período, monto total acumulado.
+    Link a estadisticas_inspectores para el detalle.
+
+    Filtro de fecha: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD (default: hoy).
+    """
+    from .models import VerificacionInspector
+
+    municipio = request.user.municipio
+    hoy       = timezone.localtime().date()
+
+    # Rango de fechas (default: hoy)
+    desde_str = request.GET.get("desde", "")
+    hasta_str = request.GET.get("hasta", "")
+    try:
+        desde = date.fromisoformat(desde_str)
+    except ValueError:
+        desde = hoy
+    try:
+        hasta = date.fromisoformat(hasta_str)
+    except ValueError:
+        hasta = hoy
+
+    # ── Vendedores ────────────────────────────────────────────────────────────
+    # Para cada vendedor: cobrado en período, comisiones, movimientos sin cerrar
+    # y fecha del último cierre (Max sobre cierrecaja relacionado).
+    vendedores = Usuario.objects.filter(
+        municipio=municipio, es_vendedor=True
+    ).annotate(
+        cobrado_periodo=Sum(
+            "movimientocaja__monto",
+            filter=Q(
+                movimientocaja__tipo="ingreso",
+                movimientocaja__creado_en__date__gte=desde,
+                movimientocaja__creado_en__date__lte=hasta,
+            )
+        ),
+        comisiones_periodo=Sum(
+            "movimientocaja__comision_monto",
+            filter=Q(
+                movimientocaja__creado_en__date__gte=desde,
+                movimientocaja__creado_en__date__lte=hasta,
+            )
+        ),
+        # Movimientos abiertos (no incluidos en ningún CierreCaja todavía)
+        movimientos_abiertos=Count(
+            "movimientocaja",
+            filter=Q(movimientocaja__cerrado=False)
+        ),
+        # Fecha del último cierre de caja de este vendedor
+        ultimo_cierre=Max("cierrecaja__creado_en"),
+    ).order_by("first_name", "last_name")
+
+    # ── Inspectores ───────────────────────────────────────────────────────────
+    # Para cada inspector: verificaciones e infracciones en el período.
+    inspectores = Usuario.objects.filter(
+        municipio=municipio, es_inspector=True
+    ).annotate(
+        verificaciones_periodo=Count(
+            "verificacioninspector",
+            filter=Q(
+                verificacioninspector__fecha__date__gte=desde,
+                verificacioninspector__fecha__date__lte=hasta,
+            )
+        ),
+        infracciones_periodo=Count(
+            "infraccion",
+            filter=Q(
+                infraccion__creado_en__date__gte=desde,
+                infraccion__creado_en__date__lte=hasta,
+                infraccion__municipio=municipio,
+            )
+        ),
+        monto_infracciones=Sum(
+            "infraccion__monto",
+            filter=Q(
+                infraccion__creado_en__date__gte=desde,
+                infraccion__creado_en__date__lte=hasta,
+                infraccion__municipio=municipio,
+            )
+        ),
+    ).order_by("first_name", "last_name")
+
+    return render(request, "admin/auditoria_staff.html", {
+        "vendedores":  vendedores,
+        "inspectores": inspectores,
+        "desde":       desde,
+        "hasta":       hasta,
+        "hoy":         hoy,
+    })
