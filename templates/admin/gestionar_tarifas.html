@@ -13,12 +13,6 @@
     Hacé clic en <strong>Editar</strong> en el campo que querés modificar. Cada cambio se confirma de forma individual.
   </p>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}" style="margin-bottom:1rem;">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
-
   {% if error %}
     <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
   {% endif %}

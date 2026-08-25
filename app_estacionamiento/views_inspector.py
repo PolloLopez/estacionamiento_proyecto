@@ -112,6 +112,25 @@ def verificar_vehiculo(request):
 
     tipo_seleccionado = "auto"
 
+    # Verificar horario ANTES de procesar cualquier búsqueda.
+    # Si está fuera del horario de cobro, el inspector no puede verificar patentes.
+    # (La restricción para infraccionar se aplica más adelante en registrar_infraccion,
+    # pero aquí cortamos el flujo completo para evitar búsquedas fuera de turno.)
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
+
+    if request.method == "POST" and not horario_activo:
+        # Ignorar el POST: mostrar el template con el aviso de horario sin resultado
+        return render(request, "inspectores/verificar.html", {
+            "resultado": None,
+            "historial": historial,
+            "modo": modo,
+            "subcuadras": subcuadras,
+            "subcuadra_activa": subcuadra_activa,
+            "tipo_seleccionado": tipo_seleccionado,
+            "horario_activo": False,
+            "mensaje_horario": mensaje_horario,
+        })
+
     if request.method == "POST":
         patente = sanitizar_patente(request.POST.get("patente") or "")
         tipo_seleccionado = request.POST.get("tipo", "auto")
@@ -150,8 +169,6 @@ def verificar_vehiculo(request):
             )
             historial.insert(0, patente)
             request.session["historial"] = historial[:5]
-
-    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
 
     return render(request, "inspectores/verificar.html", {
         "resultado": resultado,

@@ -22,6 +22,8 @@ python manage.py migrate
 Agrega `sia_titular_nombre`, `sia_titular_apellido`, `sia_titular_dni`, `sia_nci` a `Vehiculo`.
 Ya está en el modelo; falta correrla en producción.
 
+### ~~Inspector — bloquear todo fuera de horario~~ → ✅ resuelto (sesión 2026-08-25)
+
 ### Auditorías — correr todas antes del próximo municipio real
 Las auditorías se corrieron en julio/agosto temprano. El sistema creció mucho desde entonces.
 Correrlas nuevamente antes de cualquier go-live:
@@ -33,6 +35,34 @@ Correrlas nuevamente antes de cualquier go-live:
 ---
 
 ## 🟡 Media prioridad
+
+### Descuentos por pago voluntario de infracciones (feature premium por municipio)
+El superadmin habilita el módulo por municipio. El admin del municipio configura:
+
+- **Descuento por horas**: si el conductor paga dentro de X horas desde el acta → Y% de descuento
+  (ej: pago en menos de 2 hs → 40% off)
+- **Descuento por días**: si paga dentro de X días → Z% de descuento
+  (ej: pago en menos de 5 días → 20% off)
+- Fuera del plazo → monto completo
+
+Requiere:
+- Nuevos campos en `Tarifa` o tabla `ConfigDescuento`: `descuento_horas_plazo`, `descuento_horas_pct`,
+  `descuento_dias_plazo`, `descuento_dias_pct` + migración
+- `pagar_infraccion` use case: al calcular el monto a pagar, consulta los plazos y aplica el descuento
+- `MovimientoCaja` o `Infraccion`: registrar el monto original + descuento aplicado + motivo (trazabilidad)
+- Panel admin: sección "Descuentos" visible solo si el módulo está habilitado
+- Panel conductor: mostrar al ver una infracción pendiente si hay descuento disponible y cuánto tiempo falta
+
+### Admin panel — responsive con secciones desplegables
+En mobile el panel admin queda largo. Mejorar con acordeones/desplegables por sección
+(Personal, Vehículos, Configuración, Caja y rendiciones) en lugar de mostrar todo expandido.
+Alternativa: sidebar colapsable en mobile (ya hay grupos definidos en `sidebar_grupos`).
+
+### Vendedores — permiso individual para vender abonos
+Admin puede habilitar/deshabilitar por vendedor si puede gestionar abonos mensuales.
+- Nuevo campo `puede_vender_abono = BooleanField(default=True)` en `Usuario` (o toggle en panel admin)
+- `views_vendedor.py`: chequear el permiso antes de mostrar la opción de abono
+- Panel admin de usuarios: toggle visible en la ficha del vendedor
 
 ### Reseteo de contraseña desde el panel admin
 Admin hace clic en "Resetear contraseña" en la ficha del usuario → envía link de reset por email
@@ -52,6 +82,20 @@ Campos nuevos en `Usuario` (requieren migración):
 - `telefono_particular`, `telefono_comercial`, `domicilio_comercial` (CharField)
 - `horarios_atencion` (JSONField) — días y franjas horarias de atención
 - `ubicacion_lat`, `ubicacion_lon` (DecimalField) — para mapa y búsqueda del más cercano
+
+### Detección GPS de subcuadra al estacionar (conductor)
+Hoy el conductor estaciona y el sistema le asigna la subcuadra default del municipio (`get_subcuadra_default()`).
+Mejorar el flujo:
+1. Al abrir "Estacionar vehículo" → pedir permiso de geolocalización del browser
+2. Si acepta → endpoint `GET /api/subcuadra-cercana/?lat=X&lon=Y` busca la Subcuadra con menor distancia a esas coordenadas (lat/lon ya existen en el modelo) → pre-selecciona en un `<select>`
+3. Si deniega o cierra el diálogo → `<select>` de subcuadras disponible para elección manual
+4. "Estacionar sin indicar zona" → usa la subcuadra default (comportamiento actual)
+
+Cambios necesarios:
+- Nuevo endpoint `subcuadra_cercana` (view + URL) — distancia sin dependencias externas
+- `views_conductor.estacionar_vehiculo` acepta `subcuadra_id` del POST (hoy ignora y usa default)
+- JS en `estacionar_vehiculo.html`: `navigator.geolocation`, fetch al endpoint, poblar select
+- Tres estados de UI: detectando / selección manual / sin informar
 
 ### Perfil extendido — Conductor
 - `domicilio` (CharField) — fundamental para identificar frentistas
@@ -81,6 +125,46 @@ Datos ya existen: `VerificacionInspector` + `Infraccion` + `Vehiculo.subcuadras_
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
+
+### Módulo: Reintegro para residentes verificados (feature premium por municipio)
+
+**Concepto:** el conductor registra su domicilio, el admin lo verifica como residente del municipio,
+y a partir de entonces los primeros X minutos de cada estacionamiento se acreditan como saldo.
+Es un beneficio que el municipio ofrece a sus vecinos para incentivar el uso del sistema.
+Se implementa como módulo premium que el superadmin activa por municipio — cualquier municipio puede ofrecerlo.
+
+**Modelo de datos** (requieren migración):
+- `Usuario.domicilio` (CharField) — dirección declarada por el conductor
+- `Usuario.es_residente_verificado` (BooleanField, default=False) — admin lo activa/desactiva
+- `Usuario.fecha_verificacion_residencia` (DateField, null=True) — cuándo se verificó
+- Configuración del módulo (en la entrada `ModuloMunicipio` o en `Municipio`):
+  - `reintegro_minutos` — minutos a reintegrar por estacionamiento (ej: 30)
+  - `reintegro_max_por_dia` — límite de reintegros por conductor por día (ej: 1, para evitar abuso)
+
+**Lógica** en `ejecutar_estacionamiento` (use case), al final, post-creación:
+```python
+if conductor.es_residente_verificado and modulo_activo("reintegro_residentes", municipio):
+    reintegros_hoy = contar_reintegros_hoy(conductor)
+    if reintegros_hoy < municipio.reintegro_max_por_dia:
+        monto = (tarifa.precio_por_hora / 60) * municipio.reintegro_minutos
+        acreditar_saldo(conductor, monto, concepto="reintegro_residencia")
+        # Crea MovimientoCaja tipo='reintegro_residencia' con monto positivo
+```
+
+**Contabilidad:**
+- `MovimientoCaja.tipo` nuevo valor: `'reintegro_residencia'`
+- Es un egreso para el municipio (reduce recaudación neta) → visible en reportes del tesorero
+- Aparece en el historial del conductor como "Reintegro vecino verificado"
+
+**Admin UX:**
+- Ficha del conductor: campo domicilio + botón "Verificar como residente" + fecha de verificación
+- Lista de residentes verificados en panel admin
+- Panel superadmin: activar módulo + configurar minutos y límite diario por municipio
+
+**Landing y marketing:**
+- Sección "Beneficios para vecinos": destacar reintegro como diferenciador
+- Requisito: domicilio registrado y verificado por el municipio (domicilio electrónico)
+- Otros beneficios a destacar: pago desde celular, historial, sin efectivo, notificaciones
 
 ### GitHub Pages: reemplazar landing_estacionar.html
 La `landing.html` del sistema Django **sí sirve** para GitHub Pages con dos cambios mínimos:
@@ -127,6 +211,10 @@ Pendiente: versión con GIF animado o screenshots para la landing pública.
 ---
 
 ## ✅ Resuelto recientemente
+
+**Sesión 2026-08-25** — Bloqueo inspector fuera de horario:
+- `verificar_vehiculo` view: `puede_estacionar_ahora()` se evalúa ANTES del POST. Si está fuera de horario, el POST se ignora y se devuelve el template con banner. ✅
+- `verificar.html`: form y selector de patente no se renderizan fuera de horario. Banner ⏰ con `mensaje_horario`. JS con guard `if (form && input)` para no fallar cuando los elementos no existen. Historial oculto fuera de horario. ✅
 
 **Sesión 2026-08-24 (tarde)** — Tarifas click-to-edit, login UX, lockout reset link:
 - Login: `login_view` detecta tipo de error y lo pasa al template (`correo_no_encontrado`, `password_incorrecta`, `cuenta_inactiva`, `campos_vacios`). `<details>` se abre automáticamente. Input borde rojo en campo fallido. Correo se pre-carga. ✅
