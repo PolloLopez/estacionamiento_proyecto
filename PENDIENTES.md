@@ -14,14 +14,6 @@
 
 ## 🔴 Alta prioridad
 
-### Migración pendiente de correr en Railway
-```
-python manage.py makemigrations --name="sia_titular_fields_vehiculo"
-python manage.py migrate
-```
-Agrega `sia_titular_nombre`, `sia_titular_apellido`, `sia_titular_dni`, `sia_nci` a `Vehiculo`.
-Ya está en el modelo; falta correrla en producción.
-
 ### ~~Inspector — bloquear todo fuera de horario~~ → ✅ resuelto (sesión 2026-08-25)
 
 ### Auditorías — correr todas antes del próximo municipio real
@@ -212,7 +204,10 @@ Pendiente: versión con GIF animado o screenshots para la landing pública.
 
 ## ✅ Resuelto recientemente
 
-**Sesión 2026-08-25** — Bloqueo inspector fuera de horario:
+**Sesión 2026-08-25** — Migración SIA titular + bloqueo inspector fuera de horario:
+- Migración `sia_titular_fields_vehiculo` generada y aplicada localmente. Railway la aplica en el próximo deploy a main. ✅
+
+
 - `verificar_vehiculo` view: `puede_estacionar_ahora()` se evalúa ANTES del POST. Si está fuera de horario, el POST se ignora y se devuelve el template con banner. ✅
 - `verificar.html`: form y selector de patente no se renderizan fuera de horario. Banner ⏰ con `mensaje_horario`. JS con guard `if (form && input)` para no fallar cuando los elementos no existen. Historial oculto fuera de horario. ✅
 
