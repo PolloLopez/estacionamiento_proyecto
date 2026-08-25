@@ -9,132 +9,314 @@
     <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
   </div>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}"
-           style="margin-bottom:1rem;">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
+  <p style="font-size:0.9rem; color:var(--color-text-muted); margin-bottom:1.5rem;">
+    Hacé clic en <strong>Editar</strong> en el campo que querés modificar. Cada cambio se confirma de forma individual.
+  </p>
 
   {% if error %}
     <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
   {% endif %}
 
-  <form method="post" action="{% url 'admin_guardar_tarifa' %}">
-    {% csrf_token %}
+  <!-- ── TARIFAS POR HORA ──────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin:0 0 1rem;">🚗 Tarifas por hora</h3>
+    <div class="tabla-campos">
 
-    <!-- TARIFAS POR HORA -->
-    <div class="card" style="margin-bottom:1.5rem;">
-      <h3 style="margin-bottom:1rem;">🚗 Tarifas por hora</h3>
-      <div class="grid grid-2" style="gap:1.2rem;">
-        <div>
-          <label for="precio_auto">Precio/hora — Auto ($)</label>
-          <input
-            id="precio_auto"
-            name="precio_por_hora"
-            type="number" step="0.01" min="0.01" required
-            placeholder="Ej: 150.00"
-            value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}"
-          />
+      <div class="campo-fila" id="fila-precio_auto">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Precio/hora — Auto</span>
+          </div>
+          <span class="campo-valor">${{ tarifa_actual.precio_por_hora|default_if_none:"—" }}</span>
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('precio_auto')">✏️ Editar</button>
         </div>
-        <div>
-          <label for="precio_moto">Precio/hora — Moto ($)</label>
-          <input
-            id="precio_moto"
-            name="precio_por_hora_moto"
-            type="number" step="0.01" min="0"
-            placeholder="Ej: 80.00"
-            value="{{ tarifa_actual.precio_por_hora_moto|default_if_none:'' }}"
-          />
-          <p class="text-muted" style="font-size:0.85rem; margin-top:0.25rem;">
-            Dejar en 0 para usar el mismo precio que auto.
-          </p>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;"><span class="campo-label">Precio/hora — Auto</span></div>
+          <form id="form-precio_auto" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="precio_auto">
+            <span style="color:var(--color-text-muted);">$</span>
+            <input class="campo-input" type="number" name="precio_por_hora" value="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}" step="0.01" min="0.01" data-label="Precio/hora Auto" data-actual="{{ tarifa_actual.precio_por_hora|default_if_none:'' }}" data-prefijo="$" data-sufijo="" style="width:140px;" onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCampo('precio_auto','form-precio_auto');}">
+            <button type="button" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="guardarCampo('precio_auto','form-precio_auto')">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('precio_auto')">Cancelar</button>
+          </form>
         </div>
       </div>
-    </div>
 
-    <!-- INFRACCIONES -->
-    <div class="card" style="margin-bottom:1.5rem;">
-      <h3 style="margin-bottom:1rem;">⚠️ Infracciones</h3>
-      <div class="grid grid-2" style="gap:1.2rem;">
-        <div>
-          <label for="monto_inf">Monto de infracción ($)</label>
-          <input
-            id="monto_inf"
-            name="monto_infraccion"
-            type="number" step="0.01" min="0" required
-            placeholder="Ej: 5000.00"
-            value="{{ tarifa_actual.monto_infraccion|default_if_none:'0' }}"
-          />
-          <p class="text-muted" style="font-size:0.85rem; margin-top:0.25rem;">
-            Monto fijo que se aplica al labrar una infracción.
-          </p>
+      <div class="campo-fila" id="fila-precio_moto">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Precio/hora — Moto</span>
+            <span class="campo-ayuda">Vacío = usar precio de auto</span>
+          </div>
+          <span class="campo-valor">${{ tarifa_actual.precio_por_hora_moto|default_if_none:"—" }}</span>
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('precio_moto')">✏️ Editar</button>
         </div>
-        <div>
-          <label for="tolerancia">Tolerancia de multa (minutos)</label>
-          <input
-            id="tolerancia"
-            name="tolerancia_multa_minutos"
-            type="number" step="1" min="0"
-            placeholder="Ej: 5"
-            value="{{ municipio.tolerancia_multa_minutos|default:'5' }}"
-          />
-          <p class="text-muted" style="font-size:0.85rem; margin-top:0.25rem;">
-            Si el conductor paga dentro de este plazo, la infracción se cancela sin cargo.
-          </p>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;"><span class="campo-label">Precio/hora — Moto</span><span class="campo-ayuda">Vacío = usar precio de auto</span></div>
+          <form id="form-precio_moto" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="precio_moto">
+            <span style="color:var(--color-text-muted);">$</span>
+            <input class="campo-input" type="number" name="precio_por_hora_moto" value="{{ tarifa_actual.precio_por_hora_moto|default_if_none:'' }}" step="0.01" min="0" data-label="Precio/hora Moto" data-actual="{{ tarifa_actual.precio_por_hora_moto|default_if_none:'' }}" data-prefijo="$" data-sufijo="" style="width:140px;" onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCampo('precio_moto','form-precio_moto');}">
+            <button type="button" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="guardarCampo('precio_moto','form-precio_moto')">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('precio_moto')">Cancelar</button>
+          </form>
         </div>
       </div>
-    </div>
 
-    <!-- ABONOS MENSUALES -->
-    <div class="card" style="margin-bottom:1.5rem;">
-      <h3 style="margin-bottom:1rem;">📅 Abonos mensuales</h3>
-      <div class="grid grid-2" style="gap:1.2rem;">
-        <div>
-          <label for="abono_auto">Abono mensual — Auto ($)</label>
-          <input
-            id="abono_auto"
-            name="precio_abono_auto"
-            type="number" step="0.01" min="0"
-            placeholder="Ej: 3000.00"
-            value="{{ tarifa_actual.precio_abono_auto|default_if_none:'0' }}"
-          />
-        </div>
-        <div>
-          <label for="abono_moto">Abono mensual — Moto ($)</label>
-          <input
-            id="abono_moto"
-            name="precio_abono_moto"
-            type="number" step="0.01" min="0"
-            placeholder="Ej: 1500.00"
-            value="{{ tarifa_actual.precio_abono_moto|default_if_none:'0' }}"
-          />
-        </div>
-      </div>
     </div>
+  </div>
 
-    <!-- COMISIONES -->
-    <div class="card" style="margin-bottom:1.5rem;">
-      <h3 style="margin-bottom:1rem;">💵 Comisiones</h3>
-      <div class="grid grid-2" style="gap:1.2rem;">
-        <div>
-          <label for="comision">Comisión vendedor (%)</label>
-          <input
-            id="comision"
-            name="comision_vendedor"
-            type="number" step="0.01" min="0" max="100"
-            placeholder="Ej: 7.00"
-            value="{{ municipio.comision_vendedor|default:'7' }}"
-          />
-          <p class="text-muted" style="font-size:0.85rem; margin-top:0.25rem;">
-            Porcentaje del cobro que queda como comisión para el vendedor.
-          </p>
+  <!-- ── INFRACCIONES ──────────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin:0 0 1rem;">⚠️ Infracciones</h3>
+    <div class="tabla-campos">
+
+      <div class="campo-fila" id="fila-monto_infraccion">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Monto de infracción</span>
+            <span class="campo-ayuda">Monto fijo al labrar una infracción</span>
+          </div>
+          <span class="campo-valor">${{ tarifa_actual.monto_infraccion|default_if_none:"0" }}</span>
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('monto_infraccion')">✏️ Editar</button>
+        </div>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;"><span class="campo-label">Monto de infracción</span><span class="campo-ayuda">Monto fijo al labrar una infracción</span></div>
+          <form id="form-monto_infraccion" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="monto_infraccion">
+            <span style="color:var(--color-text-muted);">$</span>
+            <input class="campo-input" type="number" name="monto_infraccion" value="{{ tarifa_actual.monto_infraccion|default_if_none:'0' }}" step="0.01" min="0" data-label="Monto de infracción" data-actual="{{ tarifa_actual.monto_infraccion|default_if_none:'0' }}" data-prefijo="$" data-sufijo="" style="width:140px;" onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCampo('monto_infraccion','form-monto_infraccion');}">
+            <button type="button" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="guardarCampo('monto_infraccion','form-monto_infraccion')">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('monto_infraccion')">Cancelar</button>
+          </form>
         </div>
       </div>
-    </div>
 
-    <button class="btn" type="submit">Guardar configuración</button>
-  </form>
+      <div class="campo-fila" id="fila-tolerancia">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Tolerancia de multa</span>
+            <span class="campo-ayuda">Plazo para pagar y cancelar la infracción sin cargo</span>
+          </div>
+          <span class="campo-valor">{{ municipio.tolerancia_multa_minutos|default:"5" }} min</span>
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('tolerancia')">✏️ Editar</button>
+        </div>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;"><span class="campo-label">Tolerancia de multa</span><span class="campo-ayuda">Plazo para pagar y cancelar la infracción sin cargo</span></div>
+          <form id="form-tolerancia" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="tolerancia">
+            <input class="campo-input" type="number" name="tolerancia_multa_minutos" value="{{ municipio.tolerancia_multa_minutos|default:'5' }}" step="1" min="0" data-label="Tolerancia de multa" data-actual="{{ municipio.tolerancia_multa_minutos|default:'5' }}" data-prefijo="" data-sufijo=" min" style="width:140px;" onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCampo('tolerancia','form-tolerancia');}">
+            <span style="color:var(--color-text-muted);">min</span>
+            <button type="button" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="guardarCampo('tolerancia','form-tolerancia')">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('tolerancia')">Cancelar</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── ABONOS MENSUALES ──────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin:0 0 1rem;">📅 Abonos mensuales</h3>
+    <div class="tabla-campos">
+
+      <div class="campo-fila" id="fila-abono_auto">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Abono mensual — Auto</span>
+          </div>
+          <span class="campo-valor">${{ tarifa_actual.precio_abono_auto|default_if_none:"0" }}</span>
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('abono_auto')">✏️ Editar</button>
+        </div>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;"><span class="campo-label">Abono mensual — Auto</span></div>
+          <form id="form-abono_auto" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="abono_auto">
+            <span style="color:var(--color-text-muted);">$</span>
+            <input class="campo-input" type="number" name="precio_abono_auto" value="{{ tarifa_actual.precio_abono_auto|default_if_none:'0' }}" step="0.01" min="0" data-label="Abono mensual Auto" data-actual="{{ tarifa_actual.precio_abono_auto|default_if_none:'0' }}" data-prefijo="$" data-sufijo="" style="width:140px;" onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCampo('abono_auto','form-abono_auto');}">
+            <button type="button" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="guardarCampo('abono_auto','form-abono_auto')">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('abono_auto')">Cancelar</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="campo-fila" id="fila-abono_moto">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Abono mensual — Moto</span>
+          </div>
+          <span class="campo-valor">${{ tarifa_actual.precio_abono_moto|default_if_none:"0" }}</span>
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('abono_moto')">✏️ Editar</button>
+        </div>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;"><span class="campo-label">Abono mensual — Moto</span></div>
+          <form id="form-abono_moto" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="abono_moto">
+            <span style="color:var(--color-text-muted);">$</span>
+            <input class="campo-input" type="number" name="precio_abono_moto" value="{{ tarifa_actual.precio_abono_moto|default_if_none:'0' }}" step="0.01" min="0" data-label="Abono mensual Moto" data-actual="{{ tarifa_actual.precio_abono_moto|default_if_none:'0' }}" data-prefijo="$" data-sufijo="" style="width:140px;" onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCampo('abono_moto','form-abono_moto');}">
+            <button type="button" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="guardarCampo('abono_moto','form-abono_moto')">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('abono_moto')">Cancelar</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── COMISIONES ────────────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin:0 0 1rem;">💵 Comisiones</h3>
+    <div class="tabla-campos">
+
+      <div class="campo-fila" id="fila-comision">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Comisión vendedor</span>
+            <span class="campo-ayuda">Porcentaje del cobro que retiene el vendedor</span>
+          </div>
+          <span class="campo-valor">{{ municipio.comision_vendedor|default:"0" }}%</span>
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('comision')">✏️ Editar</button>
+        </div>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;"><span class="campo-label">Comisión vendedor</span><span class="campo-ayuda">Porcentaje del cobro que retiene el vendedor</span></div>
+          <form id="form-comision" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="comision">
+            <input class="campo-input" type="number" name="comision_vendedor" value="{{ municipio.comision_vendedor|default:'0' }}" step="0.01" min="0" max="100" data-label="Comisión vendedor" data-actual="{{ municipio.comision_vendedor|default:'0' }}" data-prefijo="" data-sufijo="%" style="width:140px;" onkeydown="if(event.key==='Enter'){event.preventDefault();guardarCampo('comision','form-comision');}">
+            <span style="color:var(--color-text-muted);">%</span>
+            <button type="button" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="guardarCampo('comision','form-comision')">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('comision')">Cancelar</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
 </section>
+
+<!-- ── MODAL DE CONFIRMACIÓN ────────────────────────────────────── -->
+<!--
+  Centrado explícito con position:fixed + transform porque el centrado
+  nativo de <dialog> varía entre navegadores (Firefox lo coloca arriba).
+-->
+<dialog id="dialogo-confirmacion" style="border-radius:12px;border:none;padding:1.75rem;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.25);position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);margin:0;">
+  <h3 style="margin:0 0 0.75rem;">⚠️ Confirmar cambio</h3>
+  <div id="dialogo-contenido" style="margin-bottom:1.25rem;font-size:0.95rem;line-height:1.6;"></div>
+  <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+    <button id="dialogo-cancelar" class="btn btn-outline" style="font-size:0.9rem;">Cancelar</button>
+    <button id="dialogo-confirmar" class="btn" style="font-size:0.9rem;">Sí, guardar</button>
+  </div>
+</dialog>
+
+<style>
+.tabla-campos {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.campo-fila {
+  display: flex;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  background: white;
+  min-height: 56px;
+}
+.campo-fila:last-child { border-bottom: none; }
+.campo-fila:hover { background: var(--color-bg-subtle, #f8fafc); }
+.campo-fila.editando { background: #fffbeb; }
+.campo-display-zona {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+.campo-edit-zona {
+  display: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  width: 100%;
+}
+.campo-label-grupo { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; }
+.campo-label { font-weight: 600; font-size: 0.92rem; color: var(--color-text, #1e293b); }
+.campo-ayuda { font-size: 0.8rem; color: var(--color-text-muted, #64748b); }
+.campo-valor { font-size: 0.95rem; font-weight: 500; white-space: nowrap; }
+dialog::backdrop { background: rgba(0,0,0,0.4); }
+</style>
+
+<script>
+var _campoActivo   = null;
+var _formPendiente = null;
+
+function editarCampo(campoId) {
+  if (_campoActivo && _campoActivo !== campoId) cancelarEdicion(_campoActivo);
+  _campoActivo = campoId;
+  var fila = document.getElementById("fila-" + campoId);
+  fila.classList.add("editando");
+  fila.querySelector(".campo-display-zona").style.display = "none";
+  fila.querySelector(".campo-edit-zona").style.display    = "flex";
+  var inp = fila.querySelector(".campo-input");
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function cancelarEdicion(campoId) {
+  var fila = document.getElementById("fila-" + campoId);
+  fila.classList.remove("editando");
+  fila.querySelector(".campo-display-zona").style.display = "";
+  fila.querySelector(".campo-edit-zona").style.display    = "none";
+  var inp = fila.querySelector(".campo-input");
+  if (inp) inp.value = inp.dataset.actual;
+  if (_campoActivo === campoId) _campoActivo = null;
+}
+
+function guardarCampo(campoId, formId) {
+  var fila   = document.getElementById("fila-" + campoId);
+  var inp    = fila.querySelector(".campo-input");
+  var actual = (inp.dataset.actual || "").trim();
+  var nuevo  = (inp.value         || "").trim();
+
+  if (actual === nuevo) { cancelarEdicion(campoId); return; }
+
+  var pre = inp.dataset.prefijo || "";
+  var suf = inp.dataset.sufijo  || "";
+  var html = "<p>Estás por cambiar:</p>"
+    + "<table style='width:100%;border-collapse:collapse;margin-top:0.5rem;font-size:0.93rem;'>"
+    + "<tr style='background:#f8fafc;'>"
+    + "<td style='padding:0.5rem 0.75rem;border:1px solid #e2e8f0;font-weight:600;'>" + inp.dataset.label + "</td>"
+    + "<td style='padding:0.5rem 0.75rem;border:1px solid #e2e8f0;'>"
+    + "<span style='color:#c0392b;text-decoration:line-through;'>" + pre + actual + suf + "</span>"
+    + "&nbsp;→&nbsp;<strong style='color:#1a7a3c;'>" + pre + nuevo + suf + "</strong>"
+    + "</td></tr></table>";
+
+  document.getElementById("dialogo-contenido").innerHTML = html;
+  _formPendiente = document.getElementById(formId);
+  document.getElementById("dialogo-confirmacion").showModal();
+}
+
+document.getElementById("dialogo-confirmar").addEventListener("click", function() {
+  document.getElementById("dialogo-confirmacion").close();
+  if (_formPendiente) { _formPendiente.submit(); _formPendiente = null; }
+});
+
+document.getElementById("dialogo-cancelar").addEventListener("click", function() {
+  document.getElementById("dialogo-confirmacion").close();
+  _formPendiente = null;
+});
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape" && _campoActivo) cancelarEdicion(_campoActivo);
+});
+</script>
+
 {% endblock %}

@@ -339,16 +339,30 @@ class TestMontoInfraccion(TestCase):
         self.assertEqual(infraccion.monto, Decimal("1500"))
 
     def test_admin_actualiza_monto_infraccion(self):
-        """POST a gestionar_tarifas guarda monto_infraccion correctamente."""
+        """
+        Cada campo de tarifa se actualiza por separado mediante el campo 'seccion'.
+        Se prueban dos POSTs independientes para verificar el aislamiento.
+        """
         admin = crear_admin(self.municipio)
         client = Client()
         client.force_login(admin)
+
+        # Actualiza el precio por hora (sección: precio_auto)
         client.post(reverse("admin_guardar_tarifa"), {
+            "seccion": "precio_auto",
             "precio_por_hora": "200",
-            "monto_infraccion": "4500",
         })
         tarifa = Tarifa.objects.get(municipio=self.municipio)
+        self.assertEqual(tarifa.precio_por_hora, Decimal("200"))
+
+        # Actualiza el monto de infracción (sección: monto_infraccion)
+        client.post(reverse("admin_guardar_tarifa"), {
+            "seccion": "monto_infraccion",
+            "monto_infraccion": "4500",
+        })
+        tarifa.refresh_from_db()
         self.assertEqual(tarifa.monto_infraccion, Decimal("4500"))
+        # El precio por hora no debe haber cambiado
         self.assertEqual(tarifa.precio_por_hora, Decimal("200"))
 
 

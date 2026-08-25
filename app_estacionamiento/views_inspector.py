@@ -112,6 +112,25 @@ def verificar_vehiculo(request):
 
     tipo_seleccionado = "auto"
 
+    # Verificar horario ANTES de procesar cualquier búsqueda.
+    # Si está fuera del horario de cobro, el inspector no puede verificar patentes.
+    # (La restricción para infraccionar se aplica más adelante en registrar_infraccion,
+    # pero aquí cortamos el flujo completo para evitar búsquedas fuera de turno.)
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
+
+    if request.method == "POST" and not horario_activo:
+        # Ignorar el POST: mostrar el template con el aviso de horario sin resultado
+        return render(request, "inspectores/verificar.html", {
+            "resultado": None,
+            "historial": historial,
+            "modo": modo,
+            "subcuadras": subcuadras,
+            "subcuadra_activa": subcuadra_activa,
+            "tipo_seleccionado": tipo_seleccionado,
+            "horario_activo": False,
+            "mensaje_horario": mensaje_horario,
+        })
+
     if request.method == "POST":
         patente = sanitizar_patente(request.POST.get("patente") or "")
         tipo_seleccionado = request.POST.get("tipo", "auto")
@@ -150,8 +169,6 @@ def verificar_vehiculo(request):
             )
             historial.insert(0, patente)
             request.session["historial"] = historial[:5]
-
-    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
 
     return render(request, "inspectores/verificar.html", {
         "resultado": resultado,
@@ -549,19 +566,24 @@ def verificar_sia(request):
             patente=patente,
             defaults={"municipio": request.user.municipio},
         )
-        vehiculo.exento_global      = True
-        vehiculo.tipo_exencion      = "discapacitado"
-        vehiculo.vigencia_exencion  = resultado.vencimiento
+        vehiculo.exento_global       = True
+        vehiculo.tipo_exencion       = "discapacitado"
+        vehiculo.vigencia_exencion   = resultado.vencimiento
         vehiculo.exencion_verificada = True
-        # Guardar NCI en notas para auditoría (no el DNI del titular)
+        vehiculo.sia_titular_nombre   = resultado.nombre
+        vehiculo.sia_titular_apellido = resultado.apellido
+        vehiculo.sia_titular_dni      = resultado.documento
+        vehiculo.sia_nci              = resultado.nci
         vehiculo.notas_exencion = (
             f"SIA verificado vía ANDIS. NCI: {resultado.nci}. "
-            f"Titular: {resultado.titular}. "
+            f"Titular: {resultado.titular}. DNI: {resultado.documento}. "
             f"Verificado por inspector {request.user.correo} el {date.today()}."
         )
         vehiculo.save(update_fields=[
             "exento_global", "tipo_exencion", "vigencia_exencion",
             "exencion_verificada", "notas_exencion",
+            "sia_titular_nombre", "sia_titular_apellido",
+            "sia_titular_dni", "sia_nci",
         ])
 
     # Construir respuesta para el frontend

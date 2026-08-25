@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-23 (sesión: dark mode, responsive, SIA parser fix, auditoría staff, cierre de caja admin)
+Última actualización: 2026-08-24
 
 ---
 
@@ -14,72 +14,157 @@
 
 ## 🔴 Alta prioridad
 
-### Monto $0 en actas de prueba (aclaración — no es un bug)
-Las infracciones creadas cuando `Tarifa.monto_infraccion` estaba en 0 siempre van a mostrar $0,
-porque el monto se fotografia al crear el acta (no se lee en tiempo real).
-→ Configurar `monto_infraccion` en `admin-tarifas/` y **crear una infracción nueva** para testearlo.
-El código es correcto: `crear_infraccion()` lee `tarifa.monto_infraccion` al momento de crear.
+### ~~Inspector — bloquear todo fuera de horario~~ → ✅ resuelto (sesión 2026-08-25)
+
+### Auditorías — correr todas antes del próximo municipio real
+Las auditorías se corrieron en julio/agosto temprano. El sistema creció mucho desde entonces.
+Correrlas nuevamente antes de cualquier go-live:
+- `auditoria-seguridad` — especialmente por el agregado de endpoints públicos y OAuth
+- `auditoria-rendimiento` — por el crecimiento de datos y nuevas queries en el admin
+- `auditoria-base-datos` — validar normalización de los nuevos campos SIA + campos de perfil
+- `checklist-produccion` — antes de cualquier entrega a municipio real
 
 ---
 
 ## 🟡 Media prioridad
 
+### Descuentos por pago voluntario de infracciones (feature premium por municipio)
+El superadmin habilita el módulo por municipio. El admin del municipio configura:
+
+- **Descuento por horas**: si el conductor paga dentro de X horas desde el acta → Y% de descuento
+  (ej: pago en menos de 2 hs → 40% off)
+- **Descuento por días**: si paga dentro de X días → Z% de descuento
+  (ej: pago en menos de 5 días → 20% off)
+- Fuera del plazo → monto completo
+
+Requiere:
+- Nuevos campos en `Tarifa` o tabla `ConfigDescuento`: `descuento_horas_plazo`, `descuento_horas_pct`,
+  `descuento_dias_plazo`, `descuento_dias_pct` + migración
+- `pagar_infraccion` use case: al calcular el monto a pagar, consulta los plazos y aplica el descuento
+- `MovimientoCaja` o `Infraccion`: registrar el monto original + descuento aplicado + motivo (trazabilidad)
+- Panel admin: sección "Descuentos" visible solo si el módulo está habilitado
+- Panel conductor: mostrar al ver una infracción pendiente si hay descuento disponible y cuánto tiempo falta
+
+### Admin panel — responsive con secciones desplegables
+En mobile el panel admin queda largo. Mejorar con acordeones/desplegables por sección
+(Personal, Vehículos, Configuración, Caja y rendiciones) en lugar de mostrar todo expandido.
+Alternativa: sidebar colapsable en mobile (ya hay grupos definidos en `sidebar_grupos`).
+
+### Vendedores — permiso individual para vender abonos
+Admin puede habilitar/deshabilitar por vendedor si puede gestionar abonos mensuales.
+- Nuevo campo `puede_vender_abono = BooleanField(default=True)` en `Usuario` (o toggle en panel admin)
+- `views_vendedor.py`: chequear el permiso antes de mostrar la opción de abono
+- Panel admin de usuarios: toggle visible en la ficha del vendedor
+
+### Reseteo de contraseña desde el panel admin
+Admin hace clic en "Resetear contraseña" en la ficha del usuario → envía link de reset por email
+→ el usuario debe cambiar al primer login.
+Requiere:
+- `cambio_password_requerido = BooleanField(default=False)` en `Usuario` + migración
+- Acción en la vista de detalle de usuario (admin)
+- Check en `login_view` que redirija al formulario de cambio si el flag está activo
+
+### Comisión vendedor como feature premium
+- Hoy `comision_vendedor` aplica a todos los municipios. Debería ser un módulo que el superadmin activa.
+- Admin solo ve la sección "Comisiones" en tarifas si el módulo está habilitado para su municipio.
+- Toggle por vendedor individual (algunos vendedores no cobran comisión).
+
+### Perfil extendido — Vendedor
+Campos nuevos en `Usuario` (requieren migración):
+- `telefono_particular`, `telefono_comercial`, `domicilio_comercial` (CharField)
+- `horarios_atencion` (JSONField) — días y franjas horarias de atención
+- `ubicacion_lat`, `ubicacion_lon` (DecimalField) — para mapa y búsqueda del más cercano
+
+### Detección GPS de subcuadra al estacionar (conductor)
+Hoy el conductor estaciona y el sistema le asigna la subcuadra default del municipio (`get_subcuadra_default()`).
+Mejorar el flujo:
+1. Al abrir "Estacionar vehículo" → pedir permiso de geolocalización del browser
+2. Si acepta → endpoint `GET /api/subcuadra-cercana/?lat=X&lon=Y` busca la Subcuadra con menor distancia a esas coordenadas (lat/lon ya existen en el modelo) → pre-selecciona en un `<select>`
+3. Si deniega o cierra el diálogo → `<select>` de subcuadras disponible para elección manual
+4. "Estacionar sin indicar zona" → usa la subcuadra default (comportamiento actual)
+
+Cambios necesarios:
+- Nuevo endpoint `subcuadra_cercana` (view + URL) — distancia sin dependencias externas
+- `views_conductor.estacionar_vehiculo` acepta `subcuadra_id` del POST (hoy ignora y usa default)
+- JS en `estacionar_vehiculo.html`: `navigator.geolocation`, fetch al endpoint, poblar select
+- Tres estados de UI: detectando / selección manual / sin informar
+
+### Perfil extendido — Conductor
+- `domicilio` (CharField) — fundamental para identificar frentistas
+
 ### Tesorero como fallback para certificar cierres de admin
-
-En el flujo multi-admin, los admins se certifican mutuamente (Admin A certifica cierre de Admin B
-y viceversa). Pero si el único admin disponible no puede autocertificarse, el tesorero necesita
-poder certificar cierres de rol admin como válvula de escape.
-
-Hoy `certificar_cierre` es `@require_role("admin")`. Falta agregar en el panel del tesorero
-un listado de cierres de admin sin certificar + acción para certificarlos.
+`certificar_cierre` es `@require_role("admin")`. Si el único admin no puede autocertificarse,
+el tesorero necesita poder certificar cierres de admin como válvula de escape.
+Falta: listado en panel tesorero de cierres de admin sin certificar + acción para certificarlos.
 
 ### Cierre de caja configurable por período
-
 - Frecuencia esperada configurable (diaria/semanal/mensual) por municipio o por vendedor.
-- Panel admin muestra semáforo: vendedores atrasados en cerrar caja.
-- Admin puede forzar el cierre de un vendedor (por ausencia o imprevisto).
+- Semáforo en panel admin: vendedores atrasados en cerrar caja.
+- Admin puede forzar el cierre de un vendedor (ausencia o imprevisto).
 
 ### Panel de auditoría del superadmin
-
-Vista global por municipio: total recaudado, rendido, pendiente de validación.
-Admins de cada municipio: sus rendiciones, montos rendidos, estado de validación.
-(El panel de auditoría del admin ya está implementado: `auditoria_staff`)
+Vista global: total recaudado/rendido/pendiente por municipio.
+(El panel de auditoría interno del admin ya está: `auditoria_staff`)
 
 ### Ícono PWA dinámico (logo del municipio)
+El `manifest.json` es estático. Debería servirse dinámicamente con el logo del municipio.
+No testeable en local — requiere HTTPS (Railway o ngrok).
 
-El ícono que aparece al agregar el app a la pantalla de inicio (PWA, enlace directo)
-es actualmente un archivo estático. Debería usar el logo del municipio configurado por el superadmin.
-Requiere servir el `manifest.json` de forma dinámica (o un endpoint que devuelva el logo del municipio
-como `icon-192` e `icon-512`) en lugar de los archivos estáticos fijos.
-No se puede testear fácilmente en local — requiere HTTPS (Railway o ngrok).
-
-### 3. Test MercadoPago end-to-end en Railway
-Probar el flujo completo en Railway:
-- Ingresar patente con infracción pendiente → pagar vía MP → verificar que el webhook procesa correctamente.
-- Verificar también el flujo de carga de saldo del conductor.
-
-### ~~4. 🔐 Riesgo pre-registro OAuth~~ → ✅ resuelto (ver abajo)
-
-### 5. 📹 Tutorial de uso — GIFs en landing
-El tutorial por rol ya está implementado dentro del sistema (collapsible `<details>` en cada panel).
-Pendiente: versión con GIF animado o screenshots para la landing pública.
-
-### 6. 📊 Reportes de subcuadras (dashboard de cobertura)
-Dashboard para el admin mostrando por subcuadra:
-- Cuántas verificaciones tuvo en el período (inspeccionada / sin inspeccionar)
-- Cantidad de infracciones generadas
-- Cantidad de vehículos exentos registrados en esa zona
-Usa los datos de `VerificacionInspector` + `Infraccion` + `Vehiculo.subcuadras_exentas` que ya existen.
+### Reportes de subcuadras (dashboard de cobertura)
+Dashboard por subcuadra: verificaciones / infracciones / vehículos exentos en el período.
+Datos ya existen: `VerificacionInspector` + `Infraccion` + `Vehiculo.subcuadras_exentas`.
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-### ~~PWA icons~~ → ✅ resuelto (ver abajo)
+### Módulo: Reintegro para residentes verificados (feature premium por municipio)
 
-### GitHub Pages: actualizar landing
-`leandrolopezalbini.github.io/estacionar/` — clonar ese repo por separado
-y pegar el contenido actualizado de `landing.html`.
+**Concepto:** el conductor registra su domicilio, el admin lo verifica como residente del municipio,
+y a partir de entonces los primeros X minutos de cada estacionamiento se acreditan como saldo.
+Es un beneficio que el municipio ofrece a sus vecinos para incentivar el uso del sistema.
+Se implementa como módulo premium que el superadmin activa por municipio — cualquier municipio puede ofrecerlo.
+
+**Modelo de datos** (requieren migración):
+- `Usuario.domicilio` (CharField) — dirección declarada por el conductor
+- `Usuario.es_residente_verificado` (BooleanField, default=False) — admin lo activa/desactiva
+- `Usuario.fecha_verificacion_residencia` (DateField, null=True) — cuándo se verificó
+- Configuración del módulo (en la entrada `ModuloMunicipio` o en `Municipio`):
+  - `reintegro_minutos` — minutos a reintegrar por estacionamiento (ej: 30)
+  - `reintegro_max_por_dia` — límite de reintegros por conductor por día (ej: 1, para evitar abuso)
+
+**Lógica** en `ejecutar_estacionamiento` (use case), al final, post-creación:
+```python
+if conductor.es_residente_verificado and modulo_activo("reintegro_residentes", municipio):
+    reintegros_hoy = contar_reintegros_hoy(conductor)
+    if reintegros_hoy < municipio.reintegro_max_por_dia:
+        monto = (tarifa.precio_por_hora / 60) * municipio.reintegro_minutos
+        acreditar_saldo(conductor, monto, concepto="reintegro_residencia")
+        # Crea MovimientoCaja tipo='reintegro_residencia' con monto positivo
+```
+
+**Contabilidad:**
+- `MovimientoCaja.tipo` nuevo valor: `'reintegro_residencia'`
+- Es un egreso para el municipio (reduce recaudación neta) → visible en reportes del tesorero
+- Aparece en el historial del conductor como "Reintegro vecino verificado"
+
+**Admin UX:**
+- Ficha del conductor: campo domicilio + botón "Verificar como residente" + fecha de verificación
+- Lista de residentes verificados en panel admin
+- Panel superadmin: activar módulo + configurar minutos y límite diario por municipio
+
+**Landing y marketing:**
+- Sección "Beneficios para vecinos": destacar reintegro como diferenciador
+- Requisito: domicilio registrado y verificado por el municipio (domicilio electrónico)
+- Otros beneficios a destacar: pago desde celular, historial, sin efectivo, notificaciones
+
+### GitHub Pages: reemplazar landing_estacionar.html
+La `landing.html` del sistema Django **sí sirve** para GitHub Pages con dos cambios mínimos:
+1. Eliminar la primera línea: `{% load static %}`
+2. Reemplazar los dos `{% url 'pago_publico_buscar' %}` por `https://estacionamiento.up.railway.app/pagar/`
+
+Todo lo demás es HTML/CSS autocontenido (sin herencia de base.html, sin assets externos propios).
+El resultado puede reemplazar directamente `landing_estacionar.html` en el repo de GitHub Pages.
 
 ### Responsive > 1050px
 En pantallas grandes el layout del panel admin queda con mucho espacio vacío.
@@ -89,20 +174,18 @@ En pantallas grandes el layout del panel admin queda con mucho espacio vacío.
 Ver checklist: `CHECKLIST_PRODUCCION_2026-07-25.md`.
 
 ### Inspector como cobrador (configurable por municipio)
-Toggle gestionado por superadmin (via `ModuloMunicipio` o flag en `Municipio`).
+Toggle por superadmin via `ModuloMunicipio`.
 
 ### Transferencia de saldo entre usuarios
-Nuevo modelo `TransferenciaSaldo` (emisor, receptor, monto, estado, creado_en).
-Receptor tiene 24h para aceptar.
+`TransferenciaSaldo` (emisor, receptor, monto, estado). Receptor tiene 24h para aceptar.
 
 ### Reconocimiento de patente por cámara (OCR)
-Google ML Kit, Tesseract.js o API de OCR. Botón "📷 Escanear" en `verificar.html`.
+Google ML Kit o Tesseract.js. Botón "📷 Escanear" en `verificar.html`.
 
 ### Alertas de vencimiento al conductor (push / WhatsApp)
-Push via service worker (PWA) o WhatsApp via Twilio/360dialog.
 
 ### Mapa de calor de infracciones
-Leaflet.js + lat/lon de subcuadras. Requiere coordenadas en Subcuadra (ya implementadas).
+Leaflet.js + lat/lon de subcuadras (coordenadas ya en el modelo).
 
 ### Módulo de impugnaciones
 `Impugnacion` (infraccion, conductor, motivo, evidencia, estado). Admin resuelve desde panel.
@@ -110,123 +193,69 @@ Leaflet.js + lat/lon de subcuadras. Requiere coordenadas en Subcuadra (ya implem
 ### Dashboard en TV (pantalla municipal en tiempo real)
 Vista sin login con token de solo lectura. Auto-refresh cada 60s.
 
-### Mejoras OAuth y UI
-- Pantalla de consentimiento Google: completar logo, descripción, dominio verificado.
-- Modo alto contraste / uso en exterior con sol.
-- Separar `settings_dev.py` / `settings_prod.py`.
-
-### Toggle estadísticas por municipio (desde Django Admin)
+### Toggle estadísticas de inspectores por municipio
 `Municipio.estadisticas_inspectores_activo = BooleanField(default=True)`. 1 migración, 1 chequeo.
+
+### Tutorial de uso — GIFs en landing pública
+El tutorial por rol ya está dentro del sistema (collapsible `<details>` en cada panel).
+Pendiente: versión con GIF animado o screenshots para la landing pública.
 
 ---
 
 ## ✅ Resuelto recientemente
 
-**Sesión 2026-08-23** — Dark mode, responsive, SIA parser fix, auditoría staff, cierre de caja admin:
-- Dark mode toggle en navbar (botón 🌙/☀️, persiste en `localStorage`). FOUC prevention con inline `<script>` en `<head>`. Variable `--color-acento` + `--color-acento-hover` en CSS. ✅
-- `Municipio.color_acento` (migración 0055). Superadmin puede configurar los 3 colores desde `editar_municipio`. ✅
-- Responsive completo: `main.container { padding:0 }` para evitar doble padding en ~60 templates. `.admin-layout` grid colapsable (260px + 1fr → 1fr en mobile). `@media (max-width:768px) { .card { overflow-x:auto } }` — fix global para tablas. ✅
-- Bug "Volver al panel rompe": `registrar_estacionamiento.html` y `cobrar_infraccion.html` tenían `href="panel_vendedor"` hardcodeado. Corregido con `{% if request.user.es_admin %}`. ✅
-- SIA `_parsear_respuesta` parser fix: soporta tabla header/valores (estructura real de ANDIS) y clave-valor por fila (tests). El bug capturaba "Vencimiento" como valor de Dominio con la estructura real. Nuevo test `test_parsea_campos_tabla_horizontal` como regresión. 38 tests OK. ✅
-- `auditoria_staff`: vista unificada admin — vendedores (cobrado, comisiones, mov. abiertos, último cierre) + inspectores (verificaciones, infracciones, monto). URL `admin-staff/`. ✅
-- Cierre de caja para el rol admin: URL `admin/cerrar-caja/`, link "🧾 Mi caja" en sidebar, `usuarios_con_cierres` en `admin_rendiciones` ahora incluye admins, `caja.html` con caso `es_admin`. ✅
+**Sesión 2026-08-25** — Migración SIA titular + bloqueo inspector fuera de horario:
+- Migración `sia_titular_fields_vehiculo` generada y aplicada localmente. Railway la aplica en el próximo deploy a main. ✅
+
+
+- `verificar_vehiculo` view: `puede_estacionar_ahora()` se evalúa ANTES del POST. Si está fuera de horario, el POST se ignora y se devuelve el template con banner. ✅
+- `verificar.html`: form y selector de patente no se renderizan fuera de horario. Banner ⏰ con `mensaje_horario`. JS con guard `if (form && input)` para no fallar cuando los elementos no existen. Historial oculto fuera de horario. ✅
+
+**Sesión 2026-08-24 (tarde)** — Tarifas click-to-edit, login UX, lockout reset link:
+- Login: `login_view` detecta tipo de error y lo pasa al template (`correo_no_encontrado`, `password_incorrecta`, `cuenta_inactiva`, `campos_vacios`). `<details>` se abre automáticamente. Input borde rojo en campo fallido. Correo se pre-carga. ✅
+- Lockout: botón "🔑 Restablecer contraseña" → `/accounts/password/reset/`. ✅
+- Tarifas refactorizadas a 7 secciones individuales (una por campo). Cada POST actualiza un solo valor. ✅
+- Tarifas click-to-edit: modo lectura por defecto, ✏️ Editar abre input inline, confirmación muestra solo ese campo (valor viejo → nuevo). Dialog centrado correctamente con `position:fixed + transform`. ✅
+- Partial `admin/_campo_tarifa.html` reutilizable. ✅
+- Test actualizado: secciones individuales + verificación de aislamiento entre campos. ✅
+
+**Sesión 2026-08-24 (mañana)** — SIA parser v2, titular SIA, sidebar agrupado, exenciones unificadas:
+- SIA parser: fix raíz — ANDIS usa `<th>` en encabezados. Si hay `<th>` → Strategy B. 38 tests OK. ✅
+- `ResultadoSia` con `nombre`, `apellido`, `documento` separados. Parser extrae DNI del titular. ✅
+- `Vehiculo`: campos `sia_titular_nombre`, `sia_titular_apellido`, `sia_titular_dni`, `sia_nci`. Migración pendiente. ✅
+- `views_inspector.verificar_sia`: guarda nombre, apellido, DNI y NCI al verificar SIA válido. ✅
+- Modal inspector: botón "↩ Verificar otro" + auto-reset a los 5s si SIA fue exitoso. ✅
+- Sidebar admin agrupado en 4 rubros: Personal · Vehículos · Configuración · Caja y rendiciones. ✅
+- Exenciones unificadas: badge "♿ SIA · ANDIS" en búsqueda y lista global con nombre, DNI, vigencia coloreada. ✅
+
+**Sesión 2026-08-23** — Dark mode, responsive, SIA parser fix inicial, auditoría staff, cierre de caja admin:
+- Dark mode toggle en navbar (persiste en `localStorage`). FOUC prevention. `--color-acento`. ✅
+- `Municipio.color_acento` (migración 0055). Superadmin configura 3 colores. ✅
+- Responsive completo: doble padding fix, grid admin colapsable, tablas con overflow-x. ✅
+- `auditoria_staff`: vista unificada admin con vendedores e inspectores. URL `admin-staff/`. ✅
+- Cierre de caja para rol admin: URL `admin/cerrar-caja/`. ✅
 
 **Sesión 2026-08-21** — OAuth account takeover + SIA ANDIS + bloqueo fuera de horario:
-- `adapters.py`: `pre_social_login()` en `SocialAccountAdapter` bloquea auto-connect si el email ya existe sin cuenta Google → previene account takeover. Template `email_conflicto_google.html` explica al usuario qué hacer. ✅
+- `adapters.py`: `pre_social_login()` bloquea auto-connect si el email ya existe sin cuenta Google. ✅
+- `services/sia_verificacion.py`: verificación SIA contra ANDIS. Validación SSRF, parseo HTML, 8 estados. ✅
+- `models.py`: campos `sia_*` en `Infraccion` (migración 0054). ✅
+- `views_inspector.py`: bloquea infraccionamiento fuera del horario de cobro. ✅
 
-**Sesión 2026-08-21** — SIA ANDIS + bloqueo de infracciones fuera de horario:
-- `services/sia_verificacion.py`: servicio completo de verificación SIA contra ANDIS. Validación SSRF, parseo HTML tolerante, 8 estados posibles. ✅
-- `models.py`: campos `sia_*` en `Infraccion` para trazabilidad de verificaciones. Migración 0054. ✅
-- `services/verificacion.py`: exención global y parcial respetan `vigencia_exencion`. Si venció → IMPAGO. ✅
-- `domain/verificacion.py`: `tipo_exencion` agregado a `ResultadoVerificacion`. ✅
-- `views_inspector.py`: vista `verificar_sia` (POST JSON) — crea/actualiza `Vehiculo` con exención si SIA válido. ✅
-- `views_inspector.py`: `registrar_infraccion` y `verificar_vehiculo` bloquean infraccionamiento fuera del horario de cobro. Reutiliza `puede_estacionar_ahora()`. ✅
-- `templates/inspectores/verificar.html`: botón "♿ Verificar SIA" + modal con cámara (jsQR), oculta INFRACCIONAR fuera de horario con mensaje explicativo. ✅
-- `views.py`: exporta `verificar_sia` (fix AttributeError en urls.py). ✅
-- `tests_sia.py`: 20 tests cubriendo servicio, parseo, estados y vista. ✅
-- `MANUAL_SISTEMA.md`: actualizado con flujo SIA, vigencia automática, bloqueo por horario. ✅
-
-**Sesión 2026-08-20** — Vista previa ticket + tarifas:
-- `ticket_infraccion.html`: agregada vista previa de `leyenda_horarios` y `texto_ordenanza` en HTML (debajo del inspector, antes del QR). ✅
-- `gestionar_tarifas` GET path: auto-limpia registros `Tarifa` duplicados (ordena por `-precio_por_hora`, elimina los extras). Evita que el formulario muestre placeholders cuando existen duplicados con defaults. ✅
-- `gestionar_tarifas` POST path: usa `filter().update()` en vez de `update_or_create()` para no romper con `MultipleObjectsReturned`. ✅
-
-**Sesión 2026-08-19** — Impresora BLE, superadmin y subcuadras:
-- `impresora_bluetooth.js`: persistencia de impresora en `localStorage` (workaround bug `getDevices()` en Chrome Android). Reconexión silenciosa → si falla, `requestDevice()` filtrado por nombre conocido.
-- Renombrado de impresoras por alias (inspectores con múltiples impresoras iguales).
-- Ticket de infracción: doble copia automática (800ms entre copias). Sin `window.print()` — solo BLE.
-- QR nativo ESC/POS via `GS(k)` + URL texto como respaldo.
-- Fix patente cortada: `centrar()` acepta `ancho` opcional. En modo doble-ancho (`GS 0x21 0x11`) se usa `ANCHO/2 = 16` para no desbordar. Mismo fix para el monto en grande.
-- Superadmin `editar_municipio`: eliminado campo `comision_vendedor` (pertenece solo al admin del municipio).
-- Superadmin `editar_municipio`: nuevos campos `leyenda_horarios` y `texto_ordenanza` (migración 0053). Se guardan en `Municipio`.
-- Superadmin `editar_municipio`: descripción de cada módulo de pago visible en el panel.
-- Fix `modulos_asignados.values_list()` sobre lista: cambiado a comprensión de set (`set(m.modulo for m in modulos)`).
-- Admin `gestionar_tarifas`: fix `MultipleObjectsReturned` (usa `filter().first()`). `Tarifa.precio_por_hora` max_digits 6→10.
-- Subcuadras GPS: selector cascade Calle → Altura. Botón "Eliminar" más visible.
-- PWA icons: `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` reemplazados con íconos reales. `<link rel="icon">` agregado en `base.html`. ✅
-
-**Sesión 2026-08-18** — Límites de carga MercadoPago configurables por municipio:
-- `Municipio.monto_minimo_carga` y `monto_maximo_carga` (PositiveIntegerField, defecto 500/50.000). Migración 0052.
-- `mp_iniciar_carga` rechaza montos fuera del rango con mensaje claro antes de llamar a la API de MP.
-- Superadmin puede configurar los límites en `editar_municipio` (dos inputs numéricos nuevos).
-- `mp_cargar_saldo.html` muestra el rango al conductor (min/max dinámicos desde el contexto).
-- Helper `_contexto_cargar_saldo(usuario)` centraliza el contexto del formulario. ✅
-
-**Sesión 2026-08-18** — Restore test del backup:
-- Restore exitoso con Docker postgres:18: 21 usuarios recuperados, tablas íntegras. ✅
-- Comando: `gunzip -c backup.sql.gz | psql -U postgres -d postgres` (dentro del container).
-
-**Sesión 2026-08-18** — Backups PostgreSQL funcionales:
-- Workflow usa imagen Docker `postgres:18` (fix para version mismatch con Railway).
-- URL pública de Railway con `?sslmode=require` como secret `RAILWAY_DATABASE_URL`.
-- Backup confirmado: ~52 KB. Corre diariamente a las 03:00 UTC desde `main`. ✅
-- Pendiente: restore test antes del go-live real.
-
-**Sesión 2026-08-18** — Hallazgos de seguridad (4 fixes + 5 tests):
-- `registro_view`: valida `municipio activo=True` antes de asignar.
-- `importar_estacionamientos`: límite 10 MB antes de `openpyxl.load_workbook()`.
-- `mp_webhook`: valida timestamp reciente (anti-replay, tolerancia 5 min).
-- `django-axes`: `AXES_USERNAME_FORM_FIELD = "correo"` + lockout combinado IP+usuario.
-- Fix adicional: `login()` en registro especifica `backend=` (bug real con múltiples backends).
+**Sesión 2026-08-18/20** — MercadoPago, backups, seguridad, email, tarifas:
+- Pago público sin registro: `PagoPublico` (migración 0051), webhook, 4 templates. ✅
+- Backups PostgreSQL: workflow GitHub Actions diario → artifact 30 días. Restore testado. ✅
+- Email transaccional (Brevo/anymail): recuperación de contraseña funcionando. ✅
+- `django-axes`: lockout combinado IP+usuario, 5 intentos, 1h cooloff. ✅
+- Verificación de email obligatoria en Railway (`ACCOUNT_EMAIL_VERIFICATION=mandatory`). ✅
+- Límites de carga MercadoPago configurables por municipio (migración 0052). ✅
+- `gestionar_tarifas`: fix `MultipleObjectsReturned`, auto-limpia duplicados. ✅
 - 160 tests, todos OK. ✅
 
-**Sesión 2026-08-18** — Verificación de email obligatoria:
-- `ACCOUNT_EMAIL_VERIFICATION = mandatory` activado en Railway. ✅
-- `views_auth.py`: `registro_view` ahora crea `EmailAddress` y envía confirmación si `ACCOUNT_EMAIL_VERIFICATION = mandatory`.
-  `login_view` bloquea acceso si hay un `EmailAddress` sin verificar, re-enviando el link.
-- `apps.py`: señal `email_confirmed` de allauth → `messages.success()` → aparece en login post-confirmación.
-- Templates nuevos: `account/email_verification_sent.html`, `account/confirm_email.html`.
-- `settings.py`: `ACCOUNT_EMAIL_VERIFICATION` ahora lee de env var (default: "none"). `ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION = True`.
-- **Para activar en Railway**: agregar `ACCOUNT_EMAIL_VERIFICATION = mandatory`.
-
-**Sesión 2026-08-18** — Backups PostgreSQL + Email transaccional:
-- `.github/workflows/backup.yml`: pg_dump diario (03:00 UTC) → artifact GitHub Actions 30 días.
-- Requiere secret `RAILWAY_DATABASE_URL` en GitHub y verificar restore al menos una vez.
-- Email (Brevo): sender verificado, BREVO_API_KEY en Railway, adapter con manejo de errores. ✅
-
-**Sesión 2026-08-18** — Email transaccional (recuperación de contraseña):
-- Brevo configurado como backend de email (anymail): remitente verificado, API key y `DEFAULT_FROM_EMAIL` en Railway.
-- `adapters.py`: `send_mail()` captura excepciones → usuario ve confirmación aunque el email falle, error logueado en Railway.
-- Activación de cuenta Brevo desbloqueada verificando teléfono → emails llegando correctamente ✅
-
-**Sesión 2026-08-17** — Refactor CSS + color theming + footer:
-- Botón Google: eliminado `::before` pseudo-elemento que duplicaba el logo; colores oficiales Google.
-- CSS migrado de templates a `global.css`: `login.html`, `verificar.html`, `registrar_infraccion.html`.
-- Color theming: navbar y botones usan `var(--color-primary)` inyectado desde `Municipio.color_primario` en `base.html`.
-- Fix responsividad: revertido `var(--color-nav-bg)` → `var(--color-primary)`.
-- Footer: `background: var(--color-primary); color: rgba(255,255,255,0.85)` — color del municipio.
-
-**Sesión 2026-08-13** — Pagos públicos + PWA + Branding:
-- Modelo `PagoPublico` (migración 0051), use case `procesar_pago_publico.py` (idempotente).
-- Webhook MP actualizado: detecta `metadata.pago_publico_id`.
-- 4 templates pago público: `buscar.html`, `detalle_patente.html`, `resultado.html`, `error.html`.
-- `beforeinstallprompt` → botón "📲 Instalar" en navbar (PWA).
-- Superadmin `editar_municipio`: upload logo, colores primario/secundario, nombre_sistema.
-
-**Sesiones anteriores (2026-08-10/11)** — GPS + Seguridad + Exenciones + Rendiciones:
-- `Subcuadra.lat/lon` + endpoint GPS + cascade Calle→Altura en `verificar.html`.
-- Importación de exenciones desde Excel (preview + confirmación).
-- `PlantillaDocumento` (5 tipos de comprobante personalizables).
-- `MovimientoCaja.mp_payment_id (unique)` — idempotencia MP.
-- Rendiciones: PDF, tesorero valida/observa, LiquidacionComision con factura.
-- Logging de seguridad en `require_role()` y `login_view()`.
+**Sesiones 2026-08-13/19** — GPS, subcuadras, superadmin, impresora BLE, rendiciones:
+- `Subcuadra.lat/lon` + endpoint GPS. ✅
+- Superadmin `editar_municipio`: logo, colores, `leyenda_horarios`, `texto_ordenanza` (migraciones 0053). ✅
+- Importación de exenciones desde Excel. ✅
+- `PlantillaDocumento` (5 tipos de comprobante personalizables). ✅
+- Impresora BLE: persistencia en `localStorage`, doble copia automática, QR nativo ESC/POS. ✅
+- Rendiciones: PDF, tesorero valida/observa, `LiquidacionComision` con factura. ✅
+- PWA icons reales (192, 512, apple-touch). ✅

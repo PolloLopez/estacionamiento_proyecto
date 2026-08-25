@@ -15,6 +15,17 @@
 
 
     <!-- FORM PRINCIPAL: ingresar patente -->
+    {% if not horario_activo %}
+    <!-- Fuera del horario de cobro: bloquear toda interacción -->
+    <div style="text-align:center; padding:2rem 1rem; background:var(--color-surface,#fff);
+                border-radius:12px; border:2px solid var(--color-border,#e2e8f0); margin-bottom:1rem;">
+      <div style="font-size:3rem; margin-bottom:0.75rem;">⏰</div>
+      <h3 style="margin:0 0 0.5rem; color:var(--color-text);">Fuera del horario de cobro</h3>
+      <p style="color:var(--color-text-muted); font-size:0.95rem; max-width:320px; margin:0 auto;">
+        {{ mensaje_horario }}
+      </p>
+    </div>
+    {% else %}
     <form method="post" id="form">
         {% csrf_token %}
 
@@ -75,6 +86,7 @@
             autofocus
         />
     </form>
+    {% endif %}{# fin {% if not horario_activo %} / {% else %} #}
 
     <!-- RESULTADO -->
     {% if resultado %}
@@ -206,8 +218,8 @@
 
     {% endif %}
 
-    <!-- HISTORIAL DE PATENTES -->
-    {% if historial %}
+    <!-- HISTORIAL DE PATENTES — solo visible dentro del horario -->
+    {% if historial and horario_activo %}
     <div style="margin-top:1.2rem; text-align:left;">
         <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.4rem;">Recientes:</p>
         {% for p in historial %}
@@ -228,33 +240,37 @@
 
 <script>
 const input = document.getElementById("patente");
-const form = document.getElementById("form");
+const form  = document.getElementById("form");
 
-// Cambiar placeholder según tipo de vehículo
-function actualizarPlaceholder() {
-    const esMoto = document.getElementById("tipo-moto").checked;
-    input.placeholder = esMoto ? "123-ABC" : "AAA111";
+// El formulario solo existe dentro del horario de cobro.
+// Todos los listeners que dependen de él se registran condicionalmente.
+if (form && input) {
+    // Cambiar placeholder según tipo de vehículo
+    function actualizarPlaceholder() {
+        const esMoto = document.getElementById("tipo-moto").checked;
+        input.placeholder = esMoto ? "123-ABC" : "AAA111";
+    }
+    document.getElementById("tipo-auto").addEventListener("change", actualizarPlaceholder);
+    document.getElementById("tipo-moto").addEventListener("change", actualizarPlaceholder);
+    actualizarPlaceholder();
+
+    input.addEventListener("input", () => {
+        input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+        const val = input.value;
+        const esValida =
+            /^[A-Z]{3}[0-9]{3}$/.test(val) ||
+            /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val) ||
+            /^[A-Z]{1}[0-9]{3}[A-Z]{3}$/.test(val);
+        if (esValida) form.submit();
+    });
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); form.submit(); }
+    });
 }
-document.getElementById("tipo-auto").addEventListener("change", actualizarPlaceholder);
-document.getElementById("tipo-moto").addEventListener("change", actualizarPlaceholder);
-actualizarPlaceholder();
-
-input.addEventListener("input", () => {
-    input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
-    const val = input.value;
-    const esValida =
-        /^[A-Z]{3}[0-9]{3}$/.test(val) ||
-        /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val) ||
-        /^[A-Z]{1}[0-9]{3}[A-Z]{3}$/.test(val);
-    if (esValida) form.submit();
-});
-
-input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); form.submit(); }
-});
 
 window.onload = () => {
-    input.focus();
+    if (input) input.focus();
     const estado = "{{ resultado.estado.name|default:'' }}";
     const exentoEnSub = "{{ resultado.exento_en_subcuadra_actual|default:'' }}";
 
@@ -670,13 +686,41 @@ function enviarVerificacionSia(qrUrl) {
             detalles += "<br>Patente SIA: <strong>" + data.patente_sia + "</strong>";
         if (data.url_andis)
             detalles += "<br><a href='" + data.url_andis + "' target='_blank' rel='noopener' style='color:inherit;'>Ver en ANDIS ↗</a>";
-        mostrarResultadoSia(tipo, data.mensaje + detalles);
+        // Botón de re-verificar con countdown de 5 segundos
+        var btnReverificar = "<div style='margin-top:0.75rem;'>"
+            + "<button onclick='resetearModalSia()' class='btn btn-outline' "
+            + "style='font-size:0.85rem; padding:0.3rem 0.8rem;' id='btn-reverificar'>"
+            + "↩ Verificar otro</button> "
+            + "<span id='sia-countdown' style='font-size:0.8rem; color:inherit; opacity:0.7;'></span>"
+            + "</div>";
+        mostrarResultadoSia(tipo, data.mensaje + detalles + btnReverificar);
         document.getElementById("sia-estado").textContent = "";
+        // Auto-reset a los 5 segundos si fue exitoso
+        if (data.es_valido) {
+            var _seg = 5;
+            var _cd = document.getElementById("sia-countdown");
+            if (_cd) _cd.textContent = "(auto-reset en " + _seg + "s)";
+            var _timer = setInterval(function() {
+                _seg--;
+                var _cdEl = document.getElementById("sia-countdown");
+                if (_cdEl) _cdEl.textContent = "(auto-reset en " + _seg + "s)";
+                if (_seg <= 0) { clearInterval(_timer); resetearModalSia(); }
+            }, 1000);
+        }
     })
     .catch(function() {
         mostrarResultadoSia("error", "❌ Error de red. Verificá la conexión.");
         _siaVerificando = false;
     });
+}
+
+function resetearModalSia() {
+    // Limpia el resultado y el input para permitir una nueva verificación
+    document.getElementById("sia-resultado").style.display = "none";
+    document.getElementById("sia-resultado").innerHTML = "";
+    var inp = document.getElementById("sia-url-input");
+    if (inp) inp.value = "";
+    _siaVerificando = false;
 }
 
 function mostrarResultadoSia(tipo, html) {

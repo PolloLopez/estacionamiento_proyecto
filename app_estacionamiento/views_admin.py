@@ -138,22 +138,44 @@ def panel_admin(request):
 
     from django.urls import reverse as _reverse
 
-    # Ítems del sidebar de gestión: label, url, badge (opcional)
-    sidebar_gestion = [
-        {"label": "👤 Usuarios",         "url": _reverse("gestionar_usuarios"),       "badge": None},
-        {"label": "👮 Inspectores",       "url": _reverse("gestionar_inspectores"),    "badge": None},
-        {"label": "💰 Vendedores",        "url": _reverse("gestionar_vendedores"),     "badge": None},
-        {"label": "🔍 Auditoría staff",   "url": _reverse("auditoria_staff"),          "badge": None},
-        {"label": "🚗 Vehículos",         "url": _reverse("admin_vehiculos"),          "badge": None},
-        {"label": "📋 Infracciones",      "url": _reverse("admin_infracciones"),       "badge": None},
-        {"label": "🚫 Exenciones",        "url": _reverse("exenciones"),               "badge": None},
-        {"label": "📍 Subcuadras GPS",    "url": _reverse("gestionar_subcuadras"),     "badge": None},
-        {"label": "💲 Tarifas",           "url": _reverse("gestionar_tarifas"),        "badge": None},
-        {"label": "🕐 Horarios",          "url": _reverse("gestionar_horarios"),       "badge": None},
-        {"label": "📅 Días especiales",   "url": _reverse("gestionar_dias_especiales"),"badge": None},
-        {"label": "✅ Verificaciones",    "url": _reverse("gestionar_verificaciones"), "badge": verificaciones_pendientes or None},
-        {"label": "💼 Rendiciones",       "url": _reverse("admin_rendiciones"),        "badge": rendiciones_pendientes or None},
-        {"label": "🧾 Mi caja",           "url": _reverse("admin_cerrar_caja"),        "badge": None},
+    # Sidebar agrupado por rubro.
+    # Cada grupo tiene un título y una lista de ítems {label, url, badge}.
+    sidebar_grupos = [
+        {
+            "titulo": "Personal",
+            "items": [
+                {"label": "👤 Usuarios",        "url": _reverse("gestionar_usuarios"),       "badge": None},
+                {"label": "👮 Inspectores",      "url": _reverse("gestionar_inspectores"),    "badge": None},
+                {"label": "💰 Vendedores",       "url": _reverse("gestionar_vendedores"),     "badge": None},
+                {"label": "🔍 Auditoría staff",  "url": _reverse("auditoria_staff"),          "badge": None},
+            ],
+        },
+        {
+            "titulo": "Vehículos",
+            "items": [
+                {"label": "🚗 Vehículos",        "url": _reverse("admin_vehiculos"),          "badge": None},
+                {"label": "📋 Infracciones",     "url": _reverse("admin_infracciones"),       "badge": None},
+                # Exenciones unifica admin + SIA en una sola vista
+                {"label": "🚫 Exenciones",       "url": _reverse("exenciones"),               "badge": None},
+            ],
+        },
+        {
+            "titulo": "Configuración",
+            "items": [
+                {"label": "📍 Subcuadras GPS",   "url": _reverse("gestionar_subcuadras"),     "badge": None},
+                {"label": "💲 Tarifas",          "url": _reverse("gestionar_tarifas"),        "badge": None},
+                {"label": "🕐 Horarios",         "url": _reverse("gestionar_horarios"),       "badge": None},
+                {"label": "📅 Días especiales",  "url": _reverse("gestionar_dias_especiales"),"badge": None},
+            ],
+        },
+        {
+            "titulo": "Caja y rendiciones",
+            "items": [
+                {"label": "✅ Verificaciones",   "url": _reverse("gestionar_verificaciones"), "badge": verificaciones_pendientes or None},
+                {"label": "💼 Rendiciones",      "url": _reverse("admin_rendiciones"),        "badge": rendiciones_pendientes or None},
+                {"label": "🧾 Mi caja",          "url": _reverse("admin_cerrar_caja"),        "badge": None},
+            ],
+        },
     ]
 
     return render(request, "admin/panel_admin.html", {
@@ -161,7 +183,7 @@ def panel_admin(request):
         "estacionamientos_activos":  estacionamientos_activos,
         "verificaciones_pendientes": verificaciones_pendientes,
         "rendiciones_pendientes":    rendiciones_pendientes,
-        "sidebar_gestion":           sidebar_gestion,
+        "sidebar_grupos":            sidebar_grupos,
     })
 
 
@@ -286,12 +308,14 @@ def panel_exenciones(request):
     vehiculos_pendientes = qs_exentos.filter(exencion_verificada=False).order_by("patente")
     vehiculos_exentos    = qs_exentos.filter(exencion_verificada=True).order_by("patente")
 
+    from datetime import date as _date
     return render(request, "admin/exenciones.html", {
         "vehiculo":             vehiculo,
         "subcuadras":           subcuadras,
         "tipos_exencion":       TIPOS_EXENCION,
         "vehiculos_exentos":    vehiculos_exentos,
         "vehiculos_pendientes": vehiculos_pendientes,
+        "hoy":                  _date.today(),
     })
 
 
@@ -877,58 +901,85 @@ def gestionar_tarifas(request):
     error     = None
 
     if request.method == "POST":
-        def _decimal(campo, minimo=0):
+        # Cada sección tiene su propio formulario y solo actualiza sus campos.
+        # Esto previene que una edición accidental en una sección pise valores de otra.
+        seccion = request.POST.get("seccion", "")
+
+        def _decimal(campo, minimo=Decimal("0")):
             val = request.POST.get(campo, "0").strip() or "0"
             d   = Decimal(val)
             if d < minimo:
-                raise ValueError(f"El campo '{campo}' debe ser >= {minimo}.")
+                raise ValueError(f"El campo '{campo}' debe ser ≥ {minimo}.")
             return d
 
         def _entero(campo, minimo=0):
             val = request.POST.get(campo, "0").strip() or "0"
             n   = int(val)
             if n < minimo:
-                raise ValueError(f"El campo '{campo}' debe ser >= {minimo}.")
+                raise ValueError(f"El campo '{campo}' debe ser ≥ {minimo}.")
             return n
 
-        try:
-            precio_auto = _decimal("precio_por_hora", minimo=Decimal("0.01"))
-            _val_moto   = request.POST.get("precio_por_hora_moto", "").strip()
-            precio_moto = Decimal(_val_moto) if _val_moto else None
-            monto_inf   = _decimal("monto_infraccion", minimo=0)
-            abono_auto  = _decimal("precio_abono_auto", minimo=0)
-            abono_moto  = _decimal("precio_abono_moto", minimo=0)
-            comision    = _decimal("comision_vendedor", minimo=0)
-            tolerancia  = _entero("tolerancia_multa_minutos", minimo=0)
-
-            # update_or_create falla con MultipleObjectsReturned si hay duplicados.
-            # Usamos filter().update() que actualiza todos los registros del municipio
-            # de forma segura, y create() solo si no existe ninguno.
+        def _obtener_o_crear_tarifa():
             tarifa_qs = Tarifa.objects.filter(municipio=municipio)
             if tarifa_qs.exists():
-                tarifa_qs.update(
-                    precio_por_hora=precio_auto,
-                    precio_por_hora_moto=precio_moto,
-                    monto_infraccion=monto_inf,
-                    precio_abono_auto=abono_auto,
-                    precio_abono_moto=abono_moto,
-                )
+                return tarifa_qs, False
+            tarifa = Tarifa.objects.create(
+                municipio=municipio,
+                precio_por_hora=Decimal("1"),
+                monto_infraccion=Decimal("0"),
+                precio_abono_auto=Decimal("0"),
+                precio_abono_moto=Decimal("0"),
+            )
+            return Tarifa.objects.filter(pk=tarifa.pk), True
+
+        try:
+            # Cada campo es una sección independiente para minimizar el riesgo de
+            # modificar valores no intencionados con un solo submit.
+            tarifa_qs, _ = _obtener_o_crear_tarifa()
+
+            if seccion == "precio_auto":
+                valor = _decimal("precio_por_hora", minimo=Decimal("0.01"))
+                tarifa_qs.update(precio_por_hora=valor)
+                messages.success(request, f"✅ Precio/hora Auto actualizado a ${valor:,.2f}.")
+
+            elif seccion == "precio_moto":
+                _raw = request.POST.get("precio_por_hora_moto", "").strip()
+                valor = Decimal(_raw) if _raw else None
+                tarifa_qs.update(precio_por_hora_moto=valor)
+                messages.success(request, f"✅ Precio/hora Moto actualizado a ${valor:,.2f}." if valor else "✅ Precio/hora Moto eliminado (usará el precio de auto).")
+
+            elif seccion == "monto_infraccion":
+                valor = _decimal("monto_infraccion", minimo=Decimal("0"))
+                tarifa_qs.update(monto_infraccion=valor)
+                messages.success(request, f"✅ Monto de infracción actualizado a ${valor:,.2f}.")
+
+            elif seccion == "tolerancia":
+                valor = _entero("tolerancia_multa_minutos", minimo=0)
+                municipio.tolerancia_multa_minutos = valor
+                municipio.save(update_fields=["tolerancia_multa_minutos"])
+                messages.success(request, f"✅ Tolerancia de multa actualizada a {valor} minuto{'s' if valor != 1 else ''}.")
+
+            elif seccion == "abono_auto":
+                valor = _decimal("precio_abono_auto", minimo=Decimal("0"))
+                tarifa_qs.update(precio_abono_auto=valor)
+                messages.success(request, f"✅ Abono mensual Auto actualizado a ${valor:,.2f}.")
+
+            elif seccion == "abono_moto":
+                valor = _decimal("precio_abono_moto", minimo=Decimal("0"))
+                tarifa_qs.update(precio_abono_moto=valor)
+                messages.success(request, f"✅ Abono mensual Moto actualizado a ${valor:,.2f}.")
+
+            elif seccion == "comision":
+                valor = _decimal("comision_vendedor", minimo=Decimal("0"))
+                municipio.comision_vendedor = valor
+                municipio.save(update_fields=["comision_vendedor"])
+                messages.success(request, f"✅ Comisión de vendedor actualizada a {valor:,.2f}%.")
+
             else:
-                Tarifa.objects.create(
-                    municipio=municipio,
-                    precio_por_hora=precio_auto,
-                    precio_por_hora_moto=precio_moto,
-                    monto_infraccion=monto_inf,
-                    precio_abono_auto=abono_auto,
-                    precio_abono_moto=abono_moto,
-                )
+                error = "Campo desconocido. No se guardó nada."
 
-            municipio.comision_vendedor        = comision
-            municipio.tolerancia_multa_minutos = tolerancia
-            municipio.save(update_fields=["comision_vendedor", "tolerancia_multa_minutos"])
-
-            messages.success(request, "✅ Tarifas y configuración guardadas correctamente.")
-            return redirect("gestionar_tarifas")
+            if not error:
+                return redirect("gestionar_tarifas")
 
         except Exception as e:
             error = f"Error al guardar: {e}"
@@ -2906,4 +2957,27 @@ def auditoria_staff(request):
         "desde":       desde,
         "hasta":       hasta,
         "hoy":         hoy,
+    })
+
+
+@require_role("admin")
+def vehiculos_exentos_sia(request):
+    """
+    Lista de vehículos exentos por certificado SIA (discapacidad).
+    Permite al admin ver quién verificó cada exención, cuándo vence
+    y los datos del titular (nombre, apellido, DNI, NCI de ANDIS).
+    """
+    from datetime import date as _date
+    municipio = request.user.municipio
+    hoy = _date.today()
+
+    vehiculos = (
+        Vehiculo.objects
+        .filter(municipio=municipio, tipo_exencion="discapacitado")
+        .order_by("sia_titular_apellido", "sia_titular_nombre", "patente")
+    )
+
+    return render(request, "admin/vehiculos_exentos_sia.html", {
+        "vehiculos": vehiculos,
+        "hoy":       hoy,
     })
