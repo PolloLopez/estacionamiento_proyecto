@@ -549,19 +549,24 @@ def verificar_sia(request):
             patente=patente,
             defaults={"municipio": request.user.municipio},
         )
-        vehiculo.exento_global      = True
-        vehiculo.tipo_exencion      = "discapacitado"
-        vehiculo.vigencia_exencion  = resultado.vencimiento
+        vehiculo.exento_global       = True
+        vehiculo.tipo_exencion       = "discapacitado"
+        vehiculo.vigencia_exencion   = resultado.vencimiento
         vehiculo.exencion_verificada = True
-        # Guardar NCI en notas para auditoría (no el DNI del titular)
+        vehiculo.sia_titular_nombre   = resultado.nombre
+        vehiculo.sia_titular_apellido = resultado.apellido
+        vehiculo.sia_titular_dni      = resultado.documento
+        vehiculo.sia_nci              = resultado.nci
         vehiculo.notas_exencion = (
             f"SIA verificado vía ANDIS. NCI: {resultado.nci}. "
-            f"Titular: {resultado.titular}. "
+            f"Titular: {resultado.titular}. DNI: {resultado.documento}. "
             f"Verificado por inspector {request.user.correo} el {date.today()}."
         )
         vehiculo.save(update_fields=[
             "exento_global", "tipo_exencion", "vigencia_exencion",
             "exencion_verificada", "notas_exencion",
+            "sia_titular_nombre", "sia_titular_apellido",
+            "sia_titular_dni", "sia_nci",
         ])
 
     # Construir respuesta para el frontend

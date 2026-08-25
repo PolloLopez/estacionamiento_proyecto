@@ -124,6 +124,7 @@ urlpatterns = [
     path("admin-vendedores/crear/", views.gestionar_vendedores, name="admin_crear_vendedor"),
     path("admin-staff/", views.auditoria_staff, name="auditoria_staff"),
     path("admin/cerrar-caja/", views.cerrar_caja, name="admin_cerrar_caja"),
+    path("admin/exentos-sia/", views.vehiculos_exentos_sia, name="vehiculos_exentos_sia"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
     path("admin-subcuadras/", views.gestionar_subcuadras, name="gestionar_subcuadras"),
     path("admin-exenciones/importar/", views.importar_exenciones, name="importar_exenciones"),

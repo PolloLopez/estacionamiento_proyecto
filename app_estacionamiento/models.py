@@ -283,6 +283,13 @@ class Vehiculo(models.Model):
         help_text="Fecha hasta la que rige la exención. Vacío = sin vencimiento.",
     )
 
+    # Datos del titular del SIA — se completan automáticamente al verificar el QR de ANDIS.
+    # Permiten al admin consultar y filtrar vehículos exentos por titular/DNI sin abrir cada uno.
+    sia_titular_nombre   = models.CharField(max_length=100, blank=True, default="", verbose_name="Nombre titular SIA")
+    sia_titular_apellido = models.CharField(max_length=100, blank=True, default="", verbose_name="Apellido titular SIA")
+    sia_titular_dni      = models.CharField(max_length=15,  blank=True, default="", verbose_name="DNI titular SIA")
+    sia_nci              = models.CharField(max_length=30,  blank=True, default="", verbose_name="NCI verificación SIA")
+
     # Marca si el admin ya revisó y completó los datos de la exención.
     # Los vehículos importados desde Excel arrancan con False (pendientes de
     # que el admin contacte al titular para completar email, condición, etc.)

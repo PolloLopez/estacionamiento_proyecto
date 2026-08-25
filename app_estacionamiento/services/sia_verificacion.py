@@ -49,7 +49,10 @@ class ResultadoSia:
     patente_sia: str       = ""        # dominio registrado en ANDIS (normalizado)
     vencimiento: Optional[date] = None # fecha de vencimiento del SIA
     nci: str               = ""        # número de caso ANDIS
-    titular: str           = ""        # "Nombre Apellido" del titular
+    titular: str           = ""        # "Apellido Nombre" combinado (para mostrar)
+    nombre: str            = ""        # nombre del titular (para guardar por separado)
+    apellido: str          = ""        # apellido del titular (para guardar por separado)
+    documento: str         = ""        # DNI del titular (campo "Documento" de ANDIS)
     error_tecnico: str     = ""        # descripción interna (solo para logs, nunca al inspector)
 
     @property
@@ -170,6 +173,7 @@ def _parsear_respuesta(html: str) -> dict:
         "apellido":    buscar("Apellido"),
         "dominio":     buscar("Dominio", ["Patente"]),
         "vencimiento": buscar("Vencimiento", ["Vigencia", "Expira"]),
+        "documento":   buscar("Documento", ["DNI"]),
     }
 
 
@@ -234,11 +238,14 @@ def verificar_sia(qr_url: str, patente_inspector: str) -> ResultadoSia:
         )
 
     # 3. Parsear la respuesta
-    datos      = _parsear_respuesta(resp.text)
-    dominio    = normalizar_patente(datos.get("dominio", ""))
-    vencimiento = _parsear_fecha(datos.get("vencimiento", ""))
-    titular    = f"{datos.get('nombre', '')} {datos.get('apellido', '')}".strip()
-    nci        = datos.get("nci", "")
+    datos        = _parsear_respuesta(resp.text)
+    dominio      = normalizar_patente(datos.get("dominio", ""))
+    vencimiento  = _parsear_fecha(datos.get("vencimiento", ""))
+    nombre_raw   = datos.get("nombre", "")
+    apellido_raw = datos.get("apellido", "")
+    titular      = f"{apellido_raw} {nombre_raw}".strip()   # "Apellido Nombre" como ANDIS muestra
+    nci          = datos.get("nci", "")
+    documento    = datos.get("documento", "")
 
     # Validación básica: si no se pudo extraer ningún dato útil, el HTML no fue reconocible
     if not dominio and not nci and not titular:
@@ -256,6 +263,9 @@ def verificar_sia(qr_url: str, patente_inspector: str) -> ResultadoSia:
             sia_code=code,
             nci=nci,
             titular=titular,
+            nombre=nombre_raw,
+            apellido=apellido_raw,
+            documento=documento,
             vencimiento=vencimiento,
             error_tecnico="ANDIS respondió pero no hay dominio/patente en el SIA",
         )
@@ -270,6 +280,9 @@ def verificar_sia(qr_url: str, patente_inspector: str) -> ResultadoSia:
             vencimiento=vencimiento,
             nci=nci,
             titular=titular,
+            nombre=nombre_raw,
+            apellido=apellido_raw,
+            documento=documento,
         )
 
     # 5. Comparar patentes (normalizado)
@@ -282,6 +295,9 @@ def verificar_sia(qr_url: str, patente_inspector: str) -> ResultadoSia:
             vencimiento=vencimiento,
             nci=nci,
             titular=titular,
+            nombre=nombre_raw,
+            apellido=apellido_raw,
+            documento=documento,
         )
 
     # 6. Todo OK
@@ -293,4 +309,7 @@ def verificar_sia(qr_url: str, patente_inspector: str) -> ResultadoSia:
         vencimiento=vencimiento,
         nci=nci,
         titular=titular,
+        nombre=nombre_raw,
+        apellido=apellido_raw,
+        documento=documento,
     )

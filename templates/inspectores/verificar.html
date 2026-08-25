@@ -670,13 +670,41 @@ function enviarVerificacionSia(qrUrl) {
             detalles += "<br>Patente SIA: <strong>" + data.patente_sia + "</strong>";
         if (data.url_andis)
             detalles += "<br><a href='" + data.url_andis + "' target='_blank' rel='noopener' style='color:inherit;'>Ver en ANDIS ↗</a>";
-        mostrarResultadoSia(tipo, data.mensaje + detalles);
+        // Botón de re-verificar con countdown de 5 segundos
+        var btnReverificar = "<div style='margin-top:0.75rem;'>"
+            + "<button onclick='resetearModalSia()' class='btn btn-outline' "
+            + "style='font-size:0.85rem; padding:0.3rem 0.8rem;' id='btn-reverificar'>"
+            + "↩ Verificar otro</button> "
+            + "<span id='sia-countdown' style='font-size:0.8rem; color:inherit; opacity:0.7;'></span>"
+            + "</div>";
+        mostrarResultadoSia(tipo, data.mensaje + detalles + btnReverificar);
         document.getElementById("sia-estado").textContent = "";
+        // Auto-reset a los 5 segundos si fue exitoso
+        if (data.es_valido) {
+            var _seg = 5;
+            var _cd = document.getElementById("sia-countdown");
+            if (_cd) _cd.textContent = "(auto-reset en " + _seg + "s)";
+            var _timer = setInterval(function() {
+                _seg--;
+                var _cdEl = document.getElementById("sia-countdown");
+                if (_cdEl) _cdEl.textContent = "(auto-reset en " + _seg + "s)";
+                if (_seg <= 0) { clearInterval(_timer); resetearModalSia(); }
+            }, 1000);
+        }
     })
     .catch(function() {
         mostrarResultadoSia("error", "❌ Error de red. Verificá la conexión.");
         _siaVerificando = false;
     });
+}
+
+function resetearModalSia() {
+    // Limpia el resultado y el input para permitir una nueva verificación
+    document.getElementById("sia-resultado").style.display = "none";
+    document.getElementById("sia-resultado").innerHTML = "";
+    var inp = document.getElementById("sia-url-input");
+    if (inp) inp.value = "";
+    _siaVerificando = false;
 }
 
 function mostrarResultadoSia(tipo, html) {

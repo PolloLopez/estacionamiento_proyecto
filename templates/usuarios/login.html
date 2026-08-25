@@ -44,20 +44,42 @@
   </div>
 
   <!-- OPCIÓN 2: Email -->
-  <details class="login-email-section">
+  {# Si hubo error, abrir el <details> automáticamente para que el usuario vea el problema #}
+  <details class="login-email-section" {% if error_tipo %}open{% endif %}>
     <summary>Ingresar con correo y contraseña</summary>
     <form method="post" action="{% url 'login' %}" class="login-form">
       {% csrf_token %}
       <input type="email" name="correo"
-             value="{{ request.POST.correo|default:'' }}"
+             value="{{ correo_previo|default:'' }}"
              placeholder="Correo electrónico"
-             autocomplete="email" required>
+             autocomplete="email" required
+             {% if error_tipo == "correo_no_encontrado" %}style="border-color:#e53935;"{% endif %}>
+
       <input type="password" name="password"
              placeholder="Contraseña"
-             autocomplete="current-password" required>
-      {% if form.errors %}
-        <p class="login-error">Correo o contraseña incorrectos</p>
+             autocomplete="current-password" required
+             {% if error_tipo == "password_incorrecta" %}style="border-color:#e53935;"{% endif %}>
+
+      {% if error_tipo == "correo_no_encontrado" %}
+        <p class="login-error">
+          No encontramos una cuenta con ese correo.
+          <a href="{% url 'registro' %}" style="color:inherit; font-weight:700;">¿Querés registrarte?</a>
+        </p>
+      {% elif error_tipo == "password_incorrecta" %}
+        <p class="login-error">
+          Contraseña incorrecta.
+          <a href="{% url 'account_reset_password' %}" style="color:inherit; font-weight:700;">¿Olvidaste tu contraseña?</a>
+        </p>
+      {% elif error_tipo == "cuenta_inactiva" %}
+        <p class="login-error">
+          Tu cuenta está desactivada. Contactá al administrador del municipio.
+        </p>
+      {% elif error_tipo == "campos_vacios" %}
+        <p class="login-error">Completá el correo y la contraseña.</p>
+      {% elif error_tipo %}
+        <p class="login-error">Correo o contraseña incorrectos.</p>
       {% endif %}
+
       <button type="submit" class="btn-email-submit">Ingresar</button>
     </form>
   </details>

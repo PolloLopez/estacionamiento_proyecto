@@ -68,9 +68,29 @@
   {% if vehiculo %}
   <!-- RESULTADO -->
   <div class="card">
-    <h3 style="margin-bottom:1rem;">
-      Patente: <strong>{{ vehiculo.patente }}</strong>
-    </h3>
+    <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem;">
+      <h3 style="margin:0;">Patente: <strong>{{ vehiculo.patente }}</strong></h3>
+      {% if vehiculo.tipo_exencion == "discapacitado" and vehiculo.sia_nci %}
+        <span style="background:#1a5fb4; color:#fff; font-size:0.78rem; font-weight:700;
+                     border-radius:6px; padding:0.2rem 0.6rem; display:inline-flex;
+                     align-items:center; gap:0.3rem;">
+          ♿ SIA · ANDIS
+        </span>
+        <span style="font-size:0.85rem; color:var(--color-text-muted);">
+          {% if vehiculo.sia_titular_apellido or vehiculo.sia_titular_nombre %}
+            {{ vehiculo.sia_titular_apellido }}{% if vehiculo.sia_titular_apellido and vehiculo.sia_titular_nombre %}, {% endif %}{{ vehiculo.sia_titular_nombre }}
+          {% endif %}
+          {% if vehiculo.sia_titular_dni %} · DNI {{ vehiculo.sia_titular_dni }}{% endif %}
+          {% if vehiculo.vigencia_exencion %}
+            · Vence {% if vehiculo.vigencia_exencion >= hoy %}
+              <strong style="color:#1a7a3c;">{{ vehiculo.vigencia_exencion|date:"d/m/Y" }}</strong>
+            {% else %}
+              <strong style="color:#c0392b;">{{ vehiculo.vigencia_exencion|date:"d/m/Y" }} (vencido)</strong>
+            {% endif %}
+          {% endif %}
+        </span>
+      {% endif %}
+    </div>
 
     <form method="POST">
       {% csrf_token %}
@@ -249,34 +269,52 @@
         <thead>
           <tr>
             <th>Patente</th>
-            <th>Tipo</th>
-            <th>Conductor(es)</th>
+            <th>Origen</th>
+            <th>Titular / Conductor</th>
             <th>Tipo de exención</th>
+            <th>Vigencia</th>
             <th style="text-align:center;">Global</th>
-            <th>Subcuadras exentas</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {% for v in vehiculos_exentos %}
+          {% with es_sia=v.sia_nci %}
           <tr>
             <td><strong style="font-size:1.05rem; letter-spacing:1px;">{{ v.patente }}</strong></td>
-            <td>{{ v.get_tipo_display }}</td>
+            <td>
+              {% if es_sia %}
+                <span style="background:#1a5fb4; color:#fff; font-size:0.75rem; font-weight:700;
+                             border-radius:5px; padding:0.15rem 0.45rem;">♿ SIA</span>
+              {% else %}
+                <span style="background:var(--color-surface-2); color:var(--color-text-muted);
+                             font-size:0.75rem; border-radius:5px; padding:0.15rem 0.45rem;">Admin</span>
+              {% endif %}
+            </td>
             <td style="font-size:0.85rem;">
-              {% for vu in v.vehiculousuario_set.all %}
-                {{ vu.usuario.nombre|default:vu.usuario.correo }}{% if not forloop.last %}, {% endif %}
-              {% empty %}—{% endfor %}
+              {% if es_sia and v.sia_titular_apellido %}
+                {{ v.sia_titular_apellido }}{% if v.sia_titular_nombre %}, {{ v.sia_titular_nombre }}{% endif %}
+                {% if v.sia_titular_dni %}<br><span style="color:var(--color-text-muted); font-size:0.8rem;">DNI {{ v.sia_titular_dni }}</span>{% endif %}
+              {% else %}
+                {% for vu in v.vehiculousuario_set.all %}
+                  {{ vu.usuario.nombre|default:vu.usuario.correo }}{% if not forloop.last %}, {% endif %}
+                {% empty %}—{% endfor %}
+              {% endif %}
             </td>
             <td style="font-size:0.85rem;">{{ v.tipo_exencion|default:"—" }}</td>
+            <td style="font-size:0.85rem;">
+              {% if v.vigencia_exencion %}
+                {% if v.vigencia_exencion >= hoy %}
+                  <span style="color:#1a7a3c; font-weight:600;">{{ v.vigencia_exencion|date:"d/m/Y" }}</span>
+                {% else %}
+                  <span style="color:#c0392b; font-size:0.8rem;">{{ v.vigencia_exencion|date:"d/m/Y" }} ⚠️</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
             <td style="text-align:center;">
               {% if v.exento_global %}
                 <span style="color:var(--color-primary); font-weight:700;">✅</span>
               {% else %}—{% endif %}
-            </td>
-            <td style="font-size:0.82rem; color:var(--color-text-muted);">
-              {% with subs=v.subcuadras_exentas.all %}
-                {% if subs %}{{ subs|length }} subcuadra{{ subs|length|pluralize }}{% else %}—{% endif %}
-              {% endwith %}
             </td>
             <td>
               <form method="POST" style="display:inline;">
@@ -287,6 +325,7 @@
               </form>
             </td>
           </tr>
+          {% endwith %}
           {% endfor %}
         </tbody>
       </table>

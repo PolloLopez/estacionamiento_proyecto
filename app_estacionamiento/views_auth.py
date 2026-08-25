@@ -118,13 +118,29 @@ def login_view(request):
             login(request, usuario)
             return redirect_por_rol(usuario)
 
+        # Determinar por qué falló el login para mostrar un mensaje específico.
+        # Nota: si axes bloqueó al usuario, el middleware intercepta antes de llegar acá.
+        from app_estacionamiento.models import Usuario as UsuarioModel
+        usuario_bd = UsuarioModel.objects.filter(correo=correo).first()
+
+        if not correo or not password:
+            error_tipo = "campos_vacios"
+        elif not usuario_bd:
+            error_tipo = "correo_no_encontrado"
+        elif not usuario_bd.is_active:
+            error_tipo = "cuenta_inactiva"
+        else:
+            error_tipo = "password_incorrecta"
+
         logger.warning(
-            "Login fallido: correo=%s ip=%s",
+            "Login fallido (%s): correo=%s ip=%s",
+            error_tipo,
             correo,
             request.META.get("REMOTE_ADDR"),
         )
         return render(request, "usuarios/login.html", {
-            "form": {"errors": True}
+            "error_tipo":   error_tipo,
+            "correo_previo": correo,
         })
 
     return render(request, "usuarios/login.html")
