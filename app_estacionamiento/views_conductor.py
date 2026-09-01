@@ -15,6 +15,7 @@ No incluye cobros en efectivo ni gestión de caja (eso es vendedor).
 No incluye gestión de municipio ni usuarios (eso es admin).
 """
 
+import math
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -23,6 +24,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -36,6 +38,7 @@ from .models import (
     MovimientoCaja,
     Notificacion,
     SolicitudVerificacion,
+    Subcuadra,
     Tarifa,
     Usuario,
     VerificacionInspector,
@@ -445,6 +448,51 @@ def eliminar_vehiculo(request, vehiculo_id):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# GPS — subcuadra más cercana para el conductor
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("conductor")
+def subcuadra_cercana_conductor(request):
+    """
+    Endpoint JSON para pre-seleccionar subcuadra desde el browser del conductor.
+
+    Recibe: GET ?lat=<float>&lon=<float>
+    Devuelve: {"id": <int>, "nombre": "<str>"} con la subcuadra más cercana,
+              o {} si el municipio no tiene subcuadras con coordenadas cargadas.
+
+    Misma lógica que el endpoint de inspectores, pero con rol conductor.
+    La distancia es euclidiana sobre lat/lon — suficiente para zonas urbanas
+    de pocos km² sin necesidad de proyecciones geográficas.
+    """
+    try:
+        lat = float(request.GET.get("lat", ""))
+        lon = float(request.GET.get("lon", ""))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "lat y lon son requeridos"}, status=400)
+
+    municipio = getattr(request.user, "municipio", None)
+    if not municipio:
+        return JsonResponse({})
+
+    subcuadras = Subcuadra.objects.filter(
+        municipio=municipio,
+        lat__isnull=False,
+        lon__isnull=False,
+    ).exclude(calle="Zona Única")
+
+    if not subcuadras.exists():
+        return JsonResponse({})
+
+    def distancia(s):
+        dlat = float(s.lat) - lat
+        dlon = float(s.lon) - lon
+        return math.sqrt(dlat ** 2 + dlon ** 2)
+
+    mas_cercana = min(subcuadras, key=distancia)
+    return JsonResponse({"id": mas_cercana.id, "nombre": str(mas_cercana)})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Estacionamiento del conductor
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -544,7 +592,17 @@ def estacionar_vehiculo(request):
                 "usuario":  usuario,
             })
 
-        subcuadra = get_subcuadra_default(usuario.municipio)
+        # Subcuadra: usa la informada por el conductor (GPS o selector manual),
+        # o la default si no se envió ninguna o el id no pertenece al municipio.
+        subcuadra_id = request.POST.get("subcuadra_id")
+        if subcuadra_id:
+            subcuadra = (
+                Subcuadra.objects.filter(id=subcuadra_id, municipio=usuario.municipio).first()
+                or get_subcuadra_default(usuario.municipio)
+            )
+        else:
+            subcuadra = get_subcuadra_default(usuario.municipio)
+
         result    = ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion)
 
         for w in result.get("warnings", []):
@@ -589,14 +647,21 @@ def estacionar_vehiculo(request):
     patente_preseleccionada = sanitizar_patente(request.GET.get("patente", ""))
     opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto)
 
+    # Subcuadras disponibles para GPS / selección manual.
+    # Excluimos "Zona Única" (el default silencioso) para no confundir al conductor.
+    subcuadras = Subcuadra.objects.filter(
+        municipio=usuario.municipio,
+    ).exclude(calle="Zona Única").order_by("calle", "altura")
+
     return render(request, "usuarios/estacionar_vehiculo.html", {
-        "vehiculos":             vehiculos,
-        "usuario":               usuario,
-        "tarifa_hora":           tarifa_hora_auto,
-        "tarifa_hora_auto":      tarifa_hora_auto,
-        "tarifa_hora_moto":      tarifa_hora_moto,
+        "vehiculos":              vehiculos,
+        "usuario":                usuario,
+        "tarifa_hora":            tarifa_hora_auto,
+        "tarifa_hora_auto":       tarifa_hora_auto,
+        "tarifa_hora_moto":       tarifa_hora_moto,
         "patente_preseleccionada": patente_preseleccionada,
-        "opciones_duracion":     opciones_duracion,
+        "opciones_duracion":      opciones_duracion,
+        "subcuadras":             subcuadras,
     })
 
 

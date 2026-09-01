@@ -79,6 +79,35 @@
       </p>
     {% endif %}
 
+    <!-- ─── SUBCUADRA GPS (solo visible si hay vehículo y hay subcuadras con GPS) ─── -->
+    {% if subcuadras %}
+    <div id="seccion-subcuadra" style="display:none; margin-bottom:1.4rem;">
+
+      <h3 style="margin-bottom:0.75rem;">📍 ¿Dónde estás?</h3>
+
+      <!-- Estado 1: esperando respuesta del GPS -->
+      <div id="gps-detectando"
+           style="font-size:0.9rem; color:var(--color-text-muted); padding:0.5rem 0;">
+        ⏳ Detectando ubicación…
+      </div>
+
+      <!-- Estado 2: GPS ok o selección manual (mismo selector, diferente label) -->
+      <div id="gps-selector" style="display:none;">
+        <p id="gps-label" style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.5rem;"></p>
+        <select name="subcuadra_id" id="select-subcuadra"
+                style="width:100%; padding:0.5rem 0.75rem; border-radius:8px;
+                       border:1px solid var(--color-border); font-size:1rem;
+                       background:var(--color-surface);">
+          <option value="">— Sin informar zona —</option>
+          {% for s in subcuadras %}
+          <option value="{{ s.id }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+    </div>
+    {% endif %}
+
     <!-- ─── DURACIÓN (solo visible si hay vehículo seleccionado) ─── -->
     <div id="seccion-duracion" style="display:none;">
 
@@ -174,10 +203,63 @@
 const PRECIO_HORA = parseFloat("{{ tarifa_hora|default:'100' }}");
 // Saldo actual del conductor — usado para validar antes de habilitar "Confirmar"
 const SALDO_CONDUCTOR = parseFloat("{{ usuario.saldo|default:'0' }}");
+const URL_SUBCUADRA_CERCANA = "{% url 'conductor_subcuadra_cercana' %}";
 let vehiculoActivo = null;
 
 // Preseleccionar si viene de "agregar vehículo"
 const preseleccionada = "{{ patente_preseleccionada|default:'' }}";
+
+// ── GPS ──────────────────────────────────────────────────────────────────────
+// Estado del GPS: "pending" | "ok" | "error"
+// Arranca la detección apenas carga la página para que cuando el conductor
+// seleccione el vehículo ya tengamos la ubicación (o sepamos que falló).
+let estadoGps = "pending";
+let subcuadraCercanaId = null;
+
+const seccionSubcuadra = document.getElementById("seccion-subcuadra");
+
+function mostrarSelectorSubcuadra(label) {
+  const detectando = document.getElementById("gps-detectando");
+  const selector   = document.getElementById("gps-selector");
+  const labelEl    = document.getElementById("gps-label");
+  if (detectando) detectando.style.display = "none";
+  if (selector)   selector.style.display   = "block";
+  if (labelEl && label) labelEl.textContent = label;
+}
+
+if (seccionSubcuadra && navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      estadoGps = "ok";
+      const { latitude: lat, longitude: lon } = pos.coords;
+      fetch(`${URL_SUBCUADRA_CERCANA}?lat=${lat}&lon=${lon}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.id) {
+            subcuadraCercanaId = data.id;
+            // Pre-seleccionar en el <select> si ya está visible
+            const sel = document.getElementById("select-subcuadra");
+            if (sel) sel.value = data.id;
+            mostrarSelectorSubcuadra(`📍 Subcuadra detectada: ${data.nombre}`);
+          } else {
+            // GPS ok pero municipio sin coordenadas cargadas
+            mostrarSelectorSubcuadra("Seleccioná tu zona:");
+          }
+        })
+        .catch(() => mostrarSelectorSubcuadra("Seleccioná tu zona:"));
+    },
+    () => {
+      // GPS denegado o error
+      estadoGps = "error";
+      mostrarSelectorSubcuadra("Seleccioná tu zona:");
+    },
+    { timeout: 8000 }
+  );
+} else if (seccionSubcuadra) {
+  // Navegador sin soporte GPS
+  estadoGps = "error";
+  mostrarSelectorSubcuadra("Seleccioná tu zona:");
+}
 
 function seleccionarVehiculo(id, patente) {
   vehiculoActivo = id;
@@ -191,12 +273,27 @@ function seleccionarVehiculo(id, patente) {
   // Actualizar input oculto
   document.getElementById("vehiculo_id_input").value = id;
 
+  // Mostrar sección de subcuadra GPS (si existe — solo cuando hay subcuadras configuradas)
+  if (seccionSubcuadra) {
+    seccionSubcuadra.style.display = "block";
+    // Si el GPS ya respondió, mostrar el selector; si sigue pendiente, se mostrará
+    // cuando llegue la respuesta del fetch de arriba
+    if (estadoGps !== "pending") {
+      mostrarSelectorSubcuadra(
+        subcuadraCercanaId
+          ? `📍 Subcuadra detectada: ${document.getElementById("select-subcuadra")?.selectedOptions[0]?.text ?? ""}`
+          : "Seleccioná tu zona:"
+      );
+    }
+  }
+
   // Mostrar sección de duración
   document.getElementById("seccion-duracion").style.display = "block";
   document.getElementById("vehiculo-seleccionado-label").innerText = patente;
 
-  // Scroll suave a la sección de duración
-  document.getElementById("seccion-duracion").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  // Scroll suave a la sección de subcuadra (o duración si no hay GPS)
+  const scrollTarget = seccionSubcuadra || document.getElementById("seccion-duracion");
+  scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 // Botones de duración (generados desde el servidor, con opciones recortadas al horario)

@@ -53,6 +53,7 @@ urlpatterns = [
     # 🚗 CONDUCTORES
     # =========================
     path("estacionar/", views.estacionar_vehiculo, name="usuarios_estacionar_vehiculo"),
+    path("estacionar/subcuadra-cercana/", views.subcuadra_cercana_conductor, name="conductor_subcuadra_cercana"),
     path("finalizar/<int:estacionamiento_id>/", views.finalizar_estacionamiento, name="usuarios_finalizar_estacionamiento"),
     path("gestion-infracciones/", views.gestion_infracciones, name="gestion_infracciones"),
     path("mis-infracciones/", views.mis_infracciones, name="mis_infracciones"),

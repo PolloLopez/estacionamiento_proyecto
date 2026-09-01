@@ -91,7 +91,7 @@ Campos nuevos en `Usuario` (requieren migración):
 - `horarios_atencion` (JSONField) — días y franjas horarias de atención
 - `ubicacion_lat`, `ubicacion_lon` (DecimalField) — para mapa y búsqueda del más cercano
 
-### Detección GPS de subcuadra al estacionar (conductor)
+### ~~Detección GPS de subcuadra al estacionar (conductor)~~ → ✅ resuelto (sesión 2026-09-01)
 Hoy el conductor estaciona y el sistema le asigna la subcuadra default del municipio (`get_subcuadra_default()`).
 Mejorar el flujo:
 1. Al abrir "Estacionar vehículo" → pedir permiso de geolocalización del browser

@@ -64,6 +64,7 @@ from .views_conductor import (
     agregar_vehiculo,
     eliminar_vehiculo,
     estacionar_vehiculo,
+    subcuadra_cercana_conductor,
     historial_estacionamientos,
     renovar_estacionamiento,
     finalizar_estacionamiento,
