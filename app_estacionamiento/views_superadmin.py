@@ -13,6 +13,7 @@ Responsabilidades:
 - Importar estacionamientos activos desde Excel del sistema anterior
 """
 
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
@@ -20,13 +21,13 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .decorators import require_role
 from .views_admin import _error_password
-from .models import Estacionamiento, ModuloMunicipio, Municipio, PlantillaDocumento, Subcuadra, Usuario, Vehiculo
+from .models import CierreCaja, Estacionamiento, ModuloMunicipio, Municipio, PlantillaDocumento, Rendicion, Subcuadra, Usuario, Vehiculo
 from .utils import sanitizar_patente
 
 
@@ -62,6 +63,82 @@ def panel_superadmin(request):
         "total_municipios": total_municipios,
         "total_admins":     total_admins,
         "modulos_choices":  ModuloMunicipio.MODULOS,
+    })
+
+
+@require_role("superadmin")
+def auditoria_superadmin(request):
+    """
+    Vista financiera global: recaudado, rendido y pendiente de rendir por municipio.
+
+    Métricas por municipio en el período seleccionado:
+    - Recaudado:  suma de CierreCaja.monto_municipio (lo que le corresponde al municipio).
+    - Rendido:    suma de Rendicion.total_neto con estado 'validada' por el tesorero.
+    - Pendiente:  suma de CierreCaja.monto_municipio donde el cierre está certificado
+                  pero aún no tiene rendición asociada.
+
+    Nota: las queries son por municipio en un loop Python (N pequeño, ~10-20 municipios).
+    """
+    hoy = timezone.localtime().date()
+    try:
+        desde = date.fromisoformat(request.GET.get("desde", ""))
+    except (ValueError, TypeError):
+        desde = hoy.replace(day=1)
+    try:
+        hasta = date.fromisoformat(request.GET.get("hasta", ""))
+    except (ValueError, TypeError):
+        hasta = hoy
+
+    municipios = Municipio.objects.filter(activo=True).order_by("nombre")
+
+    datos = []
+    for m in municipios:
+        # Total que el municipio recaudó (neto de comisiones de vendedores)
+        recaudado = (
+            CierreCaja.objects.filter(
+                usuario__municipio=m,
+                fecha_cierre__date__gte=desde,
+                fecha_cierre__date__lte=hasta,
+            ).aggregate(total=Sum("monto_municipio"))["total"] or 0
+        )
+        # Total validado por el tesorero en el período
+        rendido = (
+            Rendicion.objects.filter(
+                municipio=m,
+                estado="validada",
+                creado_en__date__gte=desde,
+                creado_en__date__lte=hasta,
+            ).aggregate(total=Sum("total_neto"))["total"] or 0
+        )
+        # Certificado por el admin pero aún sin rendición generada
+        pendiente_rendir = (
+            CierreCaja.objects.filter(
+                usuario__municipio=m,
+                certificado=True,
+                rendicion__isnull=True,
+                fecha_cierre__date__gte=desde,
+                fecha_cierre__date__lte=hasta,
+            ).aggregate(total=Sum("monto_municipio"))["total"] or 0
+        )
+        datos.append({
+            "municipio": m,
+            "recaudado": recaudado,
+            "rendido": rendido,
+            "pendiente_rendir": pendiente_rendir,
+        })
+
+    total_recaudado   = sum(d["recaudado"]       for d in datos)
+    total_rendido     = sum(d["rendido"]         for d in datos)
+    total_pendiente   = sum(d["pendiente_rendir"] for d in datos)
+
+    return render(request, "superadmin/auditoria.html", {
+        "datos":            datos,
+        "desde":            desde,
+        "hasta":            hasta,
+        "hoy":              hoy,
+        "total_recaudado":  total_recaudado,
+        "total_rendido":    total_rendido,
+        "total_pendiente":  total_pendiente,
     })
 
 

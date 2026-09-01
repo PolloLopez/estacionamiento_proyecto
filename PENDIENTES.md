@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-01 (auditorías completas)
+Última actualización: 2026-09-01 (panel auditoría superadmin)
 
 ---
 
@@ -114,14 +114,13 @@ Cambios necesarios:
 - Semáforo en panel admin: vendedores atrasados en cerrar caja.
 - Admin puede forzar el cierre de un vendedor (ausencia o imprevisto).
 
-### Panel de auditoría del superadmin
+### ~~Panel de auditoría del superadmin~~ → ✅ resuelto (sesión 2026-09-01)
 Vista global: total recaudado/rendido/pendiente por municipio.
-(El panel de auditoría interno del admin ya está: `auditoria_staff`)
+Nueva vista `auditoria_superadmin` (`/superadmin/auditoria/`) con filtro de fechas (default: mes actual). Loop por municipio con 3 queries cada uno (N pequeño). Métricas: recaudado (`CierreCaja.monto_municipio`), rendido (`Rendicion.total_neto` con estado `validada`), pendiente (cierres certificados sin rendición). Totales en tfoot. Link "💰 Auditoría financiera" en header del panel superadmin.
 
 
-### Reportes de subcuadras (dashboard de cobertura)
-Dashboard por subcuadra: verificaciones / infracciones / vehículos exentos en el período.
-Datos ya existen: `VerificacionInspector` + `Infraccion` + `Vehiculo.subcuadras_exentas`.
+### ~~Reportes de subcuadras (dashboard de cobertura)~~ → ✅ resuelto (sesión 2026-09-01)
+Vista `/admin-subcuadras/reportes/` con filtro de fechas (default: mes actual). Tabla con verificaciones, infracciones y exentos por subcuadra. Indicador de cobertura (sin / baja / activa). Link "📊 Cobertura" en sidebar de Configuración.
 
 ---
 

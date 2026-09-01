@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Auditoría financiera — Superadmin{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>💰 Auditoría financiera por municipio</h2>
+    <a href="{% url 'panel_superadmin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+  </div>
+
+  <!-- Filtro de fechas -->
+  <form method="get" style="margin-bottom:1.5rem;">
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+      <div>
+        <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Desde</label>
+        <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}"
+               style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}"
+               style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);">
+      </div>
+      <button type="submit" class="btn" style="font-size:0.9rem;">Filtrar</button>
+      <a href="{% url 'auditoria_superadmin' %}" class="btn btn-outline" style="font-size:0.9rem;">Este mes</a>
+    </div>
+    <p style="margin-top:0.5rem; font-size:0.82rem; color:var(--color-text-muted);">
+      {% if desde == hasta %}
+        Período: {{ desde|date:"d/m/Y" }}
+      {% else %}
+        Período: {{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}
+      {% endif %}
+    </p>
+  </form>
+
+  <!-- Tabla de métricas por municipio -->
+  <div class="card" style="overflow-x:auto;">
+    {% if datos %}
+      <table style="min-width:600px;">
+        <thead>
+          <tr>
+            <th>Municipio</th>
+            <th style="text-align:right;">Recaudado</th>
+            <th style="text-align:right;">Rendido</th>
+            <th style="text-align:right;">Pendiente de rendir</th>
+            <th style="text-align:center;">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in datos %}
+          <tr>
+            <td style="font-weight:600;">{{ d.municipio.nombre }}</td>
+
+            <td style="text-align:right; font-weight:600;">
+              ${{ d.recaudado|floatformat:2 }}
+            </td>
+
+            <td style="text-align:right; color:var(--color-primary);">
+              ${{ d.rendido|floatformat:2 }}
+            </td>
+
+            <td style="text-align:right;">
+              {% if d.pendiente_rendir > 0 %}
+                <span style="color:var(--color-warning); font-weight:700;">
+                  ${{ d.pendiente_rendir|floatformat:2 }}
+                </span>
+              {% else %}
+                <span style="color:var(--color-text-muted);">$0.00</span>
+              {% endif %}
+            </td>
+
+            <td style="text-align:center;">
+              {% if d.recaudado == 0 %}
+                <span style="font-size:0.8rem; color:var(--color-text-muted);">Sin actividad</span>
+              {% elif d.pendiente_rendir > 0 %}
+                <span style="font-size:0.8rem; color:var(--color-warning); font-weight:600;">⚠️ Con pendiente</span>
+              {% else %}
+                <span style="font-size:0.8rem; color:var(--color-primary); font-weight:600;">✅ Al día</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+
+        <tfoot>
+          <tr style="font-weight:700; border-top:2px solid var(--color-border); background:var(--color-surface-alt, #f9f9f9);">
+            <td>Total</td>
+            <td style="text-align:right;">${{ total_recaudado|floatformat:2 }}</td>
+            <td style="text-align:right; color:var(--color-primary);">${{ total_rendido|floatformat:2 }}</td>
+            <td style="text-align:right;">
+              {% if total_pendiente > 0 %}
+                <span style="color:var(--color-warning);">${{ total_pendiente|floatformat:2 }}</span>
+              {% else %}
+                $0.00
+              {% endif %}
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    {% else %}
+      <p class="text-muted" style="padding:1rem; text-align:center;">
+        No hay municipios activos o no hubo actividad en el período.
+      </p>
+    {% endif %}
+  </div>
+
+  <!-- Leyenda -->
+  <p style="margin-top:0.75rem; font-size:0.8rem; color:var(--color-text-muted);">
+    <strong>Recaudado:</strong> suma de cierres de caja (neto municipio) en el período. —
+    <strong>Rendido:</strong> rendiciones validadas por tesorería. —
+    <strong>Pendiente:</strong> cierres certificados por el admin pero sin rendición generada aún.
+  </p>
+
+</section>
+{% endblock %}

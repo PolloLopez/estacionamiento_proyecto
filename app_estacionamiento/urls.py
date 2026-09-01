@@ -125,6 +125,7 @@ urlpatterns = [
     path("admin-vendedores/<int:vendedor_id>/historial/", views.historial_vendedor, name="admin_historial_vendedor"),
     path("admin-vendedores/crear/", views.gestionar_vendedores, name="admin_crear_vendedor"),
     path("admin-staff/", views.auditoria_staff, name="auditoria_staff"),
+    path("admin-subcuadras/reportes/", views.reportes_subcuadras, name="reportes_subcuadras"),
     path("admin-dashboard/", views.dashboard_admin, name="dashboard_admin"),
     path("admin/cerrar-caja/", views.cerrar_caja, name="admin_cerrar_caja"),
     path("admin/exentos-sia/", views.vehiculos_exentos_sia, name="vehiculos_exentos_sia"),
@@ -183,6 +184,7 @@ urlpatterns = [
     # 🌐 SUPERADMIN
     # =========================
     path("superadmin/",                                         views_superadmin.panel_superadmin,  name="panel_superadmin"),
+    path("superadmin/auditoria/",                               views_superadmin.auditoria_superadmin, name="auditoria_superadmin"),
     path("superadmin/municipio/nuevo/",                         views_superadmin.crear_municipio,   name="crear_municipio"),
     path("superadmin/municipio/<int:municipio_id>/",            views_superadmin.editar_municipio,  name="editar_municipio"),
     path("superadmin/municipio/<int:municipio_id>/admin/nuevo/", views_superadmin.crear_admin,      name="crear_admin"),

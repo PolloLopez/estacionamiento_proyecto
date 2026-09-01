@@ -104,6 +104,7 @@ from .views_admin import (
     gestionar_subcuadras,
     importar_exenciones,
     auditoria_staff,
+    reportes_subcuadras,
     vehiculos_exentos_sia,
 )
 from .views_mp import (

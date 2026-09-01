@@ -417,6 +417,31 @@ class Tarifa(models.Model):
         help_text="Tarifa por hora para motos. Vacío = igual que autos.",
     )
 
+    # ── Descuentos por pago voluntario (módulo premium descuentos_voluntarios) ──
+    # Si el módulo está activo, el conductor tiene X horas para pagar con descuento Y%.
+    # Un segundo nivel (en días) ofrece un descuento menor para un plazo más largo.
+    # Null = nivel no configurado (no aplica descuento para ese nivel).
+    descuento_horas_plazo = models.IntegerField(
+        null=True, blank=True,
+        verbose_name="Plazo en horas para descuento mayor",
+        help_text="Horas desde el acta dentro de las cuales aplica el descuento alto.",
+    )
+    descuento_horas_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        verbose_name="Descuento (%) por pago en horas",
+        help_text="Porcentaje de descuento si el conductor paga dentro del plazo en horas.",
+    )
+    descuento_dias_plazo = models.IntegerField(
+        null=True, blank=True,
+        verbose_name="Plazo en días para descuento menor",
+        help_text="Días desde el acta dentro de los cuales aplica el descuento bajo.",
+    )
+    descuento_dias_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        verbose_name="Descuento (%) por pago en días",
+        help_text="Porcentaje de descuento si el conductor paga dentro del plazo en días.",
+    )
+
     # Abono mensual
     precio_abono_auto = models.DecimalField(
         max_digits=10, decimal_places=2, default=0,
@@ -662,6 +687,25 @@ class Infraccion(models.Model):
     fecha_pago = models.DateTimeField(null=True, blank=True)
     # Motivo requerido cuando el admin anula una infracción desde el panel
     motivo_anulacion = models.TextField(blank=True, default="")
+
+    # ── Trazabilidad de descuento por pago voluntario ──────────────────────────
+    # monto sigue siendo el monto original del acta; monto_pagado es lo que
+    # efectivamente se cobró (puede ser menor si se aplicó un descuento).
+    # Null = infracción pagada sin módulo de descuentos activo, o aún no pagada.
+    monto_pagado = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name="Monto efectivamente cobrado",
+        help_text="Monto cobrado al conductor. Puede diferir de 'monto' si hubo descuento.",
+    )
+    descuento_pct_aplicado = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        verbose_name="Descuento aplicado (%)",
+    )
+    descuento_motivo = models.CharField(
+        max_length=100, blank=True, default="",
+        verbose_name="Motivo del descuento",
+        help_text="Ej: 'Pago dentro de 2h'. Vacío si no hubo descuento.",
+    )
 
     # ── Verificación SIA (Símbolo Internacional de Acceso / ANDIS) ──────────
     # Se completan cuando el inspector escanea el QR del SIA durante la fiscalización.
@@ -1139,13 +1183,14 @@ class ModuloMunicipio(models.Model):
     """
 
     MODULOS = [
-        ("ocupacion_tiempo_real",   "Ocupación en tiempo real"),
-        ("reportes_comparativos",   "Reportes comparativos"),
-        ("balance_por_dominio",     "Balance por dominio"),
-        ("areas_reservadas",        "Áreas reservadas"),
-        ("geolocalizacion_inspector", "Geolocalización del inspector"),
-        ("notificaciones_conductor", "Notificaciones al conductor"),
-        ("informes_automaticos",    "Informes automáticos programados"),
+        ("ocupacion_tiempo_real",      "Ocupación en tiempo real"),
+        ("reportes_comparativos",      "Reportes comparativos"),
+        ("balance_por_dominio",        "Balance por dominio"),
+        ("areas_reservadas",           "Áreas reservadas"),
+        ("geolocalizacion_inspector",  "Geolocalización del inspector"),
+        ("notificaciones_conductor",   "Notificaciones al conductor"),
+        ("informes_automaticos",       "Informes automáticos programados"),
+        ("descuentos_voluntarios",     "Descuentos por pago voluntario de infracciones"),
     ]
 
     municipio      = models.ForeignKey(

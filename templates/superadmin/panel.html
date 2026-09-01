@@ -6,7 +6,10 @@
 
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
     <h1>🌐 Panel Superadmin</h1>
-    <a href="{% url 'crear_municipio' %}" class="btn">➕ Nuevo municipio</a>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a href="{% url 'auditoria_superadmin' %}" class="btn btn-outline">💰 Auditoría financiera</a>
+      <a href="{% url 'crear_municipio' %}" class="btn">➕ Nuevo municipio</a>
+    </div>
   </div>
 
   {# Resumen global #}
