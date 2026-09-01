@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-01 (descuentos voluntarios infracciones)
+Última actualización: 2026-09-01 (comisiones modulo, perfil vendedor, cierre caja configurable)
 
 ---
 
@@ -65,24 +65,28 @@ Implementado:
 - `mis_infracciones` (conductor): evalúa descuento preview y lo adjunta como `inf.descuento_preview` a cada infracción de la lista. Badge `🏷️ -X% → $Y` en la tabla. Modal de pago actualizado: muestra descuento disponible o aviso de pago completo. Botón muestra el monto correcto a pagar.
 
 
-### Reseteo de contraseña desde el panel admin
-Admin hace clic en "Resetear contraseña" en la ficha del usuario → envía link de reset por email
-→ el usuario debe cambiar al primer login.
-Requiere:
-- `cambio_password_requerido = BooleanField(default=False)` en `Usuario` + migración
-- Acción en la vista de detalle de usuario (admin)
-- Check en `login_view` que redirija al formulario de cambio si el flag está activo
+### ~~Reseteo de contraseña desde el panel admin~~ → ✅ resuelto (sesión 2026-09-01)
+Admin establece password temporal desde la ficha del usuario. `cambio_password_requerido=True` se activa.
+`ForzarCambioPasswordMiddleware` intercepta el próximo login y redirige a cambio obligatorio.
+Implementado en `views_admin.py` `detalle_usuario_admin` + `middleware.py`.
 
-### Comisión vendedor como feature premium
-- Hoy `comision_vendedor` aplica a todos los municipios. Debería ser un módulo que el superadmin activa.
-- Admin solo ve la sección "Comisiones" en tarifas si el módulo está habilitado para su municipio.
-- Toggle por vendedor individual (algunos vendedores no cobran comisión).
+### ~~Comisión vendedor como feature premium~~ → ✅ resuelto (sesión 2026-09-01)
+- Módulo `comisiones_vendedores` en `ModuloMunicipio.MODULOS` (migración 0064).
+- Sección "Comisiones" en `gestionar_tarifas.html` visible solo si `modulo_comisiones` está activo.
+- Si el módulo no está habilitado, muestra cartel explicativo con opacidad reducida.
 
-### Perfil extendido — Vendedor
-Campos nuevos en `Usuario` (requieren migración):
-- `telefono_particular`, `telefono_comercial`, `domicilio_comercial` (CharField)
-- `horarios_atencion` (JSONField) — días y franjas horarias de atención
-- `ubicacion_lat`, `ubicacion_lon` (DecimalField) — para mapa y búsqueda del más cercano
+### ~~Perfil extendido — Vendedor~~ → ✅ resuelto (sesión 2026-09-01)
+Campos nuevos en `Usuario` (migración 0064):
+- `domicilio_comercial` (CharField) — dirección del kiosco
+- `ubicacion_lat`, `ubicacion_lon` (DecimalField, null=True) — coordenadas para mapa
+Formulario `editar_vendedor.html` actualizado con los 3 campos nuevos.
+Nota: `horarios_atencion` como JSONField y `telefono_comercial/particular` separado queda como mejora futura.
+
+### ~~Cierre de caja configurable por período~~ → ✅ resuelto (sesión 2026-09-01)
+- `Municipio.frecuencia_cierre_caja` (choices: diaria/semanal/mensual, default: diaria) — migración 0064.
+- Semáforo en `panel_admin`: alerta amarilla si hay vendedores con caja atrasada + badge en sidebar "⏰ Caja vendedores".
+- Vista `caja_vendedores` (`/admin/caja-vendedores/`): tabla con todos los vendedores con movimientos abiertos, estado por colores, fecha del movimiento más antiguo.
+- Vista `forzar_cierre_vendedor` (`/admin/caja-vendedores/<id>/forzar/`): POST que llama a `generar_cierre_caja()` desde el admin.
 
 ### ~~Detección GPS de subcuadra al estacionar (conductor)~~ → ✅ resuelto (sesión 2026-09-01)
 Hoy el conductor estaciona y el sistema le asigna la subcuadra default del municipio (`get_subcuadra_default()`).

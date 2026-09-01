@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Caja de vendedores{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>⏰ Caja de vendedores</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel Admin</a>
+  </div>
+
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert {% if msg.tags == 'error' %}alert-danger{% else %}alert-info{% endif %}"
+           style="margin-bottom:1rem;">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card" style="margin-bottom:1.5rem;">
+    <p style="margin:0; font-size:0.9rem; color:var(--color-text-muted);">
+      Frecuencia esperada de cierre: <strong>{{ frecuencia }}</strong>
+      (umbral: {{ umbral_dias }} día{% if umbral_dias != 1 %}s{% endif %}).
+      Los vendedores marcados en rojo tienen movimientos abiertos más viejos que ese período.
+    </p>
+  </div>
+
+  {% if datos %}
+    <div class="card" style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Vendedor</th>
+            <th>Movimiento más antiguo</th>
+            <th style="text-align:center;">Cant. mov. abiertos</th>
+            <th style="text-align:center;">Estado</th>
+            <th style="text-align:center;">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in datos %}
+          <tr {% if d.atrasado %}style="background:#fff0f0;"{% endif %}>
+            <td>
+              <strong>{{ d.vendedor.nombre_completo }}</strong><br>
+              <span style="font-size:0.82rem; color:var(--color-text-muted);">{{ d.vendedor.correo }}</span>
+            </td>
+            <td style="font-size:0.85rem; white-space:nowrap;">{{ d.desde|date:"d/m/Y H:i" }}</td>
+            <td style="text-align:center;">{{ d.cant_mov }}</td>
+            <td style="text-align:center;">
+              {% if d.atrasado %}
+                <span style="color:var(--color-danger); font-weight:700;">⚠️ Atrasado</span>
+              {% else %}
+                <span style="color:var(--color-primary); font-weight:600;">✅ Al día</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center;">
+              <form method="post" action="{% url 'admin_forzar_cierre_vendedor' d.vendedor.id %}"
+                    onsubmit="return confirm('¿Cerrar la caja de {{ d.vendedor.nombre_completo }}? Esto generará un CierreCaja con todos sus movimientos abiertos.')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm {% if d.atrasado %}btn-danger{% else %}btn-outline{% endif %}"
+                        style="font-size:0.82rem;">
+                  🔒 Forzar cierre
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card" style="text-align:center; padding:2rem;">
+      <p class="text-muted">No hay vendedores con movimientos de caja abiertos.</p>
+    </div>
+  {% endif %}
+
+</section>
+{% endblock %}

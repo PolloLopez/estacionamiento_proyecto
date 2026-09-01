@@ -115,6 +115,20 @@ class Usuario(AbstractUser):
         verbose_name="Puede vender abono mensual",
         help_text="Si está deshabilitado, el vendedor no verá la opción de cobrar abono."
     )
+    # Ubicación física del comercio (opcional): texto y coordenadas para mapa.
+    domicilio_comercial = models.CharField(
+        max_length=255, blank=True, default="",
+        verbose_name="Domicilio comercial",
+        help_text="Dirección del kiosco o comercio del vendedor."
+    )
+    ubicacion_lat = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        verbose_name="Latitud del local",
+    )
+    ubicacion_lon = models.DecimalField(
+        max_digits=9, decimal_places=6, null=True, blank=True,
+        verbose_name="Longitud del local",
+    )
 
     # ── Datos adicionales para conductores ──────────────────────────────────
     # Fundamental para identificar frentistas y eventualmente el módulo de reintegro.
@@ -193,6 +207,15 @@ class Municipio(models.Model):
         max_digits=5, decimal_places=2, default=7,
         verbose_name='Comisión vendedor (%)',
         help_text='Porcentaje que retiene el vendedor de cada cobro.',
+    )
+    # Con qué frecuencia se espera que los vendedores cierren su caja.
+    # Determina el semáforo en el panel del admin.
+    frecuencia_cierre_caja = models.CharField(
+        max_length=10,
+        choices=[("diaria", "Diaria"), ("semanal", "Semanal"), ("mensual", "Mensual")],
+        default="diaria",
+        verbose_name="Frecuencia de cierre de caja (vendedores)",
+        help_text="Cada cuánto se espera que los vendedores cierren su caja.",
     )
     tolerancia_multa_minutos = models.IntegerField(
         default=5,
@@ -1191,6 +1214,7 @@ class ModuloMunicipio(models.Model):
         ("notificaciones_conductor",   "Notificaciones al conductor"),
         ("informes_automaticos",       "Informes automáticos programados"),
         ("descuentos_voluntarios",     "Descuentos por pago voluntario de infracciones"),
+        ("comisiones_vendedores",      "Comisiones por venta para vendedores"),
     ]
 
     municipio      = models.ForeignKey(

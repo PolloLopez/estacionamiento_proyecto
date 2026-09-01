@@ -31,6 +31,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 
 from .decorators import require_role
+from .services.caja import generar_cierre_caja
 from .services.infracciones import cobrar_infraccion_efectivo, MEDIOS_VALIDOS_COBRO
 from .services.saldo import cargar_saldo_conductor
 from .utils import sanitizar_patente
@@ -139,6 +140,24 @@ def panel_admin(request):
         usuario__municipio=municipio, certificado=False,
     ).count()
 
+    # Semáforo de cierre de caja: detecta vendedores con movimientos abiertos
+    # más viejos de lo que permite la frecuencia configurada en el municipio.
+    frecuencia = getattr(municipio, "frecuencia_cierre_caja", "diaria")
+    umbral_dias = {"diaria": 1, "semanal": 7, "mensual": 30}.get(frecuencia, 1)
+    umbral_fecha = timezone.now() - timedelta(days=umbral_dias)
+    vendedores_caja_atrasada = (
+        MovimientoCaja.objects.filter(
+            usuario__municipio=municipio,
+            usuario__es_vendedor=True,
+            tipo="ingreso",
+            cerrado=False,
+            creado_en__lte=umbral_fecha,
+        )
+        .values_list("usuario_id", flat=True)
+        .distinct()
+        .count()
+    )
+
     from django.urls import reverse as _reverse
 
     # Sidebar agrupado por rubro.
@@ -176,19 +195,22 @@ def panel_admin(request):
         {
             "titulo": "Caja y rendiciones",
             "items": [
-                {"label": "✅ Verificaciones",   "url": _reverse("gestionar_verificaciones"), "badge": verificaciones_pendientes or None},
-                {"label": "💼 Rendiciones",      "url": _reverse("admin_rendiciones"),        "badge": rendiciones_pendientes or None},
-                {"label": "🧾 Mi caja",          "url": _reverse("admin_cerrar_caja"),        "badge": None},
+                {"label": "✅ Verificaciones",   "url": _reverse("gestionar_verificaciones"),  "badge": verificaciones_pendientes or None},
+                {"label": "💼 Rendiciones",      "url": _reverse("admin_rendiciones"),         "badge": rendiciones_pendientes or None},
+                {"label": "🧾 Mi caja",          "url": _reverse("admin_cerrar_caja"),         "badge": None},
+                {"label": "⏰ Caja vendedores",  "url": _reverse("admin_caja_vendedores"),     "badge": vendedores_caja_atrasada or None},
             ],
         },
     ]
 
     return render(request, "admin/panel_admin.html", {
-        "infracciones_recientes":    infracciones_recientes,
-        "estacionamientos_activos":  estacionamientos_activos,
-        "verificaciones_pendientes": verificaciones_pendientes,
-        "rendiciones_pendientes":    rendiciones_pendientes,
-        "sidebar_grupos":            sidebar_grupos,
+        "infracciones_recientes":     infracciones_recientes,
+        "estacionamientos_activos":   estacionamientos_activos,
+        "verificaciones_pendientes":  verificaciones_pendientes,
+        "rendiciones_pendientes":     rendiciones_pendientes,
+        "vendedores_caja_atrasada":   vendedores_caja_atrasada,
+        "frecuencia_cierre_caja":     frecuencia,
+        "sidebar_grupos":             sidebar_grupos,
     })
 
 
@@ -620,6 +642,17 @@ def editar_vendedor(request, vendedor_id):
         vendedor.documento_cuil     = request.POST.get("documento_cuil", "").strip()
         vendedor.telefono           = request.POST.get("telefono", "").strip()
         vendedor.horario_atencion   = request.POST.get("horario_atencion", "").strip()
+        vendedor.domicilio_comercial = request.POST.get("domicilio_comercial", "").strip()
+        try:
+            lat_str = request.POST.get("ubicacion_lat", "").strip()
+            vendedor.ubicacion_lat = Decimal(lat_str) if lat_str else None
+        except Exception:
+            vendedor.ubicacion_lat = None
+        try:
+            lon_str = request.POST.get("ubicacion_lon", "").strip()
+            vendedor.ubicacion_lon = Decimal(lon_str) if lon_str else None
+        except Exception:
+            vendedor.ubicacion_lon = None
         try:
             vendedor.saldo_limite = Decimal(request.POST.get("saldo_limite", "0") or "0")
         except Exception:
@@ -1093,12 +1126,18 @@ def gestionar_tarifas(request):
         modulo="descuentos_voluntarios",
         activo=True,
     ).exists()
+    modulo_comisiones = ModuloMunicipio.objects.filter(
+        municipio=municipio,
+        modulo="comisiones_vendedores",
+        activo=True,
+    ).exists()
 
     return render(request, "admin/gestionar_tarifas.html", {
-        "tarifa_actual":    tarifa_actual,
-        "municipio":        municipio,
-        "error":            error,
+        "tarifa_actual":     tarifa_actual,
+        "municipio":         municipio,
+        "error":             error,
         "modulo_descuentos": modulo_descuentos,
+        "modulo_comisiones": modulo_comisiones,
     })
 
 
@@ -3158,3 +3197,77 @@ def vehiculos_exentos_sia(request):
         "vehiculos": vehiculos,
         "hoy":       hoy,
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Semáforo de cierre de caja de vendedores
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@require_role("admin")
+def caja_vendedores(request):
+    """
+    Lista de vendedores con movimientos de caja abiertos, ordenados por antigüedad.
+    Permite forzar el cierre de caja de un vendedor desde el panel admin.
+    """
+    municipio = request.user.municipio
+    frecuencia = getattr(municipio, "frecuencia_cierre_caja", "diaria")
+    umbral_dias = {"diaria": 1, "semanal": 7, "mensual": 30}.get(frecuencia, 1)
+    umbral_fecha = timezone.now() - timedelta(days=umbral_dias)
+
+    # IDs de vendedores con movimientos abiertos más viejos del umbral
+    ids_atrasados = set(
+        MovimientoCaja.objects.filter(
+            usuario__municipio=municipio,
+            usuario__es_vendedor=True,
+            tipo="ingreso",
+            cerrado=False,
+            creado_en__lte=umbral_fecha,
+        ).values_list("usuario_id", flat=True).distinct()
+    )
+
+    # Todos los vendedores activos del municipio con su movimiento más antiguo abierto
+    vendedores = Usuario.objects.filter(
+        municipio=municipio, es_vendedor=True, is_active=True
+    ).order_by("first_name")
+
+    datos = []
+    for v in vendedores:
+        mov_abiertos = MovimientoCaja.objects.filter(
+            usuario=v, tipo="ingreso", cerrado=False
+        ).order_by("creado_en")
+        mas_antiguo = mov_abiertos.first()
+        if mas_antiguo:
+            datos.append({
+                "vendedor":   v,
+                "atrasado":   v.id in ids_atrasados,
+                "desde":      mas_antiguo.creado_en,
+                "cant_mov":   mov_abiertos.count(),
+            })
+
+    return render(request, "admin/caja_vendedores.html", {
+        "datos":          datos,
+        "frecuencia":     frecuencia,
+        "umbral_dias":    umbral_dias,
+    })
+
+
+@require_role("admin")
+def forzar_cierre_vendedor(request, vendedor_id):
+    """
+    Fuerza el cierre de caja de un vendedor desde el panel admin.
+    Solo acepta POST (acción irreversible — genera un CierreCaja).
+    """
+    if request.method != "POST":
+        return redirect("admin_caja_vendedores")
+
+    vendedor = get_object_or_404(
+        Usuario, id=vendedor_id, es_vendedor=True, municipio=request.user.municipio
+    )
+    cierre = generar_cierre_caja(vendedor, periodo="Cierre forzado por admin")
+    if cierre:
+        messages.success(request, f"Caja de {vendedor.nombre_completo()} cerrada correctamente.")
+    else:
+        messages.info(request, f"{vendedor.nombre_completo()} no tiene movimientos abiertos para cerrar.")
+
+    return redirect("admin_caja_vendedores")

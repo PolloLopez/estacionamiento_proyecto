@@ -153,6 +153,22 @@
       </div>
     </details>
 
+    <!-- ALERTA: vendedores con caja atrasada -->
+    {% if vendedores_caja_atrasada %}
+    <div class="alert alert-warning"
+         style="margin-bottom:1.25rem; display:flex; align-items:center;
+                justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+      <span>
+        ⚠️ <strong>{{ vendedores_caja_atrasada }} vendedor{% if vendedores_caja_atrasada != 1 %}es{% endif %}</strong>
+        no cerró su caja en el período esperado (frecuencia: <strong>{{ frecuencia_cierre_caja }}</strong>).
+      </span>
+      <a href="{% url 'admin_caja_vendedores' %}" class="btn btn-outline"
+         style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
+        Ver y cerrar
+      </a>
+    </div>
+    {% endif %}
+
     <!-- INFRACCIONES RECIENTES + ESTACIONAMIENTOS ACTIVOS -->
     <div class="grid grid-2" style="align-items:start;">
 

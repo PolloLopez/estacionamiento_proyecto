@@ -39,6 +39,28 @@
         <input name="horario_atencion" value="{{ vendedor.horario_atencion }}"
                placeholder="Ej: Lun-Vie 8-20, Sáb 8-13" />
 
+        <label>Domicilio comercial</label>
+        <input name="domicilio_comercial" value="{{ vendedor.domicilio_comercial }}"
+               placeholder="Ej: San Martín 245, local 3" />
+
+        <div class="grid grid-2" style="gap:1rem;">
+          <div>
+            <label>Latitud (opcional)</label>
+            <input type="number" name="ubicacion_lat" step="0.000001"
+                   value="{{ vendedor.ubicacion_lat|default:'' }}"
+                   placeholder="Ej: -34.603684" />
+          </div>
+          <div>
+            <label>Longitud (opcional)</label>
+            <input type="number" name="ubicacion_lon" step="0.000001"
+                   value="{{ vendedor.ubicacion_lon|default:'' }}"
+                   placeholder="Ej: -58.381559" />
+          </div>
+        </div>
+        <p class="text-muted" style="font-size:0.83rem; margin-top:-0.5rem; margin-bottom:1rem;">
+          Las coordenadas son opcionales. Si las cargás, el comercio puede aparecer en el mapa de vendedores.
+        </p>
+
         <label>Correo (solo lectura)</label>
         <input value="{{ vendedor.correo }}" disabled style="background:var(--color-surface-2); color:var(--color-text-muted);" />
 
