@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-01
+Última actualización: 2026-09-01 (auditorías completas)
 
 ---
 
@@ -22,17 +22,37 @@
 ### ~~Reseteo de contraseña desde panel admin~~ → ✅ resuelto (sesión 2026-09-01)
 ### ~~GitHub Pages landing~~ → ✅ resuelto (sesión 2026-09-01) — archivo `landing_github_pages.html` generado
 
-### Auditorías — correr todas antes del próximo municipio real
-Las auditorías se corrieron en julio/agosto temprano. El sistema creció mucho desde entonces.
-Correrlas nuevamente antes de cualquier go-live:
-- `auditoria-seguridad` — especialmente por el agregado de endpoints públicos y OAuth
-- `auditoria-rendimiento` — por el crecimiento de datos y nuevas queries en el admin
-- `auditoria-base-datos` — validar normalización de los nuevos campos SIA + campos de perfil
-- `checklist-produccion` — antes de cualquier entrega a municipio real
+### ~~Auditorías — correr todas antes del próximo municipio real~~ → ✅ resuelto (sesión 2026-09-01)
+Ver informes:
+- `AUDITORIA_SEGURIDAD_2026-09-01.md`
+- `AUDITORIA_RENDIMIENTO_2026-09-01.md`
+- `AUDITORIA_BASE_DATOS_2026-09-01.md`
+- `CHECKLIST_PRODUCCION_2026-09-01.md`
+
+Pendientes derivados de las auditorías (ver 🟡 abajo):
 
 ---
 
 ## 🟡 Media prioridad
+
+### Pendientes derivados de auditorías 2026-09-01
+
+**Seguridad:**
+- ~~`ForzarCambioPasswordMiddleware`~~ → ✅ resuelto (sesión 2026-09-01) — `middleware.py` + `settings.py`
+- ~~Validación de tamaño/tipo en foto de infracción~~ → ✅ resuelto (sesión 2026-09-01) — `views_inspector.py`
+- ~~`SECURE_REFERRER_POLICY = "same-origin"`~~ → ✅ resuelto (sesión 2026-09-01) — `settings.py`
+
+**Rendimiento:**
+- ~~`dashboard_admin`~~ → ✅ resuelto (sesión 2026-09-01) — vista implementada con template propio, URL `/admin-dashboard/`, filtro de fechas (default últimos 30 días), link en sidebar.
+- ~~`estacionamientos_activos` en `panel_admin`: agregar `[:50]` como cap~~ → ✅ resuelto (sesión 2026-09-01) — `views_admin.py`
+
+**Base de datos:**
+- ~~`Infraccion.subcuadra → SET_NULL`~~ → ✅ resuelto (sesión 2026-09-01) — migración 0061
+- ~~`VerificacionInspector.inspector/vehiculo/subcuadra → SET_NULL`~~ → ✅ resuelto (sesión 2026-09-01) — migración 0062, `null=True` en los 3 FK.
+
+**Go-live:**
+- Limpieza de datos de prueba de Railway antes de go-live real. Ver `CHECKLIST_PRODUCCION_2026-09-01.md` para el orden correcto.
+- UptimeRobot si no está configurado todavía.
 
 ### Descuentos por pago voluntario de infracciones (feature premium por municipio)
 El superadmin habilita el módulo por municipio. El admin del municipio configura:
@@ -86,10 +106,8 @@ Cambios necesarios:
 - Tres estados de UI: detectando / selección manual / sin informar
 
 
-### Tesorero como fallback para certificar cierres de admin
-`certificar_cierre` es `@require_role("admin")`. Si el único admin no puede autocertificarse,
-el tesorero necesita poder certificar cierres de admin como válvula de escape.
-Falta: listado en panel tesorero de cierres de admin sin certificar + acción para certificarlos.
+### ~~Tesorero como fallback para certificar cierres de admin~~ → ✅ resuelto (sesión 2026-09-01)
+`certificar_cierre` ahora acepta `@require_role("admin", "tesorero")`. Guard: tesorero solo certifica cierres de admins (`es_admin=True`). Redirect dinámico por rol. Sección nueva en `panel_tesorero.html` mostrando los cierres pendientes con botón "Certificar".
 
 ### Cierre de caja configurable por período
 - Frecuencia esperada configurable (diaria/semanal/mensual) por municipio o por vendedor.

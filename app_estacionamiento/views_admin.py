@@ -15,7 +15,7 @@ Responsabilidades:
 No incluye cobros de MercadoPago (eso es views_mp.py).
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib import messages
@@ -122,11 +122,13 @@ def panel_admin(request):
         municipio=municipio
     ).select_related("vehiculo", "inspector").order_by("-creado_en")[:20]
 
-    # Vehículos con estacionamiento activo en este municipio ahora mismo
+    # Vehículos con estacionamiento activo en este municipio ahora mismo.
+    # Cap en 50: si hay muchos activos simultáneos, la tabla del panel podría ser
+    # inutilizable y lenta. 50 es suficiente para tener una foto del estado actual.
     estacionamientos_activos = Estacionamiento.objects.filter(
         subcuadra__municipio=municipio,
         estado="ACTIVO",
-    ).select_related("vehiculo", "subcuadra").order_by("-hora_inicio")
+    ).select_related("vehiculo", "subcuadra").order_by("-hora_inicio")[:50]
 
     verificaciones_pendientes = SolicitudVerificacion.objects.filter(
         estado="pendiente", usuario__municipio=municipio
@@ -148,6 +150,7 @@ def panel_admin(request):
                 {"label": "👮 Inspectores",      "url": _reverse("gestionar_inspectores"),    "badge": None},
                 {"label": "💰 Vendedores",       "url": _reverse("gestionar_vendedores"),     "badge": None},
                 {"label": "🔍 Auditoría staff",  "url": _reverse("auditoria_staff"),          "badge": None},
+                {"label": "📊 Dashboard",        "url": _reverse("dashboard_admin"),          "badge": None},
             ],
         },
         {
@@ -189,25 +192,58 @@ def panel_admin(request):
 
 @require_role("admin")
 def dashboard_admin(request):
-    """Dashboard de estadísticas: infracciones por inspector, patentes por día, cobros."""
+    """Dashboard de estadísticas del municipio con filtro de fechas.
+
+    Por defecto muestra los últimos 30 días. Acepta GET params `desde` y `hasta`
+    en formato YYYY-MM-DD para ajustar el rango.
+    """
     municipio = request.user.municipio
+    hoy = timezone.now().date()
+
+    # Parsear rango de fechas desde la URL, con fallback a los últimos 30 días.
+    # Si el valor viene vacío o con formato inválido, usamos el default silenciosamente.
+    try:
+        desde = date.fromisoformat(request.GET.get("desde", ""))
+    except (ValueError, TypeError):
+        desde = hoy - timedelta(days=30)
+
+    try:
+        hasta = date.fromisoformat(request.GET.get("hasta", ""))
+    except (ValueError, TypeError):
+        hasta = hoy
 
     infracciones_por_inspector = Infraccion.objects.filter(
-        municipio=municipio
+        municipio=municipio,
+        creado_en__date__gte=desde,
+        creado_en__date__lte=hasta,
     ).values("inspector__correo").annotate(total=Count("id")).order_by("-total")
 
-    patentes_por_dia = Vehiculo.objects.filter(
-        municipio=municipio
-    ).annotate(fecha=TruncDate("fecha_creacion")).values("fecha").annotate(total=Count("id"))
+    # Vehículos registrados por día en el rango (útil para ver tendencia de altas)
+    patentes_por_dia = (
+        Vehiculo.objects.filter(
+            municipio=municipio,
+            fecha_creacion__date__gte=desde,
+            fecha_creacion__date__lte=hasta,
+        )
+        .annotate(fecha=TruncDate("fecha_creacion"))
+        .values("fecha")
+        .annotate(total=Count("id"))
+        .order_by("fecha")
+    )
 
     cobros = MovimientoCaja.objects.filter(
-        usuario__municipio=municipio
+        usuario__municipio=municipio,
+        creado_en__date__gte=desde,
+        creado_en__date__lte=hasta,
     ).values("usuario__correo").annotate(total=Sum("monto")).order_by("-total")
 
-    return render(request, "admin/panel_admin.html", {
+    return render(request, "admin/dashboard_admin.html", {
         "infracciones_por_inspector": infracciones_por_inspector,
         "patentes_por_dia":           patentes_por_dia,
         "cobros":                     cobros,
+        "desde":                      desde,
+        "hasta":                      hasta,
+        "hoy":                        hoy,
     })
 
 
@@ -1469,9 +1505,22 @@ def crear_rendicion(request):
     })
 
 
-@require_role("admin")
+@require_role("admin", "tesorero")
 def certificar_cierre(request, cierre_id):
-    """El admin certifica (audita) un cierre de caja. Solo acepta POST."""
+    """Certifica (audita) un cierre de caja.
+
+    Acceso:
+    - Admin: puede certificar cualquier cierre de su municipio, excepto el suyo propio.
+    - Tesorero: válvula de escape — puede certificar cierres de admins sin certificar.
+      No puede certificar cierres de inspectores/vendedores (eso es tarea del admin).
+
+    Solo acepta POST.
+    """
+    es_tesorero = getattr(request.user, "es_tesorero", False)
+
+    # Destino de redirect según rol (se usa en todos los caminos)
+    destino = "panel_tesorero" if es_tesorero else "admin_rendiciones"
+
     cierre = get_object_or_404(
         CierreCaja.objects.select_related("usuario"),
         id=cierre_id,
@@ -1479,18 +1528,23 @@ def certificar_cierre(request, cierre_id):
     )
 
     if request.method != "POST":
-        return redirect("admin_rendiciones")
+        return redirect(destino)
+
+    # Tesorero solo puede certificar cierres de admins (no vendedores/inspectores)
+    if es_tesorero and not getattr(cierre.usuario, "es_admin", False):
+        messages.error(request, "El tesorero solo puede certificar cierres de administradores.")
+        return redirect(destino)
 
     # Un admin no puede certificar su propio cierre — debe hacerlo otro admin o el tesorero.
     if cierre.usuario == request.user:
-        messages.error(request, "No podés certificar tu propio cierre. Pedile a otro admin que lo certifique.")
-        return redirect("admin_rendiciones")
+        messages.error(request, "No podés certificar tu propio cierre. Pedile a otro admin o al tesorero.")
+        return redirect(destino)
 
     if cierre.certificado:
         messages.warning(request, "Este cierre ya estaba certificado.")
-        return redirect("admin_rendiciones")
+        return redirect(destino)
 
-    cierre.certificado    = True
+    cierre.certificado     = True
     cierre.certificado_en  = timezone.now()
     cierre.certificado_por = request.user
     cierre.save(update_fields=["certificado", "certificado_en", "certificado_por"])
@@ -1499,7 +1553,7 @@ def certificar_cierre(request, cierre_id):
         request,
         f"✅ Cierre de {cierre.usuario.correo} del {cierre.fecha_cierre:%d/%m/%Y} certificado."
     )
-    return redirect("admin_rendiciones")
+    return redirect(destino)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
