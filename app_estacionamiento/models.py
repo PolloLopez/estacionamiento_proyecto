@@ -109,6 +109,20 @@ class Usuario(AbstractUser):
     horario_atencion   = models.CharField(max_length=200, blank=True, default="",
                              verbose_name="Horarios de atención",
                              help_text="Ej: Lun-Vie 9-18, Sáb 9-13")
+    # El admin puede deshabilitar por vendedor si no debe gestionar abonos mensuales.
+    puede_vender_abono = models.BooleanField(
+        default=True,
+        verbose_name="Puede vender abono mensual",
+        help_text="Si está deshabilitado, el vendedor no verá la opción de cobrar abono."
+    )
+
+    # ── Datos adicionales para conductores ──────────────────────────────────
+    # Fundamental para identificar frentistas y eventualmente el módulo de reintegro.
+    domicilio = models.CharField(
+        max_length=255, blank=True, default="",
+        verbose_name="Domicilio",
+        help_text="Dirección del conductor. Requerido para exención de frentista."
+    )
 
     es_conductor   = models.BooleanField(default=True)
     es_inspector   = models.BooleanField(default=False)

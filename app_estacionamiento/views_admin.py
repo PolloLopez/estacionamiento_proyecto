@@ -593,6 +593,7 @@ def editar_vendedor(request, vendedor_id):
         except Exception:
             vendedor.porcentaje_ganancia = 0
         vendedor.periodicidad_rendicion = request.POST.get("periodicidad_rendicion", "semanal")
+        vendedor.puede_vender_abono     = request.POST.get("puede_vender_abono") == "on"
         vendedor.save()
         return redirect("gestionar_vendedores")
 
@@ -729,11 +730,13 @@ def detalle_usuario_admin(request, usuario_id):
             conductor.first_name = nombre.title()
         if apellido:
             conductor.last_name = apellido.title()
+        domicilio     = request.POST.get("domicilio", "").strip()
         conductor.telefono      = telefono
         conductor.numero_dni    = numero_dni
         conductor.es_verificado = es_verificado
+        conductor.domicilio     = domicilio
         conductor.save(update_fields=[
-            "correo", "first_name", "last_name", "telefono", "numero_dni", "es_verificado"
+            "correo", "first_name", "last_name", "telefono", "numero_dni", "es_verificado", "domicilio"
         ])
         messages.success(request, "Datos actualizados.")
 

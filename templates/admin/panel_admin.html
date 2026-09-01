@@ -50,30 +50,79 @@
 
       <hr style="border:none; border-top:1px solid var(--color-border); margin:0.85rem 0;">
 
-      <!-- GESTIÓN AGRUPADA -->
+      <!-- GESTIÓN AGRUPADA
+           Desktop: grupos siempre expandidos, summary oculto (JS agrega "open").
+           Mobile (≤700px): <details> colapsables, el usuario abre/cierra cada grupo. -->
+      <style>
+        @media (max-width: 700px) {
+          .sidebar-grupo {
+            border-top: 1px solid var(--color-border);
+            margin-top: 0.4rem;
+          }
+          .sidebar-grupo > summary {
+            list-style: none; cursor: pointer; user-select: none;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.55rem 0; font-size: 0.75rem; font-weight: 700;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            color: var(--color-text-muted);
+          }
+          .sidebar-grupo > summary::after { content: "▸"; }
+          .sidebar-grupo[open] > summary::after { content: "▾"; }
+          /* Oculta el título-texto estático en mobile (lo muestra el summary) */
+          .sidebar-titulo-desktop { display: none; }
+        }
+        @media (min-width: 701px) {
+          /* En desktop el summary se oculta; JS agrega open para que el contenido sea visible */
+          .sidebar-grupo > summary { display: none; }
+          .sidebar-titulo-desktop {
+            font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
+            text-transform: uppercase; color: var(--color-text-muted);
+          }
+        }
+      </style>
+
       {% for grupo in sidebar_grupos %}
-        <p style="font-size:0.68rem; font-weight:700; letter-spacing:0.08em;
-                  text-transform:uppercase; color:var(--color-text-muted);
-                  margin:{% if forloop.first %}0{% else %}0.75rem{% endif %} 0 0.3rem;">
+        <!-- Título visible en desktop (en mobile lo reemplaza el <summary>) -->
+        <p class="sidebar-titulo-desktop"
+           style="margin:{% if forloop.first %}0{% else %}0.75rem{% endif %} 0 0.3rem;">
           {{ grupo.titulo }}
         </p>
-        {% for item in grupo.items %}
-          <a href="{{ item.url }}"
-             class="btn btn-outline"
-             style="display:flex; align-items:center; justify-content:space-between;
-                    width:100%; text-align:left; margin-bottom:0.25rem;
-                    padding:0.4rem 0.75rem; font-size:0.88rem;">
-            {{ item.label }}
-            {% if item.badge %}
-              <span style="background:#e53935; color:#fff; font-size:0.68rem;
-                           font-weight:700; border-radius:99px;
-                           padding:1px 6px; line-height:1.4; margin-left:auto;">
-                {{ item.badge }}
-              </span>
-            {% endif %}
-          </a>
-        {% endfor %}
+
+        <details class="sidebar-grupo">
+          <summary>{{ grupo.titulo }}</summary>
+
+          {% for item in grupo.items %}
+            <a href="{{ item.url }}"
+               class="btn btn-outline"
+               style="display:flex; align-items:center; justify-content:space-between;
+                      width:100%; text-align:left; margin-bottom:0.25rem;
+                      padding:0.4rem 0.75rem; font-size:0.88rem;">
+              {{ item.label }}
+              {% if item.badge %}
+                <span style="background:#e53935; color:#fff; font-size:0.68rem;
+                             font-weight:700; border-radius:99px;
+                             padding:1px 6px; line-height:1.4; margin-left:auto;">
+                  {{ item.badge }}
+                </span>
+              {% endif %}
+            </a>
+          {% endfor %}
+        </details>
       {% endfor %}
+
+      <script>
+        // En desktop: abre todos los grupos (el UA stylesheet de <details> los oculta sin "open").
+        // En mobile: los deja cerrados para que el usuario los abra uno a uno.
+        function ajustarSidebarGrupos() {
+          var esDesktop = window.innerWidth > 700;
+          document.querySelectorAll(".sidebar-grupo").forEach(function(el) {
+            if (esDesktop) el.setAttribute("open", "");
+            // En mobile no se cierra automáticamente: si el usuario los abrió, los conservamos.
+          });
+        }
+        ajustarSidebarGrupos();
+        window.addEventListener("resize", ajustarSidebarGrupos);
+      </script>
 
     </div>
   </aside>

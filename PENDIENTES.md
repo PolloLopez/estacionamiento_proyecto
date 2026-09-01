@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-08-24
+Última actualización: 2026-09-01
 
 ---
 
@@ -15,6 +15,10 @@
 ## 🔴 Alta prioridad
 
 ### ~~Inspector — bloquear todo fuera de horario~~ → ✅ resuelto (sesión 2026-08-25)
+### ~~Vendedores — permiso individual para vender abonos~~ → ✅ resuelto (sesión 2026-09-01)
+### ~~Perfil extendido conductor — campo domicilio~~ → ✅ resuelto (sesión 2026-09-01)
+### ~~Admin panel responsive con secciones desplegables~~ → ✅ resuelto (sesión 2026-09-01)
+### ~~Ícono PWA dinámico con logo del municipio~~ → ✅ resuelto (sesión 2026-09-01)
 
 ### Auditorías — correr todas antes del próximo municipio real
 Las auditorías se corrieron en julio/agosto temprano. El sistema creció mucho desde entonces.
@@ -45,16 +49,6 @@ Requiere:
 - Panel admin: sección "Descuentos" visible solo si el módulo está habilitado
 - Panel conductor: mostrar al ver una infracción pendiente si hay descuento disponible y cuánto tiempo falta
 
-### Admin panel — responsive con secciones desplegables
-En mobile el panel admin queda largo. Mejorar con acordeones/desplegables por sección
-(Personal, Vehículos, Configuración, Caja y rendiciones) en lugar de mostrar todo expandido.
-Alternativa: sidebar colapsable en mobile (ya hay grupos definidos en `sidebar_grupos`).
-
-### Vendedores — permiso individual para vender abonos
-Admin puede habilitar/deshabilitar por vendedor si puede gestionar abonos mensuales.
-- Nuevo campo `puede_vender_abono = BooleanField(default=True)` en `Usuario` (o toggle en panel admin)
-- `views_vendedor.py`: chequear el permiso antes de mostrar la opción de abono
-- Panel admin de usuarios: toggle visible en la ficha del vendedor
 
 ### Reseteo de contraseña desde el panel admin
 Admin hace clic en "Resetear contraseña" en la ficha del usuario → envía link de reset por email
@@ -89,8 +83,6 @@ Cambios necesarios:
 - JS en `estacionar_vehiculo.html`: `navigator.geolocation`, fetch al endpoint, poblar select
 - Tres estados de UI: detectando / selección manual / sin informar
 
-### Perfil extendido — Conductor
-- `domicilio` (CharField) — fundamental para identificar frentistas
 
 ### Tesorero como fallback para certificar cierres de admin
 `certificar_cierre` es `@require_role("admin")`. Si el único admin no puede autocertificarse,
@@ -106,9 +98,6 @@ Falta: listado en panel tesorero de cierres de admin sin certificar + acción pa
 Vista global: total recaudado/rendido/pendiente por municipio.
 (El panel de auditoría interno del admin ya está: `auditoria_staff`)
 
-### Ícono PWA dinámico (logo del municipio)
-El `manifest.json` es estático. Debería servirse dinámicamente con el logo del municipio.
-No testeable en local — requiere HTTPS (Railway o ngrok).
 
 ### Reportes de subcuadras (dashboard de cobertura)
 Dashboard por subcuadra: verificaciones / infracciones / vehículos exentos en el período.
@@ -126,7 +115,7 @@ Es un beneficio que el municipio ofrece a sus vecinos para incentivar el uso del
 Se implementa como módulo premium que el superadmin activa por municipio — cualquier municipio puede ofrecerlo.
 
 **Modelo de datos** (requieren migración):
-- `Usuario.domicilio` (CharField) — dirección declarada por el conductor
+- `Usuario.domicilio` ✅ ya existe (migración 0059, 2026-09-01)
 - `Usuario.es_residente_verificado` (BooleanField, default=False) — admin lo activa/desactiva
 - `Usuario.fecha_verificacion_residencia` (DateField, null=True) — cuándo se verificó
 - Configuración del módulo (en la entrada `ModuloMunicipio` o en `Municipio`):

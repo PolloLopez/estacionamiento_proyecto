@@ -42,11 +42,20 @@
         <label>Correo (solo lectura)</label>
         <input value="{{ vendedor.correo }}" disabled style="background:var(--color-surface-2); color:var(--color-text-muted);" />
 
-        <label style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1rem; cursor:pointer; font-weight:600;">
+        <label style="display:flex; align-items:center; gap:0.6rem; margin-bottom:0.6rem; cursor:pointer; font-weight:600;">
           <input type="checkbox" name="activo" {% if vendedor.is_active %}checked{% endif %}
                  style="width:18px; height:18px;">
           Vendedor activo
         </label>
+
+        <label style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1rem; cursor:pointer; font-weight:600;">
+          <input type="checkbox" name="puede_vender_abono" {% if vendedor.puede_vender_abono %}checked{% endif %}
+                 style="width:18px; height:18px;">
+          Puede cobrar abono mensual
+        </label>
+        <p class="text-muted" style="font-size:0.83rem; margin-top:-0.75rem; margin-bottom:1rem;">
+          Si está desmarcado, el vendedor no podrá acceder a la opción de cobrar abono.
+        </p>
       </div>
 
       <!-- CONFIG RENDICIÓN -->

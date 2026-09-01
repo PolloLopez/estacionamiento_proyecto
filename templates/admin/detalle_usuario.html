@@ -73,7 +73,7 @@
           </div>
         </div>
 
-        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap;">
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap;">
           <div style="flex:1; min-width:110px;">
             <label style="font-size:0.88rem; color:var(--color-text-muted);">Teléfono</label>
             <input name="telefono" value="{{ conductor.telefono }}" placeholder="Ej: 2994123456"
@@ -84,6 +84,13 @@
             <input name="numero_dni" value="{{ conductor.numero_dni }}" placeholder="Ej: 30123456"
                    style="width:100%; margin-top:0.2rem;" />
           </div>
+        </div>
+
+        <div style="margin-bottom:0.75rem;">
+          <label style="font-size:0.88rem; color:var(--color-text-muted);">Domicilio</label>
+          <input name="domicilio" value="{{ conductor.domicilio }}"
+                 placeholder="Ej: San Martín 1234, Mercedes"
+                 style="width:100%; margin-top:0.2rem;" />
         </div>
 
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
