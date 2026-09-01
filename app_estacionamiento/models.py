@@ -614,9 +614,13 @@ class CierreCaja(models.Model):
         return f"{estado} Cierre {self.usuario} — ${self.total_cobrado} ({self.fecha_cierre:%d/%m/%Y})"
 
 class VerificacionInspector(models.Model):
-    inspector = models.ForeignKey(Usuario, on_delete=models.CASCADE)
-    vehiculo  = models.ForeignKey(Vehiculo, on_delete=models.CASCADE)
-    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE)
+    # SET_NULL en los 3 FK: borrar inspector/vehículo/subcuadra conserva el historial
+    # de verificaciones con el campo en None. CASCADE los borraría silenciosamente —
+    # inaceptable para trazabilidad (ej. cuántas veces se verificó un vehículo que
+    # después se dio de baja, o actividad de un inspector desvinculado).
+    inspector = models.ForeignKey(Usuario,   on_delete=models.SET_NULL, null=True, blank=True)
+    vehiculo  = models.ForeignKey(Vehiculo,  on_delete=models.SET_NULL, null=True, blank=True)
+    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.SET_NULL, null=True, blank=True)
     fecha     = models.DateTimeField(auto_now_add=True)
     infraccion_generada = models.BooleanField(default=False)
     # "verificado" es el único valor que se guarda actualmente.
@@ -646,7 +650,9 @@ class Infraccion(models.Model):
     # PROTECT: no permite borrar un vehículo o inspector con infracciones (historial contable).
     vehiculo  = models.ForeignKey(Vehiculo, on_delete=models.PROTECT)
     inspector = models.ForeignKey(Usuario,  on_delete=models.PROTECT)
-    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.CASCADE, null=True, blank=True)
+    # SET_NULL: si se elimina una subcuadra, la infracción se conserva con subcuadra=None.
+    # CASCADE borraría infracciones (historial contable) al eliminar una subcuadra — no aceptable.
+    subcuadra = models.ForeignKey(Subcuadra, on_delete=models.SET_NULL, null=True, blank=True)
     estacionamiento = models.ForeignKey(Estacionamiento, on_delete=models.SET_NULL, null=True, blank=True)
     motivo = models.CharField(max_length=255, default="Impago")
     foto   = models.ImageField(upload_to="infracciones/", null=True, blank=True)
