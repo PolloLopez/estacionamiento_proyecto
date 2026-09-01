@@ -166,6 +166,7 @@ def panel_admin(request):
             "titulo": "Configuración",
             "items": [
                 {"label": "📍 Subcuadras GPS",   "url": _reverse("gestionar_subcuadras"),     "badge": None},
+                {"label": "📊 Cobertura",        "url": _reverse("reportes_subcuadras"),      "badge": None},
                 {"label": "💲 Tarifas",          "url": _reverse("gestionar_tarifas"),        "badge": None},
                 {"label": "🕐 Horarios",         "url": _reverse("gestionar_horarios"),       "badge": None},
                 {"label": "📅 Días especiales",  "url": _reverse("gestionar_dias_especiales"),"badge": None},
@@ -2919,6 +2920,70 @@ def importar_exenciones(request):
 
     # GET
     return render(request, "admin/importar_exenciones.html", {})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reportes de subcuadras
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def reportes_subcuadras(request):
+    """
+    Dashboard de cobertura por subcuadra del municipio.
+
+    Por cada subcuadra muestra: verificaciones, infracciones y vehículos exentos
+    en el período seleccionado. Útil para detectar zonas sin cobertura de inspectores
+    y subcuadras con alta conflictividad.
+
+    Filtro de fecha: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD (default: mes actual).
+    """
+    municipio = request.user.municipio
+    hoy = timezone.localtime().date()
+
+    try:
+        desde = date.fromisoformat(request.GET.get("desde", ""))
+    except (ValueError, TypeError):
+        desde = hoy.replace(day=1)  # primer día del mes actual
+
+    try:
+        hasta = date.fromisoformat(request.GET.get("hasta", ""))
+    except (ValueError, TypeError):
+        hasta = hoy
+
+    # Una sola query con 3 anotaciones por subcuadra.
+    # Las FK de VerificacionInspector e Infraccion → Subcuadra son nullable (migración 0062
+    # y 0061), así que los registros sin subcuadra no cuentan en ninguna subcuadra.
+    subcuadras = (
+        Subcuadra.objects.filter(municipio=municipio)
+        .annotate(
+            total_verificaciones=Count(
+                "verificacioninspector",
+                filter=Q(
+                    verificacioninspector__fecha__date__gte=desde,
+                    verificacioninspector__fecha__date__lte=hasta,
+                ),
+                distinct=True,
+            ),
+            total_infracciones=Count(
+                "infraccion",
+                filter=Q(
+                    infraccion__creado_en__date__gte=desde,
+                    infraccion__creado_en__date__lte=hasta,
+                ),
+                distinct=True,
+            ),
+            # Vehículos con exención específica a esta subcuadra (M2M inverso)
+            total_exentos=Count("vehiculo", distinct=True),
+        )
+        .order_by("-total_verificaciones", "-total_infracciones")
+    )
+
+    return render(request, "admin/reportes_subcuadras.html", {
+        "subcuadras": subcuadras,
+        "desde":      desde,
+        "hasta":      hasta,
+        "hoy":        hoy,
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
