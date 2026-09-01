@@ -751,8 +751,15 @@ def detalle_usuario_admin(request, usuario_id):
             messages.error(request, "La contraseña debe tener al menos 6 caracteres.")
         else:
             conductor.set_password(nueva_password)
+            # Forzar cambio en el próximo login: la contraseña que el admin establece
+            # es temporal; el usuario debe elegir la suya propia.
+            conductor.cambio_password_requerido = True
             conductor.save()
-            messages.success(request, f"Contraseña de {conductor.correo} actualizada.")
+            messages.success(
+                request,
+                f"Contraseña temporal establecida. {conductor.correo} deberá cambiarla al próximo login. "
+                "Comunicale la contraseña temporal por fuera del sistema."
+            )
 
     # Últimas 5 infracciones (preview)
     infracciones = Infraccion.objects.filter(

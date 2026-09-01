@@ -21,6 +21,7 @@ from .views_auth import (
     registro_view,
     completar_perfil,
     logout_view,
+    forzar_cambio_password,
 )
 from .views_inspector import (
     panel_inspectores,

@@ -19,6 +19,8 @@
 ### ~~Perfil extendido conductor — campo domicilio~~ → ✅ resuelto (sesión 2026-09-01)
 ### ~~Admin panel responsive con secciones desplegables~~ → ✅ resuelto (sesión 2026-09-01)
 ### ~~Ícono PWA dinámico con logo del municipio~~ → ✅ resuelto (sesión 2026-09-01)
+### ~~Reseteo de contraseña desde panel admin~~ → ✅ resuelto (sesión 2026-09-01)
+### ~~GitHub Pages landing~~ → ✅ resuelto (sesión 2026-09-01) — archivo `landing_github_pages.html` generado
 
 ### Auditorías — correr todas antes del próximo municipio real
 Las auditorías se corrieron en julio/agosto temprano. El sistema creció mucho desde entonces.
@@ -147,13 +149,6 @@ if conductor.es_residente_verificado and modulo_activo("reintegro_residentes", m
 - Requisito: domicilio registrado y verificado por el municipio (domicilio electrónico)
 - Otros beneficios a destacar: pago desde celular, historial, sin efectivo, notificaciones
 
-### GitHub Pages: reemplazar landing_estacionar.html
-La `landing.html` del sistema Django **sí sirve** para GitHub Pages con dos cambios mínimos:
-1. Eliminar la primera línea: `{% load static %}`
-2. Reemplazar los dos `{% url 'pago_publico_buscar' %}` por `https://estacionamiento.up.railway.app/pagar/`
-
-Todo lo demás es HTML/CSS autocontenido (sin herencia de base.html, sin assets externos propios).
-El resultado puede reemplazar directamente `landing_estacionar.html` en el repo de GitHub Pages.
 
 ### Responsive > 1050px
 En pantallas grandes el layout del panel admin queda con mucho espacio vacío.

@@ -116,6 +116,12 @@ def login_view(request):
                     })
 
             login(request, usuario)
+
+            # Si el admin estableció una contraseña temporal, forzar el cambio
+            # antes de que el usuario acceda al sistema.
+            if getattr(usuario, "cambio_password_requerido", False):
+                return redirect("forzar_cambio_password")
+
             return redirect_por_rol(usuario)
 
         # Determinar por qué falló el login para mostrar un mensaje específico.
@@ -304,3 +310,49 @@ def completar_perfil(request):
         "falta_municipio": falta_municipio,
         "falta_nombre":    falta_nombre,
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cambio de contraseña forzado por el admin
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+def forzar_cambio_password(request):
+    """
+    Muestra un formulario de cambio de contraseña cuando el admin estableció
+    una contraseña temporal (cambio_password_requerido = True).
+
+    El usuario no puede acceder a ninguna otra parte del sistema hasta que
+    cambie su contraseña. Una vez que la cambia, el flag se desactiva y se
+    lo redirige a su panel normal.
+    """
+    usuario = request.user
+
+    # Si el flag ya fue limpiado (ej: el usuario volvió a esta URL manualmente),
+    # redirigirlo a su panel sin mostrar el formulario.
+    if not getattr(usuario, "cambio_password_requerido", False):
+        return redirect_por_rol(usuario)
+
+    error = None
+
+    if request.method == "POST":
+        nueva      = request.POST.get("nueva_password", "").strip()
+        confirmar  = request.POST.get("confirmar_password", "").strip()
+
+        if not nueva:
+            error = "Ingresá una contraseña nueva."
+        elif len(nueva) < 6:
+            error = "La contraseña debe tener al menos 6 caracteres."
+        elif nueva != confirmar:
+            error = "Las contraseñas no coinciden."
+        else:
+            usuario.set_password(nueva)
+            usuario.cambio_password_requerido = False
+            usuario.save(update_fields=["password", "cambio_password_requerido"])
+            # Django invalida la sesión al cambiar la contraseña; hay que volver a loguear.
+            from django.contrib.auth import update_session_auth_hash
+            update_session_auth_hash(request, usuario)
+            messages.success(request, "✅ Contraseña actualizada. ¡Bienvenido!")
+            return redirect_por_rol(usuario)
+
+    return render(request, "usuarios/forzar_cambio_password.html", {"error": error})

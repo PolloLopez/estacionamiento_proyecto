@@ -107,10 +107,18 @@
 
     <!-- CAMBIAR CONTRASEÑA -->
     <div class="card">
-      <h3 style="margin-bottom:0.8rem;">🔑 Cambiar contraseña</h3>
+      <h3 style="margin-bottom:0.8rem;">🔑 Contraseña temporal</h3>
       <p class="text-muted" style="font-size:0.9rem; margin-bottom:0.75rem;">
-        Usá esto si el conductor no puede recuperar su contraseña por email.
+        Establecé una contraseña temporal y comunicásela al usuario.
+        Al próximo login se le pedirá que elija una propia.
       </p>
+      {% if conductor.cambio_password_requerido %}
+      <div style="background:var(--color-warning-bg,#fff8e1); border:1px solid var(--color-warning);
+                  border-radius:6px; padding:0.5rem 0.75rem; margin-bottom:0.75rem;
+                  font-size:0.85rem; color:var(--color-text);">
+        ⏳ Este usuario tiene pendiente cambiar su contraseña al próximo login.
+      </div>
+      {% endif %}
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="accion" value="cambiar_password">

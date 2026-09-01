@@ -139,6 +139,14 @@ class Usuario(AbstractUser):
         help_text="El admin verificó la identidad del conductor."
     )
 
+    # 🔑 Forzar cambio de contraseña al próximo login.
+    # Se activa cuando el admin establece una contraseña temporal.
+    cambio_password_requerido = models.BooleanField(
+        default=False,
+        verbose_name="Debe cambiar contraseña al próximo login",
+        help_text="El admin lo activa al establecer una contraseña temporal.",
+    )
+
     # 🔐 Django admin / permisos
     #is_staff → acceso admin Django
     #es_admin → lógica de negocio
