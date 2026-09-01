@@ -248,11 +248,24 @@ def registrar_infraccion(request):
             gps_lon = request.POST.get("gps_lon", "").strip() or None
             gps_acc = request.POST.get("gps_acc", "").strip() or None
 
+            # Validar foto antes de crear la infracción: solo imágenes, máx 15 MB.
+            # ImageField valida que sea una imagen real (Pillow), pero no el tamaño.
+            foto = request.FILES.get("foto")
+            if foto:
+                _TIPOS_FOTO = {"image/jpeg", "image/png", "image/webp"}
+                _TAMAÑO_MAX = 15 * 1024 * 1024  # 15 MB
+                if foto.content_type not in _TIPOS_FOTO:
+                    messages.error(request, f"La foto debe ser JPG, PNG o WEBP (recibido: {foto.content_type}).")
+                    return redirect("inspectores_verificar_vehiculo")
+                if foto.size > _TAMAÑO_MAX:
+                    messages.error(request, f"La foto pesa {foto.size / 1024 / 1024:.1f} MB; el máximo es 15 MB.")
+                    return redirect("inspectores_verificar_vehiculo")
+
             infraccion = crear_infraccion(
                 patente=patente,
                 subcuadra_id=request.POST.get("subcuadra_id"),
                 inspector=usuario,
-                foto=request.FILES.get("foto"),
+                foto=foto,
                 gps_lat=gps_lat,
                 gps_lon=gps_lon,
                 gps_acc=gps_acc,
