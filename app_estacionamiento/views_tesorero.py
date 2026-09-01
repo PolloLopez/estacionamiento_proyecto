@@ -15,7 +15,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .decorators import require_role
-from .models import LiquidacionComision, Rendicion
+from .models import CierreCaja, LiquidacionComision, Rendicion
 
 
 @require_role("tesorero")
@@ -44,13 +44,22 @@ def panel_tesorero(request):
 
     liquidaciones = qs_liquidaciones.order_by("-creado_en")[:50]
 
+    # Cierres de admin sin certificar — válvula de escape para el tesorero.
+    # Solo cierres de admins (es_admin=True): inspectores y vendedores los certifica el admin.
+    cierres_admin_sin_certificar = CierreCaja.objects.filter(
+        usuario__municipio=municipio,
+        usuario__es_admin=True,
+        certificado=False,
+    ).select_related("usuario").order_by("-fecha_cierre")
+
     return render(request, "tesorero/panel_tesorero.html", {
-        "rendiciones_pendientes":  rendiciones_pendientes,
-        "rendiciones_historial":   rendiciones_historial,
-        "total_neto_pendiente":    total_neto_pendiente,
-        "liquidaciones":           liquidaciones,
-        "pendientes_rendicion":    pendientes_rendicion,
-        "pendientes_liquidacion":  pendientes_liquidacion,
+        "rendiciones_pendientes":        rendiciones_pendientes,
+        "rendiciones_historial":         rendiciones_historial,
+        "total_neto_pendiente":          total_neto_pendiente,
+        "liquidaciones":                 liquidaciones,
+        "pendientes_rendicion":          pendientes_rendicion,
+        "pendientes_liquidacion":        pendientes_liquidacion,
+        "cierres_admin_sin_certificar":  cierres_admin_sin_certificar,
     })
 
 
