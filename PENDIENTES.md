@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-01 (panel auditoría superadmin)
+Última actualización: 2026-09-01 (descuentos voluntarios infracciones)
 
 ---
 
@@ -54,22 +54,15 @@ Pendientes derivados de las auditorías (ver 🟡 abajo):
 - Limpieza de datos de prueba de Railway antes de go-live real. Ver `CHECKLIST_PRODUCCION_2026-09-01.md` para el orden correcto.
 - UptimeRobot si no está configurado todavía.
 
-### Descuentos por pago voluntario de infracciones (feature premium por municipio)
-El superadmin habilita el módulo por municipio. El admin del municipio configura:
+### ~~Descuentos por pago voluntario de infracciones (feature premium por municipio)~~ → ✅ resuelto (sesión 2026-09-01)
+El superadmin activa el módulo `descuentos_voluntarios` por municipio. El admin configura dos niveles desde Tarifas.
 
-- **Descuento por horas**: si el conductor paga dentro de X horas desde el acta → Y% de descuento
-  (ej: pago en menos de 2 hs → 40% off)
-- **Descuento por días**: si paga dentro de X días → Z% de descuento
-  (ej: pago en menos de 5 días → 20% off)
-- Fuera del plazo → monto completo
-
-Requiere:
-- Nuevos campos en `Tarifa` o tabla `ConfigDescuento`: `descuento_horas_plazo`, `descuento_horas_pct`,
-  `descuento_dias_plazo`, `descuento_dias_pct` + migración
-- `pagar_infraccion` use case: al calcular el monto a pagar, consulta los plazos y aplica el descuento
-- `MovimientoCaja` o `Infraccion`: registrar el monto original + descuento aplicado + motivo (trazabilidad)
-- Panel admin: sección "Descuentos" visible solo si el módulo está habilitado
-- Panel conductor: mostrar al ver una infracción pendiente si hay descuento disponible y cuánto tiempo falta
+Implementado:
+- Migración 0063: módulo en `ModuloMunicipio.MODULOS` + 4 campos en `Tarifa` (`descuento_horas_plazo`, `descuento_horas_pct`, `descuento_dias_plazo`, `descuento_dias_pct`) + 3 campos en `Infraccion` (`monto_pagado`, `descuento_pct_aplicado`, `descuento_motivo`)
+- Service `calcular_descuento_infraccion()` en `services/infracciones.py`: evalúa plazo en horas primero (mayor descuento), luego días
+- Use case `pagar_infraccion.py`: chequea módulo activo, aplica descuento y debita `monto_pagado` (no `monto`). Guarda trazabilidad en los 3 campos nuevos de `Infraccion`.
+- `gestionar_tarifas`: sección "🏷️ Descuentos" visible solo si el módulo está activo. Dos filas editables (por horas / por días). Validación de consistencia plazo+porcentaje.
+- `mis_infracciones` (conductor): evalúa descuento preview y lo adjunta como `inf.descuento_preview` a cada infracción de la lista. Badge `🏷️ -X% → $Y` en la tabla. Modal de pago actualizado: muestra descuento disponible o aviso de pago completo. Botón muestra el monto correcto a pagar.
 
 
 ### Reseteo de contraseña desde el panel admin

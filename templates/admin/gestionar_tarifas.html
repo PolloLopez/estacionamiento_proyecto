@@ -200,6 +200,105 @@
     </div>
   </div>
 
+  <!-- ── DESCUENTOS POR PAGO VOLUNTARIO ───────────────────────────── -->
+  {% if modulo_descuentos %}
+  <div class="card" style="margin-bottom:1.5rem; border-left:4px solid var(--color-primary);">
+    <h3 style="margin:0 0 0.5rem;">🏷️ Descuentos por pago voluntario</h3>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0 0 1rem;">
+      Si el conductor paga su infracción dentro del plazo configurado, el sistema aplica el descuento automáticamente al cobrar con saldo digital.
+    </p>
+    <div class="tabla-campos">
+
+      <!-- Nivel 1: por horas -->
+      <div class="campo-fila" id="fila-desc_horas">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Descuento por pago rápido (horas)</span>
+            <span class="campo-ayuda">Plazo corto → mayor descuento</span>
+          </div>
+          {% if tarifa_actual.descuento_horas_plazo %}
+            <span class="campo-valor">
+              {{ tarifa_actual.descuento_horas_pct }}% off si paga dentro de {{ tarifa_actual.descuento_horas_plazo }}h
+            </span>
+          {% else %}
+            <span class="campo-valor" style="color:var(--color-text-muted);">No configurado</span>
+          {% endif %}
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('desc_horas')">✏️ Editar</button>
+        </div>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;">
+            <span class="campo-label">Descuento por horas</span>
+            <span class="campo-ayuda">Dejá vacío para desactivar este nivel</span>
+          </div>
+          <form id="form-desc_horas" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="descuentos">
+            <input type="hidden" name="descuento_dias_plazo" value="{{ tarifa_actual.descuento_dias_plazo|default:'' }}">
+            <input type="hidden" name="descuento_dias_pct" value="{{ tarifa_actual.descuento_dias_pct|default:'' }}">
+            <input class="campo-input" type="number" name="descuento_horas_plazo"
+                   value="{{ tarifa_actual.descuento_horas_plazo|default:'' }}"
+                   placeholder="Horas" step="1" min="1" style="width:90px;"
+                   data-label="Plazo en horas" data-actual="{{ tarifa_actual.descuento_horas_plazo|default:'' }}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();}">
+            <span style="color:var(--color-text-muted); font-size:0.85rem;">horas →</span>
+            <input class="campo-input" type="number" name="descuento_horas_pct"
+                   value="{{ tarifa_actual.descuento_horas_pct|default:'' }}"
+                   placeholder="%" step="0.01" min="0.01" max="100" style="width:80px;"
+                   data-label="Descuento %" data-actual="{{ tarifa_actual.descuento_horas_pct|default:'' }}">
+            <span style="color:var(--color-text-muted);">% off</span>
+            <button type="submit" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('desc_horas')">Cancelar</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Nivel 2: por días -->
+      <div class="campo-fila" id="fila-desc_dias">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Descuento por pago en días</span>
+            <span class="campo-ayuda">Plazo más largo → menor descuento</span>
+          </div>
+          {% if tarifa_actual.descuento_dias_plazo %}
+            <span class="campo-valor">
+              {{ tarifa_actual.descuento_dias_pct }}% off si paga dentro de {{ tarifa_actual.descuento_dias_plazo }} días
+            </span>
+          {% else %}
+            <span class="campo-valor" style="color:var(--color-text-muted);">No configurado</span>
+          {% endif %}
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('desc_dias')">✏️ Editar</button>
+        </div>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;">
+            <span class="campo-label">Descuento por días</span>
+            <span class="campo-ayuda">Dejá vacío para desactivar este nivel</span>
+          </div>
+          <form id="form-desc_dias" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="descuentos">
+            <input type="hidden" name="descuento_horas_plazo" value="{{ tarifa_actual.descuento_horas_plazo|default:'' }}">
+            <input type="hidden" name="descuento_horas_pct" value="{{ tarifa_actual.descuento_horas_pct|default:'' }}">
+            <input class="campo-input" type="number" name="descuento_dias_plazo"
+                   value="{{ tarifa_actual.descuento_dias_plazo|default:'' }}"
+                   placeholder="Días" step="1" min="1" style="width:90px;"
+                   data-label="Plazo en días" data-actual="{{ tarifa_actual.descuento_dias_plazo|default:'' }}"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();}">
+            <span style="color:var(--color-text-muted); font-size:0.85rem;">días →</span>
+            <input class="campo-input" type="number" name="descuento_dias_pct"
+                   value="{{ tarifa_actual.descuento_dias_pct|default:'' }}"
+                   placeholder="%" step="0.01" min="0.01" max="100" style="width:80px;"
+                   data-label="Descuento %" data-actual="{{ tarifa_actual.descuento_dias_pct|default:'' }}">
+            <span style="color:var(--color-text-muted);">% off</span>
+            <button type="submit" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('desc_dias')">Cancelar</button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  {% endif %}
+
 </section>
 
 <!-- ── MODAL DE CONFIRMACIÓN ────────────────────────────────────── -->

@@ -53,7 +53,15 @@
             <td style="font-size:0.85rem;">
               {% if i.subcuadra %}{{ i.subcuadra }}{% else %}—{% endif %}
             </td>
-            <td style="text-align:right; font-weight:600;">${{ i.monto }}</td>
+            <td style="text-align:right; font-weight:600;">
+              ${{ i.monto }}
+              {% if i.descuento_preview %}
+                <br>
+                <span style="font-size:0.78rem; color:var(--color-primary); font-weight:600;">
+                  🏷️ -{{ i.descuento_preview.descuento_pct|floatformat:0 }}% → ${{ i.descuento_preview.monto_final|floatformat:2 }}
+                </span>
+              {% endif %}
+            </td>
             <td style="text-align:center;">
               {% if i.estado == "pagada" %}
                 <span style="color:var(--color-primary); font-weight:700;">✅ Pagada</span>
@@ -89,17 +97,32 @@
                           <strong>La infracción se anulará sin costo.</strong>
                         </p>
                       {% else %}
-                        {# Fuera del período de gracia: se cobra el monto completo #}
-                        <h3 style="margin-bottom:0.75rem;">⚠️ Pago fuera de término</h3>
+                        {# Fuera del período de gracia: se cobra monto completo o con descuento #}
+                        {% if i.descuento_preview %}
+                          <h3 style="margin-bottom:0.75rem;">🏷️ Descuento disponible</h3>
+                        {% else %}
+                          <h3 style="margin-bottom:0.75rem;">⚠️ Pago fuera de término</h3>
+                        {% endif %}
                         <p style="margin-bottom:0.5rem;">
                           Infracción <strong>#{{ i.id }}</strong> · Patente <strong>{{ i.vehiculo.patente }}</strong>
                         </p>
-                        <div style="background:var(--color-danger-light, #fff3cd);
-                                    border:1px solid var(--color-danger, #e5a000);
-                                    border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
-                          <strong>Estás pagando fuera del período de gracia{% if tolerancia_min %} ({{ tolerancia_min }} min){% endif %}.</strong><br>
-                          Se descontarán <strong>${{ i.monto }}</strong> de tu saldo.
-                        </div>
+                        {% if i.descuento_preview %}
+                          <div style="background:#f0fdf4; border:1px solid var(--color-primary);
+                                      border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
+                            <strong style="color:var(--color-primary);">
+                              🏷️ {{ i.descuento_preview.motivo }}
+                            </strong><br>
+                            Monto original: <span style="text-decoration:line-through;">${{ i.monto }}</span><br>
+                            <strong>Pagás ahora: ${{ i.descuento_preview.monto_final|floatformat:2 }}</strong>
+                          </div>
+                        {% else %}
+                          <div style="background:var(--color-danger-light, #fff3cd);
+                                      border:1px solid var(--color-danger, #e5a000);
+                                      border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
+                            <strong>Estás pagando fuera del período de gracia{% if tolerancia_min %} ({{ tolerancia_min }} min){% endif %}.</strong><br>
+                            Se descontarán <strong>${{ i.monto }}</strong> de tu saldo.
+                          </div>
+                        {% endif %}
                       {% endif %}
 
                       <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
@@ -111,6 +134,11 @@
                           {% csrf_token %}
                           {% if i.id in ids_dentro_tolerancia %}
                             <button type="submit" class="btn">Anular sin costo</button>
+                          {% elif i.descuento_preview %}
+                            <button type="submit" class="btn"
+                                    style="background:var(--color-primary); color:#fff;">
+                              Pagar ${{ i.descuento_preview.monto_final|floatformat:2 }}
+                            </button>
                           {% else %}
                             <button type="submit" class="btn btn-danger"
                                     style="background:var(--color-danger, #c0392b); color:#fff;">

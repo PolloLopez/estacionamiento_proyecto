@@ -35,6 +35,7 @@ from .models import (
     Estacionamiento,
     Estado,
     Infraccion,
+    ModuloMunicipio,
     MovimientoCaja,
     Notificacion,
     SolicitudVerificacion,
@@ -46,6 +47,7 @@ from .models import (
     VehiculoUsuario,
 )
 from .use_cases.estacionar_vehiculo import ejecutar_estacionamiento
+from .services.infracciones import calcular_descuento_infraccion
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
 from .use_cases.pagar_infraccion import ejecutar as pagar_infraccion_uc
 from .services.horarios import (
@@ -361,12 +363,38 @@ def mis_infracciones(request):
                 if elapsed <= timedelta(minutes=tolerancia_min):
                     ids_dentro_tolerancia.add(inf.id)
 
+    # Preview de descuento por pago voluntario (módulo premium).
+    # Se adjunta como atributo `descuento_preview` a cada infracción para que
+    # el template pueda acceder sin custom template tags (dict lookup por clave
+    # variable no está soportado en Django templates por defecto).
+    modulo_descuento_activo = ModuloMunicipio.objects.filter(
+        municipio=usuario.municipio,
+        modulo="descuentos_voluntarios",
+        activo=True,
+    ).exists()
+
+    # Evaluar queryset para poder anotar objetos con atributo extra
+    infracciones_lista = list(infracciones)
+    if modulo_descuento_activo:
+        tarifa = Tarifa.objects.filter(municipio=usuario.municipio).first()
+        for inf in infracciones_lista:
+            if inf.estado == "pendiente":
+                resultado = calcular_descuento_infraccion(inf, tarifa, ahora=ahora)
+                inf.descuento_preview = resultado if resultado["descuento_pct"] > 0 else None
+            else:
+                inf.descuento_preview = None
+    else:
+        for inf in infracciones_lista:
+            inf.descuento_preview = None
+
+    tiene_pendientes = any(inf.estado == "pendiente" for inf in infracciones_lista)
+
     return render(request, "usuarios/historial_infracciones.html", {
-        "infracciones":         infracciones,
-        "saldo_usuario":        usuario.saldo,
-        "tiene_pendientes":     infracciones.filter(estado="pendiente").exists(),
-        "tolerancia_min":       tolerancia_min,
-        "ids_dentro_tolerancia": ids_dentro_tolerancia,
+        "infracciones":           infracciones_lista,
+        "saldo_usuario":          usuario.saldo,
+        "tiene_pendientes":       tiene_pendientes,
+        "tolerancia_min":         tolerancia_min,
+        "ids_dentro_tolerancia":  ids_dentro_tolerancia,
     })
 
 

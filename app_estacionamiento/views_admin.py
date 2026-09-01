@@ -40,6 +40,7 @@ from .models import (
     Estacionamiento,
     HorarioEstacionamiento,
     Infraccion,
+    ModuloMunicipio,
     MovimientoCaja,
     Notificacion,
     Rendicion,
@@ -1022,6 +1023,46 @@ def gestionar_tarifas(request):
                 municipio.save(update_fields=["comision_vendedor"])
                 messages.success(request, f"✅ Comisión de vendedor actualizada a {valor:,.2f}%.")
 
+            elif seccion == "descuentos":
+                # Cada campo llega como string vacío si el admin lo borró (= sin nivel).
+                # Vacío → None en BD (nivel desactivado). Cero no es válido (sin sentido).
+                def _opcional_entero(campo):
+                    raw = request.POST.get(campo, "").strip()
+                    if not raw:
+                        return None
+                    n = int(raw)
+                    if n <= 0:
+                        raise ValueError(f"'{campo}' debe ser mayor que 0.")
+                    return n
+
+                def _opcional_decimal(campo):
+                    raw = request.POST.get(campo, "").strip()
+                    if not raw:
+                        return None
+                    d = Decimal(raw)
+                    if d <= 0 or d > 100:
+                        raise ValueError(f"'{campo}' debe estar entre 0 y 100.")
+                    return d
+
+                h_plazo = _opcional_entero("descuento_horas_plazo")
+                h_pct   = _opcional_decimal("descuento_horas_pct")
+                d_plazo = _opcional_entero("descuento_dias_plazo")
+                d_pct   = _opcional_decimal("descuento_dias_pct")
+
+                # Validar consistencia: si configura plazo, debe configurar porcentaje también
+                if bool(h_plazo) != bool(h_pct):
+                    raise ValueError("Para el nivel de horas, informá plazo Y porcentaje (o dejá ambos vacíos).")
+                if bool(d_plazo) != bool(d_pct):
+                    raise ValueError("Para el nivel de días, informá plazo Y porcentaje (o dejá ambos vacíos).")
+
+                tarifa_qs.update(
+                    descuento_horas_plazo=h_plazo,
+                    descuento_horas_pct=h_pct,
+                    descuento_dias_plazo=d_plazo,
+                    descuento_dias_pct=d_pct,
+                )
+                messages.success(request, "✅ Configuración de descuentos guardada.")
+
             else:
                 error = "Campo desconocido. No se guardó nada."
 
@@ -1047,10 +1088,17 @@ def gestionar_tarifas(request):
             precio_abono_auto=Decimal("0"),
             precio_abono_moto=Decimal("0"),
         )
+    modulo_descuentos = ModuloMunicipio.objects.filter(
+        municipio=municipio,
+        modulo="descuentos_voluntarios",
+        activo=True,
+    ).exists()
+
     return render(request, "admin/gestionar_tarifas.html", {
-        "tarifa_actual": tarifa_actual,
-        "municipio":     municipio,
-        "error":         error,
+        "tarifa_actual":    tarifa_actual,
+        "municipio":        municipio,
+        "error":            error,
+        "modulo_descuentos": modulo_descuentos,
     })
 
 
