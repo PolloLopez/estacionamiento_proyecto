@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Cobrar infracción en campo{% endblock %}
+
+{% block content %}
+<div class="container">
+  <a href="{% url 'panel_inspectores' %}" class="btn btn-outline"
+     style="margin-bottom:1rem; font-size:0.88rem;">← Volver al panel</a>
+
+  <div class="card">
+    <h2 style="margin:0 0 1rem;">💵 Cobrar infracción en campo</h2>
+
+    {% if not confirmar %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="buscar">
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+        <input name="patente" value="{{ patente }}" placeholder="Patente (ej: AB123CD)"
+               style="flex:1; min-width:160px; text-transform:uppercase;"
+               autocomplete="off" required>
+        <button type="submit" class="btn">🔍 Buscar</button>
+      </div>
+    </form>
+
+    {% if infracciones_pendientes %}
+    <h3 style="margin-bottom:0.5rem;">Infracciones pendientes — {{ vehiculo.patente }}</h3>
+    {% for inf in infracciones_pendientes %}
+    <div style="border:1px solid var(--color-border); border-radius:8px; padding:0.75rem; margin-bottom:0.6rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div>
+          <div style="font-weight:700;">#{{ inf.id }} — ${{ inf.monto }}</div>
+          <div style="font-size:0.83rem; color:var(--color-text-muted);">
+            {{ inf.creado_en|date:"d/m/Y H:i" }} · {{ inf.motivo|default:"Sin motivo" }}
+          </div>
+        </div>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="confirmar">
+          <input type="hidden" name="infraccion_id" value="{{ inf.id }}">
+          <input type="hidden" name="patente" value="{{ vehiculo.patente }}">
+          <button type="submit" class="btn btn-outline"
+                  style="font-size:0.85rem; padding:0.35rem 0.75rem;">
+            Confirmar cobro →
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% else %}
+    {# Pantalla de confirmación: muestra detalle y botón de cobrar #}
+    <div style="background:var(--color-surface); border:1px solid var(--color-border);
+                border-radius:8px; padding:1rem; margin-bottom:1rem;">
+      <div style="font-size:0.88rem; color:var(--color-text-muted); margin-bottom:0.25rem;">Infracción</div>
+      <div style="font-size:1.3rem; font-weight:800;">#{{ infraccion.id }} — ${{ infraccion.monto }}</div>
+      <div style="font-size:0.88rem; margin-top:0.25rem;">
+        Patente <strong>{{ vehiculo.patente }}</strong> ·
+        {{ infraccion.creado_en|date:"d/m/Y H:i" }}
+      </div>
+      {% if infraccion.motivo %}
+      <div style="font-size:0.88rem; margin-top:0.25rem; color:var(--color-text-muted);">
+        Motivo: {{ infraccion.motivo }}
+      </div>
+      {% endif %}
+    </div>
+    <p style="font-size:0.88rem; color:var(--color-text-muted); margin-bottom:1rem;">
+      Al confirmar, el monto ingresará a tu caja y la infracción quedará marcada como pagada.
+    </p>
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="cobrar">
+        <input type="hidden" name="infraccion_id" value="{{ infraccion.id }}">
+        <button type="submit" class="btn"
+                onclick="return confirm('¿Confirmar cobro de ${{ infraccion.monto }}?')">
+          ✅ Confirmar cobro en efectivo
+        </button>
+      </form>
+      <a href="{% url 'inspectores_cobrar_infraccion' %}" class="btn btn-outline">Cancelar</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

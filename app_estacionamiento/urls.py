@@ -5,6 +5,7 @@ from . import views
 from . import views_superadmin
 from . import views_pwa
 from . import views_pago_publico
+from . import views_publico
 
 urlpatterns = [
 
@@ -63,8 +64,12 @@ urlpatterns = [
     path("vehiculo/<int:vehiculo_id>/eliminar/", views.eliminar_vehiculo, name="eliminar_vehiculo"),
     path("mis_estacionamientos/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),
     path("infracciones/<int:infraccion_id>/pagar/",views.pagar_infraccion,name="pagar_infraccion"),
+    path("infracciones/<int:infraccion_id>/impugnar/", views.crear_impugnacion, name="crear_impugnacion"),
     path("estacionamiento/<int:est_id>/renovar/", views.renovar_estacionamiento, name="usuarios_renovar_estacionamiento"),
     path("notificacion/<int:notif_id>/leida/", views.marcar_notificacion_leida, name="marcar_notificacion_leida"),
+    path("saldo/transferir/", views.transferir_saldo, name="transferir_saldo"),
+    path("saldo/transferencias/", views.transferencias_saldo, name="transferencias_saldo"),
+    path("saldo/transferencias/<int:transf_id>/responder/", views.responder_transferencia, name="responder_transferencia"),
 
     # =========================
     # 👮 INSPECTORES
@@ -83,6 +88,7 @@ urlpatterns = [
     path("inspectores/ticket-cobro/<int:est_id>/", views.ticket_cobro, name="inspectores_ticket_cobro"),
     path("inspectores/verificar-sia/", views.verificar_sia, name="inspectores_verificar_sia"),
     path("ticket-pago-multa/<int:infraccion_id>/", views.ticket_pago_multa, name="ticket_pago_multa"),
+    path("inspectores/cobrar-infraccion/", views.cobrar_infraccion_inspector, name="inspectores_cobrar_infraccion"),
 
     # =========================
     # 💰 VENDEDORES
@@ -131,6 +137,9 @@ urlpatterns = [
     path("admin/caja-vendedores/", views.caja_vendedores, name="admin_caja_vendedores"),
     path("admin/caja-vendedores/<int:vendedor_id>/forzar/", views.forzar_cierre_vendedor, name="admin_forzar_cierre_vendedor"),
     path("admin/exentos-sia/", views.vehiculos_exentos_sia, name="vehiculos_exentos_sia"),
+    path("admin/mapa-infracciones/", views.mapa_calor_infracciones, name="mapa_calor_infracciones"),
+    path("admin/impugnaciones/", views.admin_impugnaciones, name="admin_impugnaciones"),
+    path("admin/impugnaciones/<int:impug_id>/resolver/", views.resolver_impugnacion, name="resolver_impugnacion"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
     path("admin-subcuadras/", views.gestionar_subcuadras, name="gestionar_subcuadras"),
     path("admin-exenciones/importar/", views.importar_exenciones, name="importar_exenciones"),
@@ -194,5 +203,10 @@ urlpatterns = [
     path("superadmin/municipio/<int:municipio_id>/modulo/",     views_superadmin.gestionar_modulo,      name="gestionar_modulo"),
     path("superadmin/municipio/<int:municipio_id>/importar/",   views_superadmin.importar_estacionamientos, name="importar_estacionamientos"),
     path("superadmin/municipio/<int:municipio_id>/plantillas/", views_superadmin.gestionar_plantillas,      name="gestionar_plantillas"),
+
+    # =========================
+    # 📺 DASHBOARD TV (público)
+    # =========================
+    path("tv/<str:token>/", views_publico.dashboard_tv, name="dashboard_tv"),
 
 ]

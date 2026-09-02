@@ -33,6 +33,7 @@ from .views_inspector import (
     pdf_infracciones_hoy,
     subcuadra_cercana,
     verificar_sia,
+    cobrar_infraccion_inspector,
 )
 from .views_tesorero import (
     panel_tesorero,
@@ -70,6 +71,10 @@ from .views_conductor import (
     finalizar_estacionamiento,
     mis_infracciones,
     pagar_abono_conductor,
+    crear_impugnacion,
+    transferir_saldo,
+    transferencias_saldo,
+    responder_transferencia,
 )
 from .views_admin import (
     panel_admin,
@@ -106,6 +111,11 @@ from .views_admin import (
     auditoria_staff,
     reportes_subcuadras,
     vehiculos_exentos_sia,
+    caja_vendedores,
+    forzar_cierre_vendedor,
+    mapa_calor_infracciones,
+    admin_impugnaciones,
+    resolver_impugnacion,
 )
 from .views_mp import (
     mp_iniciar_carga,

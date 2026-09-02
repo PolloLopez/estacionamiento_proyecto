@@ -214,6 +214,56 @@
     {% endif %}
   </div>
 
+  <!-- MÓDULO REINTEGRO: VERIFICACIÓN DE RESIDENCIA -->
+  {% if modulo_reintegro %}
+  <div class="card">
+    <h3 style="margin:0 0 0.6rem;">🏠 Residencia verificada</h3>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      El módulo de reintegro está activo en este municipio.
+      {% if reintegro_alcance == "residentes" %}
+      Solo los conductores marcados como vecinos verificados reciben el reintegro de saldo.
+      {% else %}
+      El reintegro aplica a todos los conductores, pero podés marcar vecinos para registro interno.
+      {% endif %}
+    </p>
+
+    {% if conductor.es_residente_verificado %}
+      <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+        <span style="background:var(--color-primary); color:#fff; font-size:0.82rem;
+                     font-weight:700; padding:0.25rem 0.75rem; border-radius:99px;">
+          ✅ Residente verificado
+        </span>
+        {% if conductor.fecha_verificacion_residencia %}
+          <span style="font-size:0.8rem; color:var(--color-text-muted);">
+            desde {{ conductor.fecha_verificacion_residencia|date:"d/m/Y" }}
+          </span>
+        {% endif %}
+      </div>
+      <form method="post" style="margin:0;">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="quitar_verificacion_residencia">
+        <button type="submit" class="btn btn-outline"
+                style="font-size:0.82rem; padding:0.3rem 0.75rem;
+                       color:var(--color-warning); border-color:var(--color-warning);"
+                onclick="return confirm('¿Revocar la verificación de residencia de {{ conductor.get_full_name }}?')">
+          Revocar verificación
+        </button>
+      </form>
+    {% else %}
+      <p style="font-size:0.85rem; margin-bottom:0.75rem;">
+        <span style="color:var(--color-text-muted);">○ Sin verificación de residencia.</span>
+      </p>
+      <form method="post" style="margin:0;">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="verificar_residencia">
+        <button type="submit" class="btn btn-primary" style="font-size:0.85rem;">
+          Marcar como residente verificado
+        </button>
+      </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- HISTORIAL DE INFRACCIONES -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; flex-wrap:wrap; gap:0.5rem;">

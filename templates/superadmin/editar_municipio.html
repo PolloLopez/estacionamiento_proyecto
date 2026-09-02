@@ -64,6 +64,74 @@
             <small style="color:var(--color-text-muted);">El conductor no puede cargar más de este monto en una sola operación.</small>
           </div>
 
+          {# ── Módulo: Reintegro de estacionamiento ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
+              Módulo reintegro de estacionamiento
+            </p>
+            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+              Configuración del crédito de saldo que el municipio otorga por los primeros N minutos de cada estacionamiento.
+              Solo aplica si el módulo <strong>Reintegro de estacionamiento para vecinos</strong> está activo.
+            </p>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.85rem; font-weight:600;">Minutos a reintegrar por estacionamiento</label>
+              <input type="number" name="reintegro_minutos" min="1" max="120" step="1"
+                     value="{{ municipio.reintegro_minutos }}"
+                     style="width:100%; margin-top:0.25rem;">
+              <small style="color:var(--color-text-muted);">Cuántos minutos se acreditan como saldo al conductor. Defecto: 30 min.</small>
+            </div>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.85rem; font-weight:600;">Máx. reintegros por día (por conductor)</label>
+              <input type="number" name="reintegro_max_por_dia" min="1" max="10" step="1"
+                     value="{{ municipio.reintegro_max_por_dia }}"
+                     style="width:100%; margin-top:0.25rem;">
+              <small style="color:var(--color-text-muted);">Límite diario de reintegros que un mismo conductor puede recibir. Defecto: 1.</small>
+            </div>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.85rem; font-weight:600;">Alcance del reintegro</label>
+              <select name="reintegro_alcance" style="width:100%; margin-top:0.25rem;">
+                <option value="residentes" {% if municipio.reintegro_alcance == "residentes" %}selected{% endif %}>
+                  Solo residentes verificados
+                </option>
+                <option value="todos" {% if municipio.reintegro_alcance == "todos" %}selected{% endif %}>
+                  Todos los conductores
+                </option>
+              </select>
+              <small style="color:var(--color-text-muted);">
+                "Solo residentes" requiere que el admin verifique manualmente cada conductor como vecino del municipio.
+              </small>
+            </div>
+          </div>
+
+          {# ── Dashboard TV ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.5px;">
+              Dashboard TV (pantalla pública)
+            </p>
+            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+              Genera un token para acceder al panel público sin login (para proyectar en una pantalla del municipio).
+            </p>
+            {% if municipio.token_tv %}
+            <div style="background:var(--color-surface); border:1px solid var(--color-border);
+                        border-radius:6px; padding:0.5rem 0.75rem; margin-bottom:0.5rem; font-size:0.82rem; word-break:break-all;">
+              <strong>URL:</strong>
+              <a href="{% url 'dashboard_tv' municipio.token_tv %}" target="_blank"
+                 style="color:var(--color-primary);">/tv/{{ municipio.token_tv }}/</a>
+            </div>
+            {% endif %}
+            <form method="post" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="accion" value="generar_token_tv">
+              <button type="submit" class="btn btn-outline" style="font-size:0.85rem;"
+                      onclick="return confirm('¿Generar un nuevo token TV? El token anterior dejará de funcionar.')">
+                🔑 {% if municipio.token_tv %}Regenerar token{% else %}Generar token{% endif %}
+              </button>
+            </form>
+          </div>
+
           {# ── Información institucional ── #}
           <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
             <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">

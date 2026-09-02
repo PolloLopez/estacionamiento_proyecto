@@ -131,11 +131,22 @@ class Usuario(AbstractUser):
     )
 
     # ── Datos adicionales para conductores ──────────────────────────────────
-    # Fundamental para identificar frentistas y eventualmente el módulo de reintegro.
+    # Fundamental para identificar frentistas y el módulo de reintegro de vecinos.
     domicilio = models.CharField(
         max_length=255, blank=True, default="",
         verbose_name="Domicilio",
         help_text="Dirección del conductor. Requerido para exención de frentista."
+    )
+    # El admin verifica manualmente que el conductor vive en el municipio.
+    # Si el módulo reintegro_residentes usa alcance="residentes", solo estos reciben reintegro.
+    es_residente_verificado = models.BooleanField(
+        default=False,
+        verbose_name="Residente verificado",
+        help_text="El admin verificó que este conductor es vecino del municipio."
+    )
+    fecha_verificacion_residencia = models.DateField(
+        null=True, blank=True,
+        verbose_name="Fecha de verificación de residencia",
     )
 
     es_conductor   = models.BooleanField(default=True)
@@ -208,6 +219,29 @@ class Municipio(models.Model):
         verbose_name='Comisión vendedor (%)',
         help_text='Porcentaje que retiene el vendedor de cada cobro.',
     )
+    # ── Módulo de reintegro para vecinos ───────────────────────────────────
+    # El superadmin activa el módulo "reintegro_residentes" y configura estos campos.
+    reintegro_minutos = models.PositiveIntegerField(
+        default=30,
+        verbose_name="Minutos de reintegro por estacionamiento",
+        help_text="Cuántos minutos se reintegran como saldo al conductor por cada estacionamiento."
+    )
+    reintegro_max_por_dia = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Máx. reintegros por día (por conductor)",
+        help_text="Límite de reintegros que un mismo conductor puede recibir en un día."
+    )
+    reintegro_alcance = models.CharField(
+        max_length=20,
+        choices=[
+            ("todos",      "Todos los conductores"),
+            ("residentes", "Solo residentes verificados"),
+        ],
+        default="residentes",
+        verbose_name="Alcance del reintegro",
+        help_text="A quiénes aplica el reintegro."
+    )
+
     # Con qué frecuencia se espera que los vendedores cierren su caja.
     # Determina el semáforo en el panel del admin.
     frecuencia_cierre_caja = models.CharField(
@@ -274,6 +308,21 @@ class Municipio(models.Model):
         default="Estacionamiento Medido",
         verbose_name="Nombre del sistema",
         help_text="Texto que aparece en la barra de navegación si no hay logo.",
+    )
+
+    # ── Funciones de operación ────────────────────────────────────────────────
+    estadisticas_inspectores_activo = models.BooleanField(
+        default=True,
+        verbose_name="Mostrar estadísticas a inspectores",
+        help_text="Si está desactivado, el inspector no ve sus métricas en el panel (infracciones del día, etc.).",
+    )
+
+    # Token de solo lectura para el dashboard en pantalla/TV del municipio.
+    # Se genera automáticamente desde el superadmin; vacío = dashboard desactivado.
+    token_tv = models.CharField(
+        max_length=64, blank=True, default="",
+        verbose_name="Token de dashboard TV",
+        help_text="Token de solo lectura para la pantalla pública /tv/<token>/. Vacío = desactivado.",
     )
 
     # ── Información institucional ────────────────────────────────────────────
@@ -1215,6 +1264,8 @@ class ModuloMunicipio(models.Model):
         ("informes_automaticos",       "Informes automáticos programados"),
         ("descuentos_voluntarios",     "Descuentos por pago voluntario de infracciones"),
         ("comisiones_vendedores",      "Comisiones por venta para vendedores"),
+        ("reintegro_residentes",       "Reintegro de estacionamiento para vecinos"),
+        ("cobrador_inspector",         "Inspectores pueden cobrar infracciones en campo"),
     ]
 
     municipio      = models.ForeignKey(
@@ -1322,3 +1373,129 @@ class PlantillaDocumento(models.Model):
             "cuerpo":     self.cuerpo.format_map(ctx),
             "pie":        self.pie.format_map(ctx),
         }
+
+
+class Reintegro(models.Model):
+    """
+    Registro de cada reintegro de estacionamiento acreditado a un conductor.
+
+    Un reintegro es un crédito financiado por el municipio: los primeros N minutos
+    de estacionamiento se devuelven como saldo al conductor.
+    Queda registrado aquí para trazabilidad contable (cuánto reintegró el municipio,
+    a quién y cuándo) sin afectar el flujo de caja de inspectores o vendedores.
+    """
+    conductor       = models.ForeignKey(
+        Usuario, on_delete=models.PROTECT, related_name="reintegros",
+    )
+    municipio       = models.ForeignKey(
+        "Municipio", on_delete=models.PROTECT, related_name="reintegros",
+    )
+    # SET_NULL: si se borra el estacionamiento (caso raro), el reintegro queda registrado.
+    estacionamiento = models.OneToOneField(
+        Estacionamiento, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="reintegro",
+    )
+    monto     = models.DecimalField(max_digits=10, decimal_places=2)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+
+    def __str__(self):
+        return f"Reintegro ${self.monto} → {self.conductor} ({self.creado_en.date()})"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Impugnación de infracciones
+# ─────────────────────────────────────────────────────────────────────────────
+
+class Impugnacion(models.Model):
+    """
+    El conductor puede impugnar una infracción que considera incorrecta.
+    Adjunta un motivo y, opcionalmente, evidencia fotográfica.
+    El admin revisa y acepta (anulando la infracción) o rechaza.
+
+    Una infracción puede tener a lo sumo una impugnación activa (pendiente).
+    """
+    ESTADOS = [
+        ("pendiente",  "Pendiente de revisión"),
+        ("aceptada",   "Aceptada — infracción anulada"),
+        ("rechazada",  "Rechazada"),
+    ]
+
+    infraccion   = models.ForeignKey(
+        "Infraccion", on_delete=models.PROTECT, related_name="impugnaciones",
+    )
+    conductor    = models.ForeignKey(
+        Usuario, on_delete=models.PROTECT, related_name="impugnaciones",
+    )
+    municipio    = models.ForeignKey(
+        Municipio, on_delete=models.PROTECT, related_name="impugnaciones",
+    )
+    motivo       = models.TextField(verbose_name="Motivo de la impugnación")
+    evidencia    = models.ImageField(
+        upload_to="impugnaciones/", null=True, blank=True,
+        verbose_name="Evidencia fotográfica",
+    )
+    estado       = models.CharField(max_length=20, choices=ESTADOS, default="pendiente")
+    # El admin completa este campo al resolver
+    resolucion   = models.TextField(
+        blank=True, default="",
+        verbose_name="Resolución / motivo del admin",
+    )
+    creado_en    = models.DateTimeField(auto_now_add=True)
+    resuelto_en  = models.DateTimeField(null=True, blank=True)
+    resuelto_por = models.ForeignKey(
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="impugnaciones_resueltas",
+    )
+
+    class Meta:
+        ordering = ["-creado_en"]
+
+    def __str__(self):
+        return f"Impugnación #{self.id} — {self.infraccion} [{self.estado}]"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Transferencia de saldo entre conductores
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TransferenciaSaldo(models.Model):
+    """
+    Un conductor puede enviar parte de su saldo a otro del mismo municipio.
+    El receptor tiene 24 horas para aceptar o rechazar.
+    Si no responde, la transferencia expira y el saldo vuelve al emisor.
+
+    Nota: la acreditación/reembolso se hace dentro de transaction.atomic()
+    con select_for_update() sobre ambos conductores, igual que debitar_saldo_conductor.
+    """
+    ESTADOS = [
+        ("pendiente",  "Esperando respuesta"),
+        ("aceptada",   "Completada"),
+        ("rechazada",  "Rechazada por el receptor"),
+        ("expirada",   "Expiró sin respuesta"),
+        ("cancelada",  "Cancelada por el emisor"),
+    ]
+
+    emisor    = models.ForeignKey(
+        Usuario, on_delete=models.PROTECT, related_name="transferencias_enviadas",
+    )
+    receptor  = models.ForeignKey(
+        Usuario, on_delete=models.PROTECT, related_name="transferencias_recibidas",
+    )
+    municipio = models.ForeignKey(
+        Municipio, on_delete=models.PROTECT, related_name="transferencias_saldo",
+    )
+    monto     = models.DecimalField(max_digits=10, decimal_places=2)
+    estado    = models.CharField(max_length=20, choices=ESTADOS, default="pendiente")
+    creado_en     = models.DateTimeField(auto_now_add=True)
+    # expira_en lo setea el use case al crear: creado_en + 24h
+    expira_en     = models.DateTimeField()
+    respondido_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+
+    def __str__(self):
+        return f"Transferencia ${self.monto} de {self.emisor} → {self.receptor} [{self.estado}]"

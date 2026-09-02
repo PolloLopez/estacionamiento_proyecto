@@ -971,3 +971,136 @@ def pagar_abono_conductor(request):
         "error":            error,
         "saldo_usuario":    usuario.saldo,
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Impugnaciones
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_login
+def crear_impugnacion(request, infraccion_id):
+    """
+    El conductor impugna una infracción pendiente o pagada propia.
+    Solo puede haber una impugnación pendiente por infracción.
+    """
+    from app_estacionamiento.models import Impugnacion, Infraccion, VehiculoUsuario
+
+    conductor = request.user
+    municipio = conductor.municipio
+
+    # Verificar que la infracción pertenece a un vehículo del conductor
+    infraccion = get_object_or_404(
+        Infraccion,
+        id=infraccion_id,
+        municipio=municipio,
+        vehiculo__vehiculousuario__usuario=conductor,
+    )
+
+    # No se puede impugnar una infracción ya anulada o que ya tiene impugnación pendiente
+    if infraccion.estado == "anulada":
+        messages.error(request, "Esta infracción ya fue anulada.")
+        return redirect("mis_infracciones")
+
+    if infraccion.impugnaciones.filter(estado="pendiente").exists():
+        messages.info(request, "Ya enviaste una impugnación pendiente para esta infracción.")
+        return redirect("mis_infracciones")
+
+    if request.method == "POST":
+        motivo   = request.POST.get("motivo", "").strip()
+        evidencia = request.FILES.get("evidencia")
+        if not motivo:
+            messages.error(request, "El motivo no puede estar vacío.")
+        else:
+            Impugnacion.objects.create(
+                infraccion=infraccion,
+                conductor=conductor,
+                municipio=municipio,
+                motivo=motivo,
+                evidencia=evidencia,
+            )
+            messages.success(
+                request,
+                f"✅ Impugnación enviada para la infracción #{infraccion_id}. "
+                "El admin la revisará y te notificará.",
+            )
+            return redirect("mis_infracciones")
+
+    return render(request, "usuarios/crear_impugnacion.html", {
+        "infraccion": infraccion,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Transferencia de saldo entre conductores
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_login
+def transferir_saldo(request):
+    """
+    El conductor envía parte de su saldo a otro conductor del mismo municipio.
+    """
+    from app_estacionamiento.use_cases.transferir_saldo import iniciar_transferencia
+
+    conductor = request.user
+    error     = None
+    exito     = False
+
+    if request.method == "POST":
+        correo_receptor = request.POST.get("correo_receptor", "").strip()
+        monto_str       = request.POST.get("monto", "0").strip()
+        resultado = iniciar_transferencia(conductor, correo_receptor, monto_str)
+        if resultado["ok"]:
+            exito = True
+            messages.success(
+                request,
+                f"✅ Transferencia de ${resultado['transferencia'].monto} enviada. "
+                "El receptor tiene 24 horas para aceptar.",
+            )
+            return redirect("transferencias_saldo")
+        else:
+            error = resultado["error"]
+
+    return render(request, "usuarios/transferir_saldo.html", {
+        "error":         error,
+        "saldo_usuario": conductor.saldo,
+    })
+
+
+@require_login
+def transferencias_saldo(request):
+    """
+    Historial de transferencias enviadas y recibidas del conductor.
+    Permite responder a transferencias pendientes recibidas.
+    """
+    from app_estacionamiento.models import TransferenciaSaldo
+
+    conductor = request.user
+    enviadas  = TransferenciaSaldo.objects.filter(emisor=conductor).order_by("-creado_en")[:20]
+    recibidas = TransferenciaSaldo.objects.filter(receptor=conductor).order_by("-creado_en")[:20]
+
+    return render(request, "usuarios/transferencias_saldo.html", {
+        "enviadas":  enviadas,
+        "recibidas": recibidas,
+    })
+
+
+@require_login
+def responder_transferencia(request, transf_id):
+    """
+    El receptor acepta o rechaza. El emisor puede cancelar.
+    """
+    from app_estacionamiento.use_cases.transferir_saldo import responder_transferencia as uc_responder
+
+    if request.method != "POST":
+        return redirect("transferencias_saldo")
+
+    accion    = request.POST.get("accion")
+    resultado = uc_responder(request.user, transf_id, accion)
+
+    if resultado["ok"]:
+        etiquetas = {"aceptar": "aceptada", "rechazar": "rechazada", "cancelar": "cancelada"}
+        messages.success(request, f"Transferencia {etiquetas.get(accion, '')}.")
+    else:
+        messages.error(request, resultado["error"])
+
+    return redirect("transferencias_saldo")

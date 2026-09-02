@@ -159,6 +159,11 @@ def panel_admin(request):
     )
 
     from django.urls import reverse as _reverse
+    from .models import Impugnacion as _Impugnacion
+
+    impugnaciones_pendientes = _Impugnacion.objects.filter(
+        municipio=municipio, estado="pendiente"
+    ).count()
 
     # Sidebar agrupado por rubro.
     # Cada grupo tiene un título y una lista de ítems {label, url, badge}.
@@ -178,8 +183,10 @@ def panel_admin(request):
             "items": [
                 {"label": "🚗 Vehículos",        "url": _reverse("admin_vehiculos"),          "badge": None},
                 {"label": "📋 Infracciones",     "url": _reverse("admin_infracciones"),       "badge": None},
+                {"label": "⚖️ Impugnaciones",    "url": _reverse("admin_impugnaciones"),      "badge": impugnaciones_pendientes or None},
                 # Exenciones unifica admin + SIA en una sola vista
                 {"label": "🚫 Exenciones",       "url": _reverse("exenciones"),               "badge": None},
+                {"label": "🗺️ Mapa de calor",    "url": _reverse("mapa_calor_infracciones"),  "badge": None},
             ],
         },
         {
@@ -832,6 +839,32 @@ def detalle_usuario_admin(request, usuario_id):
                 "Comunicale la contraseña temporal por fuera del sistema."
             )
 
+    elif accion == "verificar_residencia":
+        # El admin confirma que este conductor es vecino verificado del municipio.
+        # Habilita el reintegro si el alcance está en "residentes".
+        from django.utils.timezone import localdate
+        conductor.es_residente_verificado        = True
+        conductor.fecha_verificacion_residencia  = localdate()
+        conductor.save(update_fields=[
+            "es_residente_verificado", "fecha_verificacion_residencia"
+        ])
+        messages.success(request, f"{conductor.get_full_name()} marcado como residente verificado.")
+
+    elif accion == "quitar_verificacion_residencia":
+        # El admin puede revocar la verificación (ej. el conductor se mudó).
+        conductor.es_residente_verificado       = False
+        conductor.fecha_verificacion_residencia = None
+        conductor.save(update_fields=[
+            "es_residente_verificado", "fecha_verificacion_residencia"
+        ])
+        messages.success(request, "Verificación de residencia revocada.")
+
+    # ── Módulo reintegro: mostrar tarjeta solo si está activo ─────────────────
+    from app_estacionamiento.services.reintegro import modulo_reintegro_activo
+    municipio         = request.user.municipio
+    modulo_reintegro  = modulo_reintegro_activo(municipio)
+    reintegro_alcance = municipio.reintegro_alcance if municipio else "residentes"
+
     # Últimas 5 infracciones (preview)
     infracciones = Infraccion.objects.filter(
         vehiculo__vehiculousuario__usuario=conductor,
@@ -839,9 +872,11 @@ def detalle_usuario_admin(request, usuario_id):
     ).distinct().order_by("-creado_en")[:5]
 
     return render(request, "admin/detalle_usuario.html", {
-        "conductor":   conductor,
-        "vehiculos":   vehiculos,
-        "infracciones": infracciones,
+        "conductor":        conductor,
+        "vehiculos":        vehiculos,
+        "infracciones":     infracciones,
+        "modulo_reintegro": modulo_reintegro,
+        "reintegro_alcance": reintegro_alcance,
     })
 
 
@@ -3271,3 +3306,133 @@ def forzar_cierre_vendedor(request, vendedor_id):
         messages.info(request, f"{vendedor.nombre_completo()} no tiene movimientos abiertos para cerrar.")
 
     return redirect("admin_caja_vendedores")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mapa de calor de infracciones (Leaflet.js)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def mapa_calor_infracciones(request):
+    """
+    Mapa interactivo con la densidad de infracciones por subcuadra.
+    Usa las coordenadas (lat/lon) de cada subcuadra y muestra círculos
+    proporcionales a la cantidad de infracciones.
+    Solo incluye subcuadras con coordenadas cargadas.
+    """
+    from django.db.models import Count
+    import json
+
+    municipio = request.user.municipio
+
+    datos = list(
+        Infraccion.objects.filter(municipio=municipio, subcuadra__isnull=False)
+        .values(
+            "subcuadra__id",
+            "subcuadra__calle",
+            "subcuadra__altura",
+            "subcuadra__lat",
+            "subcuadra__lon",
+        )
+        .annotate(total=Count("id"))
+        .filter(subcuadra__lat__isnull=False, subcuadra__lon__isnull=False)
+        .order_by("-total")
+    )
+
+    puntos = json.dumps([
+        {
+            "lat":    float(d["subcuadra__lat"]),
+            "lon":    float(d["subcuadra__lon"]),
+            "nombre": f"{d['subcuadra__calle']} {d['subcuadra__altura']}",
+            "total":  d["total"],
+        }
+        for d in datos
+    ])
+
+    if datos:
+        centro_lat = sum(float(d["subcuadra__lat"]) for d in datos) / len(datos)
+        centro_lon = sum(float(d["subcuadra__lon"]) for d in datos) / len(datos)
+    else:
+        centro_lat, centro_lon = -34.6037, -58.3816
+
+    return render(request, "admin/mapa_calor_infracciones.html", {
+        "puntos":             puntos,
+        "centro_lat":         centro_lat,
+        "centro_lon":         centro_lon,
+        "total_subcuadras":   len(datos),
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Impugnaciones — panel admin
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def admin_impugnaciones(request):
+    """
+    Lista todas las impugnaciones del municipio, filtrables por estado.
+    """
+    from app_estacionamiento.models import Impugnacion
+
+    municipio     = request.user.municipio
+    estado_filtro = request.GET.get("estado", "pendiente")
+
+    impugnaciones = Impugnacion.objects.filter(
+        municipio=municipio
+    ).select_related("conductor", "infraccion", "infraccion__vehiculo").order_by("-creado_en")
+
+    if estado_filtro in ("pendiente", "aceptada", "rechazada"):
+        impugnaciones = impugnaciones.filter(estado=estado_filtro)
+
+    return render(request, "admin/impugnaciones.html", {
+        "impugnaciones": impugnaciones,
+        "estado_filtro": estado_filtro,
+    })
+
+
+@require_role("admin")
+def resolver_impugnacion(request, impug_id):
+    """
+    El admin acepta o rechaza una impugnación pendiente.
+    Aceptar anula la infracción asociada.
+    """
+    from app_estacionamiento.models import Impugnacion
+
+    if request.method != "POST":
+        return redirect("admin_impugnaciones")
+
+    municipio   = request.user.municipio
+    impugnacion = get_object_or_404(
+        Impugnacion, id=impug_id, municipio=municipio, estado="pendiente"
+    )
+
+    accion     = request.POST.get("accion")
+    resolucion = request.POST.get("resolucion", "").strip()
+
+    if accion not in ("aceptar", "rechazar"):
+        messages.error(request, "Acción inválida.")
+        return redirect("admin_impugnaciones")
+
+    ahora = timezone.now()
+
+    if accion == "aceptar":
+        infraccion = impugnacion.infraccion
+        if infraccion.estado == "pendiente":
+            infraccion.estado     = "anulada"
+            infraccion.fecha_pago = ahora
+            infraccion.save(update_fields=["estado", "fecha_pago"])
+        impugnacion.estado       = "aceptada"
+        impugnacion.resolucion   = resolucion
+        impugnacion.resuelto_en  = ahora
+        impugnacion.resuelto_por = request.user
+        impugnacion.save()
+        messages.success(request, f"Impugnación #{impug_id} aceptada. La infracción fue anulada.")
+    else:
+        impugnacion.estado       = "rechazada"
+        impugnacion.resolucion   = resolucion
+        impugnacion.resuelto_en  = ahora
+        impugnacion.resuelto_por = request.user
+        impugnacion.save()
+        messages.info(request, f"Impugnación #{impug_id} rechazada.")
+
+    return redirect("admin_impugnaciones")

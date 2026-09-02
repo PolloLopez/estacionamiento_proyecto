@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Impugnar infracción #{{ infraccion.id }}{% endblock %}
+
+{% block content %}
+<div class="container">
+  <a href="{% url 'mis_infracciones' %}" class="btn btn-outline"
+     style="margin-bottom:1rem; font-size:0.88rem;">← Volver a mis infracciones</a>
+
+  <div class="card">
+    <h2 style="margin:0 0 0.75rem;">📋 Impugnar infracción #{{ infraccion.id }}</h2>
+
+    <div style="background:var(--color-surface); border:1px solid var(--color-border);
+                border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; font-size:0.9rem;">
+      <div>Patente <strong>{{ infraccion.vehiculo.patente }}</strong></div>
+      <div>Monto: <strong>${{ infraccion.monto }}</strong> · {{ infraccion.creado_en|date:"d/m/Y H:i" }}</div>
+      {% if infraccion.motivo %}
+      <div style="color:var(--color-text-muted);">Motivo del inspector: {{ infraccion.motivo }}</div>
+      {% endif %}
+    </div>
+
+    <p style="font-size:0.88rem; color:var(--color-text-muted); margin-bottom:1rem;">
+      Explicá por qué considerás que la infracción es incorrecta. El admin del municipio revisará tu impugnación.
+    </p>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.88rem; font-weight:600;">Motivo de la impugnación *</label>
+        <textarea name="motivo" rows="4" required
+                  placeholder="Describí por qué esta infracción fue incorrecta..."
+                  style="width:100%; margin-top:0.25rem; padding:0.5rem 0.75rem; border-radius:6px;
+                         border:1px solid var(--color-border); background:var(--color-surface);
+                         color:var(--color-text); font-size:0.9rem; resize:vertical;"></textarea>
+      </div>
+
+      <div style="margin-bottom:1rem;">
+        <label style="font-size:0.88rem; font-weight:600;">Evidencia fotográfica (opcional)</label>
+        <input type="file" name="evidencia" accept="image/*"
+               style="display:block; margin-top:0.25rem; font-size:0.88rem;">
+        <small style="color:var(--color-text-muted);">Podés adjuntar una foto que respalde tu impugnación (JPG, PNG).</small>
+      </div>
+
+      <button type="submit" class="btn">Enviar impugnación</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

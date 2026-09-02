@@ -153,6 +153,12 @@
                 {% else %}
                   <span style="font-size:0.82rem; color:var(--color-muted);">Saldo insuficiente</span>
                 {% endif %}
+              {% elif i.estado == "pendiente" or i.estado == "pagada" %}
+                <a href="{% url 'crear_impugnacion' i.id %}"
+                   class="btn btn-outline"
+                   style="font-size:0.78rem; padding:0.2rem 0.55rem;">
+                  📋 Impugnar
+                </a>
               {% else %}
                 <span class="text-muted" style="font-size:0.82rem;">—</span>
               {% endif %}

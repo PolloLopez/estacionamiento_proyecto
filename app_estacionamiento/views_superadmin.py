@@ -184,6 +184,13 @@ def editar_municipio(request, municipio_id):
             messages.success(request, f"Municipio {estado}.")
             return redirect("panel_superadmin")
 
+        if accion == "generar_token_tv":
+            import secrets
+            municipio.token_tv = secrets.token_urlsafe(32)
+            municipio.save(update_fields=["token_tv"])
+            messages.success(request, "Token TV generado. Guardá la URL antes de cerrar.")
+            return redirect("editar_municipio", municipio_id=municipio.id)
+
         # ── Campos de texto y número ──────────────────────────────────────
         # Para campos numéricos usamos helpers que ignoran string vacío:
         # request.POST.get(key, fallback) devuelve "" si el key existe pero está vacío,
@@ -214,6 +221,13 @@ def editar_municipio(request, municipio_id):
         municipio.activo             = request.POST.get("activo") == "on"
         municipio.leyenda_horarios   = request.POST.get("leyenda_horarios", "").strip()
         municipio.texto_ordenanza    = request.POST.get("texto_ordenanza", "").strip()
+
+        # ── Módulo reintegro residentes ────────────────────────────────────
+        municipio.reintegro_minutos     = _entero("reintegro_minutos",     municipio.reintegro_minutos)
+        municipio.reintegro_max_por_dia = _entero("reintegro_max_por_dia", municipio.reintegro_max_por_dia)
+        alcance = request.POST.get("reintegro_alcance", "").strip()
+        if alcance in ("todos", "residentes"):
+            municipio.reintegro_alcance = alcance
 
         # ── Colores de branding ────────────────────────────────────────────
         # El input type=color sincroniza el valor con el text input vía JS.

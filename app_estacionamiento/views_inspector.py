@@ -21,10 +21,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .decorators import require_role
+from django.db import transaction
 from .models import (
     CierreCaja,
     Estacionamiento,
     Infraccion,
+    ModuloMunicipio,
     Subcuadra,
     Vehiculo,
 )
@@ -49,11 +51,23 @@ def panel_inspectores(request):
     inspector = request.user
     hoy = timezone.localtime().date()
 
-    infracciones_hoy = Infraccion.objects.filter(
-        municipio=inspector.municipio,
-        inspector=inspector,
-        creado_en__date=hoy,
-    ).count()
+    municipio = inspector.municipio
+
+    # Si el municipio desactivó las estadísticas para inspectores, no las calculamos
+    mostrar_estadisticas = municipio.estadisticas_inspectores_activo if municipio else True
+
+    infracciones_hoy = 0
+    if mostrar_estadisticas:
+        infracciones_hoy = Infraccion.objects.filter(
+            municipio=municipio,
+            inspector=inspector,
+            creado_en__date=hoy,
+        ).count()
+
+    # ¿Tiene habilitado el módulo de cobrador?
+    modulo_cobrador = ModuloMunicipio.objects.filter(
+        municipio=municipio, modulo="cobrador_inspector", activo=True
+    ).exists() if municipio else False
 
     # Cierres de caja que el admin todavía no certificó — igual al panel de vendedor
     cierres_sin_certificar = CierreCaja.objects.filter(
@@ -65,8 +79,10 @@ def panel_inspectores(request):
     }
 
     return render(request, "inspectores/panel_inspectores.html", {
-        "resumen": resumen,
+        "resumen":                resumen,
         "cierres_sin_certificar": cierres_sin_certificar,
+        "mostrar_estadisticas":   mostrar_estadisticas,
+        "modulo_cobrador":        modulo_cobrador,
     })
 
 
@@ -627,3 +643,103 @@ def verificar_sia(request):
         respuesta["url_andis"] = resultado.sia_url
 
     return JsonResponse(respuesta)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cobro de infracciones en campo (módulo premium cobrador_inspector)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("inspector")
+def cobrar_infraccion_inspector(request):
+    """
+    Permite al inspector cobrar una infracción en campo cuando el municipio
+    habilitó el módulo 'cobrador_inspector'.
+
+    Flujo idéntico al del vendedor: buscar patente → confirmar → cobrar.
+    El inspector actúa como cobrador; el monto entra a su caja igual que un vendedor.
+    """
+    from .services.infracciones import calcular_estado_tolerancia, cobrar_infraccion_efectivo
+
+    inspector = request.user
+    municipio = inspector.municipio
+
+    # Verificar módulo habilitado
+    modulo_activo = ModuloMunicipio.objects.filter(
+        municipio=municipio, modulo="cobrador_inspector", activo=True
+    ).exists()
+    if not modulo_activo:
+        messages.error(request, "Tu municipio no tiene habilitado el módulo de cobro en campo.")
+        return redirect("panel_inspectores")
+
+    infraccion             = None
+    vehiculo               = None
+    infracciones_pendientes = None
+    patente                = ""
+    confirmar              = False
+
+    if request.method == "POST":
+        accion  = request.POST.get("accion")
+        patente = sanitizar_patente(request.POST.get("patente") or "")
+
+        if accion == "buscar" and patente:
+            vehiculo = Vehiculo.objects.filter(patente=patente).first()
+            if vehiculo:
+                infracciones_pendientes = Infraccion.objects.filter(
+                    vehiculo=vehiculo, municipio=municipio, estado="pendiente"
+                ).order_by("-creado_en")
+                if not infracciones_pendientes.exists():
+                    messages.info(request, f"{patente} no tiene infracciones pendientes.")
+                    infracciones_pendientes = None
+            else:
+                messages.warning(request, f"No se encontró el vehículo con patente {patente}.")
+
+        elif accion == "confirmar":
+            infraccion_id = request.POST.get("infraccion_id")
+            if infraccion_id:
+                infraccion = Infraccion.objects.filter(
+                    id=infraccion_id, municipio=municipio, estado="pendiente"
+                ).select_related("vehiculo").first()
+                if not infraccion:
+                    messages.error(request, "Infracción no encontrada o ya procesada.")
+                    return redirect("inspectores_cobrar_infraccion")
+                vehiculo  = infraccion.vehiculo
+                patente   = vehiculo.patente
+                confirmar = True
+
+        elif accion == "cobrar":
+            infraccion_id = request.POST.get("infraccion_id")
+            if infraccion_id:
+                try:
+                    with transaction.atomic():
+                        inf = get_object_or_404(
+                            Infraccion.objects.select_for_update(),
+                            id=infraccion_id, municipio=municipio, estado="pendiente",
+                        )
+                        ahora      = timezone.now()
+                        estado_tol = calcular_estado_tolerancia(inf, municipio, ahora=ahora)
+
+                        if estado_tol["dentro_tolerancia"]:
+                            inf.estado = "anulada"
+                            inf.fecha_pago = ahora
+                            inf.save(update_fields=["estado", "fecha_pago"])
+                            messages.info(
+                                request,
+                                f"La infracción #{inf.id} estaba dentro del período de gracia y fue anulada automáticamente.",
+                            )
+                        else:
+                            cobrar_infraccion_efectivo(inf, cobrador=inspector, medio_pago="efectivo")
+                            messages.success(
+                                request,
+                                f"✅ Infracción #{inf.id} cobrada. El monto ingresó a tu caja.",
+                            )
+                except Exception as e:
+                    messages.error(request, f"Error al procesar el cobro: {e}")
+                return redirect("inspectores_cobrar_infraccion")
+
+    return render(request, "inspectores/cobrar_infraccion.html", {
+        "infraccion":             infraccion,
+        "vehiculo":               vehiculo,
+        "infracciones_pendientes": infracciones_pendientes,
+        "patente":                patente,
+        "confirmar":              confirmar,
+    })

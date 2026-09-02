@@ -24,11 +24,13 @@
     </div>
   </details>
 
-  <!-- Resumen de actividad -->
+  <!-- Resumen de actividad (solo si el municipio lo tiene habilitado) -->
+  {% if mostrar_estadisticas %}
   <div class="card" style="text-align:center; margin-bottom:1.2rem;">
     <div class="text-muted" style="font-size:0.85rem;">Infracciones hoy</div>
     <div style="font-size:2.5rem; font-weight:800;">{{ resumen.infracciones_hoy }}</div>
   </div>
+  {% endif %}
 
   {% if cierres_sin_certificar %}
   <div style="margin-bottom:1.2rem; background:var(--color-warning-bg);
@@ -59,6 +61,13 @@
          href="{% url 'inspectores_resumen_infracciones' %}">
         📑 Mis infracciones
       </a>
+      {% if modulo_cobrador %}
+      <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;
+                                        color:var(--color-primary); border-color:var(--color-primary);"
+         href="{% url 'inspectores_cobrar_infraccion' %}">
+        💵 Cobrar infracción en campo
+      </a>
+      {% endif %}
     </div>
   </div>
 

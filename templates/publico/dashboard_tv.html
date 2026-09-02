@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="refresh" content="60">
+  <title>{{ municipio.nombre }} — Panel en vivo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #1e293b;
+    }
+    .municipio-nombre {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #38bdf8;
+    }
+    .hora {
+      font-size: 1.2rem;
+      color: #94a3b8;
+      font-variant-numeric: tabular-nums;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .panel h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.75rem;
+    }
+    .contador-grande {
+      font-size: 4rem;
+      font-weight: 900;
+      line-height: 1;
+      color: #38bdf8;
+      margin-bottom: 0.25rem;
+    }
+    .contador-label {
+      font-size: 0.88rem;
+      color: #64748b;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th {
+      text-align: left;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 0.78rem;
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid #334155;
+    }
+    td { padding: 0.55rem 0.5rem; border-bottom: 1px solid #1e293b; }
+    tr:last-child td { border-bottom: none; }
+    .badge-ok    { background: #166534; color: #bbf7d0; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.75rem; }
+    .badge-warn  { background: #7c2d12; color: #fed7aa; padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.75rem; }
+    .pie {
+      margin-top: 1.5rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #334155;
+    }
+    .contadores-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .card-mini {
+      background: #1e293b;
+      border-radius: 10px;
+      padding: 1rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    {% if municipio.logo %}
+      <img src="{{ municipio.logo.url }}" style="height:40px; width:auto; vertical-align:middle; margin-right:0.75rem;">
+    {% endif %}
+    <span class="municipio-nombre">{{ municipio.nombre }}</span>
+  </div>
+  <div class="hora" id="reloj">{{ ahora|date:"H:i" }}</div>
+</header>
+
+<!-- Contadores rápidos -->
+<div class="contadores-row">
+  <div class="card-mini">
+    <div class="contador-grande">{{ total_activos }}</div>
+    <div class="contador-label">🚗 Estacionamientos activos</div>
+  </div>
+  <div class="card-mini">
+    <div class="contador-grande" style="color:#fb923c;">{{ total_infracciones }}</div>
+    <div class="contador-label">⚠️ Infracciones hoy</div>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- Estacionamientos activos -->
+  <div class="panel">
+    <h2>🚗 Activos ahora</h2>
+    {% if estacionamientos_activos %}
+    <table>
+      <thead>
+        <tr>
+          <th>Patente</th>
+          <th>Conductor</th>
+          <th>Inicio</th>
+          <th>Duración</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for est in estacionamientos_activos %}
+        <tr>
+          <td><strong>{{ est.vehiculo.patente }}</strong></td>
+          <td>{{ est.usuario.get_full_name|default:est.usuario.correo }}</td>
+          <td>{{ est.inicio|date:"H:i" }}</td>
+          <td>{{ est.duracion_horas|floatformat:1 }} h</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#475569; font-size:0.9rem; padding:0.5rem 0;">Sin estacionamientos activos en este momento.</p>
+    {% endif %}
+  </div>
+
+  <!-- Infracciones del día -->
+  <div class="panel">
+    <h2>⚠️ Infracciones de hoy</h2>
+    {% if infracciones_hoy %}
+    <table>
+      <thead>
+        <tr>
+          <th>Patente</th>
+          <th>Hora</th>
+          <th>Monto</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inf in infracciones_hoy %}
+        <tr>
+          <td><strong>{{ inf.vehiculo.patente }}</strong></td>
+          <td>{{ inf.creado_en|date:"H:i" }}</td>
+          <td>${{ inf.monto }}</td>
+          <td>
+            {% if inf.estado == "pendiente" %}
+              <span class="badge-warn">Pendiente</span>
+            {% elif inf.estado == "pagada" %}
+              <span class="badge-ok">Pagada</span>
+            {% else %}
+              <span style="font-size:0.78rem; color:#64748b;">{{ inf.estado|capfirst }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#475569; font-size:0.9rem; padding:0.5rem 0;">Sin infracciones registradas hoy.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<div class="pie">
+  Se actualiza automáticamente cada 60 segundos · {{ ahora|date:"d/m/Y H:i" }}
+</div>
+
+<script>
+  // Actualizar el reloj en tiempo real sin recargar la página
+  function actualizarReloj() {
+    const ahora = new Date();
+    const h = String(ahora.getHours()).padStart(2, "0");
+    const m = String(ahora.getMinutes()).padStart(2, "0");
+    const s = String(ahora.getSeconds()).padStart(2, "0");
+    document.getElementById("reloj").textContent = `${h}:${m}:${s}`;
+  }
+  setInterval(actualizarReloj, 1000);
+  actualizarReloj();
+</script>
+
+</body>
+</html>
