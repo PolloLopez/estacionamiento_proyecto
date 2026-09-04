@@ -191,6 +191,62 @@ def editar_municipio(request, municipio_id):
             messages.success(request, "Token TV generado. Guardá la URL antes de cerrar.")
             return redirect("editar_municipio", municipio_id=municipio.id)
 
+        if accion == "limpiar_datos_prueba":
+            # Verificación con texto de confirmación: "CONFIRMAR+NOMBREMUNICIPIO"
+            confirmacion = request.POST.get("confirmacion_texto", "").strip()
+            esperado = f"CONFIRMAR+{municipio.nombre.upper()}"
+            if confirmacion.upper() != esperado:
+                messages.error(
+                    request,
+                    f"Texto incorrecto. Escribí exactamente: {esperado}",
+                )
+                return redirect("editar_municipio", municipio_id=municipio.id)
+
+            from .models import (
+                AbonoMensual, Impugnacion, Infraccion,
+                PagoPublico, Reintegro, TransferenciaSaldo,
+            )
+
+            # IDs de conductores antes de borrarlos (para el mensaje final)
+            conductores_ids = list(
+                Usuario.objects.filter(
+                    municipio=municipio, es_conductor=True
+                ).values_list("id", flat=True)
+            )
+
+            # El orden importa: primero se borran los que tienen PROTECT hacia
+            # Infraccion, Estacionamiento o Usuario (conductor).
+            with transaction.atomic():
+                # 1. Impugnaciones (PROTECT conductor → va primero)
+                Impugnacion.objects.filter(municipio=municipio).delete()
+                # 2. Reintegros (PROTECT conductor → va primero)
+                Reintegro.objects.filter(municipio=municipio).delete()
+                # 3. Transferencias (PROTECT emisor/receptor)
+                TransferenciaSaldo.objects.filter(
+                    emisor__municipio=municipio
+                ).delete()
+                # 4. Abonos mensuales
+                AbonoMensual.objects.filter(municipio=municipio).delete()
+                # 5. Infracciones (PROTECT vehiculo — se libera aquí)
+                Infraccion.objects.filter(municipio=municipio).delete()
+                # 6. Estacionamientos (PROTECT usuario conductor — se libera aquí)
+                Estacionamiento.objects.filter(
+                    subcuadra__municipio=municipio
+                ).delete()
+                # 7. PagoPublico del municipio (FKs ya son SET_NULL — limpieza final)
+                PagoPublico.objects.filter(municipio=municipio).delete()
+                # 8. Conductores: CASCADE en SolicitudVerificacion, Notificacion,
+                #    VehiculoUsuario — ya no hay PROTECT activo sobre ellos.
+                Usuario.objects.filter(id__in=conductores_ids).delete()
+
+            messages.success(
+                request,
+                f"Datos de prueba eliminados: {len(conductores_ids)} conductor/es, "
+                f"estacionamientos, infracciones, abonos, transferencias e impugnaciones "
+                f"de {municipio.nombre}.",
+            )
+            return redirect("editar_municipio", municipio_id=municipio.id)
+
         # ── Campos de texto y número ──────────────────────────────────────
         # Para campos numéricos usamos helpers que ignoran string vacío:
         # request.POST.get(key, fallback) devuelve "" si el key existe pero está vacío,
