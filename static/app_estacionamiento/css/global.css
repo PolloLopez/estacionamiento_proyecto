@@ -1203,6 +1203,26 @@ table tr:hover { background: var(--color-surface-2); }
 }
 
 /* ─── MODO OSCURO — ajustes de componentes específicos ────────── */
+
+/* btn-outline: en dark mode el fondo transparente queda sobre #0d1117.
+   Si el primary del municipio es muy oscuro, el texto/borde desaparece.
+   Usamos un fondo muy suave del primary para darle profundidad. */
+[data-theme="dark"] .btn-outline {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+[data-theme="dark"] .btn-outline:hover {
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+/* Tarjeta vehículo seleccionada: el #f0fff4 hardcodeado se ve mal en dark */
+[data-theme="dark"] .tarjeta-vehiculo.seleccionada {
+  background: rgba(20, 136, 59, 0.18) !important;
+  border-color: var(--color-primary) !important;
+}
+
 [data-theme="dark"] .card {
   background: var(--color-surface);
   border-color: var(--color-border);

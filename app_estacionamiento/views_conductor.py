@@ -118,6 +118,13 @@ def inicio_usuarios(request):
         notif_infraccion["hora_fin_gracia"]      = parse_datetime(notif_infraccion["hora_fin_gracia"])
         notif_infraccion["hora_estacionamiento"] = parse_datetime(notif_infraccion["hora_estacionamiento"])
 
+    # Chequeo de horario para deshabilitar el botón "Estacionar" fuera del horario.
+    # Lo calculamos solo si el municipio existe para evitar error con usuario sin municipio.
+    if usuario.municipio:
+        puede_estacionar, msg_horario_inicio = puede_estacionar_ahora(usuario.municipio)
+    else:
+        puede_estacionar, msg_horario_inicio = True, None
+
     return render(request, "usuarios/inicio_usuarios.html", {
         "usuario":               usuario,
         "estacionamiento_activo": estacionamiento_activo,
@@ -125,6 +132,8 @@ def inicio_usuarios(request):
         "notificaciones_nuevas": notificaciones_nuevas,
         "abonos_activos":        abonos_activos,
         "notif_infraccion":      notif_infraccion,
+        "puede_estacionar":      puede_estacionar,
+        "mensaje_horario":       msg_horario_inicio,
     })
 
 
@@ -673,6 +682,12 @@ def estacionar_vehiculo(request):
     )
 
     patente_preseleccionada = sanitizar_patente(request.GET.get("patente", ""))
+
+    # Chequeo de horario en GET: si está fuera de horario se muestra el banner
+    # y el formulario queda bloqueado. Mismo chequeo que en POST, pero acá
+    # informamos al conductor antes de que intente enviar el formulario.
+    permitido_get, msg_horario_get = puede_estacionar_ahora(usuario.municipio)
+
     opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto)
 
     # Subcuadras disponibles para GPS / selección manual.
@@ -690,6 +705,8 @@ def estacionar_vehiculo(request):
         "patente_preseleccionada": patente_preseleccionada,
         "opciones_duracion":      opciones_duracion,
         "subcuadras":             subcuadras,
+        "fuera_de_horario":       not permitido_get,
+        "mensaje_horario":        msg_horario_get,
     })
 
 
