@@ -6,7 +6,30 @@
   <div class="panel auth-panel" style="margin-top:2rem;">
 
     <div style="text-align:center; margin-bottom:1.5rem;">
-      <div style="font-size:2rem; margin-bottom:0.4rem;">🅿️</div>
+      {# Logo/ícono del municipio: fijo si hay uno solo, dinámico si hay varios #}
+      <div id="logo-municipio"
+           style="margin-bottom:0.4rem; min-height:2.5rem;
+                  display:flex; align-items:center; justify-content:center;">
+        {% if municipios|length == 1 %}
+          {% with m=municipios.0 %}
+            {% if m.logo %}
+              <img src="{{ m.logo.url }}"
+                   alt="{{ m.nombre }}"
+                   style="height:3rem; max-width:160px; object-fit:contain;">
+            {% else %}
+              <span style="font-size:2rem;">🅿️</span>
+            {% endif %}
+          {% endwith %}
+        {% else %}
+          {# Con varios municipios: placeholder hasta que el usuario elija #}
+          <span style="font-size:2rem;">🅿️</span>
+        {% endif %}
+      </div>
+      {% if municipios|length == 1 %}
+        <p style="font-size:0.88rem; color:var(--color-text-muted); margin:0 0 0.3rem;">
+          {{ municipios.0.nombre }}
+        </p>
+      {% endif %}
       <h2 style="margin:0;">Crear cuenta</h2>
     </div>
 
@@ -125,4 +148,39 @@
 
   </div>
 </section>
+
+{% if municipios|length > 1 %}
+{# Con varios municipios: actualizar logo cuando el usuario elige en el select #}
+<script>
+(function () {
+  // Mapa id → {nombre, logo_url} generado desde Django
+  var municipioData = {
+    {% for m in municipios %}
+    "{{ m.id }}": {
+      nombre:   "{{ m.nombre|escapejs }}",
+      logo_url: "{% if m.logo %}{{ m.logo.url }}{% endif %}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  };
+
+  var selectEl  = document.getElementById('municipio_id');
+  var logoContenedor = document.getElementById('logo-municipio');
+
+  if (!selectEl || !logoContenedor) return;
+
+  selectEl.addEventListener('change', function () {
+    var datos = municipioData[this.value];
+    if (!datos) return;
+
+    if (datos.logo_url) {
+      logoContenedor.innerHTML =
+        '<img src="' + datos.logo_url + '" alt="' + datos.nombre +
+        '" style="height:3rem; max-width:160px; object-fit:contain;">';
+    } else {
+      logoContenedor.innerHTML = '<span style="font-size:2rem;">🅿️</span>';
+    }
+  });
+}());
+</script>
+{% endif %}
 {% endblock %}

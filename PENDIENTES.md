@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-06
+Última actualización: 2026-09-06 (sesión 3)
 
 ---
 
@@ -29,16 +29,6 @@ _Sin ítems pendientes._
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-- **Inspector — pausa configurable entre copias de infracción**
-  Hoy: la pausa entre copia 1 y copia 2 es de 800ms hardcodeados en `ticket_infraccion.html`.
-  Pedido: que el inspector pueda confirmar antes de la segunda impresión, O que espere X segundos (configurable desde superadmin).
-  Implementación requiere: campo nuevo en `Municipio` (ej. `segundos_pausa_doble_copia`, default 0 = pedir confirmación), migración, config en `editar_municipio.html`, y cambio en el JS de `ticket_infraccion.html`.
-
-- **Registro — mostrar logo del municipio en formulario de registro**
-  Hoy: el logo en `registro.html` es 🅿️ hardcodeado.
-  Con un solo municipio: mostrar su logo/nombre directamente.
-  Con múltiples municipios: cambiar el logo dinámicamente con JS cuando el usuario selecciona en el `<select>`.
-  Archivos: `templates/usuarios/registro.html` + `views_auth.py` (pasar `municipios` con logos al contexto, ya está).
 
 - **Migración a Digital Ocean** — disparador: cuando el sistema pase a municipio real pagando. Ver `CHECKLIST_PRODUCCION_2026-09-01.md`.
 - **OCR de patentes** — Google ML Kit o Tesseract.js. Botón "📷 Escanear" en `verificar.html`.
@@ -50,6 +40,13 @@ _Sin ítems pendientes._
 ---
 
 ## ✅ Resuelto
+
+### Sesión 2026-09-06 (tarde 3) — Logo registro + pausa configurable entre copias
+
+| Ítem | Detalle |
+|---|---|
+| Logo municipio en registro | `registro.html`: logo/nombre del municipio debajo del ícono. 1 municipio → logo fijo. Varios → JS actualiza el logo al seleccionar en el `<select>`. |
+| Pausa configurable entre copias | `Municipio.segundos_pausa_doble_copia` (migración 0071). 0 = el inspector confirma antes de la copia 2. >0 = pausa automática en segundos. Config en `editar_municipio.html` (sección general). JS en `ticket_infraccion.html` reemplaza el 800ms hardcodeado. |
 
 ### Sesión 2026-09-06 (tarde 2) — Banner impresora BLE no vinculada
 

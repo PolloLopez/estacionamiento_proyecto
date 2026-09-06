@@ -50,6 +50,17 @@
           </div>
 
           <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Pausa entre copias del acta (segundos)</label>
+            <input type="number" name="segundos_pausa_doble_copia" min="0" max="30" step="1"
+                   value="{{ municipio.segundos_pausa_doble_copia }}"
+                   style="width:100%; margin-top:0.25rem;">
+            <small style="color:var(--color-text-muted);">
+              <strong>0</strong> = el inspector confirma antes de imprimir la segunda copia.
+              <strong>Mayor que 0</strong> = pausa automática en segundos entre copia 1 y copia 2.
+            </small>
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Monto mínimo de carga MP ($)</label>
             <input type="number" name="monto_minimo_carga" min="1" step="1"
                    value="{{ municipio.monto_minimo_carga }}"

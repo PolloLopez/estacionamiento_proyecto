@@ -310,6 +310,16 @@ class Municipio(models.Model):
         help_text="Texto que aparece en la barra de navegación si no hay logo.",
     )
 
+    # ── Impresión de infracciones ─────────────────────────────────────────────
+    # Controla qué sucede entre la copia 1 y la copia 2 del acta.
+    # 0 = mostrar diálogo de confirmación antes de imprimir la segunda copia.
+    # >0 = pausa automática en segundos (el inspector no necesita confirmar).
+    segundos_pausa_doble_copia = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Pausa entre copias (segundos, 0=confirmar)",
+        help_text="0 = el inspector confirma antes de la segunda copia. Mayor que 0 = pausa automática en segundos.",
+    )
+
     # ── Funciones de operación ────────────────────────────────────────────────
     estadisticas_inspectores_activo = models.BooleanField(
         default=True,
