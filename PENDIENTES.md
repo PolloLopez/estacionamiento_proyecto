@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-04
+Última actualización: 2026-09-06
 
 ---
 
@@ -20,22 +20,79 @@ _Sin ítems pendientes._
 
 ## 🟡 Media prioridad
 
-- **Limpieza de datos de prueba en Railway** antes del go-live con un municipio real. Ver `CHECKLIST_PRODUCCION_2026-09-01.md`.
-- **UptimeRobot**: configurar monitoreo de uptime si no está activo todavía.
+- **Inspector — impresora BLE: no volver a pedir vinculación al imprimir**
+  `imprimirActa()` hace `reconectarImpresora()` silencioso primero. Si falla (bug conocido de Chrome con `getDevices()`), abre el diálogo de selección igual.
+  Workaround actual ya implementado: reconectar por nombre (`requestDevice` pre-filtrado). Evaluar si Chrome corrigió el bug o documentar como límite del navegador.
+  Archivos: `static/.../js/impresora_bluetooth.js` (función `reconectarImpresora`).
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-- **Responsive > 1050px** — en pantallas grandes el panel admin queda con mucho espacio vacío.
+- **Inspector — pausa configurable entre copias de infracción**
+  Hoy: la pausa entre copia 1 y copia 2 es de 800ms hardcodeados en `ticket_infraccion.html`.
+  Pedido: que el inspector pueda confirmar antes de la segunda impresión, O que espere X segundos (configurable desde superadmin).
+  Implementación requiere: campo nuevo en `Municipio` (ej. `segundos_pausa_doble_copia`, default 0 = pedir confirmación), migración, config en `editar_municipio.html`, y cambio en el JS de `ticket_infraccion.html`.
+
+- **Registro — mostrar logo del municipio en formulario de registro**
+  Hoy: el logo en `registro.html` es 🅿️ hardcodeado.
+  Con un solo municipio: mostrar su logo/nombre directamente.
+  Con múltiples municipios: cambiar el logo dinámicamente con JS cuando el usuario selecciona en el `<select>`.
+  Archivos: `templates/usuarios/registro.html` + `views_auth.py` (pasar `municipios` con logos al contexto, ya está).
+
 - **Migración a Digital Ocean** — disparador: cuando el sistema pase a municipio real pagando. Ver `CHECKLIST_PRODUCCION_2026-09-01.md`.
 - **OCR de patentes** — Google ML Kit o Tesseract.js. Botón "📷 Escanear" en `verificar.html`.
 - **Alertas de vencimiento al conductor** — push / WhatsApp.
 - **Tutorial GIFs en landing pública** — el tutorial por rol ya existe dentro del sistema (collapsible `<details>` en cada panel). Pendiente: versión con GIF o screenshots para la landing pública.
-
+- **Auditoría de reseteos de contraseña** — registrar quién reseteó la contraseña de quién (hoy solo queda rastro de `cambio_password_requerido=True`). Usar `LogEntry` de Django Admin o modelo propio.
+- **Jerarquía de botones en formularios** — estandarizar: botón principal con `--color-primary`, botón secundario con `.btn-outline`. Hoy hay inconsistencia entre templates.
+- **Refactor estilos inline** — muchos templates tienen `style=""` repetido. Crear clases `.card-form`, `.section-admin` en `global.css` para centralizar y facilitar el Dark Mode.
 ---
 
 ## ✅ Resuelto
+
+### Sesión 2026-09-06 (tarde 2) — Banner impresora BLE no vinculada
+
+| Ítem | Detalle |
+|---|---|
+| Banner visible cuando no hay impresora | `panel_inspectores.html`: banner amarillo con botón "Vincular impresora" en lugar del `<span>` pequeño oculto. Se oculta automáticamente al detectar impresora via `getDevices()` o localStorage. El `<details>` de config queda para configuración avanzada. |
+
+### Sesión 2026-09-06 (tarde 1) — 4 ítems 🟡 + UptimeRobot + limpieza Railway
+
+| Ítem | Detalle |
+|---|---|
+| Alerta JS "cambios sin guardar" en editar_municipio | Script en `editar_municipio.html`: detecta cambios en cada sección y resalta el botón Guardar correspondiente con un outline naranja |
+| Tablas desktop ≥ 1050px | `global.css`: `.card` pasa de `overflow-x: visible` a `overflow-x: auto; overflow-y: visible` + regla `table { width:100% }` para aprovechar el espacio |
+| UptimeRobot | Endpoint `/health/` verificado: devuelve `{"status":"ok"}` con DB check. Pasos de config en esta sesión (ver más abajo) |
+| Limpieza datos prueba Railway | Ya implementada en la UI: superadmin → editar_municipio → Zona de peligro → escribir `CONFIRMAR+NOMBRE` → botón. No requiere comandos de consola |
+
+**UptimeRobot — pasos para configurar (hacerlo en uptimerobot.com):**
+1. Crear cuenta gratuita en uptimerobot.com
+2. "Add New Monitor" → tipo: HTTP(s)
+3. URL: `https://estacionamiento.up.railway.app/health/`
+4. Intervalo: 5 minutos
+5. Alertas: configurar email o Telegram para notificación de caída
+
+### Sesión 2026-09-06 (mañana) — Mejoras UX/UI (análisis AI Studio)
+
+| Ítem | Archivos |
+|---|---|
+| Validación de email en backend al crear tesorero | `views_admin.py`: helper `_correo_invalido()` + `validate_email` |
+| Toggle 👁 para inputs de contraseña | `templates/admin/gestionar_staff.html`, `editar_staff.html`; script en `base.html` |
+| Toasts `position:fixed` para mensajes Django | `global.css` (clases `.toast*`), `base.html` (script + contenedor) |
+
+**Contexto:** las mejoras surgieron del análisis generado con Google AI Studio (`ANALISIS_AI_STUDIO_2026-09-06.md`). Se descartaron por ahora: refactor a Django ModelForms para `editar_municipio`, table stacking CSS, y LogEntry para auditoría de contraseñas.
+
+### Sesión 2026-09-06 — Backlog (4 ítems + SugerenciaMejora + eliminación de cuenta)
+
+| Ítem | Archivos / migración |
+|---|---|
+| Reseteo de contraseña para admins | `views_admin.py`: `editar_staff` + `gestionar_staff` |
+| Sectorizar `editar_municipio` | `views_superadmin.py` (4 ramas POST), `templates/superadmin/editar_municipio.html` (4 forms) |
+| Admin puede gestionar tesoreros | `views_admin.py`: `gestionar_staff`, `editar_staff`; templates nuevos |
+| Responsive ≥ 1050px | `static/.../global.css`: `@media (min-width: 1050px)` |
+| `SugerenciaMejora` — cualquier usuario puede sugerir mejoras | modelo, migración 0070, views_conductor + views_superadmin, 5 templates nuevos |
+| `SolicitudEliminacionCuenta` — conductor puede darse de baja (soft-delete) | modelo, migración 0070, views_conductor, 1 template nuevo |
 
 ### Sesión 2026-09-04 — Bugs pre-demo
 

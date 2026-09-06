@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Enviar sugerencia{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:640px; margin:2rem auto;">
+
+  <h2>💡 Sugerir una mejora</h2>
+  <p style="color:var(--color-text-muted);">
+    Tus sugerencias llegan directamente al equipo de desarrollo.
+    Te notificamos cuando cambie el estado.
+  </p>
+
+  <form method="post" style="margin-top:1.4rem;">
+    {% csrf_token %}
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-weight:600; display:block; margin-bottom:.3rem;">Título *</label>
+      <input type="text" name="titulo" required maxlength="200"
+        placeholder="Resumí tu sugerencia en una línea"
+        style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;
+               font-size:.95rem; box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-weight:600; display:block; margin-bottom:.3rem;">Descripción *</label>
+      <textarea name="descripcion" required rows="5"
+        placeholder="Describí el problema o mejora con el mayor detalle posible..."
+        style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;
+               font-size:.95rem; resize:vertical; box-sizing:border-box;"></textarea>
+    </div>
+
+    <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+      <div style="flex:1; min-width:180px;">
+        <label style="font-weight:600; display:block; margin-bottom:.3rem;">Área</label>
+        <select name="area" style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;">
+          {% for valor, etiqueta in areas %}
+            <option value="{{ valor }}"{% if valor == rol_actual or valor == "general" %} selected{% endif %}>
+              {{ etiqueta }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="flex:1; min-width:180px;">
+        <label style="font-weight:600; display:block; margin-bottom:.3rem;">Criticidad</label>
+        <select name="criticidad" style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;">
+          {% for valor, etiqueta in criticidades %}
+            <option value="{{ valor }}"{% if valor == "funcional" %} selected{% endif %}>{{ etiqueta }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:1rem; margin-top:1.4rem;">
+      <button type="submit"
+        style="background:var(--color-primary,#2980b9); color:#fff; border:none;
+               padding:.7rem 1.4rem; border-radius:6px; cursor:pointer; font-size:1rem;">
+        Enviar sugerencia
+      </button>
+      <a href="{% url 'mis_sugerencias' %}"
+         style="background:var(--color-bg-alt,#eee); color:var(--color-text,#333);
+                padding:.7rem 1.4rem; border-radius:6px; text-decoration:none; font-size:1rem;">
+        Ver mis sugerencias
+      </a>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

@@ -38,7 +38,9 @@ from .models import (
     ModuloMunicipio,
     MovimientoCaja,
     Notificacion,
+    SolicitudEliminacionCuenta,
     SolicitudVerificacion,
+    SugerenciaMejora,
     Subcuadra,
     Tarifa,
     Usuario,
@@ -1121,3 +1123,155 @@ def responder_transferencia(request, transf_id):
         messages.error(request, resultado["error"])
 
     return redirect("transferencias_saldo")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Eliminación de cuenta (conductor)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("conductor")
+def solicitar_eliminacion_cuenta(request):
+    """
+    El conductor puede eliminar su cuenta bajo dos condiciones:
+      1. Saldo = 0 (si tiene saldo positivo debe transferirlo primero).
+      2. Sin infracciones pendientes (pagadas o sin condena).
+
+    El admin solo puede bloquear/suspender — no puede eliminar en nombre del conductor.
+    La eliminación es soft-delete: is_active=False + registro en SolicitudEliminacionCuenta.
+    """
+    usuario = request.user
+
+    # Verificar saldo
+    if usuario.saldo > 0:
+        messages.error(
+            request,
+            f"Tenés un saldo de ${usuario.saldo:.2f}. "
+            "Transferilo a otro conductor antes de eliminar tu cuenta."
+        )
+        return redirect("inicio_usuarios")
+
+    # Verificar infracciones pendientes
+    infracciones_pendientes = Infraccion.objects.filter(
+        vehiculo__in=Vehiculo.objects.filter(
+            vehiculousuario__usuario=usuario
+        ),
+        estado__in=("pendiente", "notificada"),
+    ).count()
+
+    if infracciones_pendientes > 0:
+        messages.error(
+            request,
+            f"Tenés {infracciones_pendientes} infracción(es) pendiente(s) de pago. "
+            "Pagalas antes de eliminar tu cuenta."
+        )
+        return redirect("inicio_usuarios")
+
+    if request.method == "POST":
+        motivo = request.POST.get("motivo", "").strip()
+        with transaction.atomic():
+            # Registrar la solicitud para trazabilidad
+            SolicitudEliminacionCuenta.objects.update_or_create(
+                usuario=usuario,
+                defaults={
+                    "estado":     "completada",
+                    "motivo":     motivo,
+                    "resuelto_en": timezone.now(),
+                },
+            )
+            # Soft-delete: desactivar la cuenta
+            usuario.is_active = False
+            usuario.save(update_fields=["is_active"])
+
+        # Cerrar la sesión manualmente
+        from django.contrib.auth import logout
+        logout(request)
+        messages.success(request, "Tu cuenta fue eliminada. ¡Hasta pronto!")
+        return redirect("login")
+
+    return render(request, "usuarios/eliminar_cuenta.html", {
+        "usuario": usuario,
+    })
+
+
+@require_role("conductor")
+def cancelar_eliminacion_cuenta(request):
+    """Cancela una solicitud de eliminación pendiente (por si el flujo queda a medias)."""
+    if request.method == "POST":
+        SolicitudEliminacionCuenta.objects.filter(
+            usuario=request.user, estado="pendiente"
+        ).update(estado="cancelada", resuelto_en=timezone.now())
+    return redirect("inicio_usuarios")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sugerencias de mejora del sistema
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_login
+def enviar_sugerencia(request):
+    """
+    Cualquier usuario autenticado puede enviar una sugerencia.
+    Solo el superadmin las ve en su panel.
+    Cuando el superadmin cambia el estado, el usuario recibe una notificación in-app.
+    """
+    usuario = request.user
+
+    # Detectar el rol actual del usuario para pre-seleccionar area y rol_usuario
+    if usuario.is_superuser:
+        rol_actual = "superadmin"
+    elif usuario.es_admin:
+        rol_actual = "admin"
+    elif usuario.es_tesorero:
+        rol_actual = "tesorero"
+    elif usuario.es_inspector:
+        rol_actual = "inspector"
+    elif usuario.es_vendedor:
+        rol_actual = "vendedor"
+    else:
+        rol_actual = "conductor"
+
+    if request.method == "POST":
+        titulo      = request.POST.get("titulo", "").strip()
+        descripcion = request.POST.get("descripcion", "").strip()
+        area        = request.POST.get("area", "general")
+        criticidad  = request.POST.get("criticidad", "funcional")
+
+        if not titulo or not descripcion:
+            messages.error(request, "El título y la descripción son obligatorios.")
+        else:
+            SugerenciaMejora.objects.create(
+                usuario     = usuario,
+                municipio   = getattr(usuario, "municipio", None),
+                rol_usuario = rol_actual,
+                area        = area,
+                criticidad  = criticidad,
+                titulo      = titulo,
+                descripcion = descripcion,
+                estado      = "recibida",
+                notificado  = True,   # empieza notificado (no hay cambio que avisar aún)
+            )
+            messages.success(request, "Sugerencia enviada. ¡Gracias por contribuir!")
+            return redirect("mis_sugerencias")
+
+    return render(request, "usuarios/enviar_sugerencia.html", {
+        "rol_actual":  rol_actual,
+        "areas":       SugerenciaMejora.AREAS,
+        "criticidades": SugerenciaMejora.CRITICIDAD,
+    })
+
+
+@require_login
+def mis_sugerencias(request):
+    """El usuario ve sus propias sugerencias y el estado de cada una."""
+    sugerencias = SugerenciaMejora.objects.filter(
+        usuario=request.user
+    ).order_by("-creado_en")
+
+    # Marcar como notificadas las que tenía pendientes de ver
+    no_vistas = sugerencias.filter(notificado=False)
+    if no_vistas.exists():
+        no_vistas.update(notificado=True)
+
+    return render(request, "usuarios/mis_sugerencias.html", {
+        "sugerencias": sugerencias,
+    })

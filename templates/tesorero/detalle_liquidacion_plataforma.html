@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Liquidación #{{ liq.id }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:680px;">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.2rem;">
+    <h2 style="margin:0;">💳 Liquidación #{{ liq.id }}</h2>
+    <a href="{% url 'mis_liquidaciones_plataforma' %}" class="btn btn-outline" style="font-size:0.85rem;">← Volver</a>
+  </div>
+
+  {# ── Resumen ── #}
+  <div class="card" style="margin-bottom:1rem;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; font-size:0.9rem;">
+      <div><span style="color:var(--color-text-muted);">Período:</span><br>
+        <strong>{{ liq.periodo_inicio|date:"d/m/Y" }} → {{ liq.periodo_fin|date:"d/m/Y" }}</strong></div>
+      <div><span style="color:var(--color-text-muted);">Total a pagar:</span><br>
+        <strong style="font-size:1.3rem; color:var(--color-primary);">${{ liq.monto_total|floatformat:2 }}</strong></div>
+      <div><span style="color:var(--color-text-muted);">Monto fijo:</span><br>
+        <strong>${{ liq.monto_fijo|floatformat:2 }}</strong></div>
+      <div><span style="color:var(--color-text-muted);">Monto variable:</span><br>
+        <strong>${{ liq.monto_variable|floatformat:2 }}</strong>
+        {% if liq.recaudacion_base %}
+        <span style="font-size:0.78rem; color:var(--color-text-muted);"> (base: ${{ liq.recaudacion_base|floatformat:2 }})</span>
+        {% endif %}
+      </div>
+      <div><span style="color:var(--color-text-muted);">Estado:</span><br>
+        {% if liq.estado == "aprobada" %}<strong style="color:var(--color-primary);">✅ Aprobada</strong>
+        {% elif liq.estado == "comprobante_enviado" %}<strong style="color:#2563eb;">📎 Comprobante enviado</strong>
+        {% elif liq.estado == "pendiente_pago" %}<strong style="color:#d97706;">⏳ Pendiente de pago</strong>
+        {% elif liq.estado == "observada" %}<strong style="color:var(--color-danger);">⚠️ Observada</strong>
+        {% else %}<strong>📋 Borrador</strong>{% endif %}
+      </div>
+      {% if liq.aprobada_en %}
+      <div><span style="color:var(--color-text-muted);">Aprobada el:</span><br>
+        <strong>{{ liq.aprobada_en|date:"d/m/Y H:i" }}</strong></div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ── Factura del superadmin ── #}
+  <div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin-bottom:0.5rem; font-size:0.95rem;">📄 Factura emitida por el superadmin</h3>
+    {% if liq.factura %}
+      <a href="{{ liq.factura.url }}" target="_blank" class="btn btn-outline"
+         style="font-size:0.88rem; padding:0.4rem 1rem;">📄 Ver factura</a>
+    {% else %}
+      <p style="color:var(--color-text-muted); font-size:0.85rem; margin:0;">
+        El superadmin no adjuntó una factura todavía.
+      </p>
+    {% endif %}
+  </div>
+
+  {# ── Notas ── #}
+  {% if liq.notas_superadmin or liq.notas_tesorero %}
+  <div class="card" style="margin-bottom:1rem; font-size:0.88rem;">
+    {% if liq.notas_superadmin %}
+    <p><strong>Notas del superadmin:</strong> {{ liq.notas_superadmin }}</p>
+    {% endif %}
+    {% if liq.notas_tesorero %}
+    <p style="margin:0;"><strong>Tus notas:</strong> {{ liq.notas_tesorero }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Comprobante actual ── #}
+  {% if liq.comprobante_pago %}
+  <div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin-bottom:0.5rem; font-size:0.95rem;">📎 Comprobante enviado</h3>
+    <a href="{{ liq.comprobante_pago.url }}" target="_blank" class="btn btn-outline"
+       style="font-size:0.88rem; padding:0.4rem 1rem;">📎 Ver comprobante</a>
+  </div>
+  {% endif %}
+
+  {# ── Acción tesorero: subir/reemplazar comprobante ── #}
+  {% if liq.estado != "aprobada" %}
+  <div class="card">
+    <h3 style="margin-bottom:0.75rem; font-size:0.95rem;">
+      {% if liq.comprobante_pago %}📎 Reemplazar comprobante{% else %}📎 Adjuntar comprobante de pago{% endif %}
+    </h3>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      Adjuntá la constancia de la transferencia bancaria. Al enviarla, el superadmin la revisará y aprobará el pago.
+    </p>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="subir_comprobante">
+      <div style="margin-bottom:0.75rem;">
+        <input type="file" name="comprobante_pago" accept=".pdf,.jpg,.jpeg,.png,.webp" required />
+      </div>
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.85rem; font-weight:600;">Notas (opcional)</label>
+        <textarea name="notas_tesorero" rows="2"
+                  placeholder="Número de transferencia, banco, aclaraciones...">{{ liq.notas_tesorero }}</textarea>
+      </div>
+      <button type="submit" class="btn" style="width:100%; font-size:1rem; padding:0.8rem;">
+        📤 Enviar comprobante al superadmin
+      </button>
+    </form>
+  </div>
+  {% else %}
+  <div class="alert alert-success" style="text-align:center;">
+    ✅ Pago aprobado por el superadmin. No se requiere ninguna acción adicional.
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

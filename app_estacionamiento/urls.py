@@ -10,6 +10,11 @@ from . import views_publico
 urlpatterns = [
 
     # =========================
+    # 🩺 HEALTH CHECK (UptimeRobot)
+    # =========================
+    path("health/", views.health_check, name="health_check"),
+
+    # =========================
     # 📱 PWA
     # =========================
     path("manifest.json", views_pwa.manifest_json,  name="manifest_json"),
@@ -154,6 +159,12 @@ urlpatterns = [
     path("admin-tarifas/guardar/", views.gestionar_tarifas, name="admin_guardar_tarifa"),
 
     # =========================
+    # 👥 STAFF MUNICIPIO (admins + tesoreros)
+    # =========================
+    path("admin-staff-municipio/", views.gestionar_staff, name="gestionar_staff"),
+    path("admin-staff-municipio/<int:usuario_id>/editar/", views.editar_staff, name="editar_staff"),
+
+    # =========================
     # 💼 RENDICIONES (ADMIN)
     # =========================
     path("admin-rendiciones/", views.admin_rendiciones, name="admin_rendiciones"),
@@ -190,6 +201,21 @@ urlpatterns = [
     path("tesorero/", views.panel_tesorero, name="panel_tesorero"),
     path("tesorero/rendicion/<int:rendicion_id>/validar/", views.validar_rendicion, name="validar_rendicion"),
     path("tesorero/depositar/<int:liquidacion_id>/", views.depositar_comision, name="depositar_comision"),
+    path("tesorero/liquidaciones-plataforma/", views.mis_liquidaciones_plataforma, name="mis_liquidaciones_plataforma"),
+    path("tesorero/liquidaciones-plataforma/nueva/", views.crear_liquidacion_tesorero, name="crear_liquidacion_tesorero"),
+    path("tesorero/liquidaciones-plataforma/<int:liquidacion_id>/", views.gestionar_liquidacion_plataforma, name="gestionar_liquidacion_plataforma"),
+
+    # =========================
+    # 🗑️ ELIMINACIÓN DE CUENTA
+    # =========================
+    path("cuenta/eliminar/", views.solicitar_eliminacion_cuenta, name="solicitar_eliminacion_cuenta"),
+    path("cuenta/eliminar/cancelar/", views.cancelar_eliminacion_cuenta, name="cancelar_eliminacion_cuenta"),
+
+    # =========================
+    # 💡 SUGERENCIAS
+    # =========================
+    path("sugerencias/nueva/", views.enviar_sugerencia, name="enviar_sugerencia"),
+    path("sugerencias/mis/", views.mis_sugerencias, name="mis_sugerencias"),
 
     # =========================
     # 🌐 SUPERADMIN
@@ -203,6 +229,11 @@ urlpatterns = [
     path("superadmin/municipio/<int:municipio_id>/modulo/",     views_superadmin.gestionar_modulo,      name="gestionar_modulo"),
     path("superadmin/municipio/<int:municipio_id>/importar/",   views_superadmin.importar_estacionamientos, name="importar_estacionamientos"),
     path("superadmin/municipio/<int:municipio_id>/plantillas/", views_superadmin.gestionar_plantillas,      name="gestionar_plantillas"),
+    path("superadmin/liquidaciones/",                               views_superadmin.liquidaciones_plataforma,        name="liquidaciones_plataforma"),
+    path("superadmin/municipio/<int:municipio_id>/liquidacion/nueva/", views_superadmin.crear_liquidacion_plataforma, name="crear_liquidacion_plataforma"),
+    path("superadmin/liquidacion/<int:liquidacion_id>/",            views_superadmin.detalle_liquidacion_plataforma,  name="detalle_liquidacion_plataforma"),
+    path("superadmin/sugerencias/",                                 views_superadmin.panel_sugerencias,               name="panel_sugerencias"),
+    path("superadmin/sugerencias/<int:sugerencia_id>/",             views_superadmin.gestionar_sugerencia,            name="gestionar_sugerencia"),
 
     # =========================
     # 📺 DASHBOARD TV (público)

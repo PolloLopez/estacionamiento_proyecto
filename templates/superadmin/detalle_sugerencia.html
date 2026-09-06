@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Sugerencia #{{ sugerencia.id }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:680px; margin:2rem auto;">
+
+  <a href="{% url 'panel_sugerencias' %}"
+     style="font-size:.9rem; color:var(--color-primary,#2980b9);">← Volver</a>
+
+  <h2 style="margin-top:.8rem;">💡 {{ sugerencia.titulo }}</h2>
+
+  <div style="display:flex; gap:.8rem; flex-wrap:wrap; font-size:.88rem;
+              color:var(--color-text-muted); margin-bottom:1.2rem;">
+    <span>{{ sugerencia.get_criticidad_display }}</span>
+    <span>·</span>
+    <span>{{ sugerencia.get_area_display }}</span>
+    <span>·</span>
+    <span>Rol: {{ sugerencia.get_rol_usuario_display }}</span>
+    <span>·</span>
+    <span>{{ sugerencia.creado_en|date:"d/m/Y H:i" }}</span>
+    {% if sugerencia.municipio %}
+      <span>·</span>
+      <span>{{ sugerencia.municipio.nombre }}</span>
+    {% endif %}
+  </div>
+
+  {% if sugerencia.usuario %}
+    <p style="font-size:.88rem; color:#666; margin-bottom:.8rem;">
+      Usuario: <strong>{{ sugerencia.usuario.correo }}</strong>
+    </p>
+  {% endif %}
+
+  <div style="background:var(--color-bg-alt,#f5f5f5); border-radius:8px;
+              padding:1rem 1.2rem; margin-bottom:1.4rem; white-space:pre-wrap;">
+    {{ sugerencia.descripcion }}
+  </div>
+
+  {% if sugerencia.respuesta %}
+    <div style="background:#e8f5e9; border-left:3px solid #2e7d32; border-radius:0 6px 6px 0;
+                padding:.8rem 1rem; margin-bottom:1.4rem; font-size:.9rem;">
+      <strong>Respuesta guardada:</strong><br>{{ sugerencia.respuesta }}
+    </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-weight:600; display:block; margin-bottom:.3rem;">Estado</label>
+      <select name="estado"
+        style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;">
+        {% for valor, etiqueta in estados %}
+          <option value="{{ valor }}"{% if sugerencia.estado == valor %} selected{% endif %}>{{ etiqueta }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-weight:600; display:block; margin-bottom:.3rem;">
+        Respuesta para el usuario (opcional)
+      </label>
+      <textarea name="respuesta" rows="4"
+        placeholder="Si cambiás el estado, podés explicarle qué va a pasar o qué se decidió..."
+        style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;
+               font-size:.95rem; resize:vertical; box-sizing:border-box;">{{ sugerencia.respuesta }}</textarea>
+    </div>
+
+    <button type="submit"
+      style="background:var(--color-primary,#2980b9); color:#fff; border:none;
+             padding:.7rem 1.4rem; border-radius:6px; cursor:pointer; font-size:1rem;">
+      Guardar cambios
+    </button>
+  </form>
+
+</div>
+{% endblock %}

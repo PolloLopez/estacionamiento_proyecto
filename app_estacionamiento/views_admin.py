@@ -29,6 +29,7 @@ from django.utils import timezone
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 
 from .decorators import require_role
 from .services.caja import generar_cierre_caja
@@ -57,8 +58,17 @@ from .models import (
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helper privado
+# Helpers privados
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _correo_invalido(correo):
+    """Devuelve True si el correo no pasa la validación de Django."""
+    try:
+        validate_email(correo)
+        return False
+    except DjangoValidationError:
+        return True
+
 
 def _enviar_email_verificacion(correo, nombre, aprobado, motivo=""):
     """
@@ -3436,3 +3446,117 @@ def resolver_impugnacion(request, impug_id):
         messages.info(request, f"Impugnación #{impug_id} rechazada.")
 
     return redirect("admin_impugnaciones")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gestión de admins y tesoreros del municipio (desde panel admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def gestionar_staff(request):
+    """
+    Lista los admins y tesoreros del municipio.
+    El admin puede crear nuevos tesoreros y resetear contraseñas de ambos roles.
+    """
+    municipio = request.user.municipio
+    admins    = Usuario.objects.filter(municipio=municipio, es_admin=True).order_by("-is_active", "correo")
+    tesoreros = Usuario.objects.filter(municipio=municipio, es_tesorero=True).order_by("-is_active", "correo")
+
+    if request.method == "POST":
+        accion = request.POST.get("accion", "")
+
+        if accion == "crear_tesorero":
+            correo     = request.POST.get("correo", "").strip().lower()
+            nombre     = request.POST.get("first_name", "").strip()
+            apellido   = request.POST.get("last_name", "").strip()
+            password   = request.POST.get("password", "").strip()
+
+            if not correo or not nombre or not password:
+                messages.error(request, "Completá todos los campos obligatorios.")
+            elif _correo_invalido(correo):
+                messages.error(request, "El correo ingresado no es válido.")
+            elif len(password) < 6:
+                messages.error(request, "La contraseña debe tener al menos 6 caracteres.")
+            elif Usuario.objects.filter(correo=correo).exists():
+                messages.error(request, f"Ya existe un usuario con el correo {correo}.")
+            else:
+                from django.contrib.auth.hashers import make_password
+                Usuario.objects.create(
+                    correo=correo,
+                    username=correo,
+                    first_name=nombre,
+                    last_name=apellido,
+                    password=make_password(password),
+                    municipio=municipio,
+                    es_tesorero=True,
+                    es_conductor=False,
+                    is_active=True,
+                    cambio_password_requerido=True,
+                )
+                messages.success(request, f"Tesorero {correo} creado. Debe cambiar su contraseña al primer login.")
+            return redirect("gestionar_staff")
+
+    return render(request, "admin/gestionar_staff.html", {
+        "admins":    admins,
+        "tesoreros": tesoreros,
+        "municipio": municipio,
+    })
+
+
+@require_role("admin")
+def editar_staff(request, usuario_id):
+    """
+    El admin puede:
+      - Ver y editar datos de un admin o tesorero de su municipio
+      - Resetear la contraseña (temporal, fuerza cambio en próximo login)
+      - Activar / desactivar la cuenta
+    No puede editar su propio usuario desde acá (evita bloqueo accidental).
+    """
+    municipio = request.user.municipio
+    staff = get_object_or_404(
+        Usuario,
+        id=usuario_id,
+        municipio=municipio,
+    )
+    if not (staff.es_admin or staff.es_tesorero):
+        messages.error(request, "Solo podés editar admins o tesoreros.")
+        return redirect("gestionar_staff")
+    if staff.pk == request.user.pk:
+        messages.error(request, "No podés editarte a vos mismo desde acá.")
+        return redirect("gestionar_staff")
+
+    if request.method == "POST":
+        accion = request.POST.get("accion", "editar")
+
+        if accion == "editar":
+            staff.first_name = request.POST.get("first_name", "").strip()
+            staff.last_name  = request.POST.get("last_name", "").strip()
+            staff.telefono   = request.POST.get("telefono", "").strip()
+            staff.is_active  = request.POST.get("is_active") == "on"
+            staff.save(update_fields=["first_name", "last_name", "telefono", "is_active"])
+            messages.success(request, "Datos actualizados.")
+
+        elif accion == "cambiar_password":
+            nueva    = request.POST.get("nueva_password", "").strip()
+            confirma = request.POST.get("confirmar_password", "").strip()
+            if not nueva:
+                messages.error(request, "La contraseña no puede estar vacía.")
+            elif nueva != confirma:
+                messages.error(request, "Las contraseñas no coinciden.")
+            elif len(nueva) < 6:
+                messages.error(request, "Mínimo 6 caracteres.")
+            else:
+                staff.set_password(nueva)
+                staff.cambio_password_requerido = True
+                staff.save()
+                messages.success(
+                    request,
+                    f"Contraseña temporal establecida para {staff.correo}. "
+                    "Deberá cambiarla en el próximo login."
+                )
+
+        return redirect("editar_staff", usuario_id=staff.pk)
+
+    return render(request, "admin/editar_staff.html", {
+        "staff": staff,
+    })

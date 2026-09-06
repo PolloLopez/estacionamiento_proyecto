@@ -20,11 +20,12 @@
     {# ── COLUMNA IZQUIERDA: Configuración + Admins ── #}
     <div>
 
-      {# Configuración del municipio #}
+      {# ── SECCIÓN 1: Configuración general ──────────────────────────────── #}
       <div class="card" style="margin-bottom:1.5rem;">
-        <h2 style="font-size:1.05rem; margin-bottom:1rem;">⚙️ Configuración</h2>
-        <form method="post" enctype="multipart/form-data">
+        <h2 style="font-size:1.05rem; margin-bottom:1rem;">⚙️ Configuración general</h2>
+        <form method="post">
           {% csrf_token %}
+          <input type="hidden" name="accion" value="guardar_general">
 
           <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Nombre del municipio</label>
@@ -122,69 +123,125 @@
                  style="color:var(--color-primary);">/tv/{{ municipio.token_tv }}/</a>
             </div>
             {% endif %}
-            <form method="post" style="display:inline;">
-              {% csrf_token %}
-              <input type="hidden" name="accion" value="generar_token_tv">
-              <button type="submit" class="btn btn-outline" style="font-size:0.85rem;"
-                      onclick="return confirm('¿Generar un nuevo token TV? El token anterior dejará de funcionar.')">
-                🔑 {% if municipio.token_tv %}Regenerar token{% else %}Generar token{% endif %}
-              </button>
-            </form>
+            {# Nota: NO usar <form> anidado dentro del form principal — rompería el submit del form externo.
+               Usamos JS para crear y enviar el form dinámicamente. #}
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;"
+                    onclick="generarTokenTV()">
+              🔑 {% if municipio.token_tv %}Regenerar token{% else %}Generar token{% endif %}
+            </button>
           </div>
 
-          {# ── Información institucional ── #}
-          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
-            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
-              Información institucional
-            </p>
+          <div style="margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
+            <input type="checkbox" name="activo" id="id_activo"
+                   {% if municipio.activo %}checked{% endif %}>
+            <label for="id_activo" style="font-size:0.9rem; margin:0;">Municipio activo</label>
+          </div>
+          <button type="submit" class="btn" style="width:100%;">💾 Guardar configuración general</button>
+        </form>
+      </div>
 
-            <div style="margin-bottom:0.75rem;">
-              <label style="font-size:0.85rem; font-weight:600;">Leyenda de horarios</label>
-              <textarea name="leyenda_horarios" rows="3"
-                        placeholder="Ej: Lunes a viernes de 8 a 20 hs · Sábados de 8 a 13 hs."
-                        style="width:100%; margin-top:0.25rem; padding:0.4rem 0.6rem; border-radius:6px;
-                               border:1px solid var(--color-border); background:var(--color-surface);
-                               color:var(--color-text); font-size:0.88rem; resize:vertical;">{{ municipio.leyenda_horarios }}</textarea>
-              <small style="color:var(--color-text-muted);">Se muestra en el ticket y en la app del conductor.</small>
+      {# ── SECCIÓN 2: Facturación ──────────────────────────────────────── #}
+      <div class="card" style="margin-bottom:1.5rem;">
+        <h2 style="font-size:1.05rem; margin-bottom:1rem;">💳 Facturación de la plataforma</h2>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="guardar_facturacion">
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; margin-bottom:0.75rem;">
+            <div>
+              <label style="font-size:0.85rem; font-weight:600;">Cuota mensual fija ($)</label>
+              <input type="number" name="cuota_mantenimiento_mensual" step="0.01" min="0"
+                     value="{{ municipio.cuota_mantenimiento_mensual|default_if_none:'' }}"
+                     placeholder="Ej: 15000.00" style="width:100%;" />
             </div>
-
-            <div style="margin-bottom:0.75rem;">
-              <label style="font-size:0.85rem; font-weight:600;">Marco legal / Ordenanza</label>
-              <textarea name="texto_ordenanza" rows="4"
-                        placeholder="Ej: Ordenanza N° 1234/2023 — Estacionamiento Medido Municipal."
-                        style="width:100%; margin-top:0.25rem; padding:0.4rem 0.6rem; border-radius:6px;
-                               border:1px solid var(--color-border); background:var(--color-surface);
-                               color:var(--color-text); font-size:0.88rem; resize:vertical;">{{ municipio.texto_ordenanza }}</textarea>
-              <small style="color:var(--color-text-muted);">Texto de la ordenanza municipal que rige el sistema.</small>
+            <div>
+              <label style="font-size:0.85rem; font-weight:600;">Porcentaje sobre recaudación (%)</label>
+              <input type="number" name="porcentaje_plataforma" step="0.01" min="0" max="100"
+                     value="{{ municipio.porcentaje_plataforma|default_if_none:'' }}"
+                     placeholder="Ej: 2.50" style="width:100%;" />
             </div>
           </div>
-
-          {# ── Branding visual ── #}
-          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
-            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
-              Identidad visual
-            </p>
-
-            {# Logo #}
-            <div style="margin-bottom:0.75rem;">
-              <label style="font-size:0.85rem; font-weight:600;">Logo (PNG/SVG, recomendado 160×40px)</label>
-              {% if municipio.logo %}
-                <div style="margin:0.4rem 0; padding:0.5rem; background:var(--color-primary); border-radius:6px; display:inline-block;">
-                  <img src="{{ municipio.logo.url }}" style="height:36px; width:auto; display:block;">
-                </div>
-                <div style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.25rem;">
-                  Logo actual. Subí uno nuevo para reemplazarlo.
-                </div>
-                <label style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.82rem; font-weight:600; color:var(--color-danger); cursor:pointer; margin-bottom:0.5rem;">
-                  <input type="checkbox" name="borrar_logo"> Eliminar logo actual
-                </label>
-              {% endif %}
-              <input type="file" name="logo" accept="image/*"
-                     style="width:100%; margin-top:0.25rem;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem; margin-bottom:0.75rem;">
+            <div>
+              <label style="font-size:0.85rem; font-weight:600;">Día de cierre (1-28)</label>
+              <input type="number" name="dia_cierre_liquidacion" min="1" max="28"
+                     value="{{ municipio.dia_cierre_liquidacion }}" style="width:100%;" />
             </div>
+            <div>
+              <label style="font-size:0.85rem; font-weight:600;">Base del porcentaje</label>
+              <select name="concepto_recaudacion" style="width:100%;">
+                <option value="cierre_caja" {% if municipio.concepto_recaudacion == "cierre_caja" %}selected{% endif %}>Cierres de caja (neto municipio)</option>
+                <option value="rendiciones" {% if municipio.concepto_recaudacion == "rendiciones" %}selected{% endif %}>Solo rendiciones validadas</option>
+                <option value="manual" {% if municipio.concepto_recaudacion == "manual" %}selected{% endif %}>Monto manual</option>
+              </select>
+            </div>
+          </div>
+          <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:.75rem;">
+            💡 <a href="{% url 'crear_liquidacion_plataforma' municipio.id %}" style="color:var(--color-primary);">Nueva liquidación →</a>
+            &nbsp;|&nbsp;
+            <a href="{% url 'liquidaciones_plataforma' %}?municipio_id={{ municipio.id }}" style="color:var(--color-primary);">Ver historial →</a>
+          </p>
+          <button type="submit" class="btn" style="width:100%;">💾 Guardar facturación</button>
+        </form>
+      </div>
+
+      {# ── SECCIÓN 3: Información institucional ────────────────────────── #}
+      <div class="card" style="margin-bottom:1.5rem;">
+        <h2 style="font-size:1.05rem; margin-bottom:1rem;">🏛️ Información institucional</h2>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="guardar_institucional">
 
           <div style="margin-bottom:0.75rem;">
-            <label style="font-size:0.85rem; font-weight:600;">Ícono de la app (acceso directo PWA)</label>
+            <label style="font-size:0.85rem; font-weight:600;">Leyenda de horarios</label>
+            <textarea name="leyenda_horarios" rows="3"
+                      placeholder="Ej: Lunes a viernes de 8 a 20 hs · Sábados de 8 a 13 hs."
+                      style="width:100%; margin-top:0.25rem; padding:0.4rem 0.6rem; border-radius:6px;
+                             border:1px solid var(--color-border); background:var(--color-surface);
+                             color:var(--color-text); font-size:0.88rem; resize:vertical;">{{ municipio.leyenda_horarios }}</textarea>
+            <small style="color:var(--color-text-muted);">Se muestra en el ticket y en la app del conductor.</small>
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Marco legal / Ordenanza</label>
+            <textarea name="texto_ordenanza" rows="4"
+                      placeholder="Ej: Ordenanza N° 1234/2023 — Estacionamiento Medido Municipal."
+                      style="width:100%; margin-top:0.25rem; padding:0.4rem 0.6rem; border-radius:6px;
+                             border:1px solid var(--color-border); background:var(--color-surface);
+                             color:var(--color-text); font-size:0.88rem; resize:vertical;">{{ municipio.texto_ordenanza }}</textarea>
+            <small style="color:var(--color-text-muted);">Texto de la ordenanza municipal que rige el sistema.</small>
+          </div>
+
+          <button type="submit" class="btn" style="width:100%;">💾 Guardar información institucional</button>
+        </form>
+      </div>
+
+      {# ── SECCIÓN 4: Identidad visual ─────────────────────────────────── #}
+      <div class="card" style="margin-bottom:1.5rem;">
+        <h2 style="font-size:1.05rem; margin-bottom:1rem;">🎨 Identidad visual</h2>
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="guardar_branding">
+
+          {# Logo #}
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Logo (PNG/SVG, recomendado 160×40px)</label>
+            {% if municipio.logo %}
+              <div style="margin:0.4rem 0; padding:0.5rem; background:var(--color-primary); border-radius:6px; display:inline-block;">
+                <img src="{{ municipio.logo.url }}" style="height:36px; width:auto; display:block;">
+              </div>
+              <div style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.25rem;">
+                Logo actual. Subí uno nuevo para reemplazarlo.
+              </div>
+              <label style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.82rem; font-weight:600; color:var(--color-danger); cursor:pointer; margin-bottom:0.5rem;">
+                <input type="checkbox" name="borrar_logo"> Eliminar logo actual
+              </label>
+            {% endif %}
+            <input type="file" name="logo" accept="image/*" style="width:100%; margin-top:0.25rem;">
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Ícono de la app (PWA)</label>
             {% if municipio.icono_app %}
               <div style="margin:0.4rem 0;">
                 <img src="{{ municipio.icono_app.url }}" alt="Ícono app"
@@ -198,67 +255,60 @@
                 <input type="checkbox" name="borrar_icono_app"> Eliminar ícono actual
               </label>
             {% endif %}
-            <input type="file" name="icono_app" accept="image/*"
-                   style="width:100%; margin-top:0.25rem;">
-            <small style="color:var(--color-text-muted);">PNG cuadrado, mínimo 192×192px. Aparece como ícono al instalar la app en el celular.</small>
+            <input type="file" name="icono_app" accept="image/*" style="width:100%; margin-top:0.25rem;">
+            <small style="color:var(--color-text-muted);">PNG cuadrado, mínimo 192×192px.</small>
           </div>
 
-            {# Colores — 3 campos: primario, secundario, acento #}
-            <div class="grid grid-3" style="gap:0.5rem; margin-bottom:0.75rem;">
-              <div>
-                <label style="font-size:0.85rem; font-weight:600;">Color primario</label>
-                <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
-                  <input type="color" name="color_primario"
-                         value="{{ municipio.color_primario|default:'#91d5e2' }}"
-                         style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
-                  <input type="text" name="color_primario_hex"
-                         value="{{ municipio.color_primario|default:'#91d5e2' }}"
-                         placeholder="#91d5e2"
-                         style="flex:1; font-size:0.85rem; font-family:monospace;">
-                </div>
+          {# Colores #}
+          <div class="grid grid-3" style="gap:0.5rem; margin-bottom:0.75rem;">
+            <div>
+              <label style="font-size:0.85rem; font-weight:600;">Color primario</label>
+              <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
+                <input type="color" name="color_primario"
+                       value="{{ municipio.color_primario|default:'#91d5e2' }}"
+                       style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
+                <input type="text" name="color_primario_hex"
+                       value="{{ municipio.color_primario|default:'#91d5e2' }}"
+                       placeholder="#91d5e2"
+                       style="flex:1; font-size:0.85rem; font-family:monospace;">
               </div>
-              <div>
-                <label style="font-size:0.85rem; font-weight:600;">Color secundario</label>
-                <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
-                  <input type="color" name="color_secundario"
-                         value="{{ municipio.color_secundario|default:'#444444' }}"
-                         style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
-                  <input type="text" name="color_secundario_hex"
-                         value="{{ municipio.color_secundario|default:'#444444' }}"
-                         placeholder="#444444"
-                         style="flex:1; font-size:0.85rem; font-family:monospace;">
-                </div>
+            </div>
+            <div>
+              <label style="font-size:0.85rem; font-weight:600;">Color secundario</label>
+              <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
+                <input type="color" name="color_secundario"
+                       value="{{ municipio.color_secundario|default:'#444444' }}"
+                       style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
+                <input type="text" name="color_secundario_hex"
+                       value="{{ municipio.color_secundario|default:'#444444' }}"
+                       placeholder="#444444"
+                       style="flex:1; font-size:0.85rem; font-family:monospace;">
               </div>
-              <div>
-                <label style="font-size:0.85rem; font-weight:600;">Color acento</label>
-                <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
-                  <input type="color" name="color_acento"
-                         value="{{ municipio.color_acento|default:'#bed630' }}"
-                         style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
-                  <input type="text" name="color_acento_hex"
-                         value="{{ municipio.color_acento|default:'#bed630' }}"
-                         placeholder="#bed630"
-                         style="flex:1; font-size:0.85rem; font-family:monospace;">
-                </div>
+            </div>
+            <div>
+              <label style="font-size:0.85rem; font-weight:600;">Color acento</label>
+              <div style="display:flex; gap:0.4rem; align-items:center; margin-top:0.25rem;">
+                <input type="color" name="color_acento"
+                       value="{{ municipio.color_acento|default:'#bed630' }}"
+                       style="width:48px; height:36px; padding:2px; border-radius:6px; cursor:pointer;">
+                <input type="text" name="color_acento_hex"
+                       value="{{ municipio.color_acento|default:'#bed630' }}"
+                       placeholder="#bed630"
+                       style="flex:1; font-size:0.85rem; font-family:monospace;">
               </div>
             </div>
           </div>
 
-          <div style="margin-bottom:1rem; display:flex; align-items:center; gap:0.5rem;">
-            <input type="checkbox" name="activo" id="id_activo"
-                   {% if municipio.activo %}checked{% endif %}>
-            <label for="id_activo" style="font-size:0.9rem; margin:0;">Municipio activo</label>
-          </div>
-          <button type="submit" class="btn" style="width:100%;">Guardar cambios</button>
+          <button type="submit" class="btn" style="width:100%;">💾 Guardar identidad visual</button>
         </form>
       </div>
 
       {# Admins del municipio #}
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-          <h2 style="font-size:1.05rem; margin:0;">👤 Administradores</h2>
+          <h2 style="font-size:1.05rem; margin:0;">👤 Administradores y tesoreros</h2>
           <a href="{% url 'crear_admin' municipio.id %}" class="btn btn-outline"
-             style="font-size:0.82rem; padding:0.3rem 0.7rem;">➕ Nuevo admin</a>
+             style="font-size:0.82rem; padding:0.3rem 0.7rem;">➕ Nuevo usuario</a>
         </div>
 
         {% if admins %}
@@ -300,91 +350,143 @@
         {% else %}
         <p class="text-muted" style="font-size:0.9rem;">Sin admins asignados todavía.</p>
         {% endif %}
+
+        {# Tesoreros #}
+        {% if tesoreros %}
+        <div style="border-top:1px solid var(--color-border); margin-top:1rem; padding-top:1rem;">
+          <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.5rem; text-transform:uppercase;">💳 Tesoreros</p>
+          <table>
+            <tbody>
+              {% for teso in tesoreros %}
+              <tr>
+                <td style="font-size:0.85rem;">{{ teso.correo }}</td>
+                <td style="font-size:0.85rem;">{{ teso.nombre_completo }}</td>
+                <td style="text-align:center;">
+                  {% if teso.is_active %}
+                    <span style="color:var(--color-primary); font-size:0.82rem;">● Activo</span>
+                  {% else %}
+                    <span style="color:var(--color-text-muted); font-size:0.82rem;">○ Inactivo</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <form method="post" action="{% url 'toggle_admin' teso.id %}" style="margin:0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline"
+                            style="font-size:0.78rem; padding:0.2rem 0.6rem;
+                                   {% if teso.is_active %}color:var(--color-warning); border-color:var(--color-warning);{% endif %}">
+                      {% if teso.is_active %}Desactivar{% else %}Activar{% endif %}
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
       </div>
 
     </div>
 
     {# ── COLUMNA DERECHA: Módulos de pago ── #}
     <div class="card">
-      <h2 style="font-size:1.05rem; margin-bottom:1rem;">🧩 Módulos de pago</h2>
+      <h2 style="font-size:1.05rem; margin-bottom:0.25rem;">🧩 Módulos de pago</h2>
+      <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:1rem;">
+        Cada módulo puede tener un costo fijo ($/mes) que se suma a la cuota base,
+        y/o un porcentaje sobre recaudación que se suma al % de la plataforma.
+      </p>
 
-      {# Módulos ya asignados #}
-      {% if modulos %}
-      <div style="margin-bottom:1.25rem;">
-        {% for m in modulos %}
-        <div style="display:flex; justify-content:space-between; align-items:center;
-                    padding:0.6rem 0; border-bottom:1px solid var(--color-border);">
-          <div>
-            <div style="font-weight:600; font-size:0.9rem;">{{ m.get_modulo_display }}</div>
-            {% if m.descripcion %}
-            <div style="font-size:0.78rem; color:var(--color-text-muted); margin-top:1px;">{{ m.descripcion }}</div>
-            {% endif %}
-            <div style="font-size:0.8rem; color:var(--color-text-muted);">
-              ${{ m.precio_mensual }}/mes
-              {% if m.activado_por %} · activado por {{ m.activado_por.nombre_completo }}{% endif %}
-            </div>
+      {% for m in todos_modulos %}
+      <div style="border:1px solid var(--color-border); border-radius:8px;
+                  padding:0.75rem; margin-bottom:0.6rem;
+                  {% if m.activo %}background:var(--color-surface);{% else %}opacity:0.65;{% endif %}">
+
+        {# Fila superior: nombre + estado #}
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem; flex-wrap:wrap;">
+          <div style="flex:1;">
+            <div style="font-weight:700; font-size:0.9rem;">{{ m.nombre }}</div>
+            <div style="font-size:0.78rem; color:var(--color-text-muted); margin-top:2px;">{{ m.descripcion }}</div>
           </div>
-          <div style="display:flex; align-items:center; gap:0.5rem;">
+          <div>
             {% if m.activo %}
-              <span style="color:var(--color-primary); font-size:0.82rem; font-weight:600;">● Activo</span>
-              <form method="post" action="{% url 'gestionar_modulo' municipio.id %}" style="margin:0;">
-                {% csrf_token %}
-                <input type="hidden" name="accion" value="desactivar">
-                <input type="hidden" name="modulo" value="{{ m.modulo }}">
-                <button type="submit" class="btn btn-outline"
-                        style="font-size:0.78rem; padding:0.2rem 0.6rem;
-                               color:var(--color-warning); border-color:var(--color-warning);">
-                  Desactivar
-                </button>
-              </form>
+              <span style="font-size:0.78rem; font-weight:700; color:var(--color-primary);
+                           background:rgba(0,180,100,0.1); border-radius:20px; padding:0.15rem 0.6rem;">
+                ● Activo
+              </span>
             {% else %}
-              <span style="color:var(--color-text-muted); font-size:0.82rem;">○ Inactivo</span>
-              <form method="post" action="{% url 'gestionar_modulo' municipio.id %}" style="margin:0;">
-                {% csrf_token %}
-                <input type="hidden" name="accion" value="activar">
-                <input type="hidden" name="modulo" value="{{ m.modulo }}">
-                <input type="hidden" name="precio_mensual" value="{{ m.precio_mensual }}">
-                <button type="submit" class="btn btn-outline"
-                        style="font-size:0.78rem; padding:0.2rem 0.6rem;">
-                  Reactivar
-                </button>
-              </form>
+              <span style="font-size:0.78rem; color:var(--color-text-muted);
+                           border:1px solid var(--color-border); border-radius:20px; padding:0.15rem 0.6rem;">
+                ○ Inactivo
+              </span>
             {% endif %}
           </div>
         </div>
-        {% endfor %}
-      </div>
-      {% endif %}
 
-      {# Agregar nuevo módulo #}
-      {% if modulos_disponibles %}
-      <div style="margin-top:0.75rem;">
-        <p style="font-size:0.85rem; font-weight:600; margin-bottom:0.5rem;">Agregar módulo:</p>
-        <form method="post" action="{% url 'gestionar_modulo' municipio.id %}">
+        {# Fila inferior: precios + botón #}
+        <form method="post" action="{% url 'gestionar_modulo' municipio.id %}"
+              style="display:flex; gap:0.4rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.6rem;">
           {% csrf_token %}
-          <input type="hidden" name="accion" value="activar">
-          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end;">
-            <div style="flex:2; min-width:160px;">
-              <select name="modulo" style="width:100%;" required>
-                <option value="">— Seleccionar módulo —</option>
-                {% for clave, nombre in modulos_disponibles %}
-                <option value="{{ clave }}">{{ nombre }}</option>
-                {% endfor %}
-              </select>
+          <input type="hidden" name="modulo" value="{{ m.clave }}">
+          {% if m.activo %}
+            <input type="hidden" name="accion" value="desactivar">
+            <div style="flex:1; min-width:90px;">
+              <label style="font-size:0.72rem; color:var(--color-text-muted); display:block;">$/mes fijo</label>
+              <input type="number" name="precio_mensual" value="{{ m.precio|floatformat:2 }}"
+                     min="0" step="0.01" style="width:100%; font-size:0.85rem;" disabled />
             </div>
-            <div style="width:110px;">
-              <input type="number" name="precio_mensual" placeholder="$/mes"
-                     min="0" step="0.01" style="width:100%;">
+            <div style="flex:1; min-width:80px;">
+              <label style="font-size:0.72rem; color:var(--color-text-muted); display:block;">% recaudación</label>
+              <input type="number" name="porcentaje_modulo" value="{{ m.porcentaje|floatformat:2 }}"
+                     min="0" max="50" step="0.01" style="width:100%; font-size:0.85rem;" disabled />
             </div>
-            <button type="submit" class="btn" style="white-space:nowrap;">➕ Activar</button>
-          </div>
+            <button type="submit" class="btn btn-outline"
+                    style="font-size:0.78rem; padding:0.3rem 0.6rem;
+                           color:var(--color-warning); border-color:var(--color-warning); white-space:nowrap;">
+              Desactivar
+            </button>
+          {% else %}
+            <input type="hidden" name="accion" value="activar">
+            <div style="flex:1; min-width:90px;">
+              <label style="font-size:0.72rem; color:var(--color-text-muted); display:block;">$/mes fijo</label>
+              <input type="number" name="precio_mensual" value="{{ m.precio|floatformat:2 }}"
+                     min="0" step="0.01" style="width:100%; font-size:0.85rem;" placeholder="0.00" />
+            </div>
+            <div style="flex:1; min-width:80px;">
+              <label style="font-size:0.72rem; color:var(--color-text-muted); display:block;">% recaudación</label>
+              <input type="number" name="porcentaje_modulo" value="{{ m.porcentaje|floatformat:2 }}"
+                     min="0" max="50" step="0.01" style="width:100%; font-size:0.85rem;" placeholder="0.00" />
+            </div>
+            <button type="submit" class="btn btn-outline"
+                    style="font-size:0.78rem; padding:0.3rem 0.6rem; white-space:nowrap;">
+              Activar
+            </button>
+          {% endif %}
         </form>
+
+        {# Botón separado para editar precios de módulos activos #}
+        {% if m.activo %}
+        <form method="post" action="{% url 'gestionar_modulo' municipio.id %}"
+              style="display:flex; gap:0.4rem; align-items:flex-end; flex-wrap:wrap; margin-top:0.4rem;">
+          {% csrf_token %}
+          <input type="hidden" name="modulo" value="{{ m.clave }}">
+          <input type="hidden" name="accion" value="activar">
+          <div style="flex:1; min-width:90px;">
+            <input type="number" name="precio_mensual" value="{{ m.precio|floatformat:2 }}"
+                   min="0" step="0.01" style="width:100%; font-size:0.85rem;" placeholder="0.00" />
+          </div>
+          <div style="flex:1; min-width:80px;">
+            <input type="number" name="porcentaje_modulo" value="{{ m.porcentaje|floatformat:2 }}"
+                   min="0" max="50" step="0.01" style="width:100%; font-size:0.85rem;" placeholder="0.00" />
+          </div>
+          <button type="submit" class="btn btn-outline"
+                  style="font-size:0.78rem; padding:0.3rem 0.6rem; white-space:nowrap;">
+            💾 Guardar precios
+          </button>
+        </form>
+        {% endif %}
+
       </div>
-      {% else %}
-      <p class="text-muted" style="font-size:0.85rem; margin-top:0.5rem;">
-        ✅ Todos los módulos disponibles ya están asignados.
-      </p>
-      {% endif %}
+      {% endfor %}
     </div>
 
   </div>{# /grid #}
@@ -473,6 +575,91 @@ function validarConfirmacion() {
     texto.addEventListener("change", function () {
       if (/^#[0-9a-fA-F]{3,6}$/.test(texto.value)) picker.value = texto.value;
     });
+  });
+}());
+</script>
+
+<script>
+// Genera el token TV sin anidar un <form> dentro del form principal
+function generarTokenTV() {
+  if (!confirm('¿Generar un nuevo token TV? El token anterior dejará de funcionar.')) return;
+  var f = document.createElement('form');
+  f.method = 'POST';
+  f.action  = '';
+  var csrf = document.createElement('input');
+  csrf.type  = 'hidden';
+  csrf.name  = 'csrfmiddlewaretoken';
+  csrf.value = '{{ csrf_token }}';
+  var accion = document.createElement('input');
+  accion.type  = 'hidden';
+  accion.name  = 'accion';
+  accion.value = 'generar_token_tv';
+  f.appendChild(csrf);
+  f.appendChild(accion);
+  document.body.appendChild(f);
+  f.submit();
+}
+</script>
+
+<script>
+/* Alerta visual "cambios sin guardar" — editar_municipio
+   Por cada formulario de sección (accion = guardar_*), detecta cambios en sus
+   campos y resalta el botón Guardar para que el superadmin sepa que hay
+   modificaciones pendientes de guardar en esa sección. */
+(function () {
+  var OUTLINE_ADVERTENCIA = "3px solid var(--color-warning, #f59e0b)";
+
+  document.querySelectorAll('form[method="post"]').forEach(function (form) {
+    var accionInput = form.querySelector('input[name="accion"]');
+    if (!accionInput || !accionInput.value.startsWith("guardar_")) return;
+
+    var btn = form.querySelector('button[type="submit"]');
+    if (!btn) return;
+
+    var textoOriginal = btn.textContent;
+    var hayCambios = false;
+
+    // Captura el estado inicial de cada campo
+    var estadoInicial = {};
+    form.querySelectorAll("input:not([type=hidden]), select, textarea").forEach(function (c) {
+      if (!c.name) return;
+      estadoInicial[c.name] = c.type === "checkbox" ? c.checked : c.value;
+    });
+
+    function marcarPendiente() {
+      if (hayCambios) return;
+      hayCambios = true;
+      btn.style.outline       = OUTLINE_ADVERTENCIA;
+      btn.style.outlineOffset = "2px";
+      btn.textContent = "⚠️ Hay cambios sin guardar";
+      btn.title = "Guardá antes de editar otra sección";
+    }
+
+    function limpiarMarca() {
+      hayCambios = false;
+      btn.style.outline       = "";
+      btn.style.outlineOffset = "";
+      btn.textContent = textoOriginal;
+      btn.title = "";
+    }
+
+    function chequear() {
+      var diferente = false;
+      form.querySelectorAll("input:not([type=hidden]), select, textarea").forEach(function (c) {
+        if (!c.name) return;
+        var val = c.type === "checkbox" ? c.checked : c.value;
+        if (val !== estadoInicial[c.name]) diferente = true;
+      });
+      diferente ? marcarPendiente() : limpiarMarca();
+    }
+
+    form.querySelectorAll("input:not([type=hidden]), select, textarea").forEach(function (c) {
+      c.addEventListener("input",  chequear);
+      c.addEventListener("change", chequear);
+    });
+
+    // Al guardar: la página recarga, pero limpiamos igual por las dudas
+    form.addEventListener("submit", limpiarMarca);
   });
 }());
 </script>

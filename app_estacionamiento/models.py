@@ -339,9 +339,118 @@ class Municipio(models.Model):
         help_text="Ej: Ordenanza N° 1234/2023 — Estacionamiento Medido Municipal.",
     )
 
+    # ── Facturación de la plataforma ─────────────────────────────────────────
+    # Estos campos configuran cuánto le cobra Leandro (superadmin) a cada municipio
+    # por usar el sistema. El tesorero del municipio rinde contra estos valores.
+    cuota_mantenimiento_mensual = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        verbose_name="Cuota mensual de mantenimiento ($)",
+        help_text="Monto fijo mensual que el municipio paga por hosting y mantenimiento del sistema.",
+    )
+    porcentaje_plataforma = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        verbose_name="Porcentaje sobre recaudación (%)",
+        help_text="Porcentaje que la plataforma retiene sobre la recaudación del período. Ej: 2.50 = 2,5%.",
+    )
+    dia_cierre_liquidacion = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Día de cierre de liquidación",
+        help_text="Día del mes en que se cierra el período de liquidación (1-28).",
+    )
+    concepto_recaudacion = models.CharField(
+        max_length=20,
+        choices=[
+            ("cierre_caja",  "Total de cierres de caja (neto municipio)"),
+            ("rendiciones",  "Solo rendiciones validadas"),
+            ("manual",       "Monto ingresado manualmente"),
+        ],
+        default="cierre_caja",
+        verbose_name="Base de cálculo para el porcentaje",
+        help_text="Qué dato del sistema se usa para calcular el porcentaje variable.",
+    )
+
     def __str__(self):
         return self.nombre
-    
+
+
+class LiquidacionPlataforma(models.Model):
+    """
+    Liquidación entre el municipio (tesorero) y el superadmin (Leandro).
+
+    Registra el cobro mensual que la plataforma hace al municipio:
+    - Cuota fija de mantenimiento/hosting
+    - Porcentaje variable sobre la recaudación del período
+    - O ambos, según la configuración del municipio
+
+    Puede iniciarlo el superadmin (emite factura) o el tesorero (manda comprobante).
+    El flujo converge cuando el superadmin aprueba el pago.
+    """
+    ESTADOS = [
+        ("borrador",             "Borrador"),
+        ("pendiente_pago",       "Pendiente de pago (factura emitida)"),
+        ("comprobante_enviado",  "Comprobante enviado por municipio"),
+        ("aprobada",             "Aprobada — pago confirmado"),
+        ("observada",            "Observada — hay consultas pendientes"),
+    ]
+    INICIADORES = [
+        ("superadmin", "Superadmin"),
+        ("tesorero",   "Tesorero"),
+    ]
+
+    municipio       = models.ForeignKey(
+        Municipio, on_delete=models.PROTECT, related_name="liquidaciones_plataforma",
+        verbose_name="Municipio",
+    )
+    periodo_inicio  = models.DateField(verbose_name="Inicio del período")
+    periodo_fin     = models.DateField(verbose_name="Fin del período")
+
+    recaudacion_base = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        verbose_name="Recaudación del período",
+        help_text="Total recaudado por el municipio en el período (base para calcular el % variable).",
+    )
+    monto_fijo      = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        verbose_name="Monto fijo (mantenimiento)",
+    )
+    monto_variable  = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        verbose_name="Monto variable (% recaudación)",
+    )
+    monto_total     = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        verbose_name="Total a pagar",
+    )
+
+    estado          = models.CharField(max_length=30, choices=ESTADOS, default="borrador")
+    iniciado_por    = models.CharField(max_length=15, choices=INICIADORES, default="superadmin")
+
+    # Archivos: el superadmin sube la factura; el tesorero sube el comprobante de pago
+    factura          = models.FileField(
+        upload_to="liquidaciones_plataforma/facturas/", null=True, blank=True,
+        verbose_name="Factura (PDF o imagen)",
+    )
+    comprobante_pago = models.FileField(
+        upload_to="liquidaciones_plataforma/comprobantes/", null=True, blank=True,
+        verbose_name="Comprobante de transferencia",
+    )
+
+    notas_superadmin = models.TextField(blank=True, default="", verbose_name="Notas del superadmin")
+    notas_tesorero   = models.TextField(blank=True, default="", verbose_name="Notas del tesorero")
+
+    creado_en        = models.DateTimeField(auto_now_add=True)
+    actualizado_en   = models.DateTimeField(auto_now=True)
+    aprobada_en      = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-periodo_fin", "-creado_en"]
+        verbose_name = "Liquidación de plataforma"
+        verbose_name_plural = "Liquidaciones de plataforma"
+
+    def __str__(self):
+        return f"{self.municipio.nombre} — {self.periodo_inicio} → {self.periodo_fin}"
+
+
 # 🚗 Vehículo asociado a uno o varios usuarios
 TIPOS_EXENCION = [
     ("discapacitado",    "Discapacitado"),
@@ -1277,7 +1386,11 @@ class ModuloMunicipio(models.Model):
     activo         = models.BooleanField(default=True)
     precio_mensual = models.DecimalField(
         max_digits=10, decimal_places=2, default=0,
-        help_text="Precio mensual en pesos que el municipio paga por este módulo.",
+        help_text="Precio mensual fijo en pesos que el municipio paga por este módulo. Se suma a la cuota base.",
+    )
+    porcentaje_modulo = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Porcentaje adicional sobre recaudación por este módulo. Se suma al % base de la plataforma.",
     )
     activado_en    = models.DateTimeField(auto_now_add=True)
     activado_por   = models.ForeignKey(
@@ -1499,3 +1612,111 @@ class TransferenciaSaldo(models.Model):
 
     def __str__(self):
         return f"Transferencia ${self.monto} de {self.emisor} → {self.receptor} [{self.estado}]"
+
+
+class SugerenciaMejora(models.Model):
+    """
+    Sugerencia de mejora enviada por cualquier usuario del sistema.
+
+    Solo el superadmin las ve todas. El usuario puede ver el estado de las suyas.
+    La notificación de cambio de estado es in-app (sin email por ahora).
+    """
+
+    CRITICIDAD = [
+        ("cosmetico",  "🎨 Cosmético — cambio visual o de texto"),
+        ("funcional",  "⚙️ Funcional — algo no funciona como debería"),
+        ("bloqueante", "🚨 Bloqueante — detiene o rompe un proceso"),
+    ]
+
+    ESTADOS = [
+        ("recibida",     "Recibida"),
+        ("en_revision",  "En revisión"),
+        ("implementada", "Implementada"),
+        ("descartada",   "Descartada"),
+    ]
+
+    AREAS = [
+        ("conductor",  "Experiencia del conductor"),
+        ("inspector",  "Herramientas del inspector"),
+        ("vendedor",   "Flujo de cobro / vendedor"),
+        ("admin",      "Panel de administración"),
+        ("tesorero",   "Tesorería y liquidaciones"),
+        ("general",    "General / otro"),
+    ]
+
+    # Rol almacenado al momento de enviar (el usuario puede cambiar de rol luego)
+    ROL_CHOICES = [
+        ("conductor",  "Conductor"),
+        ("inspector",  "Inspector"),
+        ("vendedor",   "Vendedor"),
+        ("admin",      "Admin municipio"),
+        ("tesorero",   "Tesorero"),
+        ("superadmin", "Superadmin"),
+    ]
+
+    usuario    = models.ForeignKey(
+        "Usuario", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="sugerencias",
+    )
+    municipio  = models.ForeignKey(
+        "Municipio", on_delete=models.CASCADE, null=True, blank=True,
+        related_name="sugerencias",
+        help_text="Municipio del usuario al enviar la sugerencia.",
+    )
+    rol_usuario  = models.CharField(max_length=20, choices=ROL_CHOICES, default="conductor")
+    area         = models.CharField(max_length=20, choices=AREAS, default="general")
+    criticidad   = models.CharField(max_length=15, choices=CRITICIDAD, default="funcional")
+    titulo       = models.CharField(max_length=200)
+    descripcion  = models.TextField()
+    estado       = models.CharField(max_length=20, choices=ESTADOS, default="recibida")
+    respuesta    = models.TextField(
+        blank=True, default="",
+        help_text="Respuesta o comentario del superadmin al usuario.",
+    )
+    # Notificación in-app: True = el usuario ya vio el cambio de estado
+    notificado   = models.BooleanField(
+        default=True,
+        help_text="False cuando el superadmin cambió el estado y el usuario todavía no lo vio.",
+    )
+    creado_en    = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+        verbose_name        = "Sugerencia de mejora"
+        verbose_name_plural = "Sugerencias de mejora"
+
+    def __str__(self):
+        return f"[{self.get_criticidad_display()}] {self.titulo} — {self.get_estado_display()}"
+
+
+class SolicitudEliminacionCuenta(models.Model):
+    """
+    Registro de una solicitud de eliminación de cuenta iniciada por el conductor.
+
+    El conductor inicia el proceso; el sistema verifica saldo=0 e infracciones=0.
+    Una vez confirmado, la cuenta se desactiva (soft-delete: is_active=False).
+    El registro queda para trazabilidad.
+    """
+
+    ESTADOS = [
+        ("pendiente",  "Pendiente de confirmación"),
+        ("completada", "Cuenta eliminada"),
+        ("cancelada",  "Cancelada por el usuario"),
+    ]
+
+    usuario    = models.OneToOneField(
+        "Usuario", on_delete=models.CASCADE,
+        related_name="solicitud_eliminacion",
+    )
+    estado     = models.CharField(max_length=15, choices=ESTADOS, default="pendiente")
+    motivo     = models.TextField(blank=True, default="")
+    creado_en  = models.DateTimeField(auto_now_add=True)
+    resuelto_en = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name        = "Solicitud de eliminación de cuenta"
+        verbose_name_plural = "Solicitudes de eliminación de cuenta"
+
+    def __str__(self):
+        return f"Eliminación: {self.usuario} [{self.estado}]"

@@ -135,6 +135,7 @@
         {% if request.user.es_admin %}
           <li><a href="{% url 'panel_admin' %}">Inicio</a></li>
           <li><a href="{% url 'admin_infracciones' %}">Infracciones</a></li>
+          <li><a href="{% url 'gestionar_staff' %}">👥 Staff</a></li>
 
         {% elif request.user.es_inspector %}
           <li><a href="{% url 'panel_inspectores' %}">Inicio</a></li>
@@ -153,6 +154,10 @@
           <li><a href="{% url 'mis_infracciones' %}">Infracciones</a></li>
           <li><a href="{% url 'mp_iniciar_carga' %}">Cargar saldo</a></li>
 
+        {% endif %}
+
+        {% if request.user.is_authenticated and not request.user.is_superuser %}
+          <li><a href="{% url 'enviar_sugerencia' %}">💡 Sugerencia</a></li>
         {% endif %}
 
         <li>
@@ -181,13 +186,12 @@
   <!-- ═══ CONTENIDO PRINCIPAL ══════════════════════════════════ -->
   <main class="container">
 
+    {# Los mensajes de Django se renderizan como toasts en la esquina superior derecha.
+       El script al final del body los carga y les aplica auto-dismiss. #}
     {% if messages %}
-      <div style="margin-bottom:1rem;">
+      <div id="django-messages-data" style="display:none;">
         {% for message in messages %}
-          {# Mapeo de tags de Django al sistema de clases alert de global.css #}
-          <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% elif message.tags == 'error' or message.tags == 'danger' %}alert-danger{% else %}alert-info{% endif %}" style="margin-bottom:0.5rem;">
-            {{ message }}
-          </div>
+          <span data-tags="{{ message.tags }}">{{ message }}</span>
         {% endfor %}
       </div>
     {% endif %}
@@ -343,6 +347,87 @@
   </script>
 
   {% block extra_scripts %}{% endblock %}
+
+  <!-- Contenedor de toasts: los mensajes de Django se inyectan acá -->
+  <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Lógica de toasts: lee los mensajes del HTML oculto, crea toasts y los descarta. -->
+  <script>
+  (function () {
+    var DURACION_MS = 4500;   // tiempo visible antes del dismiss automático
+    var FADE_MS    = 400;     // duración de la animación de salida
+
+    // Mapeo de tags de Django a clases CSS de toast
+    function claseTost(tags) {
+      if (!tags) return "toast-info";
+      if (tags.indexOf("success") !== -1) return "toast-success";
+      if (tags.indexOf("error")   !== -1 || tags.indexOf("danger") !== -1) return "toast-danger";
+      if (tags.indexOf("warning") !== -1) return "toast-warning";
+      return "toast-info";
+    }
+
+    function icono(clase) {
+      if (clase === "toast-success") return "✅";
+      if (clase === "toast-danger")  return "❌";
+      if (clase === "toast-warning") return "⚠️";
+      return "ℹ️";
+    }
+
+    function mostrarToast(texto, clase) {
+      var contenedor = document.getElementById("toast-container");
+      if (!contenedor) return;
+
+      var toast = document.createElement("div");
+      toast.className = "toast " + clase;
+      toast.setAttribute("role", "alert");
+      toast.innerHTML =
+        "<span>" + icono(clase) + "</span>" +
+        "<span style='flex:1;'>" + texto + "</span>";
+
+      contenedor.appendChild(toast);
+
+      // Auto-dismiss
+      setTimeout(function () {
+        toast.classList.add("saliendo");
+        setTimeout(function () {
+          if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, FADE_MS);
+      }, DURACION_MS);
+    }
+
+    // Leer mensajes de Django del bloque oculto
+    var data = document.getElementById("django-messages-data");
+    if (data) {
+      var spans = data.querySelectorAll("span[data-tags]");
+      spans.forEach(function (span) {
+        mostrarToast(span.textContent.trim(), claseTost(span.dataset.tags));
+      });
+    }
+
+    // Exponer para uso manual desde otras vistas si hace falta
+    window.mostrarToast = mostrarToast;
+  }());
+  </script>
+
+  <!-- Toggle mostrar/ocultar contraseña.
+       Busca todos los .toggle-password y al hacer click cambia type entre
+       password y text del input hermano (o el que tenga data-target="#id"). -->
+  <script>
+  (function () {
+    document.addEventListener("click", function (e) {
+      var btn = e.target.closest(".toggle-password");
+      if (!btn) return;
+      var targetId = btn.dataset.target;
+      var input = targetId
+        ? document.querySelector(targetId)
+        : btn.previousElementSibling;
+      if (!input) return;
+      var mostrar = input.type === "password";
+      input.type  = mostrar ? "text" : "password";
+      btn.textContent = mostrar ? "🙈" : "👁";
+    });
+  }());
+  </script>
 
 </body>
 </html>
