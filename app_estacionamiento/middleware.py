@@ -57,3 +57,47 @@ class RequiereMunicipioMiddleware:
             return True
 
         return False
+
+
+# URLs accesibles mientras el usuario tiene pendiente el cambio de contraseña.
+# Se usa startswith() para cubrir subrutas (ej. /accounts/logout/ de allauth).
+URLS_EXENTAS_DE_PASSWORD = {
+    "/cambiar-password/",
+    "/logout/",
+    "/accounts/",
+    "/sistema-interno/",
+}
+
+
+class ForzarCambioPasswordMiddleware:
+    """
+    Si el usuario logueado tiene cambio_password_requerido=True,
+    lo redirige a /cambiar-password/ en cualquier URL del sistema.
+
+    Esto impide que el usuario saltee el cambio navegando directamente
+    a su panel después del login sin haber cambiado la contraseña temporal
+    que le asignó el admin.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if self._debe_redirigir(request):
+            return redirect("forzar_cambio_password")
+        return self.get_response(request)
+
+    def _debe_redirigir(self, request):
+        if not request.user.is_authenticated:
+            return False
+
+        if not getattr(request.user, "cambio_password_requerido", False):
+            return False
+
+        # Evitar loop: no redirigir si ya está en una URL exenta
+        ruta = request.path
+        for url_exenta in URLS_EXENTAS_DE_PASSWORD:
+            if ruta.startswith(url_exenta):
+                return False
+
+        return True

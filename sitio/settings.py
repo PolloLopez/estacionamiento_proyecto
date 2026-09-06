@@ -79,6 +79,9 @@ MIDDLEWARE = [
     # Redirige a completar-perfil si el usuario no tiene municipio asignado
     # (solo en sistemas con más de un municipio activo)
     "app_estacionamiento.middleware.RequiereMunicipioMiddleware",
+    # Redirige a /cambiar-password/ si el admin le asignó una contraseña temporal
+    # y el usuario todavía no la cambió (impide saltear el formulario navegando directo)
+    "app_estacionamiento.middleware.ForzarCambioPasswordMiddleware",
 ]
 
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
@@ -153,6 +156,9 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    # Evita que el browser filtre la URL actual en el header Referer al salir del sistema.
+    # "same-origin" = envía Referer solo a URLs del mismo dominio; nada a externos.
+    SECURE_REFERRER_POLICY = "same-origin"
     # Railway/Render terminan el SSL en el proxy y pasan este header.
     # Sin esto Django no detecta que la conexión es HTTPS y rompe redirects.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

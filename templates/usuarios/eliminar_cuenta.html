@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Eliminar cuenta{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:560px; margin:2rem auto;">
+
+  <h2 style="color:var(--color-danger, #c0392b);">⚠️ Eliminar mi cuenta</h2>
+  <p>Esta acción es irreversible. Tu cuenta quedará desactivada y no podrás volver a iniciar sesión.</p>
+
+  <div style="background:var(--color-bg-alt,#fdf3f3); border:1px solid var(--color-danger,#c0392b);
+              border-radius:8px; padding:1.2rem; margin:1.2rem 0;">
+    <strong>Antes de continuar confirmamos que:</strong>
+    <ul style="margin:.6rem 0 0 1rem; line-height:1.8;">
+      <li>✅ Tu saldo es <strong>${{ usuario.saldo }}</strong> (debe ser $0)</li>
+      <li>✅ No tenés infracciones pendientes de pago</li>
+    </ul>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <label for="motivo" style="font-weight:600; display:block; margin-bottom:.4rem;">
+      Motivo de la baja (opcional)
+    </label>
+    <textarea
+      id="motivo" name="motivo" rows="3"
+      placeholder="Contanos por qué eliminás tu cuenta..."
+      style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;
+             font-size:.95rem; resize:vertical; box-sizing:border-box;"
+    ></textarea>
+
+    <div style="display:flex; gap:1rem; margin-top:1.4rem;">
+      <button type="submit"
+        style="background:var(--color-danger,#c0392b); color:#fff; border:none;
+               padding:.7rem 1.4rem; border-radius:6px; cursor:pointer; font-size:1rem;"
+        onclick="return confirm('¿Estás seguro? Tu cuenta quedará eliminada de forma permanente.')">
+        🗑️ Eliminar mi cuenta
+      </button>
+      <a href="{% url 'inicio_usuarios' %}"
+         style="background:var(--color-bg-alt,#eee); color:var(--color-text,#333);
+                padding:.7rem 1.4rem; border-radius:6px; text-decoration:none; font-size:1rem;">
+        Cancelar
+      </a>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

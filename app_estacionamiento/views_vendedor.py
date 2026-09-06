@@ -411,7 +411,17 @@ def cobrar_abono(request):
     - GET / POST sin acción: formulario con patente + selector de mes
     - POST accion=confirmar: resumen antes de cobrar
     - POST accion=cobrar: registra AbonoMensual y MovimientoCaja
+
+    Restricción: si el usuario es vendedor (no admin), debe tener puede_vender_abono=True.
+    El admin puede deshabilitar este permiso por vendedor desde la ficha del vendedor.
     """
+    # Vendedores sin permiso de abono no pueden acceder a esta vista.
+    if request.user.es_vendedor and not request.user.es_admin:
+        if not getattr(request.user, "puede_vender_abono", True):
+            from django.contrib import messages as _messages
+            _messages.error(request, "No tenés permiso para cobrar abonos. Consultá con el administrador.")
+            return redirect("panel_vendedor")
+
     from datetime import date
 
     MESES_ES = [

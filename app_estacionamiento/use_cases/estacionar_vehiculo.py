@@ -12,6 +12,7 @@ from app_estacionamiento.domain.saldo_policy import SaldoPolicy
 from app_estacionamiento.services.horarios import obtener_tarifa_hora
 from app_estacionamiento.services.saldo import debitar_saldo_conductor
 from app_estacionamiento.services.infracciones import calcular_estado_tolerancia
+from app_estacionamiento.services.reintegro import aplicar_reintegro
 
 REDIRECT_OK        = "inicio_usuarios"
 REDIRECT_SIN_SALDO = "mp_iniciar_carga"
@@ -48,6 +49,7 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             "redirect": "inicio",
             "warnings": [],
             "info_infraccion": None,
+            "info_reintegro":  None,
         }
 
     tarifa_obj  = Tarifa.objects.filter(municipio=usuario.municipio).first()
@@ -63,6 +65,7 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             "redirect": REDIRECT_SIN_SALDO,
             "warnings": warnings,
             "info_infraccion": None,
+            "info_reintegro":  None,
         }
 
     with transaction.atomic():
@@ -75,6 +78,7 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
                 "redirect": REDIRECT_SIN_SALDO,
                 "warnings": warnings,
                 "info_infraccion": None,
+                "info_reintegro":  None,
             }
 
         # ── Chequeo de infraccion pendiente ───────────────────────────────────
@@ -120,7 +124,7 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
                         "hora_estacionamiento": ahora,
                     }
 
-        EstacionamientoFactory.crear(
+        estacionamiento = EstacionamientoFactory.crear(
             usuario=usuario_db,
             vehiculo=vehiculo,
             subcuadra=subcuadra,
@@ -136,9 +140,24 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             descripcion="Estacionamiento",
         )
 
+        # ── Reintegro de vecinos (si el municipio tiene el módulo activo) ───────
+        # Se aplica después del débito para no interferir con el chequeo de saldo.
+        # usuario_db ya está bloqueado; aplicar_reintegro opera sobre el mismo objeto.
+        info_reintegro = None
+        if usuario.municipio:
+            resultado = aplicar_reintegro(
+                conductor=usuario_db,
+                municipio=usuario.municipio,
+                estacionamiento=estacionamiento,
+                tarifa_hora=tarifa_hora,
+            )
+            if resultado["reintegrado"]:
+                info_reintegro = resultado
+
     return {
         "ok": True,
         "redirect": REDIRECT_OK,
         "warnings": warnings,
         "info_infraccion": info_infraccion,
+        "info_reintegro":  info_reintegro,
     }

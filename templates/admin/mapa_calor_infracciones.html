@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Mapa de calor — Infracciones{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2 style="margin:0;">🗺️ Mapa de calor de infracciones</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.85rem;">← Volver al panel</a>
+  </div>
+
+  {% if total_subcuadras == 0 %}
+  <div class="card" style="text-align:center; padding:2rem;">
+    <p style="color:var(--color-text-muted);">
+      No hay subcuadras con coordenadas cargadas.<br>
+      Cargá lat/lon en <a href="{% url 'gestionar_subcuadras' %}">Gestionar subcuadras</a> para ver el mapa.
+    </p>
+  </div>
+  {% else %}
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div id="mapa" style="height:520px; width:100%; border-radius:8px;"></div>
+  </div>
+  <p style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.5rem; text-align:center;">
+    {{ total_subcuadras }} subcuadra{{ total_subcuadras|pluralize:"s" }} con coordenadas · Tamaño del círculo proporcional a la cantidad de infracciones.
+  </p>
+  {% endif %}
+</div>
+
+{% if total_subcuadras > 0 %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const puntos = {{ puntos|safe }};
+const mapa = L.map("mapa").setView([{{ centro_lat }}, {{ centro_lon }}], 15);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© <a href='https://www.openstreetmap.org/'>OpenStreetMap</a>",
+  maxZoom: 19,
+}).addTo(mapa);
+
+// Radio máximo para escalar los círculos
+const maxTotal = puntos.length ? Math.max(...puntos.map(p => p.total)) : 1;
+
+puntos.forEach(p => {
+  const radio = 10 + (p.total / maxTotal) * 40;  // entre 10 y 50px
+  const opacity = 0.4 + (p.total / maxTotal) * 0.5;
+  const color = p.total >= maxTotal * 0.7 ? "#ef4444"
+              : p.total >= maxTotal * 0.4 ? "#f97316"
+              : "#eab308";
+
+  L.circle([p.lat, p.lon], {
+    radius: radio * 4,  // Leaflet usa metros
+    color:       color,
+    fillColor:   color,
+    fillOpacity: opacity,
+    weight:      1,
+  }).addTo(mapa)
+    .bindPopup(
+      `<strong>${p.nombre}</strong><br>Infracciones: <strong>${p.total}</strong>`
+    );
+});
+</script>
+{% endif %}
+{% endblock %}

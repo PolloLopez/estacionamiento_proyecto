@@ -24,11 +24,13 @@
     </div>
   </details>
 
-  <!-- Resumen de actividad -->
+  <!-- Resumen de actividad (solo si el municipio lo tiene habilitado) -->
+  {% if mostrar_estadisticas %}
   <div class="card" style="text-align:center; margin-bottom:1.2rem;">
     <div class="text-muted" style="font-size:0.85rem;">Infracciones hoy</div>
     <div style="font-size:2.5rem; font-weight:800;">{{ resumen.infracciones_hoy }}</div>
   </div>
+  {% endif %}
 
   {% if cierres_sin_certificar %}
   <div style="margin-bottom:1.2rem; background:var(--color-warning-bg);
@@ -59,34 +61,59 @@
          href="{% url 'inspectores_resumen_infracciones' %}">
         📑 Mis infracciones
       </a>
+      {% if modulo_cobrador %}
+      <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;
+                                        color:var(--color-primary); border-color:var(--color-primary);"
+         href="{% url 'inspectores_cobrar_infraccion' %}">
+        💵 Cobrar infracción en campo
+      </a>
+      {% endif %}
     </div>
   </div>
 
-  <!-- Impresora: solo muestra estado, config oculta en details -->
-  <div style="text-align:center; margin-top:1rem;">
-    <span id="estado-impresora" style="font-size:0.82rem; color:var(--color-text-muted);">
-      🖨 Verificando impresora...
+  <!-- ── Sección impresora BLE ──────────────────────────────────────── -->
+
+  <!-- BANNER: visible cuando no hay impresora vinculada.
+       El JS lo oculta si detecta una impresora guardada. -->
+  <div id="banner-sin-impresora" class="card"
+       style="margin-top:1.2rem; border:2px dashed var(--color-warning,#f59e0b);
+              background:var(--color-warning-bg,#fffbeb); text-align:center; padding:1.2rem;">
+    <div style="font-size:1.5rem; margin-bottom:0.4rem;">🖨</div>
+    <p style="font-weight:700; margin:0 0 0.3rem; color:var(--color-warning,#92400e);">
+      Sin impresora vinculada
+    </p>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0 0 0.9rem;">
+      Vinculá tu impresora <strong>una sola vez</strong> para imprimir actas automáticamente.
+    </p>
+    <button id="btn-conectar-banner" class="btn" style="font-size:0.95rem;"
+            onclick="accionConectar()">
+      🔌 Vincular impresora
+    </button>
+  </div>
+
+  <!-- ESTADO: visible cuando hay impresora vinculada (oculto hasta que el JS lo confirme) -->
+  <div id="cont-impresora-ok" style="display:none; text-align:center; margin-top:1rem;">
+    <span id="estado-impresora"
+          style="font-size:0.88rem; font-weight:600; color:var(--color-primary);">
+      🖨 Cargando...
     </span>
   </div>
 
-  <!-- Configuración de impresora (colapsada por defecto) -->
-  <details style="margin-top:0.75rem;">
+  <!-- Configuración avanzada (colapsada, disponible siempre) -->
+  <details id="details-impresora" style="margin-top:0.75rem;">
     <summary style="font-size:0.82rem; color:var(--color-text-muted); cursor:pointer;
                     list-style:none; text-align:center; user-select:none;">
       ⚙️ Configurar impresora
     </summary>
     <div class="card" style="margin-top:0.75rem;">
-      <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
-        Hacé esto <strong>una sola vez</strong> por teléfono. La impresora se conectará automáticamente al registrar infracciones.
-      </p>
       <div style="display:flex; flex-direction:column; gap:0.5rem;">
 
         <button id="btn-conectar" class="btn btn-outline" style="font-size:0.9rem;"
                 onclick="accionConectar()">
-          🔌 Vincular impresora
+          🔌 Vincular / cambiar impresora
         </button>
 
-        <!-- Renombrar dispositivo: aparece tras vincular o si ya hay uno autorizado -->
+        <!-- Renombrar: aparece tras vincular o si ya hay uno autorizado -->
         <div id="cont-renombrar" style="display:none;">
           <label style="font-size:0.82rem; color:var(--color-text-muted); display:block; margin-bottom:0.2rem;">
             ✏️ Nombre personalizado
@@ -124,41 +151,60 @@
 
 <script src="{% static 'app_estacionamiento/js/impresora_bluetooth.js' %}"></script>
 <script>
-var estadoEl = document.getElementById('estado-impresora');
-var logEl    = document.getElementById('log-impresora');
+var estadoEl  = document.getElementById('estado-impresora');
+var bannerEl  = document.getElementById('banner-sin-impresora');
+var contOkEl  = document.getElementById('cont-impresora-ok');
+var logEl     = document.getElementById('log-impresora');
 
 function log(msg) {
   logEl.style.display = 'block';
   logEl.textContent   = msg;
 }
 
-// Al cargar: mostrar la impresora guardada (alias de localStorage o getDevices)
+/** Muestra el banner "sin impresora" y oculta el estado OK. */
+function mostrarSinImpresora() {
+  bannerEl.style.display = '';
+  contOkEl.style.display = 'none';
+}
+
+/** Oculta el banner y muestra el estado OK con el nombre de la impresora. */
+function mostrarImpresoraOk(nombre) {
+  bannerEl.style.display  = 'none';
+  contOkEl.style.display  = '';
+  estadoEl.textContent = '🖨 ' + nombre + ' vinculada';
+}
+
+// Al cargar: detectar si hay impresora guardada
 (async function() {
   if (!navigator.bluetooth) {
-    estadoEl.textContent = '⚠️ Web Bluetooth no disponible — usá Chrome en Android';
+    // Web Bluetooth no disponible: mostrar aviso en el banner
+    bannerEl.querySelector('p:last-of-type').textContent =
+      '⚠️ Web Bluetooth no disponible. Usá Chrome en Android para imprimir.';
+    bannerEl.querySelector('button').style.display = 'none';
     return;
   }
 
-  // Primero intentar getDevices() (silencioso)
+  // Primero intentar getDevices() (silencioso, sin diálogo)
   if (typeof navigator.bluetooth.getDevices === 'function') {
     try {
       var devs = await navigator.bluetooth.getDevices();
       if (devs.length > 0) {
         guardarInfoImpresora(devs[0]);
-        estadoEl.textContent = '🖨 ' + nombreMostrar(devs[0]) + ' autorizada';
-        estadoEl.style.color = 'var(--color-primary)';
+        mostrarImpresoraOk(nombreMostrar(devs[0]));
         mostrarRenombrado(devs[0]);
         return;
       }
     } catch(e) {}
   }
 
-  // getDevices() vacío: mostrar info guardada en localStorage (si existe)
+  // getDevices() vacío o no disponible: revisar localStorage
   var info = obtenerInfoImpresora();
   if (info) {
-    estadoEl.textContent = '🖨 ' + info.alias + ' (sin confirmar)';
+    // Hay una impresora guardada pero no confirmada por el navegador
+    mostrarImpresoraOk(info.alias + ' (no confirmada)');
   } else {
-    estadoEl.textContent = '🖨 Sin impresora vinculada';
+    // Sin impresora: dejar el banner visible
+    mostrarSinImpresora();
   }
 })();
 
@@ -186,24 +232,31 @@ function accionRenombrar() {
 }
 
 async function accionConectar() {
-  var btn = document.getElementById('btn-conectar');
-  btn.disabled    = true;
-  btn.textContent = '⏳ Buscando...';
+  // Deshabilitar ambos botones de vincular (banner + details)
+  var btnBanner  = document.getElementById('btn-conectar-banner');
+  var btnDetails = document.getElementById('btn-conectar');
+  [btnBanner, btnDetails].forEach(function(b) {
+    if (b) { b.disabled = true; b.textContent = '⏳ Buscando...'; }
+  });
   log('Abriendo selector Bluetooth...');
   try {
     var r = await conectarImpresora();
     r.device.gatt.disconnect();
     var nombre = nombreMostrar(r.device);
     log('✅ Vinculada: ' + (r.device.name || 'dispositivo BLE') + '\nPerfil: ' + r.perfil.servicio);
-    estadoEl.textContent = '🖨 ' + nombre + ' autorizada';
-    estadoEl.style.color = 'var(--color-primary)';
+    mostrarImpresoraOk(nombre);
     mostrarRenombrado(r.device);
-    btn.textContent = '🔄 Cambiar impresora';
+    if (btnDetails) btnDetails.textContent = '🔄 Cambiar impresora';
+    if (btnBanner)  btnBanner.textContent  = '🔌 Vincular impresora';
   } catch(e) {
     log('❌ ' + e.message);
-    btn.textContent = '🔌 Reintentar';
+    [btnBanner, btnDetails].forEach(function(b) {
+      if (b) b.textContent = '🔌 Reintentar';
+    });
   }
-  btn.disabled = false;
+  [btnBanner, btnDetails].forEach(function(b) {
+    if (b) b.disabled = false;
+  });
 }
 
 async function accionDiagnostico() {

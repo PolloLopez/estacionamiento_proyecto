@@ -5,8 +5,14 @@ from . import views
 from . import views_superadmin
 from . import views_pwa
 from . import views_pago_publico
+from . import views_publico
 
 urlpatterns = [
+
+    # =========================
+    # 🩺 HEALTH CHECK (UptimeRobot)
+    # =========================
+    path("health/", views.health_check, name="health_check"),
 
     # =========================
     # 📱 PWA
@@ -40,6 +46,7 @@ urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("logout/", views.logout_view, name="logout"),
     path("registro/", views.registro_view, name="registro"),
+    path("cambiar-password/", views.forzar_cambio_password, name="forzar_cambio_password"),
     path("completar-perfil/", views.completar_perfil, name="completar_perfil"),
     path("verificacion/solicitar/", views.solicitar_verificacion, name="solicitar_verificacion"),
 
@@ -52,6 +59,7 @@ urlpatterns = [
     # 🚗 CONDUCTORES
     # =========================
     path("estacionar/", views.estacionar_vehiculo, name="usuarios_estacionar_vehiculo"),
+    path("estacionar/subcuadra-cercana/", views.subcuadra_cercana_conductor, name="conductor_subcuadra_cercana"),
     path("finalizar/<int:estacionamiento_id>/", views.finalizar_estacionamiento, name="usuarios_finalizar_estacionamiento"),
     path("gestion-infracciones/", views.gestion_infracciones, name="gestion_infracciones"),
     path("mis-infracciones/", views.mis_infracciones, name="mis_infracciones"),
@@ -61,8 +69,12 @@ urlpatterns = [
     path("vehiculo/<int:vehiculo_id>/eliminar/", views.eliminar_vehiculo, name="eliminar_vehiculo"),
     path("mis_estacionamientos/", views.historial_estacionamientos, name="usuarios_historial_estacionamientos"),
     path("infracciones/<int:infraccion_id>/pagar/",views.pagar_infraccion,name="pagar_infraccion"),
+    path("infracciones/<int:infraccion_id>/impugnar/", views.crear_impugnacion, name="crear_impugnacion"),
     path("estacionamiento/<int:est_id>/renovar/", views.renovar_estacionamiento, name="usuarios_renovar_estacionamiento"),
     path("notificacion/<int:notif_id>/leida/", views.marcar_notificacion_leida, name="marcar_notificacion_leida"),
+    path("saldo/transferir/", views.transferir_saldo, name="transferir_saldo"),
+    path("saldo/transferencias/", views.transferencias_saldo, name="transferencias_saldo"),
+    path("saldo/transferencias/<int:transf_id>/responder/", views.responder_transferencia, name="responder_transferencia"),
 
     # =========================
     # 👮 INSPECTORES
@@ -81,6 +93,7 @@ urlpatterns = [
     path("inspectores/ticket-cobro/<int:est_id>/", views.ticket_cobro, name="inspectores_ticket_cobro"),
     path("inspectores/verificar-sia/", views.verificar_sia, name="inspectores_verificar_sia"),
     path("ticket-pago-multa/<int:infraccion_id>/", views.ticket_pago_multa, name="ticket_pago_multa"),
+    path("inspectores/cobrar-infraccion/", views.cobrar_infraccion_inspector, name="inspectores_cobrar_infraccion"),
 
     # =========================
     # 💰 VENDEDORES
@@ -123,8 +136,15 @@ urlpatterns = [
     path("admin-vendedores/<int:vendedor_id>/historial/", views.historial_vendedor, name="admin_historial_vendedor"),
     path("admin-vendedores/crear/", views.gestionar_vendedores, name="admin_crear_vendedor"),
     path("admin-staff/", views.auditoria_staff, name="auditoria_staff"),
+    path("admin-subcuadras/reportes/", views.reportes_subcuadras, name="reportes_subcuadras"),
+    path("admin-dashboard/", views.dashboard_admin, name="dashboard_admin"),
     path("admin/cerrar-caja/", views.cerrar_caja, name="admin_cerrar_caja"),
+    path("admin/caja-vendedores/", views.caja_vendedores, name="admin_caja_vendedores"),
+    path("admin/caja-vendedores/<int:vendedor_id>/forzar/", views.forzar_cierre_vendedor, name="admin_forzar_cierre_vendedor"),
     path("admin/exentos-sia/", views.vehiculos_exentos_sia, name="vehiculos_exentos_sia"),
+    path("admin/mapa-infracciones/", views.mapa_calor_infracciones, name="mapa_calor_infracciones"),
+    path("admin/impugnaciones/", views.admin_impugnaciones, name="admin_impugnaciones"),
+    path("admin/impugnaciones/<int:impug_id>/resolver/", views.resolver_impugnacion, name="resolver_impugnacion"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
     path("admin-subcuadras/", views.gestionar_subcuadras, name="gestionar_subcuadras"),
     path("admin-exenciones/importar/", views.importar_exenciones, name="importar_exenciones"),
@@ -137,6 +157,12 @@ urlpatterns = [
     path("admin-horarios/", views.gestionar_horarios, name="gestionar_horarios"),
     path("admin-dias-especiales/", views.gestionar_dias_especiales, name="gestionar_dias_especiales"),
     path("admin-tarifas/guardar/", views.gestionar_tarifas, name="admin_guardar_tarifa"),
+
+    # =========================
+    # 👥 STAFF MUNICIPIO (admins + tesoreros)
+    # =========================
+    path("admin-staff-municipio/", views.gestionar_staff, name="gestionar_staff"),
+    path("admin-staff-municipio/<int:usuario_id>/editar/", views.editar_staff, name="editar_staff"),
 
     # =========================
     # 💼 RENDICIONES (ADMIN)
@@ -175,11 +201,27 @@ urlpatterns = [
     path("tesorero/", views.panel_tesorero, name="panel_tesorero"),
     path("tesorero/rendicion/<int:rendicion_id>/validar/", views.validar_rendicion, name="validar_rendicion"),
     path("tesorero/depositar/<int:liquidacion_id>/", views.depositar_comision, name="depositar_comision"),
+    path("tesorero/liquidaciones-plataforma/", views.mis_liquidaciones_plataforma, name="mis_liquidaciones_plataforma"),
+    path("tesorero/liquidaciones-plataforma/nueva/", views.crear_liquidacion_tesorero, name="crear_liquidacion_tesorero"),
+    path("tesorero/liquidaciones-plataforma/<int:liquidacion_id>/", views.gestionar_liquidacion_plataforma, name="gestionar_liquidacion_plataforma"),
+
+    # =========================
+    # 🗑️ ELIMINACIÓN DE CUENTA
+    # =========================
+    path("cuenta/eliminar/", views.solicitar_eliminacion_cuenta, name="solicitar_eliminacion_cuenta"),
+    path("cuenta/eliminar/cancelar/", views.cancelar_eliminacion_cuenta, name="cancelar_eliminacion_cuenta"),
+
+    # =========================
+    # 💡 SUGERENCIAS
+    # =========================
+    path("sugerencias/nueva/", views.enviar_sugerencia, name="enviar_sugerencia"),
+    path("sugerencias/mis/", views.mis_sugerencias, name="mis_sugerencias"),
 
     # =========================
     # 🌐 SUPERADMIN
     # =========================
     path("superadmin/",                                         views_superadmin.panel_superadmin,  name="panel_superadmin"),
+    path("superadmin/auditoria/",                               views_superadmin.auditoria_superadmin, name="auditoria_superadmin"),
     path("superadmin/municipio/nuevo/",                         views_superadmin.crear_municipio,   name="crear_municipio"),
     path("superadmin/municipio/<int:municipio_id>/",            views_superadmin.editar_municipio,  name="editar_municipio"),
     path("superadmin/municipio/<int:municipio_id>/admin/nuevo/", views_superadmin.crear_admin,      name="crear_admin"),
@@ -187,5 +229,15 @@ urlpatterns = [
     path("superadmin/municipio/<int:municipio_id>/modulo/",     views_superadmin.gestionar_modulo,      name="gestionar_modulo"),
     path("superadmin/municipio/<int:municipio_id>/importar/",   views_superadmin.importar_estacionamientos, name="importar_estacionamientos"),
     path("superadmin/municipio/<int:municipio_id>/plantillas/", views_superadmin.gestionar_plantillas,      name="gestionar_plantillas"),
+    path("superadmin/liquidaciones/",                               views_superadmin.liquidaciones_plataforma,        name="liquidaciones_plataforma"),
+    path("superadmin/municipio/<int:municipio_id>/liquidacion/nueva/", views_superadmin.crear_liquidacion_plataforma, name="crear_liquidacion_plataforma"),
+    path("superadmin/liquidacion/<int:liquidacion_id>/",            views_superadmin.detalle_liquidacion_plataforma,  name="detalle_liquidacion_plataforma"),
+    path("superadmin/sugerencias/",                                 views_superadmin.panel_sugerencias,               name="panel_sugerencias"),
+    path("superadmin/sugerencias/<int:sugerencia_id>/",             views_superadmin.gestionar_sugerencia,            name="gestionar_sugerencia"),
+
+    # =========================
+    # 📺 DASHBOARD TV (público)
+    # =========================
+    path("tv/<str:token>/", views_publico.dashboard_tv, name="dashboard_tv"),
 
 ]

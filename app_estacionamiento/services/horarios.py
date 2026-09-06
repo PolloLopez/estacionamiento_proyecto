@@ -134,9 +134,11 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
     ahora   = timezone.localtime()
     hoy_dia = ahora.weekday()
 
+    # Mismo criterio que puede_estacionar_ahora: si hay duplicados,
+    # usar el registro más reciente para que ambas funciones sean consistentes.
     horario = HorarioEstacionamiento.objects.filter(
         municipio=municipio, dia_semana=hoy_dia, activo=True
-    ).first()
+    ).order_by("-id").first()
 
     if horario:
         cierre = timezone.make_aware(
@@ -201,9 +203,10 @@ def cerrar_estacionamientos_vencidos_por_horario(municipio):
     if cache.get(cache_key_cierre):
         return
 
+    # Mismo criterio que las otras funciones: registro más reciente si hay duplicados.
     horario = HorarioEstacionamiento.objects.filter(
         municipio=municipio, dia_semana=hoy_dia, activo=True
-    ).first()
+    ).order_by("-id").first()
 
     if horario and hora_actual > horario.hora_fin:
         activos = Estacionamiento.objects.filter(

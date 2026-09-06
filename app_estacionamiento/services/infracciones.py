@@ -293,6 +293,76 @@ def cobrar_infraccion_efectivo(infraccion, cobrador, medio_pago="efectivo"):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Descuento por pago voluntario — módulo premium descuentos_voluntarios
+# ─────────────────────────────────────────────────────────────────────────────
+
+def calcular_descuento_infraccion(infraccion, tarifa, ahora=None):
+    """
+    Calcula el descuento por pago voluntario si aplica.
+
+    Dos niveles configurables en Tarifa:
+      - Por horas (plazo corto, mayor descuento): si el conductor paga dentro de
+        tarifa.descuento_horas_plazo horas → aplica tarifa.descuento_horas_pct %.
+      - Por días  (plazo largo, menor descuento): si paga dentro de
+        tarifa.descuento_dias_plazo días → aplica tarifa.descuento_dias_pct %.
+      - Si aplican los dos, se usa el de horas (mayor descuento, plazo más corto).
+
+    No evalúa si el módulo está activo — eso le corresponde al caller (use_case).
+    Solo recibe la tarifa y calcula aritméticamente.
+
+    Parámetros:
+        infraccion: instancia de Infraccion (debe tener creado_en y monto)
+        tarifa: instancia de Tarifa o None
+        ahora: datetime con timezone (default: timezone.now())
+
+    Retorna dict con:
+        monto_final    (Decimal) — monto a cobrar (puede igualar monto original)
+        descuento_pct  (Decimal) — porcentaje aplicado (0 si no aplica ningún nivel)
+        motivo         (str)     — descripción legible del descuento, vacío si no aplica
+    """
+    if ahora is None:
+        ahora = timezone.now()
+
+    monto_original = infraccion.monto
+    sin_descuento = {
+        "monto_final": monto_original,
+        "descuento_pct": Decimal("0"),
+        "motivo": "",
+    }
+
+    if not tarifa:
+        return sin_descuento
+
+    delta_segundos = (ahora - infraccion.creado_en).total_seconds()
+    horas_transcurridas = delta_segundos / 3600
+    dias_transcurridos  = delta_segundos / 86400
+
+    # Prioridad: plazo en horas (descuento mayor). Si aplica, no se evalúa el de días.
+    if tarifa.descuento_horas_plazo and tarifa.descuento_horas_pct:
+        if horas_transcurridas <= tarifa.descuento_horas_plazo:
+            pct = tarifa.descuento_horas_pct
+            monto_final = (monto_original * (1 - pct / 100)).quantize(Decimal("0.01"))
+            return {
+                "monto_final": monto_final,
+                "descuento_pct": pct,
+                "motivo": f"Pago dentro de {tarifa.descuento_horas_plazo}h ({pct}% off)",
+            }
+
+    # Segundo nivel: plazo en días (descuento menor).
+    if tarifa.descuento_dias_plazo and tarifa.descuento_dias_pct:
+        if dias_transcurridos <= tarifa.descuento_dias_plazo:
+            pct = tarifa.descuento_dias_pct
+            monto_final = (monto_original * (1 - pct / 100)).quantize(Decimal("0.01"))
+            return {
+                "monto_final": monto_final,
+                "descuento_pct": pct,
+                "motivo": f"Pago dentro de {tarifa.descuento_dias_plazo} dias ({pct}% off)",
+            }
+
+    return sin_descuento
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Tolerancia de gracia — helper compartido
 # ─────────────────────────────────────────────────────────────────────────────
 

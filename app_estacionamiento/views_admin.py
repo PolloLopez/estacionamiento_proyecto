@@ -15,7 +15,7 @@ Responsabilidades:
 No incluye cobros de MercadoPago (eso es views_mp.py).
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib import messages
@@ -29,8 +29,10 @@ from django.utils import timezone
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 
 from .decorators import require_role
+from .services.caja import generar_cierre_caja
 from .services.infracciones import cobrar_infraccion_efectivo, MEDIOS_VALIDOS_COBRO
 from .services.saldo import cargar_saldo_conductor
 from .utils import sanitizar_patente
@@ -40,6 +42,7 @@ from .models import (
     Estacionamiento,
     HorarioEstacionamiento,
     Infraccion,
+    ModuloMunicipio,
     MovimientoCaja,
     Notificacion,
     Rendicion,
@@ -55,8 +58,17 @@ from .models import (
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helper privado
+# Helpers privados
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _correo_invalido(correo):
+    """Devuelve True si el correo no pasa la validación de Django."""
+    try:
+        validate_email(correo)
+        return False
+    except DjangoValidationError:
+        return True
+
 
 def _enviar_email_verificacion(correo, nombre, aprobado, motivo=""):
     """
@@ -122,11 +134,13 @@ def panel_admin(request):
         municipio=municipio
     ).select_related("vehiculo", "inspector").order_by("-creado_en")[:20]
 
-    # Vehículos con estacionamiento activo en este municipio ahora mismo
+    # Vehículos con estacionamiento activo en este municipio ahora mismo.
+    # Cap en 50: si hay muchos activos simultáneos, la tabla del panel podría ser
+    # inutilizable y lenta. 50 es suficiente para tener una foto del estado actual.
     estacionamientos_activos = Estacionamiento.objects.filter(
         subcuadra__municipio=municipio,
         estado="ACTIVO",
-    ).select_related("vehiculo", "subcuadra").order_by("-hora_inicio")
+    ).select_related("vehiculo", "subcuadra").order_by("-hora_inicio")[:50]
 
     verificaciones_pendientes = SolicitudVerificacion.objects.filter(
         estado="pendiente", usuario__municipio=municipio
@@ -136,7 +150,30 @@ def panel_admin(request):
         usuario__municipio=municipio, certificado=False,
     ).count()
 
+    # Semáforo de cierre de caja: detecta vendedores con movimientos abiertos
+    # más viejos de lo que permite la frecuencia configurada en el municipio.
+    frecuencia = getattr(municipio, "frecuencia_cierre_caja", "diaria")
+    umbral_dias = {"diaria": 1, "semanal": 7, "mensual": 30}.get(frecuencia, 1)
+    umbral_fecha = timezone.now() - timedelta(days=umbral_dias)
+    vendedores_caja_atrasada = (
+        MovimientoCaja.objects.filter(
+            usuario__municipio=municipio,
+            usuario__es_vendedor=True,
+            tipo="ingreso",
+            cerrado=False,
+            creado_en__lte=umbral_fecha,
+        )
+        .values_list("usuario_id", flat=True)
+        .distinct()
+        .count()
+    )
+
     from django.urls import reverse as _reverse
+    from .models import Impugnacion as _Impugnacion
+
+    impugnaciones_pendientes = _Impugnacion.objects.filter(
+        municipio=municipio, estado="pendiente"
+    ).count()
 
     # Sidebar agrupado por rubro.
     # Cada grupo tiene un título y una lista de ítems {label, url, badge}.
@@ -148,6 +185,7 @@ def panel_admin(request):
                 {"label": "👮 Inspectores",      "url": _reverse("gestionar_inspectores"),    "badge": None},
                 {"label": "💰 Vendedores",       "url": _reverse("gestionar_vendedores"),     "badge": None},
                 {"label": "🔍 Auditoría staff",  "url": _reverse("auditoria_staff"),          "badge": None},
+                {"label": "📊 Dashboard",        "url": _reverse("dashboard_admin"),          "badge": None},
             ],
         },
         {
@@ -155,14 +193,17 @@ def panel_admin(request):
             "items": [
                 {"label": "🚗 Vehículos",        "url": _reverse("admin_vehiculos"),          "badge": None},
                 {"label": "📋 Infracciones",     "url": _reverse("admin_infracciones"),       "badge": None},
+                {"label": "⚖️ Impugnaciones",    "url": _reverse("admin_impugnaciones"),      "badge": impugnaciones_pendientes or None},
                 # Exenciones unifica admin + SIA en una sola vista
                 {"label": "🚫 Exenciones",       "url": _reverse("exenciones"),               "badge": None},
+                {"label": "🗺️ Mapa de calor",    "url": _reverse("mapa_calor_infracciones"),  "badge": None},
             ],
         },
         {
             "titulo": "Configuración",
             "items": [
                 {"label": "📍 Subcuadras GPS",   "url": _reverse("gestionar_subcuadras"),     "badge": None},
+                {"label": "📊 Cobertura",        "url": _reverse("reportes_subcuadras"),      "badge": None},
                 {"label": "💲 Tarifas",          "url": _reverse("gestionar_tarifas"),        "badge": None},
                 {"label": "🕐 Horarios",         "url": _reverse("gestionar_horarios"),       "badge": None},
                 {"label": "📅 Días especiales",  "url": _reverse("gestionar_dias_especiales"),"badge": None},
@@ -171,43 +212,79 @@ def panel_admin(request):
         {
             "titulo": "Caja y rendiciones",
             "items": [
-                {"label": "✅ Verificaciones",   "url": _reverse("gestionar_verificaciones"), "badge": verificaciones_pendientes or None},
-                {"label": "💼 Rendiciones",      "url": _reverse("admin_rendiciones"),        "badge": rendiciones_pendientes or None},
-                {"label": "🧾 Mi caja",          "url": _reverse("admin_cerrar_caja"),        "badge": None},
+                {"label": "✅ Verificaciones",   "url": _reverse("gestionar_verificaciones"),  "badge": verificaciones_pendientes or None},
+                {"label": "💼 Rendiciones",      "url": _reverse("admin_rendiciones"),         "badge": rendiciones_pendientes or None},
+                {"label": "🧾 Mi caja",          "url": _reverse("admin_cerrar_caja"),         "badge": None},
+                {"label": "⏰ Caja vendedores",  "url": _reverse("admin_caja_vendedores"),     "badge": vendedores_caja_atrasada or None},
             ],
         },
     ]
 
     return render(request, "admin/panel_admin.html", {
-        "infracciones_recientes":    infracciones_recientes,
-        "estacionamientos_activos":  estacionamientos_activos,
-        "verificaciones_pendientes": verificaciones_pendientes,
-        "rendiciones_pendientes":    rendiciones_pendientes,
-        "sidebar_grupos":            sidebar_grupos,
+        "infracciones_recientes":     infracciones_recientes,
+        "estacionamientos_activos":   estacionamientos_activos,
+        "verificaciones_pendientes":  verificaciones_pendientes,
+        "rendiciones_pendientes":     rendiciones_pendientes,
+        "vendedores_caja_atrasada":   vendedores_caja_atrasada,
+        "frecuencia_cierre_caja":     frecuencia,
+        "sidebar_grupos":             sidebar_grupos,
     })
 
 
 @require_role("admin")
 def dashboard_admin(request):
-    """Dashboard de estadísticas: infracciones por inspector, patentes por día, cobros."""
+    """Dashboard de estadísticas del municipio con filtro de fechas.
+
+    Por defecto muestra los últimos 30 días. Acepta GET params `desde` y `hasta`
+    en formato YYYY-MM-DD para ajustar el rango.
+    """
     municipio = request.user.municipio
+    hoy = timezone.now().date()
+
+    # Parsear rango de fechas desde la URL, con fallback a los últimos 30 días.
+    # Si el valor viene vacío o con formato inválido, usamos el default silenciosamente.
+    try:
+        desde = date.fromisoformat(request.GET.get("desde", ""))
+    except (ValueError, TypeError):
+        desde = hoy - timedelta(days=30)
+
+    try:
+        hasta = date.fromisoformat(request.GET.get("hasta", ""))
+    except (ValueError, TypeError):
+        hasta = hoy
 
     infracciones_por_inspector = Infraccion.objects.filter(
-        municipio=municipio
+        municipio=municipio,
+        creado_en__date__gte=desde,
+        creado_en__date__lte=hasta,
     ).values("inspector__correo").annotate(total=Count("id")).order_by("-total")
 
-    patentes_por_dia = Vehiculo.objects.filter(
-        municipio=municipio
-    ).annotate(fecha=TruncDate("fecha_creacion")).values("fecha").annotate(total=Count("id"))
+    # Vehículos registrados por día en el rango (útil para ver tendencia de altas)
+    patentes_por_dia = (
+        Vehiculo.objects.filter(
+            municipio=municipio,
+            fecha_creacion__date__gte=desde,
+            fecha_creacion__date__lte=hasta,
+        )
+        .annotate(fecha=TruncDate("fecha_creacion"))
+        .values("fecha")
+        .annotate(total=Count("id"))
+        .order_by("fecha")
+    )
 
     cobros = MovimientoCaja.objects.filter(
-        usuario__municipio=municipio
+        usuario__municipio=municipio,
+        creado_en__date__gte=desde,
+        creado_en__date__lte=hasta,
     ).values("usuario__correo").annotate(total=Sum("monto")).order_by("-total")
 
-    return render(request, "admin/panel_admin.html", {
+    return render(request, "admin/dashboard_admin.html", {
         "infracciones_por_inspector": infracciones_por_inspector,
         "patentes_por_dia":           patentes_por_dia,
         "cobros":                     cobros,
+        "desde":                      desde,
+        "hasta":                      hasta,
+        "hoy":                        hoy,
     })
 
 
@@ -582,6 +659,17 @@ def editar_vendedor(request, vendedor_id):
         vendedor.documento_cuil     = request.POST.get("documento_cuil", "").strip()
         vendedor.telefono           = request.POST.get("telefono", "").strip()
         vendedor.horario_atencion   = request.POST.get("horario_atencion", "").strip()
+        vendedor.domicilio_comercial = request.POST.get("domicilio_comercial", "").strip()
+        try:
+            lat_str = request.POST.get("ubicacion_lat", "").strip()
+            vendedor.ubicacion_lat = Decimal(lat_str) if lat_str else None
+        except Exception:
+            vendedor.ubicacion_lat = None
+        try:
+            lon_str = request.POST.get("ubicacion_lon", "").strip()
+            vendedor.ubicacion_lon = Decimal(lon_str) if lon_str else None
+        except Exception:
+            vendedor.ubicacion_lon = None
         try:
             vendedor.saldo_limite = Decimal(request.POST.get("saldo_limite", "0") or "0")
         except Exception:
@@ -593,6 +681,7 @@ def editar_vendedor(request, vendedor_id):
         except Exception:
             vendedor.porcentaje_ganancia = 0
         vendedor.periodicidad_rendicion = request.POST.get("periodicidad_rendicion", "semanal")
+        vendedor.puede_vender_abono     = request.POST.get("puede_vender_abono") == "on"
         vendedor.save()
         return redirect("gestionar_vendedores")
 
@@ -729,11 +818,13 @@ def detalle_usuario_admin(request, usuario_id):
             conductor.first_name = nombre.title()
         if apellido:
             conductor.last_name = apellido.title()
+        domicilio     = request.POST.get("domicilio", "").strip()
         conductor.telefono      = telefono
         conductor.numero_dni    = numero_dni
         conductor.es_verificado = es_verificado
+        conductor.domicilio     = domicilio
         conductor.save(update_fields=[
-            "correo", "first_name", "last_name", "telefono", "numero_dni", "es_verificado"
+            "correo", "first_name", "last_name", "telefono", "numero_dni", "es_verificado", "domicilio"
         ])
         messages.success(request, "Datos actualizados.")
 
@@ -748,8 +839,41 @@ def detalle_usuario_admin(request, usuario_id):
             messages.error(request, "La contraseña debe tener al menos 6 caracteres.")
         else:
             conductor.set_password(nueva_password)
+            # Forzar cambio en el próximo login: la contraseña que el admin establece
+            # es temporal; el usuario debe elegir la suya propia.
+            conductor.cambio_password_requerido = True
             conductor.save()
-            messages.success(request, f"Contraseña de {conductor.correo} actualizada.")
+            messages.success(
+                request,
+                f"Contraseña temporal establecida. {conductor.correo} deberá cambiarla al próximo login. "
+                "Comunicale la contraseña temporal por fuera del sistema."
+            )
+
+    elif accion == "verificar_residencia":
+        # El admin confirma que este conductor es vecino verificado del municipio.
+        # Habilita el reintegro si el alcance está en "residentes".
+        from django.utils.timezone import localdate
+        conductor.es_residente_verificado        = True
+        conductor.fecha_verificacion_residencia  = localdate()
+        conductor.save(update_fields=[
+            "es_residente_verificado", "fecha_verificacion_residencia"
+        ])
+        messages.success(request, f"{conductor.get_full_name()} marcado como residente verificado.")
+
+    elif accion == "quitar_verificacion_residencia":
+        # El admin puede revocar la verificación (ej. el conductor se mudó).
+        conductor.es_residente_verificado       = False
+        conductor.fecha_verificacion_residencia = None
+        conductor.save(update_fields=[
+            "es_residente_verificado", "fecha_verificacion_residencia"
+        ])
+        messages.success(request, "Verificación de residencia revocada.")
+
+    # ── Módulo reintegro: mostrar tarjeta solo si está activo ─────────────────
+    from app_estacionamiento.services.reintegro import modulo_reintegro_activo
+    municipio         = request.user.municipio
+    modulo_reintegro  = modulo_reintegro_activo(municipio)
+    reintegro_alcance = municipio.reintegro_alcance if municipio else "residentes"
 
     # Últimas 5 infracciones (preview)
     infracciones = Infraccion.objects.filter(
@@ -758,9 +882,11 @@ def detalle_usuario_admin(request, usuario_id):
     ).distinct().order_by("-creado_en")[:5]
 
     return render(request, "admin/detalle_usuario.html", {
-        "conductor":   conductor,
-        "vehiculos":   vehiculos,
-        "infracciones": infracciones,
+        "conductor":        conductor,
+        "vehiculos":        vehiculos,
+        "infracciones":     infracciones,
+        "modulo_reintegro": modulo_reintegro,
+        "reintegro_alcance": reintegro_alcance,
     })
 
 
@@ -975,6 +1101,46 @@ def gestionar_tarifas(request):
                 municipio.save(update_fields=["comision_vendedor"])
                 messages.success(request, f"✅ Comisión de vendedor actualizada a {valor:,.2f}%.")
 
+            elif seccion == "descuentos":
+                # Cada campo llega como string vacío si el admin lo borró (= sin nivel).
+                # Vacío → None en BD (nivel desactivado). Cero no es válido (sin sentido).
+                def _opcional_entero(campo):
+                    raw = request.POST.get(campo, "").strip()
+                    if not raw:
+                        return None
+                    n = int(raw)
+                    if n <= 0:
+                        raise ValueError(f"'{campo}' debe ser mayor que 0.")
+                    return n
+
+                def _opcional_decimal(campo):
+                    raw = request.POST.get(campo, "").strip()
+                    if not raw:
+                        return None
+                    d = Decimal(raw)
+                    if d <= 0 or d > 100:
+                        raise ValueError(f"'{campo}' debe estar entre 0 y 100.")
+                    return d
+
+                h_plazo = _opcional_entero("descuento_horas_plazo")
+                h_pct   = _opcional_decimal("descuento_horas_pct")
+                d_plazo = _opcional_entero("descuento_dias_plazo")
+                d_pct   = _opcional_decimal("descuento_dias_pct")
+
+                # Validar consistencia: si configura plazo, debe configurar porcentaje también
+                if bool(h_plazo) != bool(h_pct):
+                    raise ValueError("Para el nivel de horas, informá plazo Y porcentaje (o dejá ambos vacíos).")
+                if bool(d_plazo) != bool(d_pct):
+                    raise ValueError("Para el nivel de días, informá plazo Y porcentaje (o dejá ambos vacíos).")
+
+                tarifa_qs.update(
+                    descuento_horas_plazo=h_plazo,
+                    descuento_horas_pct=h_pct,
+                    descuento_dias_plazo=d_plazo,
+                    descuento_dias_pct=d_pct,
+                )
+                messages.success(request, "✅ Configuración de descuentos guardada.")
+
             else:
                 error = "Campo desconocido. No se guardó nada."
 
@@ -1000,10 +1166,23 @@ def gestionar_tarifas(request):
             precio_abono_auto=Decimal("0"),
             precio_abono_moto=Decimal("0"),
         )
+    modulo_descuentos = ModuloMunicipio.objects.filter(
+        municipio=municipio,
+        modulo="descuentos_voluntarios",
+        activo=True,
+    ).exists()
+    modulo_comisiones = ModuloMunicipio.objects.filter(
+        municipio=municipio,
+        modulo="comisiones_vendedores",
+        activo=True,
+    ).exists()
+
     return render(request, "admin/gestionar_tarifas.html", {
-        "tarifa_actual": tarifa_actual,
-        "municipio":     municipio,
-        "error":         error,
+        "tarifa_actual":     tarifa_actual,
+        "municipio":         municipio,
+        "error":             error,
+        "modulo_descuentos": modulo_descuentos,
+        "modulo_comisiones": modulo_comisiones,
     })
 
 
@@ -1459,9 +1638,22 @@ def crear_rendicion(request):
     })
 
 
-@require_role("admin")
+@require_role("admin", "tesorero")
 def certificar_cierre(request, cierre_id):
-    """El admin certifica (audita) un cierre de caja. Solo acepta POST."""
+    """Certifica (audita) un cierre de caja.
+
+    Acceso:
+    - Admin: puede certificar cualquier cierre de su municipio, excepto el suyo propio.
+    - Tesorero: válvula de escape — puede certificar cierres de admins sin certificar.
+      No puede certificar cierres de inspectores/vendedores (eso es tarea del admin).
+
+    Solo acepta POST.
+    """
+    es_tesorero = getattr(request.user, "es_tesorero", False)
+
+    # Destino de redirect según rol (se usa en todos los caminos)
+    destino = "panel_tesorero" if es_tesorero else "admin_rendiciones"
+
     cierre = get_object_or_404(
         CierreCaja.objects.select_related("usuario"),
         id=cierre_id,
@@ -1469,18 +1661,23 @@ def certificar_cierre(request, cierre_id):
     )
 
     if request.method != "POST":
-        return redirect("admin_rendiciones")
+        return redirect(destino)
+
+    # Tesorero solo puede certificar cierres de admins (no vendedores/inspectores)
+    if es_tesorero and not getattr(cierre.usuario, "es_admin", False):
+        messages.error(request, "El tesorero solo puede certificar cierres de administradores.")
+        return redirect(destino)
 
     # Un admin no puede certificar su propio cierre — debe hacerlo otro admin o el tesorero.
     if cierre.usuario == request.user:
-        messages.error(request, "No podés certificar tu propio cierre. Pedile a otro admin que lo certifique.")
-        return redirect("admin_rendiciones")
+        messages.error(request, "No podés certificar tu propio cierre. Pedile a otro admin o al tesorero.")
+        return redirect(destino)
 
     if cierre.certificado:
         messages.warning(request, "Este cierre ya estaba certificado.")
-        return redirect("admin_rendiciones")
+        return redirect(destino)
 
-    cierre.certificado    = True
+    cierre.certificado     = True
     cierre.certificado_en  = timezone.now()
     cierre.certificado_por = request.user
     cierre.save(update_fields=["certificado", "certificado_en", "certificado_por"])
@@ -1489,7 +1686,7 @@ def certificar_cierre(request, cierre_id):
         request,
         f"✅ Cierre de {cierre.usuario.correo} del {cierre.fecha_cierre:%d/%m/%Y} certificado."
     )
-    return redirect("admin_rendiciones")
+    return redirect(destino)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2858,6 +3055,70 @@ def importar_exenciones(request):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Reportes de subcuadras
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def reportes_subcuadras(request):
+    """
+    Dashboard de cobertura por subcuadra del municipio.
+
+    Por cada subcuadra muestra: verificaciones, infracciones y vehículos exentos
+    en el período seleccionado. Útil para detectar zonas sin cobertura de inspectores
+    y subcuadras con alta conflictividad.
+
+    Filtro de fecha: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD (default: mes actual).
+    """
+    municipio = request.user.municipio
+    hoy = timezone.localtime().date()
+
+    try:
+        desde = date.fromisoformat(request.GET.get("desde", ""))
+    except (ValueError, TypeError):
+        desde = hoy.replace(day=1)  # primer día del mes actual
+
+    try:
+        hasta = date.fromisoformat(request.GET.get("hasta", ""))
+    except (ValueError, TypeError):
+        hasta = hoy
+
+    # Una sola query con 3 anotaciones por subcuadra.
+    # Las FK de VerificacionInspector e Infraccion → Subcuadra son nullable (migración 0062
+    # y 0061), así que los registros sin subcuadra no cuentan en ninguna subcuadra.
+    subcuadras = (
+        Subcuadra.objects.filter(municipio=municipio)
+        .annotate(
+            total_verificaciones=Count(
+                "verificacioninspector",
+                filter=Q(
+                    verificacioninspector__fecha__date__gte=desde,
+                    verificacioninspector__fecha__date__lte=hasta,
+                ),
+                distinct=True,
+            ),
+            total_infracciones=Count(
+                "infraccion",
+                filter=Q(
+                    infraccion__creado_en__date__gte=desde,
+                    infraccion__creado_en__date__lte=hasta,
+                ),
+                distinct=True,
+            ),
+            # Vehículos con exención específica a esta subcuadra (M2M inverso)
+            total_exentos=Count("vehiculo", distinct=True),
+        )
+        .order_by("-total_verificaciones", "-total_infracciones")
+    )
+
+    return render(request, "admin/reportes_subcuadras.html", {
+        "subcuadras": subcuadras,
+        "desde":      desde,
+        "hasta":      hasta,
+        "hoy":        hoy,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Auditoría de staff
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -2980,4 +3241,322 @@ def vehiculos_exentos_sia(request):
     return render(request, "admin/vehiculos_exentos_sia.html", {
         "vehiculos": vehiculos,
         "hoy":       hoy,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Semáforo de cierre de caja de vendedores
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@require_role("admin")
+def caja_vendedores(request):
+    """
+    Lista de vendedores con movimientos de caja abiertos, ordenados por antigüedad.
+    Permite forzar el cierre de caja de un vendedor desde el panel admin.
+    """
+    municipio = request.user.municipio
+    frecuencia = getattr(municipio, "frecuencia_cierre_caja", "diaria")
+    umbral_dias = {"diaria": 1, "semanal": 7, "mensual": 30}.get(frecuencia, 1)
+    umbral_fecha = timezone.now() - timedelta(days=umbral_dias)
+
+    # IDs de vendedores con movimientos abiertos más viejos del umbral
+    ids_atrasados = set(
+        MovimientoCaja.objects.filter(
+            usuario__municipio=municipio,
+            usuario__es_vendedor=True,
+            tipo="ingreso",
+            cerrado=False,
+            creado_en__lte=umbral_fecha,
+        ).values_list("usuario_id", flat=True).distinct()
+    )
+
+    # Todos los vendedores activos del municipio con su movimiento más antiguo abierto
+    vendedores = Usuario.objects.filter(
+        municipio=municipio, es_vendedor=True, is_active=True
+    ).order_by("first_name")
+
+    datos = []
+    for v in vendedores:
+        mov_abiertos = MovimientoCaja.objects.filter(
+            usuario=v, tipo="ingreso", cerrado=False
+        ).order_by("creado_en")
+        mas_antiguo = mov_abiertos.first()
+        if mas_antiguo:
+            datos.append({
+                "vendedor":   v,
+                "atrasado":   v.id in ids_atrasados,
+                "desde":      mas_antiguo.creado_en,
+                "cant_mov":   mov_abiertos.count(),
+            })
+
+    return render(request, "admin/caja_vendedores.html", {
+        "datos":          datos,
+        "frecuencia":     frecuencia,
+        "umbral_dias":    umbral_dias,
+    })
+
+
+@require_role("admin")
+def forzar_cierre_vendedor(request, vendedor_id):
+    """
+    Fuerza el cierre de caja de un vendedor desde el panel admin.
+    Solo acepta POST (acción irreversible — genera un CierreCaja).
+    """
+    if request.method != "POST":
+        return redirect("admin_caja_vendedores")
+
+    vendedor = get_object_or_404(
+        Usuario, id=vendedor_id, es_vendedor=True, municipio=request.user.municipio
+    )
+    cierre = generar_cierre_caja(vendedor, periodo="Cierre forzado por admin")
+    if cierre:
+        messages.success(request, f"Caja de {vendedor.nombre_completo()} cerrada correctamente.")
+    else:
+        messages.info(request, f"{vendedor.nombre_completo()} no tiene movimientos abiertos para cerrar.")
+
+    return redirect("admin_caja_vendedores")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mapa de calor de infracciones (Leaflet.js)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def mapa_calor_infracciones(request):
+    """
+    Mapa interactivo con la densidad de infracciones por subcuadra.
+    Usa las coordenadas (lat/lon) de cada subcuadra y muestra círculos
+    proporcionales a la cantidad de infracciones.
+    Solo incluye subcuadras con coordenadas cargadas.
+    """
+    from django.db.models import Count
+    import json
+
+    municipio = request.user.municipio
+
+    datos = list(
+        Infraccion.objects.filter(municipio=municipio, subcuadra__isnull=False)
+        .values(
+            "subcuadra__id",
+            "subcuadra__calle",
+            "subcuadra__altura",
+            "subcuadra__lat",
+            "subcuadra__lon",
+        )
+        .annotate(total=Count("id"))
+        .filter(subcuadra__lat__isnull=False, subcuadra__lon__isnull=False)
+        .order_by("-total")
+    )
+
+    puntos = json.dumps([
+        {
+            "lat":    float(d["subcuadra__lat"]),
+            "lon":    float(d["subcuadra__lon"]),
+            "nombre": f"{d['subcuadra__calle']} {d['subcuadra__altura']}",
+            "total":  d["total"],
+        }
+        for d in datos
+    ])
+
+    if datos:
+        centro_lat = sum(float(d["subcuadra__lat"]) for d in datos) / len(datos)
+        centro_lon = sum(float(d["subcuadra__lon"]) for d in datos) / len(datos)
+    else:
+        centro_lat, centro_lon = -34.6037, -58.3816
+
+    return render(request, "admin/mapa_calor_infracciones.html", {
+        "puntos":             puntos,
+        "centro_lat":         centro_lat,
+        "centro_lon":         centro_lon,
+        "total_subcuadras":   len(datos),
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Impugnaciones — panel admin
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def admin_impugnaciones(request):
+    """
+    Lista todas las impugnaciones del municipio, filtrables por estado.
+    """
+    from app_estacionamiento.models import Impugnacion
+
+    municipio     = request.user.municipio
+    estado_filtro = request.GET.get("estado", "pendiente")
+
+    impugnaciones = Impugnacion.objects.filter(
+        municipio=municipio
+    ).select_related("conductor", "infraccion", "infraccion__vehiculo").order_by("-creado_en")
+
+    if estado_filtro in ("pendiente", "aceptada", "rechazada"):
+        impugnaciones = impugnaciones.filter(estado=estado_filtro)
+
+    return render(request, "admin/impugnaciones.html", {
+        "impugnaciones": impugnaciones,
+        "estado_filtro": estado_filtro,
+    })
+
+
+@require_role("admin")
+def resolver_impugnacion(request, impug_id):
+    """
+    El admin acepta o rechaza una impugnación pendiente.
+    Aceptar anula la infracción asociada.
+    """
+    from app_estacionamiento.models import Impugnacion
+
+    if request.method != "POST":
+        return redirect("admin_impugnaciones")
+
+    municipio   = request.user.municipio
+    impugnacion = get_object_or_404(
+        Impugnacion, id=impug_id, municipio=municipio, estado="pendiente"
+    )
+
+    accion     = request.POST.get("accion")
+    resolucion = request.POST.get("resolucion", "").strip()
+
+    if accion not in ("aceptar", "rechazar"):
+        messages.error(request, "Acción inválida.")
+        return redirect("admin_impugnaciones")
+
+    ahora = timezone.now()
+
+    if accion == "aceptar":
+        infraccion = impugnacion.infraccion
+        if infraccion.estado == "pendiente":
+            infraccion.estado     = "anulada"
+            infraccion.fecha_pago = ahora
+            infraccion.save(update_fields=["estado", "fecha_pago"])
+        impugnacion.estado       = "aceptada"
+        impugnacion.resolucion   = resolucion
+        impugnacion.resuelto_en  = ahora
+        impugnacion.resuelto_por = request.user
+        impugnacion.save()
+        messages.success(request, f"Impugnación #{impug_id} aceptada. La infracción fue anulada.")
+    else:
+        impugnacion.estado       = "rechazada"
+        impugnacion.resolucion   = resolucion
+        impugnacion.resuelto_en  = ahora
+        impugnacion.resuelto_por = request.user
+        impugnacion.save()
+        messages.info(request, f"Impugnación #{impug_id} rechazada.")
+
+    return redirect("admin_impugnaciones")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gestión de admins y tesoreros del municipio (desde panel admin)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("admin")
+def gestionar_staff(request):
+    """
+    Lista los admins y tesoreros del municipio.
+    El admin puede crear nuevos tesoreros y resetear contraseñas de ambos roles.
+    """
+    municipio = request.user.municipio
+    admins    = Usuario.objects.filter(municipio=municipio, es_admin=True).order_by("-is_active", "correo")
+    tesoreros = Usuario.objects.filter(municipio=municipio, es_tesorero=True).order_by("-is_active", "correo")
+
+    if request.method == "POST":
+        accion = request.POST.get("accion", "")
+
+        if accion == "crear_tesorero":
+            correo     = request.POST.get("correo", "").strip().lower()
+            nombre     = request.POST.get("first_name", "").strip()
+            apellido   = request.POST.get("last_name", "").strip()
+            password   = request.POST.get("password", "").strip()
+
+            if not correo or not nombre or not password:
+                messages.error(request, "Completá todos los campos obligatorios.")
+            elif _correo_invalido(correo):
+                messages.error(request, "El correo ingresado no es válido.")
+            elif len(password) < 6:
+                messages.error(request, "La contraseña debe tener al menos 6 caracteres.")
+            elif Usuario.objects.filter(correo=correo).exists():
+                messages.error(request, f"Ya existe un usuario con el correo {correo}.")
+            else:
+                from django.contrib.auth.hashers import make_password
+                Usuario.objects.create(
+                    correo=correo,
+                    username=correo,
+                    first_name=nombre,
+                    last_name=apellido,
+                    password=make_password(password),
+                    municipio=municipio,
+                    es_tesorero=True,
+                    es_conductor=False,
+                    is_active=True,
+                    cambio_password_requerido=True,
+                )
+                messages.success(request, f"Tesorero {correo} creado. Debe cambiar su contraseña al primer login.")
+            return redirect("gestionar_staff")
+
+    return render(request, "admin/gestionar_staff.html", {
+        "admins":    admins,
+        "tesoreros": tesoreros,
+        "municipio": municipio,
+    })
+
+
+@require_role("admin")
+def editar_staff(request, usuario_id):
+    """
+    El admin puede:
+      - Ver y editar datos de un admin o tesorero de su municipio
+      - Resetear la contraseña (temporal, fuerza cambio en próximo login)
+      - Activar / desactivar la cuenta
+    No puede editar su propio usuario desde acá (evita bloqueo accidental).
+    """
+    municipio = request.user.municipio
+    staff = get_object_or_404(
+        Usuario,
+        id=usuario_id,
+        municipio=municipio,
+    )
+    if not (staff.es_admin or staff.es_tesorero):
+        messages.error(request, "Solo podés editar admins o tesoreros.")
+        return redirect("gestionar_staff")
+    if staff.pk == request.user.pk:
+        messages.error(request, "No podés editarte a vos mismo desde acá.")
+        return redirect("gestionar_staff")
+
+    if request.method == "POST":
+        accion = request.POST.get("accion", "editar")
+
+        if accion == "editar":
+            staff.first_name = request.POST.get("first_name", "").strip()
+            staff.last_name  = request.POST.get("last_name", "").strip()
+            staff.telefono   = request.POST.get("telefono", "").strip()
+            staff.is_active  = request.POST.get("is_active") == "on"
+            staff.save(update_fields=["first_name", "last_name", "telefono", "is_active"])
+            messages.success(request, "Datos actualizados.")
+
+        elif accion == "cambiar_password":
+            nueva    = request.POST.get("nueva_password", "").strip()
+            confirma = request.POST.get("confirmar_password", "").strip()
+            if not nueva:
+                messages.error(request, "La contraseña no puede estar vacía.")
+            elif nueva != confirma:
+                messages.error(request, "Las contraseñas no coinciden.")
+            elif len(nueva) < 6:
+                messages.error(request, "Mínimo 6 caracteres.")
+            else:
+                staff.set_password(nueva)
+                staff.cambio_password_requerido = True
+                staff.save()
+                messages.success(
+                    request,
+                    f"Contraseña temporal establecida para {staff.correo}. "
+                    "Deberá cambiarla en el próximo login."
+                )
+
+        return redirect("editar_staff", usuario_id=staff.pk)
+
+    return render(request, "admin/editar_staff.html", {
+        "staff": staff,
     })

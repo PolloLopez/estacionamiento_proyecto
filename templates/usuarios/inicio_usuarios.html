@@ -95,14 +95,23 @@
         🟡 Sin estacionamiento activo
       </div>
 
-      <p class="info">
-        No hay ningún vehículo estacionado en este momento.
-      </p>
-
-      <a class="btn"
-         href="{% url 'usuarios_estacionar_vehiculo' %}">
-        🚗 Estacionar vehículo
-      </a>
+      {% if puede_estacionar %}
+        <p class="info">
+          No hay ningún vehículo estacionado en este momento.
+        </p>
+        <a class="btn"
+           href="{% url 'usuarios_estacionar_vehiculo' %}">
+          🚗 Estacionar vehículo
+        </a>
+      {% else %}
+        <div class="alert alert-warning" style="margin-bottom:0.75rem;">
+          ⏰ {{ mensaje_horario }}
+        </div>
+        <button class="btn" disabled
+                style="opacity:0.4; cursor:not-allowed; filter:grayscale(60%);">
+          🚗 Estacionar vehículo
+        </button>
+      {% endif %}
 
     {% endif %}
   </div>

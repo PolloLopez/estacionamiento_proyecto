@@ -15,6 +15,7 @@ No incluye cobros en efectivo ni gestión de caja (eso es vendedor).
 No incluye gestión de municipio ni usuarios (eso es admin).
 """
 
+import math
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -23,6 +24,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -33,9 +35,13 @@ from .models import (
     Estacionamiento,
     Estado,
     Infraccion,
+    ModuloMunicipio,
     MovimientoCaja,
     Notificacion,
+    SolicitudEliminacionCuenta,
     SolicitudVerificacion,
+    SugerenciaMejora,
+    Subcuadra,
     Tarifa,
     Usuario,
     VerificacionInspector,
@@ -43,6 +49,7 @@ from .models import (
     VehiculoUsuario,
 )
 from .use_cases.estacionar_vehiculo import ejecutar_estacionamiento
+from .services.infracciones import calcular_descuento_infraccion
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
 from .use_cases.pagar_infraccion import ejecutar as pagar_infraccion_uc
 from .services.horarios import (
@@ -113,6 +120,13 @@ def inicio_usuarios(request):
         notif_infraccion["hora_fin_gracia"]      = parse_datetime(notif_infraccion["hora_fin_gracia"])
         notif_infraccion["hora_estacionamiento"] = parse_datetime(notif_infraccion["hora_estacionamiento"])
 
+    # Chequeo de horario para deshabilitar el botón "Estacionar" fuera del horario.
+    # Lo calculamos solo si el municipio existe para evitar error con usuario sin municipio.
+    if usuario.municipio:
+        puede_estacionar, msg_horario_inicio = puede_estacionar_ahora(usuario.municipio)
+    else:
+        puede_estacionar, msg_horario_inicio = True, None
+
     return render(request, "usuarios/inicio_usuarios.html", {
         "usuario":               usuario,
         "estacionamiento_activo": estacionamiento_activo,
@@ -120,6 +134,8 @@ def inicio_usuarios(request):
         "notificaciones_nuevas": notificaciones_nuevas,
         "abonos_activos":        abonos_activos,
         "notif_infraccion":      notif_infraccion,
+        "puede_estacionar":      puede_estacionar,
+        "mensaje_horario":       msg_horario_inicio,
     })
 
 
@@ -358,12 +374,38 @@ def mis_infracciones(request):
                 if elapsed <= timedelta(minutes=tolerancia_min):
                     ids_dentro_tolerancia.add(inf.id)
 
+    # Preview de descuento por pago voluntario (módulo premium).
+    # Se adjunta como atributo `descuento_preview` a cada infracción para que
+    # el template pueda acceder sin custom template tags (dict lookup por clave
+    # variable no está soportado en Django templates por defecto).
+    modulo_descuento_activo = ModuloMunicipio.objects.filter(
+        municipio=usuario.municipio,
+        modulo="descuentos_voluntarios",
+        activo=True,
+    ).exists()
+
+    # Evaluar queryset para poder anotar objetos con atributo extra
+    infracciones_lista = list(infracciones)
+    if modulo_descuento_activo:
+        tarifa = Tarifa.objects.filter(municipio=usuario.municipio).first()
+        for inf in infracciones_lista:
+            if inf.estado == "pendiente":
+                resultado = calcular_descuento_infraccion(inf, tarifa, ahora=ahora)
+                inf.descuento_preview = resultado if resultado["descuento_pct"] > 0 else None
+            else:
+                inf.descuento_preview = None
+    else:
+        for inf in infracciones_lista:
+            inf.descuento_preview = None
+
+    tiene_pendientes = any(inf.estado == "pendiente" for inf in infracciones_lista)
+
     return render(request, "usuarios/historial_infracciones.html", {
-        "infracciones":         infracciones,
-        "saldo_usuario":        usuario.saldo,
-        "tiene_pendientes":     infracciones.filter(estado="pendiente").exists(),
-        "tolerancia_min":       tolerancia_min,
-        "ids_dentro_tolerancia": ids_dentro_tolerancia,
+        "infracciones":           infracciones_lista,
+        "saldo_usuario":          usuario.saldo,
+        "tiene_pendientes":       tiene_pendientes,
+        "tolerancia_min":         tolerancia_min,
+        "ids_dentro_tolerancia":  ids_dentro_tolerancia,
     })
 
 
@@ -442,6 +484,51 @@ def eliminar_vehiculo(request, vehiculo_id):
             vehiculo_id=vehiculo_id
         ).delete()
     return redirect("usuarios_estacionar_vehiculo")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GPS — subcuadra más cercana para el conductor
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("conductor")
+def subcuadra_cercana_conductor(request):
+    """
+    Endpoint JSON para pre-seleccionar subcuadra desde el browser del conductor.
+
+    Recibe: GET ?lat=<float>&lon=<float>
+    Devuelve: {"id": <int>, "nombre": "<str>"} con la subcuadra más cercana,
+              o {} si el municipio no tiene subcuadras con coordenadas cargadas.
+
+    Misma lógica que el endpoint de inspectores, pero con rol conductor.
+    La distancia es euclidiana sobre lat/lon — suficiente para zonas urbanas
+    de pocos km² sin necesidad de proyecciones geográficas.
+    """
+    try:
+        lat = float(request.GET.get("lat", ""))
+        lon = float(request.GET.get("lon", ""))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "lat y lon son requeridos"}, status=400)
+
+    municipio = getattr(request.user, "municipio", None)
+    if not municipio:
+        return JsonResponse({})
+
+    subcuadras = Subcuadra.objects.filter(
+        municipio=municipio,
+        lat__isnull=False,
+        lon__isnull=False,
+    ).exclude(calle="Zona Única")
+
+    if not subcuadras.exists():
+        return JsonResponse({})
+
+    def distancia(s):
+        dlat = float(s.lat) - lat
+        dlon = float(s.lon) - lon
+        return math.sqrt(dlat ** 2 + dlon ** 2)
+
+    mas_cercana = min(subcuadras, key=distancia)
+    return JsonResponse({"id": mas_cercana.id, "nombre": str(mas_cercana)})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -544,7 +631,17 @@ def estacionar_vehiculo(request):
                 "usuario":  usuario,
             })
 
-        subcuadra = get_subcuadra_default(usuario.municipio)
+        # Subcuadra: usa la informada por el conductor (GPS o selector manual),
+        # o la default si no se envió ninguna o el id no pertenece al municipio.
+        subcuadra_id = request.POST.get("subcuadra_id")
+        if subcuadra_id:
+            subcuadra = (
+                Subcuadra.objects.filter(id=subcuadra_id, municipio=usuario.municipio).first()
+                or get_subcuadra_default(usuario.municipio)
+            )
+        else:
+            subcuadra = get_subcuadra_default(usuario.municipio)
+
         result    = ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion)
 
         for w in result.get("warnings", []):
@@ -587,16 +684,31 @@ def estacionar_vehiculo(request):
     )
 
     patente_preseleccionada = sanitizar_patente(request.GET.get("patente", ""))
+
+    # Chequeo de horario en GET: si está fuera de horario se muestra el banner
+    # y el formulario queda bloqueado. Mismo chequeo que en POST, pero acá
+    # informamos al conductor antes de que intente enviar el formulario.
+    permitido_get, msg_horario_get = puede_estacionar_ahora(usuario.municipio)
+
     opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto)
 
+    # Subcuadras disponibles para GPS / selección manual.
+    # Excluimos "Zona Única" (el default silencioso) para no confundir al conductor.
+    subcuadras = Subcuadra.objects.filter(
+        municipio=usuario.municipio,
+    ).exclude(calle="Zona Única").order_by("calle", "altura")
+
     return render(request, "usuarios/estacionar_vehiculo.html", {
-        "vehiculos":             vehiculos,
-        "usuario":               usuario,
-        "tarifa_hora":           tarifa_hora_auto,
-        "tarifa_hora_auto":      tarifa_hora_auto,
-        "tarifa_hora_moto":      tarifa_hora_moto,
+        "vehiculos":              vehiculos,
+        "usuario":                usuario,
+        "tarifa_hora":            tarifa_hora_auto,
+        "tarifa_hora_auto":       tarifa_hora_auto,
+        "tarifa_hora_moto":       tarifa_hora_moto,
         "patente_preseleccionada": patente_preseleccionada,
-        "opciones_duracion":     opciones_duracion,
+        "opciones_duracion":      opciones_duracion,
+        "subcuadras":             subcuadras,
+        "fuera_de_horario":       not permitido_get,
+        "mensaje_horario":        msg_horario_get,
     })
 
 
@@ -877,4 +989,289 @@ def pagar_abono_conductor(request):
         "confirmar":        confirmar,
         "error":            error,
         "saldo_usuario":    usuario.saldo,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Impugnaciones
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_login
+def crear_impugnacion(request, infraccion_id):
+    """
+    El conductor impugna una infracción pendiente o pagada propia.
+    Solo puede haber una impugnación pendiente por infracción.
+    """
+    from app_estacionamiento.models import Impugnacion, Infraccion, VehiculoUsuario
+
+    conductor = request.user
+    municipio = conductor.municipio
+
+    # Verificar que la infracción pertenece a un vehículo del conductor
+    infraccion = get_object_or_404(
+        Infraccion,
+        id=infraccion_id,
+        municipio=municipio,
+        vehiculo__vehiculousuario__usuario=conductor,
+    )
+
+    # No se puede impugnar una infracción ya anulada o que ya tiene impugnación pendiente
+    if infraccion.estado == "anulada":
+        messages.error(request, "Esta infracción ya fue anulada.")
+        return redirect("mis_infracciones")
+
+    if infraccion.impugnaciones.filter(estado="pendiente").exists():
+        messages.info(request, "Ya enviaste una impugnación pendiente para esta infracción.")
+        return redirect("mis_infracciones")
+
+    if request.method == "POST":
+        motivo   = request.POST.get("motivo", "").strip()
+        evidencia = request.FILES.get("evidencia")
+        if not motivo:
+            messages.error(request, "El motivo no puede estar vacío.")
+        else:
+            Impugnacion.objects.create(
+                infraccion=infraccion,
+                conductor=conductor,
+                municipio=municipio,
+                motivo=motivo,
+                evidencia=evidencia,
+            )
+            messages.success(
+                request,
+                f"✅ Impugnación enviada para la infracción #{infraccion_id}. "
+                "El admin la revisará y te notificará.",
+            )
+            return redirect("mis_infracciones")
+
+    return render(request, "usuarios/crear_impugnacion.html", {
+        "infraccion": infraccion,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Transferencia de saldo entre conductores
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_login
+def transferir_saldo(request):
+    """
+    El conductor envía parte de su saldo a otro conductor del mismo municipio.
+    """
+    from app_estacionamiento.use_cases.transferir_saldo import iniciar_transferencia
+
+    conductor = request.user
+    error     = None
+    exito     = False
+
+    if request.method == "POST":
+        correo_receptor = request.POST.get("correo_receptor", "").strip()
+        monto_str       = request.POST.get("monto", "0").strip()
+        resultado = iniciar_transferencia(conductor, correo_receptor, monto_str)
+        if resultado["ok"]:
+            exito = True
+            messages.success(
+                request,
+                f"✅ Transferencia de ${resultado['transferencia'].monto} enviada. "
+                "El receptor tiene 24 horas para aceptar.",
+            )
+            return redirect("transferencias_saldo")
+        else:
+            error = resultado["error"]
+
+    return render(request, "usuarios/transferir_saldo.html", {
+        "error":         error,
+        "saldo_usuario": conductor.saldo,
+    })
+
+
+@require_login
+def transferencias_saldo(request):
+    """
+    Historial de transferencias enviadas y recibidas del conductor.
+    Permite responder a transferencias pendientes recibidas.
+    """
+    from app_estacionamiento.models import TransferenciaSaldo
+
+    conductor = request.user
+    enviadas  = TransferenciaSaldo.objects.filter(emisor=conductor).order_by("-creado_en")[:20]
+    recibidas = TransferenciaSaldo.objects.filter(receptor=conductor).order_by("-creado_en")[:20]
+
+    return render(request, "usuarios/transferencias_saldo.html", {
+        "enviadas":  enviadas,
+        "recibidas": recibidas,
+    })
+
+
+@require_login
+def responder_transferencia(request, transf_id):
+    """
+    El receptor acepta o rechaza. El emisor puede cancelar.
+    """
+    from app_estacionamiento.use_cases.transferir_saldo import responder_transferencia as uc_responder
+
+    if request.method != "POST":
+        return redirect("transferencias_saldo")
+
+    accion    = request.POST.get("accion")
+    resultado = uc_responder(request.user, transf_id, accion)
+
+    if resultado["ok"]:
+        etiquetas = {"aceptar": "aceptada", "rechazar": "rechazada", "cancelar": "cancelada"}
+        messages.success(request, f"Transferencia {etiquetas.get(accion, '')}.")
+    else:
+        messages.error(request, resultado["error"])
+
+    return redirect("transferencias_saldo")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Eliminación de cuenta (conductor)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("conductor")
+def solicitar_eliminacion_cuenta(request):
+    """
+    El conductor puede eliminar su cuenta bajo dos condiciones:
+      1. Saldo = 0 (si tiene saldo positivo debe transferirlo primero).
+      2. Sin infracciones pendientes (pagadas o sin condena).
+
+    El admin solo puede bloquear/suspender — no puede eliminar en nombre del conductor.
+    La eliminación es soft-delete: is_active=False + registro en SolicitudEliminacionCuenta.
+    """
+    usuario = request.user
+
+    # Verificar saldo
+    if usuario.saldo > 0:
+        messages.error(
+            request,
+            f"Tenés un saldo de ${usuario.saldo:.2f}. "
+            "Transferilo a otro conductor antes de eliminar tu cuenta."
+        )
+        return redirect("inicio_usuarios")
+
+    # Verificar infracciones pendientes
+    infracciones_pendientes = Infraccion.objects.filter(
+        vehiculo__in=Vehiculo.objects.filter(
+            vehiculousuario__usuario=usuario
+        ),
+        estado__in=("pendiente", "notificada"),
+    ).count()
+
+    if infracciones_pendientes > 0:
+        messages.error(
+            request,
+            f"Tenés {infracciones_pendientes} infracción(es) pendiente(s) de pago. "
+            "Pagalas antes de eliminar tu cuenta."
+        )
+        return redirect("inicio_usuarios")
+
+    if request.method == "POST":
+        motivo = request.POST.get("motivo", "").strip()
+        with transaction.atomic():
+            # Registrar la solicitud para trazabilidad
+            SolicitudEliminacionCuenta.objects.update_or_create(
+                usuario=usuario,
+                defaults={
+                    "estado":     "completada",
+                    "motivo":     motivo,
+                    "resuelto_en": timezone.now(),
+                },
+            )
+            # Soft-delete: desactivar la cuenta
+            usuario.is_active = False
+            usuario.save(update_fields=["is_active"])
+
+        # Cerrar la sesión manualmente
+        from django.contrib.auth import logout
+        logout(request)
+        messages.success(request, "Tu cuenta fue eliminada. ¡Hasta pronto!")
+        return redirect("login")
+
+    return render(request, "usuarios/eliminar_cuenta.html", {
+        "usuario": usuario,
+    })
+
+
+@require_role("conductor")
+def cancelar_eliminacion_cuenta(request):
+    """Cancela una solicitud de eliminación pendiente (por si el flujo queda a medias)."""
+    if request.method == "POST":
+        SolicitudEliminacionCuenta.objects.filter(
+            usuario=request.user, estado="pendiente"
+        ).update(estado="cancelada", resuelto_en=timezone.now())
+    return redirect("inicio_usuarios")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sugerencias de mejora del sistema
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_login
+def enviar_sugerencia(request):
+    """
+    Cualquier usuario autenticado puede enviar una sugerencia.
+    Solo el superadmin las ve en su panel.
+    Cuando el superadmin cambia el estado, el usuario recibe una notificación in-app.
+    """
+    usuario = request.user
+
+    # Detectar el rol actual del usuario para pre-seleccionar area y rol_usuario
+    if usuario.is_superuser:
+        rol_actual = "superadmin"
+    elif usuario.es_admin:
+        rol_actual = "admin"
+    elif usuario.es_tesorero:
+        rol_actual = "tesorero"
+    elif usuario.es_inspector:
+        rol_actual = "inspector"
+    elif usuario.es_vendedor:
+        rol_actual = "vendedor"
+    else:
+        rol_actual = "conductor"
+
+    if request.method == "POST":
+        titulo      = request.POST.get("titulo", "").strip()
+        descripcion = request.POST.get("descripcion", "").strip()
+        area        = request.POST.get("area", "general")
+        criticidad  = request.POST.get("criticidad", "funcional")
+
+        if not titulo or not descripcion:
+            messages.error(request, "El título y la descripción son obligatorios.")
+        else:
+            SugerenciaMejora.objects.create(
+                usuario     = usuario,
+                municipio   = getattr(usuario, "municipio", None),
+                rol_usuario = rol_actual,
+                area        = area,
+                criticidad  = criticidad,
+                titulo      = titulo,
+                descripcion = descripcion,
+                estado      = "recibida",
+                notificado  = True,   # empieza notificado (no hay cambio que avisar aún)
+            )
+            messages.success(request, "Sugerencia enviada. ¡Gracias por contribuir!")
+            return redirect("mis_sugerencias")
+
+    return render(request, "usuarios/enviar_sugerencia.html", {
+        "rol_actual":  rol_actual,
+        "areas":       SugerenciaMejora.AREAS,
+        "criticidades": SugerenciaMejora.CRITICIDAD,
+    })
+
+
+@require_login
+def mis_sugerencias(request):
+    """El usuario ve sus propias sugerencias y el estado de cada una."""
+    sugerencias = SugerenciaMejora.objects.filter(
+        usuario=request.user
+    ).order_by("-creado_en")
+
+    # Marcar como notificadas las que tenía pendientes de ver
+    no_vistas = sugerencias.filter(notificado=False)
+    if no_vistas.exists():
+        no_vistas.update(notificado=True)
+
+    return render(request, "usuarios/mis_sugerencias.html", {
+        "sugerencias": sugerencias,
     })

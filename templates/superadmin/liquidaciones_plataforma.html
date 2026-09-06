@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Liquidaciones de plataforma{% endblock %}
+
+{% block content %}
+<div class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.2rem;">
+    <h2 style="margin:0;">💳 Liquidaciones de plataforma</h2>
+    <a href="{% url 'panel_superadmin' %}" class="btn btn-outline" style="font-size:0.85rem;">← Panel superadmin</a>
+  </div>
+
+  {% if pendientes_pago or comprobantes_enviados %}
+  <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1.2rem;">
+    {% if pendientes_pago %}
+    <div class="alert alert-warning" style="margin:0; flex:1; min-width:180px;">
+      📄 <strong>{{ pendientes_pago }}</strong> con factura emitida esperando pago
+    </div>
+    {% endif %}
+    {% if comprobantes_enviados %}
+    <div class="alert alert-info" style="margin:0; flex:1; min-width:180px;">
+      📎 <strong>{{ comprobantes_enviados }}</strong> comprobante/s para revisar
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Filtros ── #}
+  <form method="get" style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:1rem; align-items:flex-end;">
+    <div>
+      <label style="font-size:0.82rem; font-weight:600;">Municipio</label>
+      <select name="municipio_id" style="min-width:160px;">
+        <option value="">Todos</option>
+        {% for m in municipios %}
+        <option value="{{ m.id }}" {% if municipio_filtro == m.id|stringformat:"s" %}selected{% endif %}>{{ m.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="font-size:0.82rem; font-weight:600;">Estado</label>
+      <select name="estado">
+        <option value="">Todos</option>
+        {% for val, label in estados %}
+        <option value="{{ val }}" {% if estado_filtro == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-outline" style="font-size:0.85rem;">Filtrar</button>
+    {% if estado_filtro or municipio_filtro %}
+    <a href="{% url 'liquidaciones_plataforma' %}" class="btn btn-outline" style="font-size:0.85rem;">Limpiar</a>
+    {% endif %}
+  </form>
+
+  {# ── Tabla ── #}
+  {% if liquidaciones %}
+  <div style="overflow-x:auto;">
+    <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--color-border); text-align:left;">
+          <th style="padding:0.5rem;">#</th>
+          <th style="padding:0.5rem;">Municipio</th>
+          <th style="padding:0.5rem;">Período</th>
+          <th style="padding:0.5rem; text-align:right;">Total ($)</th>
+          <th style="padding:0.5rem;">Estado</th>
+          <th style="padding:0.5rem;">Iniciado por</th>
+          <th style="padding:0.5rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for liq in liquidaciones %}
+        <tr style="border-bottom:1px solid var(--color-border);">
+          <td style="padding:0.5rem; color:var(--color-text-muted);">#{{ liq.id }}</td>
+          <td style="padding:0.5rem; font-weight:600;">{{ liq.municipio.nombre }}</td>
+          <td style="padding:0.5rem;">{{ liq.periodo_inicio|date:"d/m/Y" }} → {{ liq.periodo_fin|date:"d/m/Y" }}</td>
+          <td style="padding:0.5rem; text-align:right; font-weight:700;">
+            ${{ liq.monto_total|floatformat:2 }}
+          </td>
+          <td style="padding:0.5rem;">
+            {% if liq.estado == "aprobada" %}
+              <span style="color:var(--color-primary); font-weight:600;">✅ Aprobada</span>
+            {% elif liq.estado == "comprobante_enviado" %}
+              <span style="color:#0070f3; font-weight:600;">📎 Comprobante enviado</span>
+            {% elif liq.estado == "pendiente_pago" %}
+              <span style="color:#d97706; font-weight:600;">⏳ Pendiente de pago</span>
+            {% elif liq.estado == "observada" %}
+              <span style="color:var(--color-danger); font-weight:600;">⚠️ Observada</span>
+            {% else %}
+              <span style="color:var(--color-text-muted);">📋 Borrador</span>
+            {% endif %}
+          </td>
+          <td style="padding:0.5rem; font-size:0.82rem; color:var(--color-text-muted);">
+            {{ liq.iniciado_por|capfirst }}
+          </td>
+          <td style="padding:0.5rem;">
+            <a href="{% url 'detalle_liquidacion_plataforma' liq.id %}" class="btn btn-outline"
+               style="font-size:0.78rem; padding:0.2rem 0.55rem;">Ver</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-muted" style="text-align:center; padding:2rem 0;">
+    No hay liquidaciones con esos filtros.
+  </p>
+  {% endif %}
+
+  {# ── Acceso rápido: nueva liquidación por municipio ── #}
+  <div style="margin-top:2rem; border-top:1px solid var(--color-border); padding-top:1rem;">
+    <h3 style="margin-bottom:0.75rem; font-size:1rem;">Nueva liquidación por municipio</h3>
+    <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+      {% for m in municipios %}
+      <a href="{% url 'crear_liquidacion_plataforma' m.id %}"
+         class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.75rem;">
+        + {{ m.nombre }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

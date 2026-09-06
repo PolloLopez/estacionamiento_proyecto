@@ -73,7 +73,7 @@
           </div>
         </div>
 
-        <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem; flex-wrap:wrap;">
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap;">
           <div style="flex:1; min-width:110px;">
             <label style="font-size:0.88rem; color:var(--color-text-muted);">Teléfono</label>
             <input name="telefono" value="{{ conductor.telefono }}" placeholder="Ej: 2994123456"
@@ -84,6 +84,13 @@
             <input name="numero_dni" value="{{ conductor.numero_dni }}" placeholder="Ej: 30123456"
                    style="width:100%; margin-top:0.2rem;" />
           </div>
+        </div>
+
+        <div style="margin-bottom:0.75rem;">
+          <label style="font-size:0.88rem; color:var(--color-text-muted);">Domicilio</label>
+          <input name="domicilio" value="{{ conductor.domicilio }}"
+                 placeholder="Ej: San Martín 1234, Mercedes"
+                 style="width:100%; margin-top:0.2rem;" />
         </div>
 
         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
@@ -100,10 +107,18 @@
 
     <!-- CAMBIAR CONTRASEÑA -->
     <div class="card">
-      <h3 style="margin-bottom:0.8rem;">🔑 Cambiar contraseña</h3>
+      <h3 style="margin-bottom:0.8rem;">🔑 Contraseña temporal</h3>
       <p class="text-muted" style="font-size:0.9rem; margin-bottom:0.75rem;">
-        Usá esto si el conductor no puede recuperar su contraseña por email.
+        Establecé una contraseña temporal y comunicásela al usuario.
+        Al próximo login se le pedirá que elija una propia.
       </p>
+      {% if conductor.cambio_password_requerido %}
+      <div style="background:var(--color-warning-bg,#fff8e1); border:1px solid var(--color-warning);
+                  border-radius:6px; padding:0.5rem 0.75rem; margin-bottom:0.75rem;
+                  font-size:0.85rem; color:var(--color-text);">
+        ⏳ Este usuario tiene pendiente cambiar su contraseña al próximo login.
+      </div>
+      {% endif %}
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="accion" value="cambiar_password">
@@ -198,6 +213,56 @@
       <p class="text-muted">Este conductor no tiene vehículos registrados.</p>
     {% endif %}
   </div>
+
+  <!-- MÓDULO REINTEGRO: VERIFICACIÓN DE RESIDENCIA -->
+  {% if modulo_reintegro %}
+  <div class="card">
+    <h3 style="margin:0 0 0.6rem;">🏠 Residencia verificada</h3>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      El módulo de reintegro está activo en este municipio.
+      {% if reintegro_alcance == "residentes" %}
+      Solo los conductores marcados como vecinos verificados reciben el reintegro de saldo.
+      {% else %}
+      El reintegro aplica a todos los conductores, pero podés marcar vecinos para registro interno.
+      {% endif %}
+    </p>
+
+    {% if conductor.es_residente_verificado %}
+      <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+        <span style="background:var(--color-primary); color:#fff; font-size:0.82rem;
+                     font-weight:700; padding:0.25rem 0.75rem; border-radius:99px;">
+          ✅ Residente verificado
+        </span>
+        {% if conductor.fecha_verificacion_residencia %}
+          <span style="font-size:0.8rem; color:var(--color-text-muted);">
+            desde {{ conductor.fecha_verificacion_residencia|date:"d/m/Y" }}
+          </span>
+        {% endif %}
+      </div>
+      <form method="post" style="margin:0;">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="quitar_verificacion_residencia">
+        <button type="submit" class="btn btn-outline"
+                style="font-size:0.82rem; padding:0.3rem 0.75rem;
+                       color:var(--color-warning); border-color:var(--color-warning);"
+                onclick="return confirm('¿Revocar la verificación de residencia de {{ conductor.get_full_name }}?')">
+          Revocar verificación
+        </button>
+      </form>
+    {% else %}
+      <p style="font-size:0.85rem; margin-bottom:0.75rem;">
+        <span style="color:var(--color-text-muted);">○ Sin verificación de residencia.</span>
+      </p>
+      <form method="post" style="margin:0;">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="verificar_residencia">
+        <button type="submit" class="btn btn-primary" style="font-size:0.85rem;">
+          Marcar como residente verificado
+        </button>
+      </form>
+    {% endif %}
+  </div>
+  {% endif %}
 
   <!-- HISTORIAL DE INFRACCIONES -->
   <div class="card">

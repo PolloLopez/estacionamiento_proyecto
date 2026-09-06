@@ -215,8 +215,10 @@ var DATOS_ACTA = {
   inspector:    "{% if infraccion.inspector.nombre %}{{ infraccion.inspector.nombre|escapejs }} {{ infraccion.inspector.apellido|escapejs }}{% else %}{{ infraccion.inspector.correo|escapejs }}{% endif %}",
   legajo:           "{{ infraccion.inspector.numero_legajo|default:''|escapejs }}",
   url_pago:         "{{ request.scheme }}://{{ request.get_host }}/pagar/{{ infraccion.vehiculo.patente }}/",
-  leyenda_horarios: "{{ infraccion.municipio.leyenda_horarios|default:''|escapejs }}",
-  texto_ordenanza:  "{{ infraccion.municipio.texto_ordenanza|default:''|escapejs }}",
+  leyenda_horarios:       "{{ infraccion.municipio.leyenda_horarios|default:''|escapejs }}",
+  texto_ordenanza:        "{{ infraccion.municipio.texto_ordenanza|default:''|escapejs }}",
+  // 0 = pedir confirmación antes de la segunda copia; >0 = pausa automática en ms
+  segundos_pausa_copias:  {{ infraccion.municipio.segundos_pausa_doble_copia }},
 };
 
 var URL_VERIFICAR = "{% url 'inspectores_verificar_vehiculo' %}";
@@ -268,8 +270,29 @@ async function imprimirActa() {
     estado.textContent = '⏳ Imprimiendo copia 1 de 2...';
     await enviarImpresion(conexion.caracteristica, bytes);
 
-    // Pausa para que el papel avance y el cutter actúe antes de la segunda copia
-    await new Promise(function(r) { setTimeout(r, 800); });
+    // Pausa entre copias: configurable desde superadmin.
+    // 0 = pedir confirmación; >0 = pausa automática en segundos.
+    var pausaSegundos = DATOS_ACTA.segundos_pausa_copias || 0;
+    if (pausaSegundos > 0) {
+      // Pausa automática: el papel avanza sin que el inspector tenga que hacer nada
+      for (var seg = pausaSegundos; seg > 0; seg--) {
+        estado.textContent = '⏳ Esperando ' + seg + 's para copia 2...';
+        await new Promise(function(r) { setTimeout(r, 1000); });
+      }
+    } else {
+      // Confirmación manual: el inspector decide cuándo imprimir la segunda copia
+      estado.textContent = '✋ Retirá la copia 1 y presioná para imprimir la copia 2.';
+      btn.textContent = '🖨 Imprimir copia 2';
+      btn.disabled = false;
+      await new Promise(function(resolver) {
+        btn.onclick = function () {
+          btn.disabled = true;
+          resolver();
+        };
+      });
+      // Restaurar el handler original para el finally
+      btn.onclick = imprimirActa;
+    }
 
     btn.textContent = '⏳ Imprimiendo (2/2)...';
     estado.textContent = '⏳ Imprimiendo copia 2 de 2...';

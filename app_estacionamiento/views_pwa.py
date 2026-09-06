@@ -16,14 +16,25 @@ from django.templatetags.static import static
 
 def manifest_json(request):
     """
-    Devuelve el Web App Manifest.
-    Nombre y color primario se toman del municipio activo si existe.
+    Devuelve el Web App Manifest con el nombre e ícono del municipio correcto.
+
+    Prioridad para elegir el municipio:
+      1. El municipio del usuario autenticado (garantiza que la PWA instalada
+         muestre el ícono del municipio en el que el usuario está registrado).
+      2. Si no hay sesión activa: el primer municipio activo (para la pantalla
+         de login, donde el prompt de instalación puede aparecer antes de loguearse).
     """
     from .models import Municipio
 
-    municipio = Municipio.objects.filter(activo=True).first()
-    nombre    = (getattr(municipio, "nombre_sistema", None) or "Estacionamiento").strip() or "Estacionamiento"
-    color     = getattr(municipio, "color_primario", None) or "#14883b"
+    if request.user.is_authenticated and getattr(request.user, "municipio_id", None):
+        # Usuario logueado: usa su propio municipio.
+        municipio = request.user.municipio
+    else:
+        # Sin sesión: fallback al primero activo (ej. página de login).
+        municipio = Municipio.objects.filter(activo=True).first()
+
+    nombre = (getattr(municipio, "nombre_sistema", None) or "Estacionamiento").strip() or "Estacionamiento"
+    color  = getattr(municipio, "color_primario", None) or "#14883b"
 
     # Si el municipio tiene ícono propio lo usamos; si no, los íconos estáticos del repo.
     icono = getattr(municipio, "icono_app", None)

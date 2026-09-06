@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Nueva liquidación — {{ municipio.nombre }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:680px;">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.2rem;">
+    <h2 style="margin:0;">💳 Nueva liquidación — {{ municipio.nombre }}</h2>
+    <a href="{% url 'liquidaciones_plataforma' %}" class="btn btn-outline" style="font-size:0.85rem;">← Volver</a>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem; padding:1rem 1.2rem;
+       background:var(--color-surface-2); border:1px solid var(--color-border);">
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0;">
+      Los montos están pre-calculados según la configuración del municipio.
+      Podés editarlos antes de guardar. Si adjuntás la factura ahora, el tesorero
+      recibirá la notificación de pago pendiente.
+    </p>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="card">
+    {% csrf_token %}
+
+    <h3 style="margin-bottom:1rem;">Período</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.2rem;">
+      <div>
+        <label style="font-size:0.85rem; font-weight:600;">Desde</label>
+        <input type="date" name="periodo_inicio" required value="{{ desde_sugerido|date:'Y-m-d' }}" />
+      </div>
+      <div>
+        <label style="font-size:0.85rem; font-weight:600;">Hasta</label>
+        <input type="date" name="periodo_fin" required value="{{ hasta_sugerido|date:'Y-m-d' }}" />
+      </div>
+    </div>
+
+    <h3 style="margin-bottom:0.5rem;">Montos</h3>
+    <p style="font-size:0.82rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      Recaudación calculada del período: <strong>${{ recaudacion_calculada|floatformat:2 }}</strong>
+    </p>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+      <div>
+        <label style="font-size:0.85rem; font-weight:600;">Monto fijo — mantenimiento ($)</label>
+        <input type="number" name="monto_fijo" step="0.01" min="0"
+               value="{{ monto_fijo_sugerido }}" id="monto_fijo"
+               oninput="actualizarTotal()" />
+      </div>
+      <div>
+        <label style="font-size:0.85rem; font-weight:600;">Monto variable — % recaudación ($)</label>
+        <input type="number" name="monto_variable" step="0.01" min="0"
+               value="{{ monto_variable_sugerido }}" id="monto_variable"
+               oninput="actualizarTotal()" />
+      </div>
+    </div>
+
+    <div>
+      <label style="font-size:0.85rem; font-weight:600;">Recaudación base (referencia)</label>
+      <input type="number" name="recaudacion_base" step="0.01" min="0"
+             value="{{ recaudacion_calculada }}" />
+      <p style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.2rem;">
+        Solo referencial — no afecta el total.
+      </p>
+    </div>
+
+    <div class="card" style="background:var(--color-primary); color:#fff;
+         border-radius:10px; padding:0.75rem 1rem; margin:1rem 0;
+         display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:0.95rem; font-weight:600;">Total a pagar</span>
+      <span style="font-size:1.4rem; font-weight:800;" id="total-display">
+        ${{ monto_total_sugerido|floatformat:2 }}
+      </span>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:0.85rem; font-weight:600;">Factura (PDF o imagen) — opcional</label>
+      <input type="file" name="factura" accept=".pdf,.jpg,.jpeg,.png,.webp" />
+      <p style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.2rem;">
+        Si adjuntás la factura ahora, la liquidación pasa a "Pendiente de pago" (visible para el tesorero).
+        Si no, se guarda como borrador.
+      </p>
+    </div>
+
+    <div style="margin-bottom:1.2rem;">
+      <label style="font-size:0.85rem; font-weight:600;">Notas (opcional)</label>
+      <textarea name="notas_superadmin" rows="3"
+                placeholder="Observaciones, aclaraciones, período de gracia, etc."></textarea>
+    </div>
+
+    <button type="submit" class="btn" style="width:100%; font-size:1.1rem; padding:0.9rem;">
+      💾 Crear liquidación
+    </button>
+  </form>
+
+</div>
+
+<script>
+function actualizarTotal() {
+  var fijo = parseFloat(document.getElementById("monto_fijo").value) || 0;
+  var variable = parseFloat(document.getElementById("monto_variable").value) || 0;
+  document.getElementById("total-display").textContent = "$" + (fijo + variable).toFixed(2);
+}
+</script>
+{% endblock %}

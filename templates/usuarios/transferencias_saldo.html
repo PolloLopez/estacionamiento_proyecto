@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Mis transferencias{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2 style="margin:0;">💸 Mis transferencias</h2>
+    <a href="{% url 'transferir_saldo' %}" class="btn" style="font-size:0.88rem;">
+      + Nueva transferencia
+    </a>
+  </div>
+
+  {% if transferencias_enviadas or transferencias_recibidas %}
+
+  {% if transferencias_recibidas %}
+  <div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin-bottom:0.75rem; font-size:1rem;">📥 Recibidas</h3>
+    {% for t in transferencias_recibidas %}
+    <div style="border-bottom:1px solid var(--color-border); padding:0.65rem 0; last-child:no-border;">
+      <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; align-items:flex-start;">
+        <div>
+          <span style="font-weight:700;">${{ t.monto }}</span>
+          <span style="font-size:0.83rem; color:var(--color-text-muted); margin-left:0.5rem;">
+            de {{ t.emisor.get_full_name|default:t.emisor.correo }} · {{ t.creado_en|date:"d/m/Y H:i" }}
+          </span>
+          {% if t.estado == "pendiente" %}
+          <br>
+          <small style="color:var(--color-text-muted);">Expira: {{ t.expira_en|date:"d/m/Y H:i" }}</small>
+          {% endif %}
+        </div>
+        <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+          {% if t.estado == "pendiente" %}
+            <form method="post" action="{% url 'responder_transferencia' t.id %}" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" name="accion" value="aceptar"
+                      class="btn" style="font-size:0.82rem; padding:0.3rem 0.65rem;
+                                         background:var(--color-primary);">
+                ✅ Aceptar
+              </button>
+            </form>
+            <form method="post" action="{% url 'responder_transferencia' t.id %}" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" name="accion" value="rechazar"
+                      class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
+                      onclick="return confirm('¿Rechazar la transferencia?')">
+                ❌ Rechazar
+              </button>
+            </form>
+          {% else %}
+            <span style="font-size:0.82rem; font-weight:700;
+              {% if t.estado == 'aceptada' %}color:var(--color-primary);
+              {% elif t.estado == 'rechazada' or t.estado == 'cancelada' %}color:var(--color-text-muted);
+              {% else %}color:var(--color-warning);{% endif %}">
+              {{ t.get_estado_display }}
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if transferencias_enviadas %}
+  <div class="card">
+    <h3 style="margin-bottom:0.75rem; font-size:1rem;">📤 Enviadas</h3>
+    {% for t in transferencias_enviadas %}
+    <div style="border-bottom:1px solid var(--color-border); padding:0.65rem 0;">
+      <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; align-items:flex-start;">
+        <div>
+          <span style="font-weight:700;">${{ t.monto }}</span>
+          <span style="font-size:0.83rem; color:var(--color-text-muted); margin-left:0.5rem;">
+            a {{ t.receptor.get_full_name|default:t.receptor.correo }} · {{ t.creado_en|date:"d/m/Y H:i" }}
+          </span>
+          {% if t.estado == "pendiente" %}
+          <br>
+          <small style="color:var(--color-text-muted);">Expira: {{ t.expira_en|date:"d/m/Y H:i" }}</small>
+          {% endif %}
+        </div>
+        <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+          {% if t.estado == "pendiente" %}
+            <form method="post" action="{% url 'responder_transferencia' t.id %}" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" name="accion" value="cancelar"
+                      class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
+                      onclick="return confirm('¿Cancelar la transferencia y recuperar el saldo?')">
+                🔁 Cancelar
+              </button>
+            </form>
+          {% else %}
+            <span style="font-size:0.82rem; font-weight:700;
+              {% if t.estado == 'aceptada' %}color:var(--color-primary);
+              {% elif t.estado == 'rechazada' or t.estado == 'cancelada' %}color:var(--color-text-muted);
+              {% else %}color:var(--color-warning);{% endif %}">
+              {{ t.get_estado_display }}
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="card" style="text-align:center; padding:2rem; color:var(--color-text-muted);">
+    No tenés transferencias registradas.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

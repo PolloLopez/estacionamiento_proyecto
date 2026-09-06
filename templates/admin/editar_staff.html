@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Editar {{ staff.correo }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:620px; margin:2rem auto;">
+
+  <a href="{% url 'gestionar_staff' %}"
+     style="font-size:.9rem; color:var(--color-primary,#2980b9);">← Volver</a>
+
+  <h2 style="margin-top:.8rem;">
+    {% if staff.es_admin %}🏛️ Admin{% else %}💳 Tesorero{% endif %}
+    — {{ staff.correo }}
+  </h2>
+
+  <!-- ── Datos generales ──────────────────────────────── -->
+  <section style="background:var(--color-bg-alt,#f9f9f9); border:1px solid #ddd;
+                  border-radius:8px; padding:1.2rem; margin-bottom:1.2rem;">
+    <h3 style="margin-top:0; font-size:1rem;">Datos generales</h3>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="editar">
+      <div style="display:flex; gap:.8rem; flex-wrap:wrap; margin-bottom:.7rem;">
+        <div style="flex:1; min-width:160px;">
+          <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Nombre</label>
+          <input type="text" name="first_name" value="{{ staff.first_name }}"
+            style="width:100%; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+        </div>
+        <div style="flex:1; min-width:160px;">
+          <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Apellido</label>
+          <input type="text" name="last_name" value="{{ staff.last_name }}"
+            style="width:100%; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="margin-bottom:.7rem;">
+        <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Teléfono</label>
+        <input type="text" name="telefono" value="{{ staff.telefono|default:'' }}"
+          style="width:100%; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+      </div>
+      <label style="display:flex; align-items:center; gap:.5rem; margin-bottom:.8rem; cursor:pointer;">
+        <input type="checkbox" name="is_active" {% if staff.is_active %}checked{% endif %}>
+        <span style="font-size:.9rem;">Cuenta activa</span>
+      </label>
+      <button type="submit"
+        style="background:var(--color-primary,#2980b9); color:#fff; border:none;
+               padding:.55rem 1.1rem; border-radius:6px; cursor:pointer;">
+        Guardar cambios
+      </button>
+    </form>
+  </section>
+
+  <!-- ── Cambio de contraseña ──────────────────────────── -->
+  <section style="background:var(--color-bg-alt,#f9f9f9); border:1px solid #ddd;
+                  border-radius:8px; padding:1.2rem;">
+    <h3 style="margin-top:0; font-size:1rem;">🔑 Resetear contraseña</h3>
+    <p style="font-size:.85rem; color:#666; margin-bottom:.8rem;">
+      La contraseña que establezcas es temporal.
+      {{ staff.correo }} deberá cambiarla en el próximo login.
+      Comunicásela por fuera del sistema.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="cambiar_password">
+      <div style="display:flex; gap:.8rem; flex-wrap:wrap; margin-bottom:.7rem;">
+        <div style="flex:1; min-width:180px;">
+          <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Nueva contraseña</label>
+          <div style="display:flex; gap:.3rem; align-items:center;">
+            <input type="password" name="nueva_password" id="id_nueva_password"
+                   minlength="6" required
+                   style="flex:1; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+            <button type="button" class="toggle-password" data-target="#id_nueva_password"
+                    title="Mostrar / ocultar"
+                    style="background:none; border:1px solid #ccc; border-radius:6px;
+                           padding:.4rem .6rem; cursor:pointer; font-size:1rem; line-height:1;">👁</button>
+          </div>
+        </div>
+        <div style="flex:1; min-width:180px;">
+          <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Confirmar</label>
+          <div style="display:flex; gap:.3rem; align-items:center;">
+            <input type="password" name="confirmar_password" id="id_confirmar_password"
+                   minlength="6" required
+                   style="flex:1; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+            <button type="button" class="toggle-password" data-target="#id_confirmar_password"
+                    title="Mostrar / ocultar"
+                    style="background:none; border:1px solid #ccc; border-radius:6px;
+                           padding:.4rem .6rem; cursor:pointer; font-size:1rem; line-height:1;">👁</button>
+          </div>
+        </div>
+      </div>
+      <button type="submit"
+        onclick="return confirm('¿Establecer contraseña temporal para {{ staff.correo }}?')"
+        style="background:#e65100; color:#fff; border:none;
+               padding:.55rem 1.1rem; border-radius:6px; cursor:pointer;">
+        Establecer contraseña temporal
+      </button>
+    </form>
+  </section>
+
+</div>
+{% endblock %}

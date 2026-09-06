@@ -21,6 +21,7 @@ from .views_auth import (
     registro_view,
     completar_perfil,
     logout_view,
+    forzar_cambio_password,
 )
 from .views_inspector import (
     panel_inspectores,
@@ -32,11 +33,15 @@ from .views_inspector import (
     pdf_infracciones_hoy,
     subcuadra_cercana,
     verificar_sia,
+    cobrar_infraccion_inspector,
 )
 from .views_tesorero import (
     panel_tesorero,
     validar_rendicion,
     depositar_comision,
+    mis_liquidaciones_plataforma,
+    crear_liquidacion_tesorero,
+    gestionar_liquidacion_plataforma,
 )
 from .views_vendedor import (
     panel_vendedor,
@@ -63,11 +68,20 @@ from .views_conductor import (
     agregar_vehiculo,
     eliminar_vehiculo,
     estacionar_vehiculo,
+    subcuadra_cercana_conductor,
     historial_estacionamientos,
     renovar_estacionamiento,
     finalizar_estacionamiento,
     mis_infracciones,
     pagar_abono_conductor,
+    crear_impugnacion,
+    transferir_saldo,
+    transferencias_saldo,
+    responder_transferencia,
+    solicitar_eliminacion_cuenta,
+    cancelar_eliminacion_cuenta,
+    enviar_sugerencia,
+    mis_sugerencias,
 )
 from .views_admin import (
     panel_admin,
@@ -102,7 +116,15 @@ from .views_admin import (
     gestionar_subcuadras,
     importar_exenciones,
     auditoria_staff,
+    reportes_subcuadras,
     vehiculos_exentos_sia,
+    caja_vendedores,
+    forzar_cierre_vendedor,
+    mapa_calor_infracciones,
+    admin_impugnaciones,
+    resolver_impugnacion,
+    gestionar_staff,
+    editar_staff,
 )
 from .views_mp import (
     mp_iniciar_carga,
@@ -111,4 +133,22 @@ from .views_mp import (
     mp_pendiente,
     mp_webhook,
 )
+
+# ─── Utilidades generales ─────────────────────────────────────────────────────
+from django.http import JsonResponse
+from django.db import connection
+
+def health_check(request):
+    """
+    Endpoint de health check para UptimeRobot y otros monitores de disponibilidad.
+    Verifica que la app responda Y que la base de datos sea accesible.
+    Devuelve 200 OK si todo está bien, 503 si hay un problema.
+    """
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        return JsonResponse({"status": "ok"}, status=200)
+    except Exception as e:
+        return JsonResponse({"status": "error", "detail": str(e)}, status=503)
+
 # ─────────────────────────────────────────────

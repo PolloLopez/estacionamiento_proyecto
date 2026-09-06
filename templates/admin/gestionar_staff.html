@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Administradores y tesoreros{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:860px; margin:2rem auto;">
+
+  <h2>👥 Administradores y tesoreros — {{ municipio.nombre }}</h2>
+
+  <!-- ── Admins ──────────────────────────────────────────── -->
+  <h3 style="margin-top:1.6rem;">🏛️ Administradores</h3>
+  <table style="width:100%; border-collapse:collapse; font-size:.9rem; margin-bottom:1.4rem;">
+    <thead>
+      <tr style="border-bottom:2px solid #ddd; text-align:left;">
+        <th style="padding:.5rem .7rem;">Nombre</th>
+        <th style="padding:.5rem .7rem;">Correo</th>
+        <th style="padding:.5rem .7rem;">Estado</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in admins %}
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:.5rem .7rem;">{{ u.nombre_completo }}</td>
+          <td style="padding:.5rem .7rem; color:#555;">{{ u.correo }}</td>
+          <td style="padding:.5rem .7rem;">
+            {% if u.is_active %}<span style="color:#2e7d32;">✅ Activo</span>
+            {% else %}<span style="color:#c62828;">❌ Inactivo</span>{% endif %}
+          </td>
+          <td style="padding:.5rem .7rem;">
+            {% if u.pk != request.user.pk %}
+              <a href="{% url 'editar_staff' u.pk %}"
+                 style="font-size:.85rem; color:var(--color-primary,#2980b9);">Editar →</a>
+            {% else %}
+              <span style="font-size:.8rem; color:#999;">(vos)</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" style="padding:.7rem; color:#999;">Sin admins registrados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- ── Tesoreros ──────────────────────────────────────── -->
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+    <h3 style="margin:0;">💳 Tesoreros</h3>
+    <button onclick="document.getElementById('form-nuevo-tesorero').style.display='block'; this.style.display='none';"
+      style="background:var(--color-primary,#2980b9); color:#fff; border:none;
+             padding:.45rem 1rem; border-radius:6px; cursor:pointer; font-size:.9rem;">
+      + Nuevo tesorero
+    </button>
+  </div>
+
+  <!-- Formulario nuevo tesorero (oculto por defecto) -->
+  <div id="form-nuevo-tesorero" style="display:none; background:var(--color-bg-alt,#f9f9f9);
+       border:1px solid #ddd; border-radius:8px; padding:1.2rem; margin:.8rem 0 1rem;">
+    <h4 style="margin-top:0;">Nuevo tesorero</h4>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="crear_tesorero">
+      <div style="display:flex; gap:.8rem; flex-wrap:wrap; margin-bottom:.7rem;">
+        <div style="flex:1; min-width:180px;">
+          <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Nombre *</label>
+          <input type="text" name="first_name" required
+            style="width:100%; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+        </div>
+        <div style="flex:1; min-width:180px;">
+          <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Apellido</label>
+          <input type="text" name="last_name"
+            style="width:100%; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+        </div>
+      </div>
+      <div style="display:flex; gap:.8rem; flex-wrap:wrap; margin-bottom:.7rem;">
+        <div style="flex:1; min-width:200px;">
+          <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Correo *</label>
+          <input type="email" name="correo" required
+            style="width:100%; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+        </div>
+        <div style="flex:1; min-width:160px;">
+          <label style="font-size:.85rem; font-weight:600; display:block; margin-bottom:.2rem;">Contraseña temporal *</label>
+          <div style="display:flex; gap:.3rem; align-items:center;">
+            <input type="password" name="password" id="id_password_nuevo_tesorero"
+                   required minlength="6"
+                   style="flex:1; padding:.5rem; border:1px solid #ccc; border-radius:6px; box-sizing:border-box;">
+            <button type="button" class="toggle-password" data-target="#id_password_nuevo_tesorero"
+                    title="Mostrar / ocultar contraseña"
+                    style="background:none; border:1px solid #ccc; border-radius:6px;
+                           padding:.4rem .6rem; cursor:pointer; font-size:1rem; line-height:1;">👁</button>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; gap:.8rem;">
+        <button type="submit"
+          style="background:var(--color-primary,#2980b9); color:#fff; border:none;
+                 padding:.5rem 1.1rem; border-radius:6px; cursor:pointer;">
+          Crear tesorero
+        </button>
+        <button type="button"
+          onclick="document.getElementById('form-nuevo-tesorero').style.display='none';"
+          style="background:#eee; border:none; padding:.5rem 1rem; border-radius:6px; cursor:pointer;">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <table style="width:100%; border-collapse:collapse; font-size:.9rem;">
+    <thead>
+      <tr style="border-bottom:2px solid #ddd; text-align:left;">
+        <th style="padding:.5rem .7rem;">Nombre</th>
+        <th style="padding:.5rem .7rem;">Correo</th>
+        <th style="padding:.5rem .7rem;">Estado</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in tesoreros %}
+        <tr style="border-bottom:1px solid #eee;">
+          <td style="padding:.5rem .7rem;">{{ u.nombre_completo }}</td>
+          <td style="padding:.5rem .7rem; color:#555;">{{ u.correo }}</td>
+          <td style="padding:.5rem .7rem;">
+            {% if u.is_active %}<span style="color:#2e7d32;">✅ Activo</span>
+            {% else %}<span style="color:#c62828;">❌ Inactivo</span>{% endif %}
+          </td>
+          <td style="padding:.5rem .7rem;">
+            <a href="{% url 'editar_staff' u.pk %}"
+               style="font-size:.85rem; color:var(--color-primary,#2980b9);">Editar →</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" style="padding:.7rem; color:#999;">Sin tesoreros registrados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+</div>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Cobertura por subcuadra{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>📊 Cobertura por subcuadra</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+  </div>
+
+  <!-- Filtro de fechas -->
+  <form method="get" style="margin-bottom:1.5rem;">
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+      <div>
+        <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Desde</label>
+        <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}"
+               style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}"
+               style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);">
+      </div>
+      <button type="submit" class="btn" style="font-size:0.9rem;">Filtrar</button>
+      <a href="{% url 'reportes_subcuadras' %}" class="btn btn-outline" style="font-size:0.9rem;">Este mes</a>
+    </div>
+    <p style="margin-top:0.5rem; font-size:0.82rem; color:var(--color-text-muted);">
+      {% if desde == hasta %}
+        Actividad del {{ desde|date:"d/m/Y" }}
+      {% else %}
+        Actividad del {{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}
+      {% endif %}
+    </p>
+  </form>
+
+  <!-- Tabla de subcuadras -->
+  <div class="card" style="overflow-x:auto;">
+    {% if subcuadras %}
+      <table style="min-width:500px;">
+        <thead>
+          <tr>
+            <th>Subcuadra</th>
+            <th style="text-align:right;">Verificaciones</th>
+            <th style="text-align:right;">Infracciones</th>
+            <th style="text-align:right;">Vehículos exentos</th>
+            <th style="text-align:center;">Cobertura</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in subcuadras %}
+          <tr>
+            <td style="font-weight:600;">{{ s }}</td>
+            <td style="text-align:right;">{{ s.total_verificaciones }}</td>
+            <td style="text-align:right;">
+              {% if s.total_infracciones > 0 %}
+                <span style="color:var(--color-warning); font-weight:700;">
+                  {{ s.total_infracciones }}
+                </span>
+              {% else %}
+                0
+              {% endif %}
+            </td>
+            <td style="text-align:right; color:var(--color-text-muted);">
+              {{ s.total_exentos }}
+            </td>
+            <td style="text-align:center;">
+              {% if s.total_verificaciones == 0 %}
+                <span style="color:var(--color-danger); font-size:0.8rem; font-weight:600;">
+                  ⚠️ Sin cobertura
+                </span>
+              {% elif s.total_verificaciones < 5 %}
+                <span style="color:var(--color-warning); font-size:0.8rem; font-weight:600;">
+                  🔶 Baja
+                </span>
+              {% else %}
+                <span style="color:var(--color-primary); font-size:0.8rem; font-weight:600;">
+                  ✅ Activa
+                </span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted" style="padding:1rem; text-align:center;">
+        No hay subcuadras configuradas en este municipio.
+      </p>
+    {% endif %}
+  </div>
+
+  <!-- Leyenda -->
+  <p style="margin-top:0.75rem; font-size:0.8rem; color:var(--color-text-muted);">
+    ⚠️ Sin cobertura = 0 verificaciones en el período.
+    🔶 Baja = menos de 5 verificaciones.
+    ✅ Activa = 5 o más.
+  </p>
+
+</section>
+{% endblock %}

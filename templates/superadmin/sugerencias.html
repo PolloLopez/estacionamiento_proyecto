@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Sugerencias de mejora{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:960px; margin:2rem auto;">
+
+  <h2>💡 Sugerencias de mejora
+    {% if pendientes_count %}
+      <span style="font-size:.75rem; background:#e65100; color:#fff;
+                   padding:.2rem .6rem; border-radius:12px; vertical-align:middle;">
+        {{ pendientes_count }} sin resolver
+      </span>
+    {% endif %}
+  </h2>
+
+  <!-- Filtros -->
+  <form method="get" style="display:flex; gap:.6rem; flex-wrap:wrap; margin-bottom:1.2rem;">
+    <select name="estado" style="padding:.4rem .7rem; border:1px solid #ccc; border-radius:6px;">
+      <option value="">Todos los estados</option>
+      {% for valor, etiqueta in estados %}
+        <option value="{{ valor }}"{% if estado_filtro == valor %} selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+    <select name="criticidad" style="padding:.4rem .7rem; border:1px solid #ccc; border-radius:6px;">
+      <option value="">Toda criticidad</option>
+      {% for valor, etiqueta in criticidades %}
+        <option value="{{ valor }}"{% if criticidad_filtro == valor %} selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+    <select name="area" style="padding:.4rem .7rem; border:1px solid #ccc; border-radius:6px;">
+      <option value="">Todas las áreas</option>
+      {% for valor, etiqueta in areas %}
+        <option value="{{ valor }}"{% if area_filtro == valor %} selected{% endif %}>{{ etiqueta }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit"
+      style="background:var(--color-primary,#2980b9); color:#fff; border:none;
+             padding:.4rem 1rem; border-radius:6px; cursor:pointer;">
+      Filtrar
+    </button>
+    {% if estado_filtro or criticidad_filtro or area_filtro %}
+      <a href="{% url 'panel_sugerencias' %}"
+         style="padding:.4rem .8rem; border-radius:6px; background:#eee;
+                text-decoration:none; color:#333; font-size:.9rem;">
+        Limpiar
+      </a>
+    {% endif %}
+  </form>
+
+  {% if not sugerencias %}
+    <p style="color:var(--color-text-muted);">No hay sugerencias con esos filtros.</p>
+  {% else %}
+    <table style="width:100%; border-collapse:collapse; font-size:.9rem;">
+      <thead>
+        <tr style="border-bottom:2px solid #ddd; text-align:left;">
+          <th style="padding:.5rem .7rem;">#</th>
+          <th style="padding:.5rem .7rem;">Título</th>
+          <th style="padding:.5rem .7rem;">Criticidad</th>
+          <th style="padding:.5rem .7rem;">Área</th>
+          <th style="padding:.5rem .7rem;">Usuario</th>
+          <th style="padding:.5rem .7rem;">Estado</th>
+          <th style="padding:.5rem .7rem;">Fecha</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sugerencias %}
+          <tr style="border-bottom:1px solid #eee; {% if s.estado == 'recibida' %}background:#fafff8;{% endif %}">
+            <td style="padding:.5rem .7rem; color:#999;">{{ s.id }}</td>
+            <td style="padding:.5rem .7rem; font-weight:600;">{{ s.titulo }}</td>
+            <td style="padding:.5rem .7rem;">{{ s.get_criticidad_display }}</td>
+            <td style="padding:.5rem .7rem;">{{ s.get_area_display }}</td>
+            <td style="padding:.5rem .7rem; font-size:.85rem;">
+              {% if s.usuario %}{{ s.usuario.correo }}{% else %}<span style="color:#aaa;">anónimo</span>{% endif %}
+              {% if s.municipio %}<br><span style="color:#999; font-size:.78rem;">{{ s.municipio.nombre }}</span>{% endif %}
+            </td>
+            <td style="padding:.5rem .7rem;">
+              <span style="font-size:.8rem; padding:.2rem .6rem; border-radius:12px;
+                {% if s.estado == 'recibida' %}background:#e3f2fd; color:#1565c0;
+                {% elif s.estado == 'en_revision' %}background:#fff3e0; color:#e65100;
+                {% elif s.estado == 'implementada' %}background:#e8f5e9; color:#2e7d32;
+                {% else %}background:#fafafa; color:#777;{% endif %}">
+                {{ s.get_estado_display }}
+              </span>
+            </td>
+            <td style="padding:.5rem .7rem; color:#999; font-size:.85rem;">{{ s.creado_en|date:"d/m/Y" }}</td>
+            <td style="padding:.5rem .7rem;">
+              <a href="{% url 'gestionar_sugerencia' s.id %}"
+                 style="font-size:.85rem; color:var(--color-primary,#2980b9);">Ver →</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+
+</div>
+{% endblock %}

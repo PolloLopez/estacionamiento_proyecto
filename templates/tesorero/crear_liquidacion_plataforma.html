@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Nueva liquidación de plataforma{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:680px;">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; margin-bottom:1.2rem;">
+    <h2 style="margin:0;">💳 Nueva liquidación — plataforma</h2>
+    <a href="{% url 'mis_liquidaciones_plataforma' %}" class="btn btn-outline" style="font-size:0.85rem;">← Volver</a>
+  </div>
+
+  <div class="card" style="margin-bottom:1rem; padding:1rem 1.2rem;
+       background:var(--color-surface-2); border:1px solid var(--color-border);">
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0;">
+      Base de cálculo configurada por el superadmin: <strong>{{ concepto }}</strong>.<br>
+      Los montos están pre-calculados — podés editarlos si es necesario.
+      Si adjuntás el comprobante de pago, la liquidación queda enviada al superadmin para su aprobación.
+    </p>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="card">
+    {% csrf_token %}
+
+    <h3 style="margin-bottom:1rem;">Período</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1.2rem;">
+      <div>
+        <label style="font-size:0.85rem; font-weight:600;">Desde</label>
+        <input type="date" name="periodo_inicio" required value="{{ desde_sugerido|date:'Y-m-d' }}" />
+      </div>
+      <div>
+        <label style="font-size:0.85rem; font-weight:600;">Hasta</label>
+        <input type="date" name="periodo_fin" required value="{{ hasta_sugerido|date:'Y-m-d' }}" />
+      </div>
+    </div>
+
+    <h3 style="margin-bottom:0.5rem;">Montos</h3>
+    <p style="font-size:0.82rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      Recaudación del período calculada automáticamente: <strong>${{ recaudacion_calculada|floatformat:2 }}</strong>
+    </p>
+    <input type="hidden" name="recaudacion_base" value="{{ recaudacion_calculada }}">
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:0.75rem;">
+      <div>
+        <label style="font-size:0.85rem; font-weight:600;">Monto fijo ($)</label>
+        <input type="number" name="monto_fijo" step="0.01" min="0"
+               value="{{ monto_fijo_sugerido }}" id="monto_fijo" oninput="actualizarTotal()" />
+      </div>
+      <div>
+        <label style="font-size:0.85rem; font-weight:600;">Monto variable ($)</label>
+        <input type="number" name="monto_variable" step="0.01" min="0"
+               value="{{ monto_variable_sugerido }}" id="monto_variable" oninput="actualizarTotal()" />
+      </div>
+    </div>
+
+    <div class="card" style="background:var(--color-primary); color:#fff;
+         border-radius:10px; padding:0.75rem 1rem; margin:1rem 0;
+         display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:0.95rem; font-weight:600;">Total</span>
+      <span style="font-size:1.4rem; font-weight:800;" id="total-display">
+        ${{ monto_total_sugerido|floatformat:2 }}
+      </span>
+    </div>
+
+    <div style="margin-bottom:1rem;">
+      <label style="font-size:0.85rem; font-weight:600;">Comprobante de transferencia (PDF o imagen)</label>
+      <input type="file" name="comprobante_pago" accept=".pdf,.jpg,.jpeg,.png,.webp" />
+      <p style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.2rem;">
+        Si adjuntás el comprobante ahora, la liquidación queda enviada al superadmin.
+        Si no, se guarda como borrador.
+      </p>
+    </div>
+
+    <div style="margin-bottom:1.2rem;">
+      <label style="font-size:0.85rem; font-weight:600;">Notas (opcional)</label>
+      <textarea name="notas_tesorero" rows="3"
+                placeholder="Número de transferencia, banco, observaciones..."></textarea>
+    </div>
+
+    <button type="submit" class="btn" style="width:100%; font-size:1.1rem; padding:0.9rem;">
+      💾 Crear liquidación
+    </button>
+  </form>
+
+</div>
+
+<script>
+function actualizarTotal() {
+  var fijo = parseFloat(document.getElementById("monto_fijo").value) || 0;
+  var variable = parseFloat(document.getElementById("monto_variable").value) || 0;
+  document.getElementById("total-display").textContent = "$" + (fijo + variable).toFixed(2);
+}
+</script>
+{% endblock %}

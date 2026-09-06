@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<section class="container">
+
+  <!-- Encabezado + botón volver -->
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2>📊 Dashboard</h2>
+    <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
+  </div>
+
+  <!-- Filtro de fechas (mismo patrón que auditoria_staff) -->
+  <form method="get" style="margin-bottom:1.5rem;">
+    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; align-items:flex-end;">
+      <div>
+        <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Desde</label>
+        <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}"
+               style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);">
+      </div>
+      <div>
+        <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">Hasta</label>
+        <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}"
+               style="padding:0.4rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);">
+      </div>
+      <button type="submit" class="btn" style="font-size:0.9rem;">Filtrar</button>
+      <a href="{% url 'dashboard_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">Últimos 30 días</a>
+    </div>
+    <p style="margin-top:0.5rem; font-size:0.82rem; color:var(--color-text-muted);">
+      {% if desde == hasta %}
+        Mostrando actividad del {{ desde|date:"d/m/Y" }}
+      {% else %}
+        Mostrando actividad del {{ desde|date:"d/m/Y" }} al {{ hasta|date:"d/m/Y" }}
+      {% endif %}
+    </p>
+  </form>
+
+  <!-- ── INFRACCIONES POR INSPECTOR ─────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
+    <h3 style="margin-bottom:0.75rem;">👮 Infracciones por inspector</h3>
+    {% if infracciones_por_inspector %}
+      <table style="min-width:300px;">
+        <thead>
+          <tr>
+            <th>Inspector</th>
+            <th style="text-align:right;">Infracciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in infracciones_por_inspector %}
+          <tr>
+            <td>{{ fila.inspector__correo }}</td>
+            <td style="text-align:right; font-weight:600;">{{ fila.total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">Sin infracciones en el período.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── COBROS POR USUARIO ─────────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
+    <h3 style="margin-bottom:0.75rem;">💰 Cobros por usuario</h3>
+    {% if cobros %}
+      <table style="min-width:300px;">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th style="text-align:right;">Total cobrado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in cobros %}
+          <tr>
+            <td>{{ fila.usuario__correo }}</td>
+            <td style="text-align:right; font-weight:600;">${{ fila.total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">Sin cobros registrados en el período.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── VEHÍCULOS REGISTRADOS POR DÍA ─────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
+    <h3 style="margin-bottom:0.75rem;">🚗 Vehículos registrados por día</h3>
+    {% if patentes_por_dia %}
+      <table style="min-width:250px;">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th style="text-align:right;">Altas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in patentes_por_dia %}
+          <tr>
+            <td>{{ fila.fecha|date:"d/m/Y" }}</td>
+            <td style="text-align:right; font-weight:600;">{{ fila.total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">Sin vehículos registrados en el período.</p>
+    {% endif %}
+  </div>
+
+</section>
+{% endblock %}

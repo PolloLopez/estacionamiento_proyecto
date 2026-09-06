@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Transferir saldo{% endblock %}
+
+{% block content %}
+<div class="container">
+  <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline"
+     style="margin-bottom:1rem; font-size:0.88rem;">← Volver al inicio</a>
+
+  <div class="card">
+    <h2 style="margin:0 0 0.75rem;">💸 Transferir saldo</h2>
+    <p style="font-size:0.88rem; color:var(--color-text-muted); margin-bottom:1rem;">
+      Podés enviar saldo a otro conductor del municipio. El receptor tiene 24 hs para aceptar o rechazar.
+      Si no responde, el saldo se devuelve automáticamente.
+    </p>
+
+    <div style="background:var(--color-surface); border:1px solid var(--color-border);
+                border-radius:8px; padding:0.6rem 1rem; margin-bottom:1rem; font-size:0.9rem;">
+      Tu saldo: <strong>${{ request.user.saldo }}</strong>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <div style="margin-bottom:0.75rem;">
+        <label style="font-size:0.88rem; font-weight:600;">Correo del receptor *</label>
+        <input type="email" name="correo_receptor" required
+               placeholder="conductor@ejemplo.com"
+               style="display:block; width:100%; margin-top:0.25rem; padding:0.45rem 0.75rem;
+                      border-radius:6px; border:1px solid var(--color-border);
+                      background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
+        <small style="color:var(--color-text-muted);">Debe ser un conductor registrado en tu mismo municipio.</small>
+      </div>
+
+      <div style="margin-bottom:1rem;">
+        <label style="font-size:0.88rem; font-weight:600;">Monto a transferir (mínimo $100) *</label>
+        <input type="number" name="monto" min="100" step="1" required
+               placeholder="500"
+               style="display:block; width:100%; margin-top:0.25rem; padding:0.45rem 0.75rem;
+                      border-radius:6px; border:1px solid var(--color-border);
+                      background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
+      </div>
+
+      <button type="submit" class="btn"
+              onclick="return confirm('¿Enviar la transferencia? El saldo se reserva hasta que el receptor responda.')">
+        Enviar transferencia
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
