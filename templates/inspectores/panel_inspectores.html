@@ -116,10 +116,11 @@
         <!-- Renombrar: aparece tras vincular o si ya hay uno autorizado -->
         <div id="cont-renombrar" style="display:none;">
           <label style="font-size:0.82rem; color:var(--color-text-muted); display:block; margin-bottom:0.2rem;">
-            ✏️ Nombre personalizado
+            ✏️ Poné un nombre a tu impresora (para identificarla)
           </label>
           <div style="display:flex; gap:0.4rem;">
             <input id="inp-alias" type="text" maxlength="30"
+                   placeholder="Ej: Mi impresora"
                    style="flex:1; padding:0.5rem 0.7rem; border:1.5px solid var(--color-border);
                           border-radius:8px; font-size:0.9rem; background:var(--color-surface);
                           color:var(--color-text);">
@@ -248,6 +249,10 @@ async function accionConectar() {
     mostrarRenombrado(r.device);
     if (btnDetails) btnDetails.textContent = '🔄 Cambiar impresora';
     if (btnBanner)  btnBanner.textContent  = '🔌 Vincular impresora';
+    // Abrir el panel de configuración para que el inspector vea el campo de alias.
+    // Cada inspector puede ponerle un nombre a su propia impresora (ej: "Mi Printer").
+    var detailsEl = document.getElementById('details-impresora');
+    if (detailsEl) detailsEl.open = true;
   } catch(e) {
     log('❌ ' + e.message);
     [btnBanner, btnDetails].forEach(function(b) {

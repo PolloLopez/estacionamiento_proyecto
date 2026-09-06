@@ -41,6 +41,15 @@ _Sin ítems pendientes._
 
 ## ✅ Resuelto
 
+### Sesión 2026-09-06 (tarde 4) — Auto-impresión, sugerencias por rol, bug horario inspector
+
+| Ítem | Detalle |
+|---|---|
+| Bug: inspector actúa sin horario configurado | `services/horarios.py`: `puede_estacionar_ahora()` ganó parámetro `bloquear_sin_horario`. Cuando es `True` y no hay `HorarioEstacionamiento` para hoy (ej: domingo), devuelve `False` en lugar de "libre de cobro". Usado en `verificar_vehiculo` y `registrar_infraccion`. |
+| Auto-impresión al cargar ticket | `ticket_infraccion.html`: `imprimirActa()` se llama automáticamente en `DOMContentLoaded`. La vista previa del acta se oculta. El botón "Reintentar" solo aparece si hay error. |
+| Sugerencias filtradas por rol | `views_conductor.py`: `AREAS_POR_ROL` filtra las áreas del select según el rol del usuario. Conductor ve solo "conductor" + "general"; inspector solo "inspector" + "general", etc. |
+| Alias impresora más visible | `panel_inspectores.html`: al vincular una impresora, el `<details>` de config se abre solo para que el inspector vea el campo de nombre. Nuevo placeholder "Ej: Mi impresora". |
+
 ### Sesión 2026-09-06 (tarde 3) — Logo registro + pausa configurable entre copias
 
 | Ítem | Detalle |

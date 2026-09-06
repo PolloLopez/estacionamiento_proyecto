@@ -1253,9 +1253,23 @@ def enviar_sugerencia(request):
             messages.success(request, "Sugerencia enviada. ¡Gracias por contribuir!")
             return redirect("mis_sugerencias")
 
+    # Filtrar áreas según el rol: cada usuario solo ve las secciones del sistema
+    # que usa. Un conductor no debería poder sugerir sobre el flujo de inspector
+    # o vendedor porque no los conoce.
+    AREAS_POR_ROL = {
+        "conductor":  ["conductor", "general"],
+        "inspector":  ["inspector", "general"],
+        "vendedor":   ["vendedor", "general"],
+        "tesorero":   ["tesorero", "admin", "general"],
+        "admin":      ["conductor", "inspector", "vendedor", "admin", "general"],
+        "superadmin": [v for v, _ in SugerenciaMejora.AREAS],  # todas
+    }
+    areas_permitidas = AREAS_POR_ROL.get(rol_actual, ["general"])
+    areas_filtradas  = [(v, e) for v, e in SugerenciaMejora.AREAS if v in areas_permitidas]
+
     return render(request, "usuarios/enviar_sugerencia.html", {
-        "rol_actual":  rol_actual,
-        "areas":       SugerenciaMejora.AREAS,
+        "rol_actual":   rol_actual,
+        "areas":        areas_filtradas,
         "criticidades": SugerenciaMejora.CRITICIDAD,
     })
 
