@@ -186,8 +186,6 @@
   <!-- ═══ CONTENIDO PRINCIPAL ══════════════════════════════════ -->
   <main class="container">
 
-    {# Los mensajes de Django se renderizan como toasts en la esquina superior derecha.
-       El script al final del body los carga y les aplica auto-dismiss. #}
     {% if messages %}
       <div id="django-messages-data" style="display:none;">
         {% for message in messages %}
