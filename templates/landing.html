@@ -467,7 +467,7 @@
 
     <div class="hero-stats">
       <div class="hero-stat">
-        <div class="num">5</div>
+        <div class="num">6</div>
         <div class="lbl" data-lang-inline="es">Roles de usuario</div>
         <div class="lbl" data-lang-inline="en">User roles</div>
       </div>
@@ -477,7 +477,7 @@
         <div class="lbl" data-lang-inline="en">Automated tests</div>
       </div>
       <div class="hero-stat">
-        <div class="num">20+</div>
+        <div class="num">25+</div>
         <div class="lbl" data-lang-inline="es">Modelos de datos</div>
         <div class="lbl" data-lang-inline="en">Data models</div>
       </div>
@@ -581,8 +581,8 @@
         <div class="card-icon">📊</div>
         <h3 data-lang="es">Auditoría completa</h3>
         <h3 data-lang="en">Full audit trail</h3>
-        <p data-lang="es">Cada cobro queda registrado en <code>MovimientoCaja</code> con quién lo hizo, cuándo y cuánto corresponde de comisión. El tesorero valida rendiciones con trazabilidad total.</p>
-        <p data-lang="en">Every payment is recorded in <code>MovimientoCaja</code> with who did it, when, and the commission breakdown. The treasurer validates settlements with full traceability.</p>
+        <p data-lang="es">Cada cobro queda en <code>MovimientoCaja</code> con quién lo hizo, cuándo y cuánto de comisión. Al crear una rendición, las comisiones de vendedores se calculan y agrupan automáticamente. El tesorero valida con vista de detalle completo: cierres por operador y liquidaciones de comisión incluidas.</p>
+        <p data-lang="en">Every payment is logged in <code>MovimientoCaja</code> with who, when, and the commission split. When a settlement is created, vendor commissions are auto-calculated and grouped. The treasurer validates with a full detail view: per-operator shifts and commission payments included.</p>
       </div>
       <div class="card">
         <div class="card-icon">🕐</div>
@@ -595,8 +595,22 @@
         <div class="card-icon">🖨️</div>
         <h3 data-lang="es">Impresión BLE desde el celular</h3>
         <h3 data-lang="en">BLE printing from the phone</h3>
-        <p data-lang="es">El inspector imprime el acta directamente desde su celular Android a una impresora térmica de 58mm via Bluetooth (Web Bluetooth API). Doble copia automática, QR nativo y persistencia de dispositivo. Sin cables, sin app extra.</p>
-        <p data-lang="en">Inspectors print the infraction ticket directly from their Android phone to a 58mm thermal printer via Bluetooth (Web Bluetooth API). Automatic double copy, native QR code, and device persistence. No cables, no extra app.</p>
+        <p data-lang="es">El inspector imprime el acta automáticamente al confirmar, desde su celular Android a una impresora térmica de 58mm via Bluetooth (Web Bluetooth API). Doble copia, QR nativo y persistencia de dispositivo. La pausa entre copias es configurable: automática (N segundos) o manual (el inspector confirma). Sin cables, sin app extra.</p>
+        <p data-lang="en">The ticket prints automatically on confirmation from the inspector's Android phone to a 58mm thermal printer via Bluetooth (Web Bluetooth API). Double copy, native QR code, and device persistence. The pause between copies is configurable: automatic (N seconds) or manual (inspector confirms). No cables, no extra app.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">♿</div>
+        <h3 data-lang="es">Exenciones SIA — ANDIS en tiempo real</h3>
+        <h3 data-lang="en">SIA exemptions — ANDIS real-time lookup</h3>
+        <p data-lang="es">El inspector escanea el QR del certificado de discapacidad (SIA de ANDIS) en el campo. El sistema consulta ANDIS en tiempo real: si el certificado es válido, la exención se registra automáticamente con la fecha de vigencia y no se labra infracción. No requiere carga previa por el admin.</p>
+        <p data-lang="en">The inspector scans the disability certificate QR (SIA from ANDIS) in the field. The system queries ANDIS in real time: if valid, the exemption is registered automatically with the expiry date — no infraction issued. No pre-registration by the admin needed.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">💡</div>
+        <h3 data-lang="es">Sugerencias y mejoras</h3>
+        <h3 data-lang="en">Feedback and improvements</h3>
+        <p data-lang="es">Cada rol puede enviar sugerencias de mejora filtradas por área: el conductor ve opciones de su experiencia, el inspector las de su operatoria, el vendedor las de su panel. El superadmin las centraliza y puede responderlas.</p>
+        <p data-lang="en">Each role can submit improvement suggestions filtered by area relevant to their work. The superadmin centralizes and can reply to them.</p>
       </div>
       <div class="card">
         <div class="card-icon">📖</div>
@@ -638,8 +652,8 @@
           <li data-lang="en">Auto-refund if parking.</li>
           <li data-lang="es">Historial completo de estacionamientos</li>
           <li data-lang="en">Full parking history</li>
-          <li data-lang="es">Ver, pagar y seguir infracciones pendientes</li>
-          <li data-lang="en">View, pay, and track pending infractions</li>
+          <li data-lang="es">Ver, pagar e impugnar infracciones pendientes</li>
+          <li data-lang="en">View, pay, and dispute pending infractions</li>
           <li data-lang="es">Comprar abono mensual con saldo digital</li>
           <li data-lang="en">Buy monthly pass with digital balance</li>
           <li data-lang="es">Login con Google (sin contraseña)</li>
@@ -648,6 +662,10 @@
           <li data-lang="en">Pay without an account via QR or direct link</li>
           <li data-lang="es">Notificaciones internas del sistema</li>
           <li data-lang="en">In-app system notifications</li>
+          <li data-lang="es">Enviar sugerencias de mejora al equipo de desarrollo</li>
+          <li data-lang="en">Submit improvement suggestions to the dev team</li>
+          <li data-lang="es">Solicitar eliminación de cuenta con datos de usuario</li>
+          <li data-lang="en">Request account and data deletion</li>
         </ul>
       </div>
 
@@ -665,8 +683,10 @@
           <li data-lang="en">Issue infraction: photo + GPS + block + customizable reason</li>
           <li data-lang="es">Watermark automático con coordenadas sobre la foto del acta</li>
           <li data-lang="en">Auto GPS watermark on every infraction photo</li>
-          <li data-lang="es">Imprime actas en impresora BLE 58mm desde el celular (doble copia + QR)</li>
-          <li data-lang="en">Print tickets on a BLE 58mm thermal printer from the phone (double copy + QR)</li>
+          <li data-lang="es">Imprime actas automáticamente al confirmar: BLE 58mm, doble copia + QR, pausa configurable entre copias</li>
+          <li data-lang="en">Auto-prints on confirmation: BLE 58mm, double copy + QR, configurable pause between copies</li>
+          <li data-lang="es">Verificación SIA/ANDIS en campo: escanea el QR del certificado de discapacidad, la exención se registra sola si es válida</li>
+          <li data-lang="en">Field SIA/ANDIS check: scan the disability certificate QR — exemption registered automatically if valid</li>
           <li data-lang="es">Ver exenciones y abonos activos al verificar la patente</li>
           <li data-lang="en">See exemptions and active passes during plate check</li>
           <li data-lang="es">Resumen de verificaciones e infracciones del turno</li>
@@ -733,8 +753,8 @@
           <li data-lang="es">Auditoría de staff unificada: resumen diario/semanal/mensual de cobros por vendedor e infracciones por inspector</li>
           <li data-lang="es">El admin puede cerrar su propia caja para que otro admin la certifique (flujo multi-oficina)</li>
           <li data-lang="en">Inspector stats: checks, infractions, effectiveness + Excel export</li>
-          <li data-lang="es">Rendiciones: selecciona cierres certificados, el sistema calcula totales automáticamente</li>
-          <li data-lang="en">Settlements: select certified shifts, system auto-calculates totals</li>
+          <li data-lang="es">Rendiciones: selecciona cierres certificados, el sistema calcula totales y comisiones de vendedores automáticamente — con vista de detalle por cierre</li>
+          <li data-lang="en">Settlements: select certified shifts, system auto-calculates totals and vendor commissions — with per-shift detail view</li>
           <li data-lang="es">Branding municipal: logo, nombre del sistema, colores primarios y secundarios</li>
           <li data-lang="en">Municipal branding: logo, system name, primary and secondary colors</li>
           <li data-lang="es">Plantillas de documentos personalizables por tipo de comprobante</li>
@@ -748,16 +768,22 @@
         <h3 data-lang="es">Tesorero</h3>
         <h3 data-lang="en">Treasurer</h3>
         <ul>
-          <li data-lang="es">Panel con rendiciones pendientes de validar</li>
-          <li data-lang="en">Dashboard with pending settlements to review</li>
-          <li data-lang="es">Validar o observar rendiciones con comentario</li>
-          <li data-lang="en">Approve or flag settlements with comments</li>
+          <li data-lang="es">Panel con rendiciones pendientes de validar y monto total acumulado</li>
+          <li data-lang="en">Dashboard with pending settlements and accumulated total</li>
+          <li data-lang="es">Validar o observar rendiciones con comentario — motivo obligatorio al observar</li>
+          <li data-lang="en">Approve or flag settlements with comments — reason required when flagging</li>
+          <li data-lang="es">Vista de detalle por rendición: cierres incluidos (por operador, tipo, monto) y liquidaciones de comisión</li>
+          <li data-lang="en">Per-settlement detail view: included shifts by operator and commission payments</li>
           <li data-lang="es">Ver desglose: efectivo / digital (transferencia, débito, crédito, QR)</li>
           <li data-lang="en">View breakdown: cash / digital (transfer, debit, credit, QR)</li>
-          <li data-lang="es">Registrar depósito de comisiones a vendedores</li>
-          <li data-lang="en">Record commission deposits to vendors</li>
+          <li data-lang="es">Comisiones de vendedores auto-calculadas al crear la rendición — el tesorero solo registra el depósito</li>
+          <li data-lang="en">Vendor commissions auto-calculated when the settlement is created — treasurer only records the deposit</li>
           <li data-lang="es">El vendedor certifica el recibo y adjunta factura</li>
           <li data-lang="en">Vendor certifies receipt and attaches invoice</li>
+          <li data-lang="es">Certificar cierres de caja de admins pendientes</li>
+          <li data-lang="en">Certify pending admin shift closures</li>
+          <li data-lang="es">Gestión de liquidaciones de plataforma (SaaS): borrador, comprobante de pago, historial</li>
+          <li data-lang="en">Platform license payments (SaaS): draft, attach payment proof, history</li>
           <li data-lang="es">Auditoría total: quién validó qué y cuándo</li>
           <li data-lang="en">Full audit trail: who validated what and when</li>
         </ul>

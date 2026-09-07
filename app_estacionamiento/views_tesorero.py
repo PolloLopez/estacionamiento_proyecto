@@ -94,6 +94,11 @@ def validar_rendicion(request, rendicion_id):
     accion = request.POST.get("accion", "validar")
     notas  = request.POST.get("notas_tesorero", "").strip()
 
+    # Al observar es obligatorio dejar registrado el motivo
+    if accion == "observar" and not notas:
+        messages.error(request, "Describí el motivo de la observación antes de continuar.")
+        return redirect("panel_tesorero")
+
     estado_nuevo = "validada" if accion == "validar" else "observada"
     with transaction.atomic():
         rendicion.estado          = estado_nuevo
@@ -295,4 +300,45 @@ def gestionar_liquidacion_plataforma(request, liquidacion_id):
 
     return render(request, "tesorero/detalle_liquidacion_plataforma.html", {
         "liq": liq,
+    })
+
+
+@require_role("tesorero", "admin")
+def detalle_rendicion(request, rendicion_id):
+    """
+    Detalle de una rendición: montos, cierres incluidos y liquidaciones de comisión.
+
+    Acceso:
+    - Tesorero: puede ver cualquier rendición de su municipio.
+    - Admin: puede ver solo las rendiciones que él mismo generó.
+    """
+    municipio = request.user.municipio
+    rendicion = get_object_or_404(Rendicion, id=rendicion_id, municipio=municipio)
+
+    # Un admin solo ve sus propias rendiciones; el tesorero puede ver todas las del municipio
+    if getattr(request.user, "es_admin", False) and not getattr(request.user, "es_tesorero", False):
+        if rendicion.admin_id != request.user.pk:
+            messages.error(request, "Solo podés ver tus propias rendiciones.")
+            return redirect("admin_rendiciones")
+
+    # Cierres de caja incluidos en esta rendición
+    cierres = (
+        CierreCaja.objects
+        .filter(rendicion=rendicion)
+        .select_related("usuario")
+        .order_by("fecha_cierre")
+    )
+
+    # Liquidaciones de comisión generadas para esta rendición
+    liquidaciones = (
+        LiquidacionComision.objects
+        .filter(rendicion=rendicion)
+        .select_related("vendedor")
+        .order_by("vendedor__apellido")
+    )
+
+    return render(request, "tesorero/detalle_rendicion.html", {
+        "rendicion":    rendicion,
+        "cierres":      cierres,
+        "liquidaciones": liquidaciones,
     })

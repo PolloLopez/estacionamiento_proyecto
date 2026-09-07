@@ -168,19 +168,36 @@ Vendedor → "Cobrar infracción" → ingresa patente → ve la infracción pend
   └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Flujo de rendición de caja (inspector/vendedor → admin)
+### Flujo de rendición de caja (inspector/vendedor → admin → tesorero)
 
 ```
-Inspector/Vendedor:
-  → Acumula movimientos (cobros manuales, infracciones cobradas)
-  → Desde "Caja" puede ver el total pendiente
-  → Confirma cierre de caja
+1. Inspector/Vendedor:
+   → Acumula movimientos (cobros manuales, infracciones cobradas)
+   → Desde "Caja" puede ver el total pendiente
+   → Confirma cierre de caja → se crea CierreCaja (certificado=False)
 
-Admin:
-  → Ve la rendición pendiente en el panel del inspector/vendedor
-  → Confirma la rendición
-  → El saldo del operador se actualiza
-  → Queda registro en CierreCaja con auditoría de quién y cuándo
+2. Admin certifica el CierreCaja:
+   → Ve los cierres pendientes en el panel del inspector/vendedor
+   → Confirma la certificación → CierreCaja.certificado=True
+
+3. Admin crea Rendición hacia tesorería:
+   → Selecciona cierres certificados del período
+   → El sistema calcula totales (efectivo, digital, neto) automáticamente
+   → Al guardar la Rendicion, el sistema agrupa CierreCaja por vendedor,
+     suma ganancia_usuario de cada uno y crea una LiquidacionComision
+     por vendedor (con monto_total > 0) vinculada a la misma Rendicion
+
+4. Tesorero valida la rendición:
+   → Ve la rendición pendiente en su panel con monto total y desglose
+   → Puede ver "Ver detalle" para ver cada CierreCaja incluido y las
+     LiquidacionComision generadas automáticamente
+   → Valida (recibida físicamente) u observa (motivo obligatorio)
+   → Si observa: el motivo se guarda en notas_tesorero (campo requerido)
+
+5. Tesorero deposita comisiones a vendedores:
+   → Desde el panel o desde el detalle de la rendición
+   → Registra el depósito con fecha y notas opcionales
+   → El vendedor lo certifica desde su panel y puede adjuntar factura
 ```
 
 ### Flujo de horarios y días especiales
@@ -196,10 +213,19 @@ Admin carga días especiales (con prioridad sobre el horario):
   01/01 Año Nuevo        → cobro_activo=False (libre)
   Caso especial: día de cobro fuera del horario habitual → cobro_activo=True
 
-El sistema consulta:
-  1. ¿Hay DiaEspecial para hoy? → usa cobro_activo de ese registro
-  2. Si no hay → ¿el horario semanal está activo para hoy? → usa hora_inicio/hora_fin
-  3. Si no hay horario para hoy → cobro libre
+El sistema consulta puede_estacionar_ahora() con dos comportamientos:
+
+  CONDUCTOR (bloquear_sin_horario=False):
+    1. ¿Hay DiaEspecial para hoy? → usa cobro_activo de ese registro
+    2. Si no hay → ¿el horario semanal está activo para hoy? → usa hora_inicio/hora_fin
+    3. Si no hay horario para hoy → cobro libre (el conductor puede estacionar)
+    Resultado cacheado en sesión para evitar consultas repetidas.
+
+  INSPECTOR (bloquear_sin_horario=True):
+    Igual que conductor, pero el paso 3 cambia:
+    3. Si no hay horario para hoy → BLOQUEADO (el inspector no puede actuar)
+    El inspector no puede verificar ni infraccionar si no hay horario configurado.
+    Resultado NO se cachea (para no contaminar el caché del conductor).
 
 El sistema cierra automáticamente los estacionamientos activos cuando vence el
 horario configurado, aplicando reintegro proporcional si el conductor pagó
@@ -276,6 +302,17 @@ Panel Admin → "💲 Tarifas" → ingreso el nuevo precio → guardar.
 **¿Cómo configuro el porcentaje de ganancia de un inspector?**
 Panel Admin → "👮 Inspectores" → click en el inspector → sección "Configuración de rendición".
 
+**¿Cómo creo una rendición hacia tesorería?**
+Panel Admin → "Rendiciones" → "Crear rendición". Seleccioná los cierres de caja certificados del período. El sistema calcula los totales automáticamente (efectivo, digital, neto) y genera las liquidaciones de comisión por cada vendedor incluido en los cierres — sin intervención manual.
+
+**¿Cómo veo el detalle de una rendición?**
+En la tabla de rendiciones (tanto en el panel del admin como en el del tesorero) hay un botón "Ver detalle" en cada fila. Muestra los cierres de caja incluidos con totales por operador y las liquidaciones de comisión generadas automáticamente.
+
+**¿Cómo configuro la pausa entre copias del ticket BLE?**
+Panel Admin → "⚙️ Municipio" (o desde Superadmin → Gestionar municipio) → sección de impresora. El campo "Segundos de pausa entre copias" acepta:
+- `0` → el inspector confirma manualmente antes de imprimir la segunda copia.
+- `> 0` → la segunda copia se imprime automáticamente después de esa cantidad de segundos.
+
 ---
 
 ### FAQ — Inspector
@@ -290,7 +327,10 @@ Sí. El dropdown de subcuadra está en la parte superior de "Verificar vehículo
 No. El botón INFRACCIONAR solo aparece dentro del horario de cobro configurado para el municipio. Si estás fuera del horario (o es feriado sin cobro), la pantalla muestra el horario habilitado en lugar del botón. Si intentás entrar directo a la URL de infracción, el sistema te redirige con un aviso.
 
 **¿Cómo registro una infracción?**
-Si el resultado es 🚨 INFRACCIONAR, aparece el formulario de infracción. La foto es opcional — si la subís, el sistema le agrega automáticamente una marca de agua con patente, nombre del inspector, subcuadra, GPS (o "sin señal" si no está disponible) y fecha/hora. Confirmás y se genera el acta. Antes de imprimir el ticket podés revisar la foto; el ticket no se imprime solo.
+Si el resultado es 🚨 INFRACCIONAR, aparece el formulario de infracción. La foto es opcional — si la subís, el sistema le agrega automáticamente una marca de agua con patente, nombre del inspector, subcuadra, GPS (o "sin señal" si no está disponible) y fecha/hora. Confirmás y el acta se genera. **El ticket se imprime automáticamente al cargar la pantalla de confirmación** (doble copia, vía BLE). La pausa entre la primera y la segunda copia es configurable por el admin:
+- `segundos_pausa_doble_copia = 0` → el inspector confirma manualmente antes de imprimir la segunda copia.
+- `segundos_pausa_doble_copia > 0` → la segunda copia se imprime automáticamente después de N segundos.
+Si la impresión falla, aparece un botón "Reintentar" en lugar de la vista previa.
 
 **¿Cómo verifico el SIA (certificado de discapacidad)?**
 En la pantalla de resultado del vehículo (estado IMPAGO o NO REGISTRADO) aparece el botón "♿ Verificar SIA". Al tocarlo, se abre un panel donde podés sacar una foto del QR del certificado. El sistema consulta ANDIS en tiempo real:
@@ -346,6 +386,15 @@ Desde tu panel de inicio → "📅 Pagar abono". Elegís el vehículo y el mes (
 **¿Qué hago si no tengo cuenta de email?**
 Podés entrar con tu cuenta de Google directamente.
 
+**¿Puedo impugnar una infracción?**
+Sí. Desde "Mis infracciones" → detalle de la infracción → "Impugnar". Describís el motivo. El admin la revisa y puede anularla o rechazar la impugnación.
+
+**¿Cómo envío una sugerencia de mejora?**
+Desde el menú → "Enviar sugerencia". Elegís el área (experiencia como conductor, pagos, etc.) y describís tu propuesta. El equipo de desarrollo las revisa centralizadas desde el panel del superadmin.
+
+**¿Cómo pido la eliminación de mi cuenta?**
+Desde el menú → "Eliminar cuenta". Describís el motivo. El superadmin procesa la solicitud. Los datos se eliminan según la política de privacidad del municipio.
+
 ---
 
 ### FAQ — Vendedor
@@ -361,6 +410,25 @@ Panel Vendedor → "Resumen de caja". Mostrá los movimientos del período.
 
 **¿Cómo hago la rendición al admin?**
 Cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja". El admin lo verifica de su lado.
+
+---
+
+### FAQ — Tesorero
+
+**¿Cómo valido una rendición?**
+Panel Tesorería → tabla "Rendiciones pendientes" → elegís la rendición → botón "Validar" (recibí el efectivo/transferencia físicamente) o "Observar" (hay algo que no cierra). Si observás, el campo de motivo es **obligatorio** — no se puede enviar vacío.
+
+**¿Cómo veo el detalle de una rendición?**
+En cualquier fila de la tabla de rendiciones (pendientes o historial) hay un botón "Ver detalle". Te muestra los cierres de caja incluidos por operador (con sus montos de efectivo, digital y comisión) y las liquidaciones de comisión de vendedores generadas automáticamente.
+
+**¿De dónde salen las comisiones de vendedores?**
+Las comisiones se calculan automáticamente al crear la rendición. El sistema agrupa los cierres de vendedores por operador, suma el campo `ganancia_usuario` de cada cierre y crea una liquidación por vendedor. El tesorero no necesita calcular nada — solo verifica y registra el depósito.
+
+**¿Cómo registro el depósito de una comisión?**
+Panel Tesorería → sección "Liquidaciones de comisión" → botón "Depositar" junto a la liquidación → se abre un formulario para confirmar la fecha y agregar notas. El vendedor luego certifica el recibo desde su panel.
+
+**¿Cómo certifico cierres de admin?**
+Los cierres de admin pendientes de certificación aparecen en una sección separada del panel. Revisalos y certificalos para que queden disponibles para futuras rendiciones.
 
 ---
 

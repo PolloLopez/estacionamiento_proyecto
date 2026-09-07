@@ -199,6 +199,7 @@
         <th style="text-align:center;">Estado</th>
         <th>Validado por</th>
         <th style="text-align:center;">PDF</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -226,6 +227,12 @@
              title="Descargar PDF"
              style="font-size:1.1rem; text-decoration:none; color:var(--color-danger);">
             📄
+          </a>
+        </td>
+        <td>
+          <a href="{% url 'detalle_rendicion' r.id %}" class="btn btn-outline"
+             style="font-size:0.78rem; padding:0.2rem 0.55rem;">
+            Ver detalle
           </a>
         </td>
       </tr>
