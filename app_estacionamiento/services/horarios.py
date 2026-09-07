@@ -47,12 +47,18 @@ def obtener_tarifa_hora(tarifa_obj, vehiculo, fallback=None):
         return precio_moto
     return tarifa_obj.precio_por_hora
 
-def puede_estacionar_ahora(municipio):
+def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
     """
     Verifica si el horario del municipio permite estacionar en este momento.
     Tiene en cuenta días especiales (feriados) y el horario semanal configurado.
 
     Usa caché de 1 hora para evitar queries repetidas en cada verificación.
+
+    Parámetros:
+        bloquear_sin_horario: si True, devuelve False cuando no hay HorarioEstacionamiento
+            configurado para el día de hoy. Usar en vistas del inspector: un día sin horario
+            significa que los inspectores no trabajan (distinto al conductor, que puede
+            estacionar gratis ese día).
 
     Retorna:
         (permitido: bool, mensaje_error: str | None)
@@ -91,7 +97,12 @@ def puede_estacionar_ahora(municipio):
     ).order_by("-id").first()
 
     if horario is None:
-        # Sin horario configurado → libre de cobro todo el día
+        if bloquear_sin_horario:
+            # Sin horario para hoy → el inspector no trabaja este día.
+            # No cachear: el conductor sí puede estacionar gratis, y comparten la
+            # misma cache_key; cachear False aquí rompería el flujo del conductor.
+            return (False, "No hay horario de cobro configurado para hoy.")
+        # Para conductores: sin horario = libre de cobro todo el día
         resultado = (True, None)
         cache.set(cache_key, resultado, timeout=3600)
         return resultado

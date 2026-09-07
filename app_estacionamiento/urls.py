@@ -200,6 +200,7 @@ urlpatterns = [
     # =========================
     path("tesorero/", views.panel_tesorero, name="panel_tesorero"),
     path("tesorero/rendicion/<int:rendicion_id>/validar/", views.validar_rendicion, name="validar_rendicion"),
+    path("tesorero/rendicion/<int:rendicion_id>/", views.detalle_rendicion, name="detalle_rendicion"),
     path("tesorero/depositar/<int:liquidacion_id>/", views.depositar_comision, name="depositar_comision"),
     path("tesorero/liquidaciones-plataforma/", views.mis_liquidaciones_plataforma, name="mis_liquidaciones_plataforma"),
     path("tesorero/liquidaciones-plataforma/nueva/", views.crear_liquidacion_tesorero, name="crear_liquidacion_tesorero"),

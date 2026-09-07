@@ -165,17 +165,21 @@
 
   </div>
 
-  <!-- Acciones -->
-  <div class="no-print" style="margin-top:1.5rem; display:flex; flex-direction:column; gap:0.6rem; align-items:center;">
+  <!-- Acciones (solo pantalla) -->
+  <div class="no-print" style="margin-top:1.5rem; display:flex; flex-direction:column; gap:0.8rem; align-items:center;">
 
-    <button class="btn-imprimir" id="btn-imprimir" onclick="imprimirActa()"
-            style="width:100%; max-width:300px;">
-      🖨 Imprimir acta
+    <!-- Estado de impresión: mensaje principal visible durante todo el proceso -->
+    <p id="estado-impresion"
+       style="font-size:1rem; font-weight:600; margin:0; color:#333; text-align:center; min-height:1.4em;"></p>
+
+    <!-- Botón de reintento: solo aparece si algo falla -->
+    <button class="btn-imprimir" id="btn-imprimir"
+            style="display:none; width:100%; max-width:300px;"
+            onclick="imprimirActa()">
+      🔄 Reintentar impresión
     </button>
 
-    <p id="estado-impresion"
-       style="font-size:0.85rem; margin:0; color:#555; text-align:center; min-height:1.2em;"></p>
-
+    <!-- Botón "Verificar otro": aparece al terminar o si el inspector omite -->
     <button class="btn-verificar" id="btn-verificar"
             style="display:none; width:100%; max-width:300px;"
             onclick="window.location.href='{% url 'inspectores_verificar_vehiculo' %}'">
@@ -183,7 +187,7 @@
     </button>
 
     <a href="{% url 'inspectores_verificar_vehiculo' %}"
-       style="font-size:0.82rem; color:var(--color-text-muted, #888); margin-top:0.25rem;">
+       style="font-size:0.82rem; color:var(--color-text-muted, #888); margin-top:0.1rem;">
       Omitir impresión →
     </a>
 
@@ -234,8 +238,9 @@ async function imprimirActa() {
   var estado = document.getElementById('estado-impresion');
   var btnVer = document.getElementById('btn-verificar');
 
-  btn.disabled    = true;
-  btn.textContent = '⏳ Conectando...';
+  // btn-imprimir empieza oculto; solo se muestra si hay error (reintento).
+  btn.disabled = true;
+  btn.style.display = 'none';
   estado.textContent = '';
 
   // 1. Reconexión silenciosa (sin diálogo)
@@ -255,8 +260,9 @@ async function imprimirActa() {
     } catch (e) {
       // El inspector canceló el diálogo o el dispositivo no responde
       estado.textContent = '❌ ' + (e.message || 'No se pudo conectar a la impresora.');
-      btn.disabled    = false;
-      btn.textContent = '🖨 Reintentar';
+      btn.disabled = false;
+      btn.textContent = '🔄 Reintentar impresión';
+      btn.style.display = 'block';
       btnVer.style.display = 'block';
       return;
     }
@@ -306,27 +312,33 @@ async function imprimirActa() {
   } catch (e) {
     console.warn('[BLE] envío falló:', e.message);
     estado.textContent = '❌ Error al enviar datos: ' + e.message;
-    btn.disabled    = false;
-    btn.textContent = '🖨 Reintentar';
+    btn.disabled = false;
+    btn.textContent = '🔄 Reintentar impresión';
+    btn.style.display = 'block';
     btnVer.style.display = 'block';
   }
 }
 
-// Al cargar: personalizar el botón con el alias de la impresora guardada.
+// Al cargar: ocultar la vista previa y arrancar la impresión automáticamente.
 window.addEventListener('DOMContentLoaded', function() {
-  var btn    = document.getElementById('btn-imprimir');
   var estado = document.getElementById('estado-impresion');
+  var btnReintentar = document.getElementById('btn-imprimir');
+  var btnVer        = document.getElementById('btn-verificar');
+
+  // Ocultar la vista previa del acta — el inspector no necesita verla en pantalla.
+  // Los DATOS_ACTA ya están en JS para el ESC/POS.
+  var ticketPreview = document.querySelector('.ticket');
+  if (ticketPreview) ticketPreview.style.display = 'none';
 
   if (!navigator.bluetooth) {
     estado.textContent = '⚠️ Impresión BLE no disponible. Usá Chrome en Android.';
+    if (btnReintentar) { btnReintentar.style.display = 'block'; btnReintentar.textContent = '📱 Necesitás Chrome en Android'; btnReintentar.disabled = true; }
+    if (btnVer) btnVer.style.display = 'block';
     return;
   }
 
-  // Mostrar alias en el botón si hay dispositivo guardado
-  var info = obtenerInfoImpresora();
-  if (info && info.alias) {
-    btn.textContent = '🖨 Imprimir con ' + info.alias;
-  }
+  // Arrancar impresión automáticamente al cargar el acta
+  imprimirActa();
 });
 </script>
 </html>

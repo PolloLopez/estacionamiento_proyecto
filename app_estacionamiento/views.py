@@ -38,6 +38,7 @@ from .views_inspector import (
 from .views_tesorero import (
     panel_tesorero,
     validar_rendicion,
+    detalle_rendicion,
     depositar_comision,
     mis_liquidaciones_plataforma,
     crear_liquidacion_tesorero,

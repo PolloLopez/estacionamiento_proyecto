@@ -1608,6 +1608,26 @@ def crear_rendicion(request):
             # Vincular cada cierre a esta rendición (auditoría)
             cierres.update(rendicion=rendicion)
 
+            # Crear liquidaciones de comisión por cada vendedor incluido en la rendición.
+            # Se agrupa la ganancia_usuario de los cierres de vendedores (no inspectores).
+            # Solo se crea liquidación si la comisión acumulada es mayor a cero.
+            comisiones_por_vendedor = (
+                CierreCaja.objects
+                .filter(rendicion=rendicion, usuario__es_vendedor=True)
+                .values("usuario")
+                .annotate(total_comision=Sum("ganancia_usuario"))
+                .filter(total_comision__gt=0)
+            )
+            for item in comisiones_por_vendedor:
+                LiquidacionComision.objects.create(
+                    vendedor_id = item["usuario"],
+                    municipio   = municipio,
+                    rendicion   = rendicion,
+                    fecha_desde = rendicion.fecha_desde,
+                    fecha_hasta = rendicion.fecha_hasta,
+                    monto_total = item["total_comision"],
+                )
+
         messages.success(
             request,
             f"Rendición creada con {cantidad_cierres} cierre(s). Total neto: ${total_neto:,.2f}"

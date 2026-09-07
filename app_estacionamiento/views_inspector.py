@@ -132,7 +132,9 @@ def verificar_vehiculo(request):
     # Si está fuera del horario de cobro, el inspector no puede verificar patentes.
     # (La restricción para infraccionar se aplica más adelante en registrar_infraccion,
     # pero aquí cortamos el flujo completo para evitar búsquedas fuera de turno.)
-    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
+    # bloquear_sin_horario=True: si el día no tiene horario configurado (ej: domingo),
+    # el inspector no puede actuar. Para conductores ese caso es "cobro libre".
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio, bloquear_sin_horario=True)
 
     if request.method == "POST" and not horario_activo:
         # Ignorar el POST: mostrar el template con el aviso de horario sin resultado
@@ -240,9 +242,9 @@ def registrar_infraccion(request):
         messages.error(request, "No existe subcuadra configurada.")
         return redirect("panel_inspectores")
 
-    # Bloquear infraccionamiento fuera del horario de cobro
-    # (misma lógica que para estacionar — si no hay cobro, no hay infracción)
-    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio)
+    # Bloquear infraccionamiento fuera del horario de cobro.
+    # bloquear_sin_horario=True: día sin horario configurado (ej: domingo) = no hay turno.
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio, bloquear_sin_horario=True)
     if not horario_activo:
         messages.warning(
             request,

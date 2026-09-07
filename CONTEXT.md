@@ -1,7 +1,7 @@
 # CONTEXT.md — Sistema de Estacionamiento Medido
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-08-23
+Última actualización estructural: 2026-09-06
 
 ---
 
@@ -35,7 +35,7 @@ GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 MP_ACCESS_TOKEN, MP_PUBLIC_KEY, MP_CLIENT_ID, MP_CLIENT_SECRET
 MP_WEBHOOK_SECRET               # secreto HMAC desde MP Dashboard → Webhooks
 CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
-BREVO_API_KEY                   # email transaccional (pendiente configurar)
+BREVO_API_KEY                   # email transaccional
 DEFAULT_FROM_EMAIL
 SENTRY_DSN                      # error tracking (Sentry)
 ```
@@ -52,18 +52,18 @@ Admin URL: `/sistema-interno/` (no obvia, reduce bruteforce).
 | Backend | Django 5.2, Python 3.12 | Framework principal |
 | Base de datos | SQLite (local) / PostgreSQL (Railway) | Railway provee Postgres |
 | Autenticación | django-allauth + Google OAuth | Login social + email |
-| Pagos | MercadoPago SDK (producción real) | Carga de saldo online |
-| Media storage | Cloudinary (cdn) / filesystem (local) | Fotos de infracciones persistentes en Railway |
+| Pagos | MercadoPago SDK | Carga de saldo online |
+| Media storage | Cloudinary (cdn) / filesystem (local) | Fotos de infracciones y logos en Railway |
 | Imágenes | Pillow | Watermark GPS sobre fotos de actas |
 | PDF | reportlab | PDF de infracciones para juzgado de faltas |
 | Excel | openpyxl | Exportación estadísticas inspectores |
 | Seguridad | django-axes | Rate limiting en login (5 intentos, 1h cooloff) |
 | Error tracking | Sentry (django-sentry-sdk) | Alertas de errores en Railway |
-| Email | django-anymail + Brevo | API transaccional (pendiente verificar remitente) |
-| Frontend | HTML + CSS propio (`global.css`) | Sin frameworks JS. Todo CSS en `global.css` — templates sin bloques `<style>` inline. Colores del municipio inyectados como variables CSS en `base.html` vía `{{ municipio_branding.color_primario }}`. |
+| Email | django-anymail + Brevo | API transaccional |
+| Frontend | HTML + CSS propio (`global.css`) | Sin frameworks JS. Colores del municipio inyectados como variables CSS en `base.html`. |
 | Deploy | Railway + Gunicorn + WhiteNoise | PaaS simple |
-| Tests | Django TestCase | 130 tests (suite estable; 160 era con tests transitorios) |
-| Impresora BLE | Web Bluetooth API (`impresora_bluetooth.js`) | Impresión directa a impresoras térmicas 58mm desde Chrome Android (HTTPS). Protocolo ESC/POS. Persistencia en `localStorage` (workaround `getDevices()` bug). QR nativo `GS(k)`. Doble copia automática. Alias por dispositivo. |
+| Tests | Django TestCase | ~130 tests (suite estable) |
+| Impresora BLE | Web Bluetooth API (`impresora_bluetooth.js`) | Chrome Android (HTTPS). ESC/POS 58mm. Doble copia con pausa configurable (`Municipio.segundos_pausa_doble_copia`): 0=el inspector confirma, >0=pausa automática en segundos. Alias por dispositivo en localStorage. QR nativo `GS(k)`. |
 
 ---
 
@@ -77,40 +77,37 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 **views.py** — fachada pura (~100 líneas), re-exporta desde módulos por rol. No define vistas.
 
 **Módulos de vistas:**
-- `views_auth.py` — login, logout, registro, completar_perfil, OAuth
-- `views_conductor.py` — estacionar, historial, infracciones, vehículos
+- `views_auth.py` — login, logout, registro (con logo del municipio), completar_perfil, OAuth
+- `views_conductor.py` — estacionar, historial, infracciones, vehículos, sugerencias de mejora, eliminación de cuenta
 - `views_inspector.py` — panel, verificar patente, infracciones, PDF, `subcuadra_cercana` (API GPS)
 - `views_vendedor.py` — cobros, abono mensual, caja, comisiones
-- `views_admin.py` — gestión completa del municipio. Incluye `auditoria_staff`: vista unificada de actividad de vendedores e inspectores con filtro de fechas.
-- `views_tesorero.py` — panel tesorero, validar/observar rendiciones, depositar comisiones
-- `views_superadmin.py` — gestión de municipios, admins y módulos (rol superadmin)
-- `views_mp.py` — integración MercadoPago (carga de saldo conductores + webhook unificado)
+- `views_admin.py` — gestión completa del municipio. Incluye `auditoria_staff` (actividad de vendedores e inspectores con filtro de fechas), `crear_rendicion` (genera automáticamente `LiquidacionComision` por vendedor al crear la rendición)
+- `views_tesorero.py` — panel tesorero, `validar_rendicion` (notas obligatorias al observar), `detalle_rendicion`, depositar comisiones
+- `views_superadmin.py` — gestión de municipios, admins y módulos
+- `views_mp.py` — integración MercadoPago (carga de saldo + webhook unificado)
 - `views_pago_publico.py` — pago sin registro: buscar por patente, pagar infracción/estacionamiento/abono vía MP
 - `views_pwa.py` — manifest.json y service worker para PWA
 
 **services/:**
-- `services/horarios.py` — `puede_estacionar_ahora()`, `calcular_opciones_duracion()`, `obtener_tarifa_hora()`, `cerrar_estacionamientos_vencidos_por_horario()`
-- `services/infracciones.py` — `crear_infraccion()`, `cobrar_infraccion_efectivo(medio_pago='efectivo')`, `calcular_estado_tolerancia()` (con `MARGEN_TOLERANCIA_SEGUNDOS = 60`). Constante exportada: `MEDIOS_VALIDOS_COBRO = frozenset({"efectivo","transferencia","debito","credito","qr"})`. Normaliza valores inválidos a `'efectivo'`.
+- `services/horarios.py` — `puede_estacionar_ahora(municipio, bloquear_sin_horario=False)`: cuando `bloquear_sin_horario=True` y no hay `HorarioEstacionamiento` para el día de hoy, devuelve `(False, "No hay horario...")` sin cachear (para no contaminar el caché del conductor). Usado en vistas del inspector. Cuando `False` (default): sin horario = libre de cobro (conductor). También: `calcular_opciones_duracion()`, `obtener_tarifa_hora()`, `cerrar_estacionamientos_vencidos_por_horario()`.
+- `services/infracciones.py` — `crear_infraccion()`, `cobrar_infraccion_efectivo()`, `calcular_estado_tolerancia()` (con `MARGEN_TOLERANCIA_SEGUNDOS = 60`). `MEDIOS_VALIDOS_COBRO = frozenset({"efectivo","transferencia","debito","credito","qr"})`.
 - `services/saldo.py` — `cargar_saldo_conductor()`, `debitar_saldo_conductor()`
-- `services/caja.py` — `generar_cierre_caja()` (calcula desglose por medio de pago en una sola query de agregación condicional), `registrar_cobro_efectivo()`
-- `services/verificacion.py` — `verificar_estado_vehiculo()`. Respeta `vigencia_exencion` (DateField en Vehiculo): si venció, EXENTO_TOTAL/PARCIAL cae a IMPAGO.
-- `services/sia_verificacion.py` — verificación de SIA (Símbolo Internacional de Acceso) contra ANDIS. Función principal: `verificar_sia(qr_url, patente_inspector) → ResultadoSia`. Valida URL (SSRF prevention), parsea HTML con dos estrategias: clave-valor por fila (tests) y encabezados/valores en filas separadas (estructura real de ANDIS). 8 estados posibles: `VALIDO_PATENTE_COINCIDENTE`, `PATENTE_NO_COINCIDE`, `SIA_VENCIDO`, `SIA_SIN_DOMINIO`, `QR_URL_INVALIDA`, `ANDIS_NO_DISPONIBLE`, `ANDIS_ERROR`, `RESPUESTA_INVALIDA`.
+- `services/caja.py` — `generar_cierre_caja()`, `registrar_cobro_efectivo()`
+- `services/verificacion.py` — `verificar_estado_vehiculo()`. Respeta `vigencia_exencion`.
+- `services/sia_verificacion.py` — verificación SIA contra ANDIS. `verificar_sia(qr_url, patente_inspector) → ResultadoSia`. 8 estados posibles. Dos estrategias de parseo (clave-valor / encabezados ANDIS).
 
 **use_cases/:** delegan en services/, sin lógica inline.
 - `estacionar_vehiculo.py`, `pagar_infraccion.py`, `cobrar_estacionamiento.py`
 - `finalizar_estacionamiento.py`, `registrar_infraccion.py`, `acreditar_saldo_mp.py`
-- `procesar_pago_publico.py` — idempotente: marca infraccion pagada, crea Estacionamiento o AbonoMensual según tipo. Usa `select_for_update()`.
+- `procesar_pago_publico.py` — idempotente, `select_for_update()`.
 
-**domain/:**
-- `vehiculo_policy.py` — warnings por tipo de vehículo
-- `saldo_policy.py` — `tiene_saldo(usuario, monto)`
+**domain/:** `vehiculo_policy.py`, `saldo_policy.py`
 
-**Shims de compatibilidad:** `services_caja.py`, `services_infracciones.py`, `services_verificacion.py`
-— re-exportan desde `services/` para no romper imports viejos.
+**Shims de compatibilidad:** `services_caja.py`, `services_infracciones.py`, `services_verificacion.py` — re-exportan desde `services/`.
 
 **utils.py** — `get_subcuadra_default()` + `sanitizar_patente()`.
 
-**middleware.py** — redirige conductores sin `first_name` a `completar_perfil`.
+**middleware.py** — redirige conductores sin `first_name` a `completar_perfil`. `ForzarCambioPasswordMiddleware`.
 
 **factories.py** — `EstacionamientoFactory.crear()` centraliza creación con estado inicial.
 
@@ -120,107 +117,77 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 
 | Modelo | Descripción |
 |--------|-------------|
-| `Usuario` | AbstractUser con `correo` como USERNAME_FIELD. Flags: `es_admin`, `es_inspector`, `es_vendedor`, `es_conductor`, `es_tesorero`, `es_superadmin`. Campos: `saldo` (wallet digital conductor), `saldo_operativo` (caja del vendedor/inspector), `es_verificado`, `municipio`, `porcentaje_ganancia`. |
-| `Municipio` | Configuración del municipio: `comision_vendedor (%)` (solo admin del municipio), `tolerancia_multa_minutos`, branding (logo, `color_primario`, `color_secundario`, `color_acento` — migración 0055). `monto_minimo_carga` y `monto_maximo_carga` (enteros, defecto 500/50.000). `leyenda_horarios` y `texto_ordenanza` (TextField). |
-| `ModuloMunicipio` | Feature flags por municipio (activo/inactivo). Gestionado por superadmin. |
-| `Vehiculo` | Patente única. Tipos: `auto`, `moto`. Exenciones: `exento_global` (bool), `tipo_exencion` (discapacitado/vecino_frentista/jubilado/fuerza/vehiculo_oficial), `vigencia_exencion` (DateField, null=indefinida), `exencion_verificada` (bool), `notas_exencion` (TextField). Exención parcial: `subcuadras_exentas` (M2M). El inspector puede registrar exención 'discapacitado' automáticamente vía SIA ANDIS con vigencia del certificado. |
-| `Infraccion` (campos SIA) | `sia_presentado`, `sia_verificado` (bool), `sia_estado` (CharField), `sia_url`, `sia_code`, `sia_patente_sia`, `sia_nci`, `sia_titular` (CharField), `sia_vencimiento` (DateField), `sia_verificado_en` (DateTimeField), `sia_observacion` (TextField). Migración 0054. |
+| `Usuario` | AbstractUser con `correo` como USERNAME_FIELD. Flags: `es_admin`, `es_inspector`, `es_vendedor`, `es_conductor`, `es_tesorero`, `es_superadmin`. Campos: `saldo` (wallet digital conductor), `saldo_operativo` (caja del vendedor/inspector), `es_verificado`, `municipio`, `porcentaje_ganancia`, `cambio_password_requerido`. |
+| `Municipio` | Configuración del municipio. Campos de tarifa/horario. Branding: `logo (ImageField, upload_to="municipios/logos/")`, `color_primario`, `color_secundario`, `color_acento`. Textos: `leyenda_horarios`, `texto_ordenanza`. Opciones: `tolerancia_multa_minutos`, `minutos_entre_infracciones`, `monto_minimo_carga`, `monto_maximo_carga`. Features: `estadisticas_inspectores_activo`, `token_tv (CharField secreto para dashboard público)`. Impresora BLE: `segundos_pausa_doble_copia (PositiveIntegerField, 0=el inspector confirma antes de la copia 2, >0=pausa automática en segundos)`. Facturación: `porcentaje_plataforma`, `cuota_mantenimiento_mensual`, `concepto_recaudacion`. |
+| `ModuloMunicipio` | Feature flags premium por municipio (activo/inactivo). Gestionado por superadmin. |
+| `Vehiculo` | Patente única. Tipos: `auto`, `moto`. Exenciones: `exento_global`, `tipo_exencion`, `vigencia_exencion (DateField, null=indefinida)`, `exencion_verificada`, `notas_exencion`. Exención parcial: `subcuadras_exentas (M2M)`. Campos SIA: `sia_titular_nombre`, `sia_titular_apellido`, `sia_titular_dni`, `sia_nci`. |
+| `Infraccion` | Estado: `pendiente`/`pagada`/`anulada`. `monto`, `motivo`, `foto (ImageField → Cloudinary)`, `descuento_porcentaje`. Campos SIA: `sia_presentado`, `sia_verificado`, `sia_estado`, `sia_url`, `sia_patente_sia`, `sia_nci`, `sia_titular`, `sia_vencimiento`, etc. |
 | `VehiculoUsuario` | Relación N:N entre vehículo y conductor. |
-| `Subcuadra` | Calle + altura + municipio. `unique_together = (calle, altura, municipio)`. `lat`/`lon` (DecimalField, null) para GPS preselección desde `verificar.html`. El admin las carga desde `/admin-subcuadras/` con mapa Leaflet/OSM (sin API key). |
-| `Estacionamiento` | Estado: `ACTIVO` / `FINALIZADO`. `hora_inicio`, `hora_fin`, `duracion_horas (DecimalField)`, `costo_base`, `costo_final`. Constraint: un ACTIVO por vehículo. |
-| `Infraccion` | Estado: `pendiente` / `pagada` / `anulada`. `monto`, `motivo`, `foto` (ImageField → Cloudinary en Railway), `motivo_anulacion`, `fecha_pago`, `creado_en`. |
-| `MovimientoCaja` | Registro contable de cada cobro. `tipo`: `ingreso`/`egreso`. `medio_pago`: `efectivo`, `transferencia`, `debito`, `credito`, `qr`, `mercadopago` (default `efectivo`). `comision_monto`. `cerrado`: True cuando el movimiento fue incluido en un CierreCaja. |
-| `CierreCaja` | Cierre de turno de inspector/vendedor/admin. `total_cobrado`, `ganancia_usuario`, `monto_municipio`. Desglose automático: `total_efectivo`, `total_transferencia`, `total_digital` (débito+crédito+QR). FK `rendicion → Rendicion (SET_NULL)`: null = pendiente de rendir. Los admins también pueden cerrar su propia caja (`admin/cerrar-caja/`) y otro admin certifica el cierre. |
-| `AbonoMensual` | Habilita estacionamiento libre por un mes. `mes`, `vehiculo`, `municipio`, `vendedor`. `medio_pago`: `efectivo` / `mercadopago` / `saldo`. `conductor` y `vendedor` nullable (pagos públicos anónimos). |
-| `PagoPublico` | Registro de pagos via MP sin cuenta de usuario. `tipo`: `infraccion`/`estacionamiento`/`abono`. `estado`: `pendiente`/`aprobado`/`fallido`. FK nullable a `Infraccion`, `Estacionamiento`, `AbonoMensual`. `mp_preference_id`, `mp_payment_id (unique)`, `email_contacto`, `patente`, `duracion_horas`, `mes_abono`, `subcuadra`. Webhook MP detecta `metadata.pago_publico_id` para rutear. |
-| `Tarifa` | `precio_por_hora` (max_digits=10), `precio_por_hora_moto`, `precio_abono_auto`, `precio_abono_moto`, `monto_infraccion` (monto fijo fotografiado al crear cada acta — no se calcula en tiempo real). |
-| `HorarioEstacionamiento` | Horario semanal por día (`dia_semana` 0-6). `hora_inicio`, `hora_fin`. |
+| `Subcuadra` | Calle + altura + municipio. `unique_together`. `lat`/`lon` para GPS. Mapa Leaflet/OSM en `/admin-subcuadras/`. |
+| `Estacionamiento` | Estado: `ACTIVO`/`FINALIZADO`. `hora_inicio`, `hora_fin`, `duracion_horas`, `costo_base`, `costo_final`. Un ACTIVO por vehículo. |
+| `MovimientoCaja` | Registro contable de cada cobro. `medio_pago`: `efectivo`, `transferencia`, `debito`, `credito`, `qr`, `mercadopago`. `comision_monto`. `cerrado` al incluirse en un CierreCaja. |
+| `CierreCaja` | Cierre de turno. `total_cobrado`, `ganancia_usuario`, `monto_municipio`. Desglose: `total_efectivo`, `total_transferencia`, `total_digital`. FK `rendicion → Rendicion (SET_NULL)`. Admins también cierran caja y otro admin certifica. |
+| `AbonoMensual` | Estacionamiento libre por un mes. `mes`, `vehiculo`, `municipio`. `medio_pago`: `efectivo`/`mercadopago`/`saldo`. |
+| `PagoPublico` | Pago vía MP sin cuenta. `tipo`: `infraccion`/`estacionamiento`/`abono`. `mp_payment_id (unique)`. Webhook detecta `metadata.pago_publico_id`. |
+| `Tarifa` | `precio_por_hora`, `precio_por_hora_moto`, `precio_abono_auto`, `precio_abono_moto`, `monto_infraccion` (snapshot al crear el acta). |
+| `HorarioEstacionamiento` | Horario semanal por día (`dia_semana` 0-6). `hora_inicio`, `hora_fin`, `activo`. Siempre usar `.order_by("-id").first()` si puede haber duplicados. |
 | `DiaEspecial` | Feriados o días sin cobro. `fecha`, `cobro_activo`. |
 | `VerificacionInspector` | Resultado de verificar una patente. Índice compuesto `(vehiculo_id, fecha DESC)`. |
-| `SolicitudVerificacion` | El conductor pide verificación de identidad al admin. |
-| `Rendicion` | El admin cierra un período seleccionando CierreCaja certificados. Totales **calculados automáticamente** del desglose de los cierres elegidos: `total_efectivo`, `total_digital` (transferencia+débito+crédito+QR agrupados), `total_neto = efectivo + digital`. `comprobante_archivo` para adjuntar comprobante de transferencia. Estado: `pendiente`/`validada`/`observada`. El tesorero registra quién validó y cuándo. |
-| `LiquidacionComision` | Pago de comisiones a un vendedor. Flujo: `pendiente` → `depositada` (tesorero) → `certificada` (vendedor). `factura_presentada (BooleanField)` + `factura_archivo (FileField)` para el comprobante de factura del vendedor. |
-| `DestinatarioInforme` | Personas que reciben el informe mensual por email. |
-| `PlantillaDocumento` | *(pendiente)* Texto personalizable por municipio para cada tipo de comprobante/acta. Tipos: `acta`, `cobro_hora`, `abono`, `cobro_infraccion`, `anulacion`. Campos: `encabezado`, `cuerpo`, `pie`. Si no existe plantilla → usa texto hardcodeado actual. |
+| `Rendicion` | El admin cierra un período seleccionando `CierreCaja` certificados. Totales **calculados automáticamente**: `total_efectivo`, `total_digital` (transferencia+débito+crédito+QR), `total_neto`. Estado: `pendiente`/`validada`/`observada`. Al crear la rendición, el sistema genera automáticamente `LiquidacionComision` por cada vendedor con `ganancia_usuario > 0` en los cierres incluidos. |
+| `LiquidacionComision` | Comisiones de un vendedor por período. Flujo: `pendiente` → `depositada` (tesorero) → `certificada` (vendedor). `factura_presentada`, `factura_archivo`. **Se crean automáticamente** al crear la `Rendicion` desde `views_admin.crear_rendicion()`. |
+| `SugerenciaMejora` | Cualquier usuario puede enviar sugerencias de mejora. `area` filtrada por rol del usuario (conductor ve áreas de conductor+general, inspector ve inspector+general, etc.). `criticidad`, `estado`. Gestionada por superadmin. |
+| `SolicitudEliminacionCuenta` | El conductor puede solicitar darse de baja (soft-delete). Revisada por admin. |
+| `Impugnacion` | El conductor impugna una infracción. Revisada por admin. |
+| `TransferenciaSaldo` | Transferencia de saldo entre conductores. |
+| `Reintegro` | Reintegro por cancelación temprana de estacionamiento. |
+| `LiquidacionPlataforma` | Lo que el municipio le paga a la plataforma (Leandro). Iniciada por tesorero o superadmin. |
+| `PlantillaDocumento` | Texto personalizable por municipio para comprobantes/actas. Tipos: `acta`, `cobro_hora`, `abono`, `cobro_infraccion`, `anulacion`. |
 | `Notificacion` | Notificaciones internas al conductor. |
 
 ---
 
 ## Roles y reglas de negocio
 
-**Tolerancia de gracia:** si el conductor (o el vendedor) resuelve una infracción dentro de
-`municipio.tolerancia_multa_minutos` desde que fue labrada, se anula automáticamente sin cobrar.
-Centralizado en `calcular_estado_tolerancia()` de `services/infracciones.py`; incluye margen de
-60 segundos para evitar cobrar por diferencias mínimas.
+**Tolerancia de gracia:** si el conductor resuelve una infracción dentro de `municipio.tolerancia_multa_minutos`, se anula automáticamente. Centralizado en `calcular_estado_tolerancia()` con `MARGEN_TOLERANCIA_SEGUNDOS = 60`.
 
-**Exenciones:** exento global → nunca paga. Exento parcial → libre en sus subcuadras exentas,
-paga en el resto. El inspector ve el estado al verificar la patente.
+**Exenciones:** exento global → nunca paga. Exento parcial → libre en sus subcuadras exentas. El inspector puede registrar exención 'discapacitado' vía SIA ANDIS.
 
-**Abono mensual:** unique constraint (mes + vehículo + municipio). Puede cobrarlo el vendedor
-(con comisión), el admin (sin comisión, 100% a tesorería) o el propio conductor (con saldo digital).
-El vehículo se crea automáticamente si no existe.
+**Horario inspector vs conductor:** `puede_estacionar_ahora(bloquear_sin_horario=True)` en vistas del inspector. Sin horario para hoy → inspector no puede operar (distinto al conductor, que estaciona gratis). El resultado de `bloquear_sin_horario=True` **no se cachea** para no contaminar el flujo del conductor.
 
-**Comisión vendedor:** `monto * comision_vendedor% / 100` al cobrar, guardado en
-`MovimientoCaja.comision_monto`. Se acumula hasta que el tesorero genera una `LiquidacionComision`.
+**Abono mensual:** unique constraint (mes + vehículo + municipio). Cobra el vendedor (con comisión), el admin (sin comisión) o el conductor (con saldo digital).
 
-**Duración mínima de estacionamiento:** 1 hora. `calcular_opciones_duracion()` arranca desde `n=2`.
-
-**Reintegro por cancelación temprana:** si el conductor finaliza antes de
-`UMBRAL_REINTEGRO_MINUTOS = 30`, se devuelve el 100% del `costo_base`. Centralizado en
-`use_cases/finalizar_estacionamiento.py`.
-
-**Debitar saldo conductor:** `debitar_saldo_conductor()` en `services/saldo.py` NO abre su propia
-transacción. Debe llamarse desde dentro de un `transaction.atomic()` con `select_for_update()` ya
-activo. El estacionamiento se descuenta al activarlo (no cuando el inspector verifica).
+**Comisión vendedor:** `monto * comision_vendedor% / 100` al cobrar → `MovimientoCaja.comision_monto`. Se acumula en `CierreCaja.ganancia_usuario` hasta que se genera la `LiquidacionComision`.
 
 **Flujo financiero completo:**
-1. Conductor activa estacionamiento → `debitar_saldo_conductor()` → `conductor.saldo ↓` + `MovimientoCaja(conductor, egreso)`
-2. Vendedor cobra en persona → `MovimientoCaja(vendedor, ingreso, medio_pago=...)` → `vendedor.saldo_operativo ↑`
-3. Vendedor cierra caja → `generar_cierre_caja()` → calcula desglose por medio_pago en 1 query → `CierreCaja` creado → movimientos `cerrado=True`
-4. Admin certifica cierre → revisa el desglose efectivo/digital
-5. Admin crea rendición → selecciona CierreCaja certificados con checkboxes → totales calculados automáticamente → `CierreCaja.rendicion FK` vinculado → `Rendicion` creada
-6. Tesorero valida rendición → marca `validada` o `observada`
-7. Tesorero paga comisiones → `LiquidacionComision(depositada)` → vendedor certifica recibo → puede adjuntar factura
+1. Conductor activa estacionamiento → `debitar_saldo_conductor()` → `conductor.saldo ↓` + `MovimientoCaja(egreso)`
+2. Vendedor cobra en persona → `MovimientoCaja(ingreso)` → `vendedor.saldo_operativo ↑`
+3. Vendedor cierra caja → `generar_cierre_caja()` → `CierreCaja` creado, movimientos `cerrado=True`
+4. Admin certifica cierre → revisa desglose efectivo/digital
+5. Admin crea rendición → selecciona `CierreCaja` certificados → totales calculados automáticamente → `CierreCaja.rendicion FK` vinculado → **`LiquidacionComision` generada automáticamente por vendedor** (suma de `ganancia_usuario` de sus cierres)
+6. Tesorero valida rendición → marca `validada` o `observada` (notas obligatorias al observar)
+7. Tesorero deposita comisión → `LiquidacionComision(depositada)` → vendedor certifica recibo y adjunta factura
 
-**Medios de pago (MovimientoCaja.medio_pago):**
-- `efectivo`: el cobrador recibe cash y lo rinde físicamente al admin.
-- `transferencia`: va a la cuenta personal del vendedor; se rinde en efectivo o con nueva transferencia.
-- `debito`, `credito`, `qr`: van directo a tesorería (no pasan por el vendedor físicamente).
-- `mercadopago`: carga de saldo online del conductor (webhook MP → `acreditar_saldo_mp`).
+**Debitar saldo conductor:** `debitar_saldo_conductor()` NO abre su propia transacción. Debe llamarse dentro de `transaction.atomic()` + `select_for_update()`.
 
-En el CierreCaja: `total_transferencia` y `total_digital` se calculan por separado.
-En la Rendición: `total_digital = total_transferencia + total_digital` (tesorería los agrupa porque ninguno es efectivo físico).
-
-**Rendición a tesorería:** el admin selecciona cierres certificados (certificado=True, rendicion=null).
-Los totales son calculados por el sistema, no hay entrada manual. El admin puede adjuntar comprobante
-de transferencia. Las comisiones de vendedores son gestionadas por tesorería aparte via LiquidacionComision.
-
-**Multi-municipio:** cada municipio tiene su propia tarifa, horario, inspectores y vendedores.
-Los datos no se cruzan entre municipios. Patrón obligatorio en todas las vistas:
+**Multi-municipio:** patrón obligatorio en todas las vistas:
 ```python
 get_object_or_404(Modelo, id=pk, municipio=request.user.municipio)
-# Nunca: Modelo.objects.get(id=pk)  ← no filtra por municipio
+# Nunca: Modelo.objects.get(id=pk)
 ```
 
-**Concurrencia:** todo cobro usa `transaction.atomic()` + `select_for_update()`:
-```python
-with transaction.atomic():
-    obj = Modelo.objects.select_for_update().get(pk=...)
-    # modificar y guardar
-```
-Modelos que requieren este patrón: `Usuario` (saldo), `MovimientoCaja`, `Infraccion`.
+**Concurrencia:** todo cobro usa `transaction.atomic()` + `select_for_update()`.
 
-**Cierre reactivo (sin Celery):** los estacionamientos vencidos se cierran al acceder a
-`inicio_usuarios` y al verificar una patente. Pull-based: no hay tareas programadas.
+**Cierre reactivo (sin Celery):** estacionamientos vencidos se cierran al acceder a `inicio_usuarios` y al verificar una patente. Pull-based.
 
-**Cache:** `puede_estacionar_ahora(municipio)` cacheada 1 hora por clave `municipio+fecha+hora`.
-Se invalida automáticamente al cambiar el tramo horario.
+**Cache:** `puede_estacionar_ahora()` cacheada 1 hora por clave `municipio+fecha+hora`. El resultado con `bloquear_sin_horario=True` **no** se cachea.
 
-**Patentes sanitizadas:** `sanitizar_patente()` en `utils.py` — alfanumérico, mayúsculas, en todas
-las vistas y templates via handler JS `oninput`.
+**Patentes sanitizadas:** `sanitizar_patente()` — alfanumérico, mayúsculas, en todas las vistas.
 
-**Saldo doble-check:** antes de estacionar se verifica saldo optimista (sin lock) y luego dentro
-de `select_for_update()` para evitar race conditions.
+**Rendición a tesorería:** notas obligatorias cuando el tesorero marca "observada". El tesorero y el admin que la generó pueden ver el detalle desde `/tesorero/rendicion/<id>/` (`detalle_rendicion`).
+
+**Dashboard TV:** URL pública `/tv/<token>/` (sin auth). Token generado por superadmin en `editar_municipio`.
+
+**Sugerencias de mejora:** las áreas del formulario se filtran por rol del usuario vía `AREAS_POR_ROL` en `views_conductor.py`.
 
 ---
 
@@ -230,36 +197,42 @@ de `select_for_update()` para evitar race conditions.
 /usuarios/                                     → inicio conductor
 /usuarios/admin-inicio/                        → panel admin
 /usuarios/admin-usuarios/                      → gestionar conductores
-/usuarios/admin-usuarios/<id>/                 → detalle conductor (cambiar contraseña)
+/usuarios/admin-usuarios/<id>/                 → detalle conductor
 /usuarios/admin-inspectores/                   → gestionar inspectores
 /usuarios/admin-inspectores/estadisticas/      → estadísticas + exportar Excel
 /usuarios/admin-vendedores/                    → gestionar vendedores
-/usuarios/admin-infracciones/                  → infracciones (cobrar / anular / PDF juzgado)
+/usuarios/admin-infracciones/                  → infracciones
 /usuarios/admin-rendiciones/                   → rendiciones (crear / certificar cierres)
 /usuarios/admin-exenciones/                    → exenciones de vehículos
-/usuarios/admin-subcuadras/                    → gestionar subcuadras + asignar coordenadas GPS (mapa Leaflet)
+/usuarios/admin-subcuadras/                    → subcuadras + mapa GPS Leaflet
+/usuarios/admin-dashboard/                     → dashboard con filtro de fechas
 /usuarios/inspectores/                         → panel inspector
-/usuarios/inspectores/verificar/               → verificar patente en calle (preselección GPS si hay coordenadas cargadas)
-/usuarios/inspectores/subcuadra-cercana/       → API JSON: subcuadra más cercana por lat/lon (uso interno del template)
-/usuarios/inspectores/infraccion/              → labrar acta
+/usuarios/inspectores/verificar/               → verificar patente
+/usuarios/inspectores/subcuadra-cercana/       → API JSON GPS (uso interno)
+/usuarios/inspectores/infraccion/              → labrar acta (auto-impresión BLE al cargar)
 /usuarios/inspectores/resumen/                 → mis infracciones del día
 /usuarios/vendedores/                          → panel vendedor
 /usuarios/vendedores/cobrar-infraccion/        → cobrar multa en efectivo
 /usuarios/vendedores/cobrar-abono/             → cobrar abono mensual
-/usuarios/vendedores/caja/                     → resumen de caja del vendedor
+/usuarios/vendedores/caja/                     → resumen de caja
 /usuarios/vendedores/comisiones/               → mis liquidaciones de comisión
-/usuarios/vendedores/comisiones/<id>/factura/  → presentar factura de comisión
+/usuarios/vendedores/comisiones/<id>/factura/  → presentar factura
 /usuarios/tesorero/                            → panel tesorero
+/usuarios/tesorero/rendicion/<id>/             → detalle rendición (tesorero + admin)
+/usuarios/tesorero/rendicion/<id>/validar/     → validar/observar (POST)
+/usuarios/tesorero/depositar/<id>/             → depositar comisión
+/usuarios/sugerencias/nueva/                   → nueva sugerencia (áreas filtradas por rol)
 /usuarios/mp/cargar/                           → iniciar carga MercadoPago
-/usuarios/pagar/                               → buscar patente (pago público sin registro)
-/usuarios/pagar/<patente>/                     → detalle: infracciones + form estacionar + form abono
-/usuarios/pagar/infraccion/<id>/               → iniciar pago infracción (POST → MP)
-/usuarios/pagar/estacionar/                    → iniciar pago estacionamiento (POST → MP)
-/usuarios/pagar/abono/                         → iniciar pago abono mensual (POST → MP)
-/usuarios/pagar/subcuadra-cercana/             → API GPS pública (sin auth)
+/usuarios/pagar/                               → pago público sin registro
+/usuarios/pagar/<patente>/                     → detalle patente pública
 /usuarios/manifest.json                        → PWA manifest
 /usuarios/sw.js                                → PWA service worker
 /usuarios/mis-infracciones/                    → infracciones del conductor
-/usuarios/consultar-deuda/                     → buscar deuda por patente (conductor/vendedor)
-/sistema-interno/                              → Django Admin (URL no obvia, reduce bruteforce)
+/usuarios/consultar-deuda/                     → buscar deuda por patente
+/superadmin/municipios/                        → lista de municipios
+/superadmin/municipio/<id>/editar/             → configuración completa del municipio
+/superadmin/sugerencias/                       → panel de sugerencias
+/sistema-interno/                              → Django Admin
+/health/                                       → healthcheck (UptimeRobot)
+/tv/<token>/                                   → dashboard TV público
 ```
