@@ -1,0 +1,27 @@
+# Configuración de Jekyll para GitHub Pages
+# Solo sirve los archivos HTML del landing; excluye toda la documentación interna
+# que puede contener sintaxis de Django templates ({% extends %}, etc.) que Jekyll
+# interpreta como Liquid y rompe el build.
+
+exclude:
+  # Documentación interna del proyecto
+  - ANALISIS_AI_STUDIO_2026-09-06.md
+  - CONTEXT.md
+  - PENDIENTES.md
+  - CLAUDE.md
+  - MANUAL_SISTEMA.md
+  - CHECKLIST_PRODUCCION_2026-09-01.md
+  - AUDITORIA_SEGURIDAD_2026-09-01.md
+  - AUDITORIA_RENDIMIENTO_2026-09-01.md
+  - AUDITORIA_BASE_DATOS_2026-09-01.md
+  # Archivos de configuración Python/Django (no son páginas)
+  - manage.py
+  - requirements.txt
+  - Procfile
+  - "*.py"
+  - app_estacionamiento/
+  - static/
+  - templates/
+  - media/
+  - "*.cfg"
+  - "*.toml"
