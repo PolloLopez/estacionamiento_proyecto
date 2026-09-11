@@ -333,6 +333,35 @@ def gestionar_liquidacion_plataforma(request, liquidacion_id):
     })
 
 
+@require_role("tesorero", "admin", "superadmin")
+def cancelar_observacion(request, rendicion_id):
+    """
+    El tesorero (o admin/superadmin) puede revertir una rendición observada
+    a pendiente — por ejemplo, si la marcó por error o quiere que el admin
+    la pueda responder y reenviar.
+
+    Solo acepta POST. Mantiene notas_tesorero como registro histórico.
+    """
+    municipio = request.user.municipio
+    rendicion = get_object_or_404(Rendicion, id=rendicion_id, municipio=municipio)
+
+    if rendicion.estado != "observada":
+        messages.warning(request, "Solo se pueden revertir rendiciones observadas.")
+        return redirect("panel_tesorero")
+
+    if request.method != "POST":
+        return redirect("panel_tesorero")
+
+    with transaction.atomic():
+        rendicion.estado      = "pendiente"
+        rendicion.tesorero    = None
+        rendicion.validado_en = None
+        rendicion.save(update_fields=["estado", "tesorero", "validado_en"])
+
+    messages.success(request, f"Rendición #{rendicion.id} revertida a pendiente.")
+    return redirect("panel_tesorero")
+
+
 @require_role("tesorero", "admin")
 def detalle_rendicion(request, rendicion_id):
     """

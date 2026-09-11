@@ -38,6 +38,7 @@ from .views_inspector import (
 from .views_tesorero import (
     panel_tesorero,
     validar_rendicion,
+    cancelar_observacion,
     detalle_rendicion,
     depositar_comision,
     mis_liquidaciones_plataforma,
@@ -126,6 +127,7 @@ from .views_admin import (
     resolver_impugnacion,
     gestionar_staff,
     editar_staff,
+    responder_observacion,
 )
 from .views_mp import (
     mp_iniciar_carga,

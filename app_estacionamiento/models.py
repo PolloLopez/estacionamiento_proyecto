@@ -1256,6 +1256,7 @@ class Rendicion(models.Model):
 
     estado          = models.CharField(max_length=15, choices=ESTADOS, default='pendiente')
     notas_tesorero  = models.TextField(blank=True, verbose_name='Observaciones del tesorero')
+    notas_admin     = models.TextField(blank=True, verbose_name='Respuesta del admin')
 
     creado_en    = models.DateTimeField(auto_now_add=True)
     tesorero     = models.ForeignKey(
