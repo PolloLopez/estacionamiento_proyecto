@@ -35,13 +35,54 @@
 
       <div style="margin-bottom:1rem;">
         <label style="font-size:0.88rem; font-weight:600;">Evidencia fotográfica (opcional)</label>
-        <input type="file" name="evidencia" accept="image/*"
-               style="display:block; margin-top:0.25rem; font-size:0.88rem;">
-        <small style="color:var(--color-text-muted);">Podés adjuntar una foto que respalde tu impugnación (JPG, PNG).</small>
+
+        <!-- Input real oculto -->
+        <input type="file" id="evidencia-input" name="evidencia" accept="image/*"
+               style="display:none;"
+               onchange="mostrarEvidencia(this)">
+
+        <!-- Botón styled -->
+        <button type="button" id="btn-evidencia" class="btn btn-outline"
+                style="margin-top:0.35rem; font-size:0.9rem; padding:0.5rem 1rem;
+                       border-style:dashed;"
+                onclick="document.getElementById('evidencia-input').click()">
+          📎 Adjuntar foto
+        </button>
+
+        <!-- Nombre del archivo seleccionado + opción de quitar -->
+        <div id="evidencia-seleccionada" style="display:none; margin-top:0.4rem;
+             font-size:0.85rem; color:var(--color-text-muted); display:flex;
+             align-items:center; gap:0.5rem;">
+          <span id="evidencia-nombre"></span>
+          <button type="button" style="background:none; border:none; cursor:pointer;
+                  font-size:0.9rem; color:var(--color-danger); padding:0; line-height:1;"
+                  onclick="quitarEvidencia()" title="Quitar foto">✕</button>
+        </div>
+
+        <small style="display:block; margin-top:0.25rem; color:var(--color-text-muted);">
+          Podés adjuntar una foto que respalde tu impugnación (JPG, PNG).
+        </small>
       </div>
 
       <button type="submit" class="btn">Enviar impugnación</button>
     </form>
   </div>
 </div>
+
+<script>
+function mostrarEvidencia(input) {
+  var archivo = input.files && input.files[0];
+  if (!archivo) return;
+  document.getElementById("evidencia-nombre").textContent = "📷 " + archivo.name;
+  document.getElementById("evidencia-seleccionada").style.display = "flex";
+  document.getElementById("btn-evidencia").textContent = "📎 Cambiar foto";
+}
+
+function quitarEvidencia() {
+  document.getElementById("evidencia-input").value = "";
+  document.getElementById("evidencia-nombre").textContent = "";
+  document.getElementById("evidencia-seleccionada").style.display = "none";
+  document.getElementById("btn-evidencia").textContent = "📎 Adjuntar foto";
+}
+</script>
 {% endblock %}

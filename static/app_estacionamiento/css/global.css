@@ -45,6 +45,13 @@
   --font-size-base: 1.05rem;
   --font-size-sm:   0.92rem;
 
+  /* Texto del navbar — blanco por defecto (color primario oscuro).
+     Se sobreescribe via JS en base.html si el color primario del municipio
+     es claro (luminancia > 0.35): en ese caso se usa texto oscuro para contraste. */
+  --color-nav-text:      rgba(255,255,255,0.92);
+  --color-nav-text-hover: #ffffff;
+  --color-nav-hover-bg:  rgba(255,255,255,0.18);
+
   /* Altura del navbar — usada para compensar position:sticky */
   --navbar-h: 62px;
 }
@@ -186,7 +193,7 @@ main.container {
 }
 
 .nav-items a {
-  color: rgba(255,255,255,0.92);
+  color: var(--color-nav-text);
   text-decoration: none;
   padding: 0.45rem 0.8rem;
   border-radius: var(--radius-sm);
@@ -198,8 +205,8 @@ main.container {
 
 .nav-items a:hover,
 .nav-items a.activo {
-  background: rgba(255,255,255,0.18);
-  color: #ffffff;
+  background: var(--color-nav-hover-bg);
+  color: var(--color-nav-text-hover);
   text-decoration: none;
 }
 
@@ -221,13 +228,13 @@ main.container {
   border: none;
 }
 
-.menu-toggle:hover { background: rgba(255,255,255,0.15); }
+.menu-toggle:hover { background: var(--color-nav-hover-bg); }
 
 .menu-toggle span {
   display: block;
   width: 24px;
   height: 2.5px;
-  background: #fff;
+  background: var(--color-nav-text-hover);
   border-radius: 2px;
   transition: transform 0.28s ease, opacity 0.2s ease;
   transform-origin: center;
@@ -1132,8 +1139,8 @@ table tr:hover { background: var(--color-surface-2); }
   /* Timer más pequeño */
   .timer-box { font-size: 2.4rem; }
 
-  /* Auth panel ocupa más pantalla */
-  .auth-panel { margin: 1.5rem auto; }
+  /* Auth panel ocupa toda la pantalla disponible en mobile */
+  .auth-panel { max-width: 100%; margin: 1.5rem auto; }
 
   /* Botones grandes tocan mejor */
   .btn { min-height: 44px; }
@@ -1352,6 +1359,23 @@ table tr:hover { background: var(--color-surface-2); }
     box-shadow: none;
     background: transparent;
     overflow-y: visible;
+  }
+
+  /* Desktop dark mode: los nav-items flotan inline dentro del navbar (color primario),
+     no necesitan fondo propio. Las reglas globales de dark mode tienen mayor especificidad
+     ([data-theme] + clase = 0,2,0) que la regla de arriba (clase = 0,1,0), así que
+     las anulamos acá con la misma especificidad, ganando por orden en la hoja.
+     Usamos las variables --color-nav-text* que el script de base.html ajusta según
+     la luminancia del primario, para que texto oscuro/claro sea consistente en dark mode. */
+  [data-theme="dark"] .nav-items {
+    background: transparent;
+  }
+  [data-theme="dark"] .nav-items a {
+    color: var(--color-nav-text);
+  }
+  [data-theme="dark"] .nav-items a:hover {
+    background: var(--color-nav-hover-bg);
+    color: var(--color-nav-text-hover);
   }
 
   /* Grids a 2/3/4 columnas según clase (ya definidos arriba, solo aseguramos

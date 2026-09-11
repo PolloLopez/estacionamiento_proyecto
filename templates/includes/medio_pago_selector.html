@@ -1,28 +1,53 @@
-/* Selector de medio de pago — incluir en formularios de confirmación de cobro.
-   Emite un <input type="radio" name="medio_pago"> estilizado como botones.
-   Requiere que el form padre incluya el campo y que JS esté habilitado (graceful degradation: radio funciona sin JS). */
+{% comment %}
+Selector de medio de pago — incluir en formularios de confirmación de cobro.
+
+Uso:
+  {% include "includes/medio_pago_selector.html" %}
+
+El template emite los <input type="radio" name="medio_pago"> estilizados como botones
+dentro del form padre. No necesitás declarar el campo por separado.
+
+Selección inicial:
+  - Si el form viene de un POST (ej: validación fallida), preserva el valor seleccionado
+    gracias a request.POST.medio_pago.
+  - Por defecto (primer carga) preselecciona "efectivo".
+  - Para forzar otro valor inicial desde la vista, pasá un contexto medio_pago_inicial="transferencia".
+
+Graceful degradation sin JS:
+  - Los labels wrappean los radios: click en el label = click en el radio (HTML nativo).
+  - Sin JS, el radio correcto se envía en el form, pero la clase .medio-activo NO se actualiza
+    visualmente al seleccionar otra opción. El valor se guarda y envía igual.
+{% endcomment %}
+
+{% with pago_actual=request.POST.medio_pago|default:medio_pago_inicial|default:"efectivo" %}
 <div style="margin-bottom:1.2rem;">
   <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.5rem; color:var(--color-text-muted);">
     Medio de pago
   </label>
   <div class="medio-pago-group" style="display:flex; flex-wrap:wrap; gap:0.4rem;">
-    <label class="medio-btn medio-activo">
-      <input type="radio" name="medio_pago" value="efectivo" checked> 💵 Efectivo
+    <label class="medio-btn {% if pago_actual == 'efectivo' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="efectivo"
+             {% if pago_actual == 'efectivo' %}checked{% endif %}> 💵 Efectivo
     </label>
-    <label class="medio-btn">
-      <input type="radio" name="medio_pago" value="transferencia"> 📲 Transferencia
+    <label class="medio-btn {% if pago_actual == 'transferencia' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="transferencia"
+             {% if pago_actual == 'transferencia' %}checked{% endif %}> 📲 Transferencia
     </label>
-    <label class="medio-btn">
-      <input type="radio" name="medio_pago" value="debito"> 💳 Débito
+    <label class="medio-btn {% if pago_actual == 'debito' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="debito"
+             {% if pago_actual == 'debito' %}checked{% endif %}> 💳 Débito
     </label>
-    <label class="medio-btn">
-      <input type="radio" name="medio_pago" value="credito"> 💳 Crédito
+    <label class="medio-btn {% if pago_actual == 'credito' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="credito"
+             {% if pago_actual == 'credito' %}checked{% endif %}> 💳 Crédito
     </label>
-    <label class="medio-btn">
-      <input type="radio" name="medio_pago" value="qr"> 📱 QR
+    <label class="medio-btn {% if pago_actual == 'qr' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="qr"
+             {% if pago_actual == 'qr' %}checked{% endif %}> 📱 QR
     </label>
   </div>
 </div>
+{% endwith %}
 
 <style>
 .medio-btn {
@@ -34,6 +59,7 @@
   user-select: none;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
+/* El radio está oculto: el label wrapeado actúa como control visual */
 .medio-btn input[type="radio"] { display: none; }
 .medio-activo {
   background: var(--color-primary, #2563eb);
@@ -44,7 +70,8 @@
 
 <script>
 (function () {
-  // Activar botón seleccionado con JS; sin JS los radios ocultos siguen funcionando
+  // Actualizar la clase .medio-activo al hacer click, para feedback visual inmediato.
+  // Sin este script el radio sigue funcionando nativamente (el label wrappea el input).
   document.querySelectorAll('.medio-pago-group').forEach(function (grupo) {
     grupo.querySelectorAll('.medio-btn').forEach(function (lbl) {
       lbl.addEventListener('click', function () {

@@ -181,10 +181,10 @@
               <thead>
                 <tr>
                   <th>Patente</th>
-                  <th>Inspector</th>
                   <th style="text-align:right;">Monto</th>
                   <th>Estado</th>
                   <th>Fecha</th>
+                  <th>Inspector</th>
                 </tr>
               </thead>
               <tbody>
@@ -192,7 +192,6 @@
                 <tr style="cursor:pointer;"
                     onclick="location.href='{% url 'admin_infracciones' %}?detalle={{ inf.id }}'">
                   <td><strong>{{ inf.vehiculo.patente }}</strong></td>
-                  <td style="font-size:0.82rem;">{{ inf.inspector.nombre|default:inf.inspector.correo }}</td>
                   <td style="text-align:right;">${{ inf.monto }}</td>
                   <td>
                     {% if inf.estado == "pendiente" %}
@@ -208,6 +207,7 @@
                     {% endif %}
                   </td>
                   <td style="font-size:0.8rem; white-space:nowrap;">{{ inf.creado_en|date:"d/m H:i" }}</td>
+                  <td style="font-size:0.82rem;">{{ inf.inspector.nombre|default:inf.inspector.correo }}</td>
                 </tr>
                 {% endfor %}
               </tbody>

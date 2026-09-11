@@ -502,7 +502,7 @@ def editar_inspector(request, inspector_id):
     )
 
     if request.method == "POST":
-        inspector.first_name    = request.POST.get("nombre", "").strip()
+        inspector.first_name    = request.POST.get("nombre", "").strip().title()
         inspector.is_active     = request.POST.get("activo") == "on"
         inspector.telefono      = request.POST.get("telefono", "").strip()
         inspector.numero_dni    = request.POST.get("numero_dni", "").strip()
@@ -653,9 +653,9 @@ def editar_vendedor(request, vendedor_id):
     )
 
     if request.method == "POST":
-        vendedor.first_name         = request.POST.get("nombre", "").strip()
+        vendedor.first_name         = request.POST.get("nombre", "").strip().title()
         vendedor.is_active          = request.POST.get("activo") == "on"
-        vendedor.nombre_propietario = request.POST.get("nombre_propietario", "").strip()
+        vendedor.nombre_propietario = request.POST.get("nombre_propietario", "").strip().title()
         vendedor.documento_cuil     = request.POST.get("documento_cuil", "").strip()
         vendedor.telefono           = request.POST.get("telefono", "").strip()
         vendedor.horario_atencion   = request.POST.get("horario_atencion", "").strip()
@@ -680,8 +680,9 @@ def editar_vendedor(request, vendedor_id):
             )
         except Exception:
             vendedor.porcentaje_ganancia = 0
-        vendedor.periodicidad_rendicion = request.POST.get("periodicidad_rendicion", "semanal")
-        vendedor.puede_vender_abono     = request.POST.get("puede_vender_abono") == "on"
+        vendedor.periodicidad_rendicion  = request.POST.get("periodicidad_rendicion", "semanal")
+        vendedor.puede_vender_abono      = request.POST.get("puede_vender_abono") == "on"
+        vendedor.puede_cobrar_infraccion = request.POST.get("puede_cobrar_infraccion") == "on"
         vendedor.save()
         return redirect("gestionar_vendedores")
 
@@ -939,6 +940,8 @@ def admin_infracciones(request):
                 inf.motivo_anulacion = motivo_anulacion
                 inf.save(update_fields=["estado", "motivo_anulacion"])
                 messages.success(request, f"Infracción #{inf.id} anulada.")
+                # Redirigir sin ?detalle=ID para que el modal no se reabra
+                return redirect(reverse("admin_infracciones"))
 
         elif accion == "cobrar" and infraccion_id:
             inf = get_object_or_404(Infraccion, id=infraccion_id, municipio=municipio)

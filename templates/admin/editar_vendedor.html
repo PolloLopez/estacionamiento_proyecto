@@ -41,7 +41,7 @@
 
         <label>Domicilio comercial</label>
         <input name="domicilio_comercial" value="{{ vendedor.domicilio_comercial }}"
-               placeholder="Ej: San Martín 245, local 3" />
+               placeholder="Ej: Calle 26 esquina 27, Nº 123" />
 
         <div class="grid grid-2" style="gap:1rem;">
           <div>
@@ -77,6 +77,17 @@
         </label>
         <p class="text-muted" style="font-size:0.83rem; margin-top:-0.75rem; margin-bottom:1rem;">
           Si está desmarcado, el vendedor no podrá acceder a la opción de cobrar abono.
+          Los abonos se pueden cobrar fuera del horario de estacionamiento.
+        </p>
+
+        <label style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1rem; cursor:pointer; font-weight:600;">
+          <input type="checkbox" name="puede_cobrar_infraccion" {% if vendedor.puede_cobrar_infraccion %}checked{% endif %}
+                 style="width:18px; height:18px;">
+          Puede cobrar infracciones
+        </label>
+        <p class="text-muted" style="font-size:0.83rem; margin-top:-0.75rem; margin-bottom:1rem;">
+          Si está desmarcado, el vendedor no verá la opción de cobrar infracciones.
+          Las infracciones se pueden cobrar fuera del horario de estacionamiento.
         </p>
       </div>
 

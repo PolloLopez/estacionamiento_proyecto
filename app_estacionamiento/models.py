@@ -115,6 +115,13 @@ class Usuario(AbstractUser):
         verbose_name="Puede vender abono mensual",
         help_text="Si está deshabilitado, el vendedor no verá la opción de cobrar abono."
     )
+    # El admin puede deshabilitar el cobro de infracciones por vendedor.
+    # default=True para que los vendedores existentes no pierdan el acceso.
+    puede_cobrar_infraccion = models.BooleanField(
+        default=True,
+        verbose_name="Puede cobrar infracciones",
+        help_text="Si está deshabilitado, el vendedor no verá la opción de cobrar infracciones."
+    )
     # Ubicación física del comercio (opcional): texto y coordenadas para mapa.
     domicilio_comercial = models.CharField(
         max_length=255, blank=True, default="",

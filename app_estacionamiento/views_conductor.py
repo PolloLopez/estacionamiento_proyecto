@@ -347,13 +347,14 @@ def mis_infracciones(request):
         messages.info(request, "Esta sección es solo para conductores.")
         return redirect_por_rol(usuario)
 
-    if not usuario.es_verificado and not usuario.vehiculos.exists():
-        messages.info(
-            request,
-            "No tenés vehículos registrados. "
-            "Agregá tu vehículo o verificá tu cuenta para ver tus infracciones."
-        )
-        return redirect("solicitar_verificacion")
+    # Si el usuario no tiene vehículos registrados, mostramos la lista vacía.
+    # No redirigimos a verificación: un conductor nuevo puede ver sus infracciones
+    # (ninguna) sin necesidad de pasar por el proceso de verificación de identidad.
+    if not usuario.vehiculos.exists():
+        return render(request, "usuarios/mis_infracciones.html", {
+            "infracciones": [],
+            "ids_dentro_tolerancia": set(),
+        })
 
     infracciones = (
         Infraccion.objects
@@ -648,6 +649,14 @@ def estacionar_vehiculo(request):
             messages.warning(request, w)
 
         if not result["ok"]:
+            # Informar al conductor por qué no puede estacionar antes de redirigir.
+            # Sin este mensaje, el usuario ve una redirección silenciosa a MP y no entiende qué pasó.
+            if result["redirect"] == "mp_iniciar_carga":
+                messages.warning(
+                    request,
+                    "⚠️ No tenés saldo suficiente para estacionar. "
+                    "Cargá saldo con MercadoPago o acercate a un punto de venta."
+                )
             return redirect(reverse(result["redirect"]))
 
         # ── Notificacion de infraccion detectada al estacionar ───────────────

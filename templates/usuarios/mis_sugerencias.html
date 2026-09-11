@@ -19,18 +19,18 @@
     <div style="display:flex; flex-direction:column; gap:.8rem;">
       {% for s in sugerencias %}
         {% if not s.notificado %}
-          <div style="background:#fff8e1; border:1.5px solid #f0c040; border-radius:8px; padding:1rem 1.2rem;">
+          <div style="background:var(--color-warning-bg); border:1.5px solid var(--color-warning); border-radius:8px; padding:1rem 1.2rem;">
         {% else %}
-          <div style="background:var(--color-bg,#fff); border:1px solid #ddd; border-radius:8px; padding:1rem 1.2rem;">
+          <div style="background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; padding:1rem 1.2rem;">
         {% endif %}
 
           <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.4rem;">
             <strong>{{ s.titulo }}</strong>
             <span style="font-size:.8rem; padding:.2rem .6rem; border-radius:12px;
-              {% if s.estado == 'recibida' %}background:#e3f2fd; color:#1565c0;
-              {% elif s.estado == 'en_revision' %}background:#fff3e0; color:#e65100;
-              {% elif s.estado == 'implementada' %}background:#e8f5e9; color:#2e7d32;
-              {% else %}background:#fafafa; color:#777;{% endif %}">
+              {% if s.estado == 'recibida' %}background:var(--color-primary-light); color:var(--color-primary);
+              {% elif s.estado == 'en_revision' %}background:var(--color-warning-bg); color:var(--color-warning);
+              {% elif s.estado == 'implementada' %}background:var(--color-success-bg); color:var(--color-success);
+              {% else %}background:var(--color-surface-2); color:var(--color-text-muted);{% endif %}">
               {{ s.get_estado_display }}
             </span>
           </div>
@@ -40,9 +40,9 @@
           </p>
 
           {% if s.respuesta %}
-            <div style="margin-top:.7rem; padding:.6rem .8rem; background:var(--color-bg-alt,#f5f5f5);
-                        border-left:3px solid var(--color-primary,#2980b9); border-radius:0 4px 4px 0;
-                        font-size:.9rem;">
+            <div style="margin-top:.7rem; padding:.6rem .8rem; background:var(--color-surface-2);
+                        border-left:3px solid var(--color-primary); border-radius:0 4px 4px 0;
+                        font-size:.9rem; color:var(--color-text);">
               <strong>Respuesta del equipo:</strong> {{ s.respuesta }}
             </div>
           {% endif %}

@@ -311,9 +311,17 @@ def cobrar_infraccion_vendedor(request):
     El vendedor busca una patente, ve la infracción pendiente y la cobra en efectivo.
     Flujo: buscar → confirmar (modal) → cobrar.
     No valida horario — el kiosco siempre puede cobrar.
+    El admin puede deshabilitar este acceso por vendedor vía puede_cobrar_infraccion.
     """
     vendedor  = request.user
     municipio = vendedor.municipio
+
+    # Vendedores sin permiso no pueden acceder (los admins siempre pueden).
+    if vendedor.es_vendedor and not vendedor.es_admin:
+        if not getattr(vendedor, "puede_cobrar_infraccion", True):
+            from django.contrib import messages as _messages
+            _messages.error(request, "No tenés permiso para cobrar infracciones. Consultá con el administrador.")
+            return redirect("panel_vendedor")
     infraccion = None
     vehiculo   = None
     patente    = ""
