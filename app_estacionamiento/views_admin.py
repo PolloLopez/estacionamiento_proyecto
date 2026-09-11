@@ -918,7 +918,12 @@ def admin_infracciones(request):
     if patente:
         infracciones = infracciones.filter(vehiculo__patente__icontains=patente)
     if inspector_id:
-        infracciones = infracciones.filter(inspector_id=inspector_id)
+        # Validar que sea un entero antes de filtrar: un valor inválido (ej. un nombre de
+        # variable de template) causaría ValueError al evaluar el queryset de forma lazy.
+        try:
+            infracciones = infracciones.filter(inspector_id=int(inspector_id))
+        except ValueError:
+            inspector_id = ""  # resetear para que el filtro no aparezca activo en el template
     if estado:
         infracciones = infracciones.filter(estado=estado)
     if fecha_desde:
