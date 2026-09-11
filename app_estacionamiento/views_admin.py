@@ -21,6 +21,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Max, Min, Q, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
@@ -2655,6 +2656,47 @@ def pdf_rendicion(request, rendicion_id):
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'attachment; filename="{nombre_archivo}"'
     return response
+
+
+@require_role("admin")
+def responder_observacion(request, rendicion_id):
+    """
+    El admin responde a una observación del tesorero: agrega notas explicativas
+    y reenvía la rendición como 'pendiente' para que el tesorero la vuelva a revisar.
+
+    Solo acepta POST. El admin solo puede responder sus propias rendiciones.
+    Requiere que el campo notas_admin tenga contenido (forzamos que explique algo).
+    """
+    municipio = request.user.municipio
+    rendicion = get_object_or_404(Rendicion, id=rendicion_id, municipio=municipio)
+
+    # El admin solo puede responder rendiciones que él mismo generó
+    if rendicion.admin_id != request.user.pk:
+        messages.error(request, "Solo podés responder tus propias rendiciones.")
+        return redirect("admin_rendiciones")
+
+    if rendicion.estado != "observada":
+        messages.warning(request, "Solo se pueden responder rendiciones observadas.")
+        return redirect("admin_rendiciones")
+
+    if request.method != "POST":
+        return redirect("admin_rendiciones")
+
+    notas = request.POST.get("notas_admin", "").strip()
+    if not notas:
+        messages.error(request, "Describí tu respuesta antes de reenviar la rendición.")
+        return redirect("admin_rendiciones")
+
+    with transaction.atomic():
+        rendicion.notas_admin = notas
+        rendicion.estado      = "pendiente"
+        # Limpiamos el sello de validación anterior para que el tesorero la procese de nuevo
+        rendicion.tesorero    = None
+        rendicion.validado_en = None
+        rendicion.save(update_fields=["notas_admin", "estado", "tesorero", "validado_en"])
+
+    messages.success(request, f"Rendición #{rendicion.id} reenviada a tesorería con tu respuesta.")
+    return redirect("admin_rendiciones")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

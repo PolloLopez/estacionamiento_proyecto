@@ -23,15 +23,22 @@
 ## 🟡 Media prioridad
 
 - **Bug #9 — Preguntas de negocio (pendiente respuesta de Leandro)**
-  - Notificaciones: ¿el conductor puede activar/desactivar qué notificaciones recibe?
+  - Notificaciones: ¿el conductor puede activar/desactivar qué notificaciones recibe? 
+    - Respuesta: SI
   - Pago fuera de horario: ¿un usuario no registrado puede pagar una infracción fuera de horario?
+    - Respuesta: SI
   - Comentario Django en panel superadmin de plantillas: ¿es un TODO o se puede borrar?
+    - Respuesta: Entiendo que Se puede borrar
   - Facturación de la plataforma: ¿cómo se calcula el cobro mensual al municipio?
+    - Respuesta: Como consideras que debe ser, teniendo en cuenta el hosting y soporte. (sueldo minimo de desarrollador y soporte)
 
 - **Bug #10 — Features para texto de ventas (pendiente respuesta de Leandro)**
   - SIA: revalidación cada 6 meses — ¿implementar flag/cron?
+  - Respuesta: Si
   - Precio diferido/descuento para vecinos (frentistas) — ¿modelo de descuento automático?
+  - Respuesta: Segun autorizacion de admin si esta aprobado y el porcentaje
   - Geolocalización del inspector al verificar — ¿guardar lat/lon en `Infraccion`?
+  - Respuesta: Siempre, como en la imagen de la infraccion (la imagen lleva geoloclizacion, dia, horario e inspector)
 
 - **Inspector — impresora BLE: no volver a pedir vinculación al imprimir**
   `imprimirActa()` hace `reconectarImpresora()` silencioso primero. Si falla (bug conocido de Chrome con `getDevices()`), abre el diálogo de selección igual.

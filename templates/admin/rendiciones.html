@@ -250,6 +250,36 @@
         </td>
       </tr>
       {% endif %}
+      {# Si hay respuesta del admin, mostrarla en una fila aparte #}
+      {% if r.notas_admin %}
+      <tr>
+        <td colspan="10"
+            style="font-size:0.85rem; padding:0.5rem 1rem;
+                   background:#e8f5e9; border-left:3px solid var(--color-primary); color:var(--color-primary);">
+          💬 <strong>Tu respuesta:</strong> {{ r.notas_admin }}
+        </td>
+      </tr>
+      {% endif %}
+      {# Formulario para responder a una observación (solo cuando está observada) #}
+      {% if r.estado == "observada" %}
+      <tr>
+        <td colspan="10" style="background:#fff8e1; padding:0.6rem 1rem; border-left:3px solid var(--color-warning);">
+          <form method="post" action="{% url 'responder_observacion' r.id %}" style="display:flex; gap:0.5rem; align-items:flex-start; flex-wrap:wrap;">
+            {% csrf_token %}
+            <textarea name="notas_admin" rows="2" required
+                      placeholder="Explicá el motivo o adjuntá información adicional para el tesorero…"
+                      style="flex:1; min-width:220px; font-size:0.85rem; border:1px solid var(--color-border); border-radius:6px; padding:0.4rem 0.6rem; resize:vertical;">{% if r.notas_admin %}{{ r.notas_admin }}{% endif %}</textarea>
+            <button type="submit" class="btn"
+                    style="font-size:0.82rem; padding:0.4rem 0.9rem; align-self:flex-end; white-space:nowrap;">
+              📨 Responder y reenviar
+            </button>
+          </form>
+          <div style="font-size:0.78rem; color:var(--color-text-muted); margin-top:0.3rem;">
+            Al responder, la rendición vuelve a "pendiente" para que el tesorero la revise.
+          </div>
+        </td>
+      </tr>
+      {% endif %}
       {% endfor %}
     </tbody>
   </table>

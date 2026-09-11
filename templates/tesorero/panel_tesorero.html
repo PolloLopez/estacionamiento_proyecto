@@ -159,6 +159,25 @@
             {% if r.notas_tesorero %}{{ r.notas_tesorero }}{% else %}—{% endif %}
           </td>
         </tr>
+        {# Fila extra para observadas: permite al tesorero revertir la observación #}
+        {% if r.estado == "observada" %}
+        <tr>
+          <td colspan="8" style="background:#fff8e1; padding:0.5rem 1rem; border-left:3px solid var(--color-warning);">
+            <form method="post" action="{% url 'cancelar_observacion' r.id %}"
+                  style="display:inline;"
+                  onsubmit="return confirm('¿Revertir esta observación? La rendición vuelve a pendiente y el admin podrá responder.');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline"
+                      style="font-size:0.78rem; padding:0.25rem 0.6rem; border-color:var(--color-warning); color:var(--color-warning);">
+                ↩️ Revertir observación
+              </button>
+            </form>
+            <span style="font-size:0.8rem; color:var(--color-text-muted); margin-left:0.75rem;">
+              Vuelve a pendiente para que el admin pueda responder.
+            </span>
+          </td>
+        </tr>
+        {% endif %}
         {% endfor %}
       </tbody>
     </table>

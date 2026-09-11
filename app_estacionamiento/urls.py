@@ -175,6 +175,7 @@ urlpatterns = [
     path("admin-rendiciones/crear/", views.crear_rendicion, name="crear_rendicion"),
     path("admin-rendiciones/<int:cierre_id>/certificar/", views.certificar_cierre, name="certificar_cierre"),
     path("admin-rendiciones/<int:rendicion_id>/pdf/", views.pdf_rendicion, name="pdf_rendicion"),
+    path("admin-rendiciones/<int:rendicion_id>/responder/", views.responder_observacion, name="responder_observacion"),
 
     # =========================
     # ✅ VERIFICACIONES
@@ -204,6 +205,7 @@ urlpatterns = [
     # =========================
     path("tesorero/", views.panel_tesorero, name="panel_tesorero"),
     path("tesorero/rendicion/<int:rendicion_id>/validar/", views.validar_rendicion, name="validar_rendicion"),
+    path("tesorero/rendicion/<int:rendicion_id>/cancelar-observacion/", views.cancelar_observacion, name="cancelar_observacion"),
     path("tesorero/rendicion/<int:rendicion_id>/", views.detalle_rendicion, name="detalle_rendicion"),
     path("tesorero/depositar/<int:liquidacion_id>/", views.depositar_comision, name="depositar_comision"),
     path("tesorero/liquidaciones-plataforma/", views.mis_liquidaciones_plataforma, name="mis_liquidaciones_plataforma"),
