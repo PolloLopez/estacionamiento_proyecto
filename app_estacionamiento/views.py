@@ -153,3 +153,15 @@ def health_check(request):
         return JsonResponse({"status": "error", "detail": str(e)}, status=503)
 
 # ─────────────────────────────────────────────
+
+# ─── Manejadores de errores personalizados ────────────────────────────────────
+from django.shortcuts import render as _render
+
+def server_error(request, *args, **kwargs):
+    """
+    Handler 500 personalizado.
+    Al usar render() en vez de HttpResponseServerError, los context_processors
+    corren y la plantilla puede acceder a municipio_branding, color_primario, etc.
+    Si la DB está caída y los context_processors fallan, Django muestra respuesta bare.
+    """
+    return _render(request, "500.html", status=500)

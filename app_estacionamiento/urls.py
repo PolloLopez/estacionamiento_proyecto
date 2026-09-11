@@ -7,6 +7,10 @@ from . import views_pwa
 from . import views_pago_publico
 from . import views_publico
 
+# Handler 500 personalizado: usa render() para que los context_processors
+# corran y la plantilla tenga acceso a municipio_branding (colores del municipio).
+handler500 = "app_estacionamiento.views.server_error"
+
 urlpatterns = [
 
     # =========================

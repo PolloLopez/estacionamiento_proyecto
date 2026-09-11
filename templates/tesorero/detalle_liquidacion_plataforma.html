@@ -74,7 +74,7 @@
 
   {# ── Acción tesorero: subir/reemplazar comprobante ── #}
   {% if liq.estado != "aprobada" %}
-  <div class="card">
+  <div class="card" style="margin-bottom:1rem;">
     <h3 style="margin-bottom:0.75rem; font-size:0.95rem;">
       {% if liq.comprobante_pago %}📎 Reemplazar comprobante{% else %}📎 Adjuntar comprobante de pago{% endif %}
     </h3>
@@ -97,6 +97,42 @@
       </button>
     </form>
   </div>
+
+  {# ── Solicitar factura ── si el superadmin no la subió todavía #}
+  {% if not liq.factura %}
+  <div class="card" style="margin-bottom:1rem; border-left:3px solid var(--color-warning);">
+    <p style="font-size:0.85rem; margin-bottom:0.6rem;">
+      El superadmin todavía no adjuntó la factura. Podés solicitar que la emita:
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="solicitar_factura">
+      <button type="submit" class="btn btn-outline"
+              style="font-size:0.88rem; border-color:var(--color-warning); color:var(--color-warning);">
+        📧 Solicitar factura al superadmin
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  {# ── Notas / Observaciones ── #}
+  <div class="card" style="margin-bottom:1rem;">
+    <h3 style="margin-bottom:0.75rem; font-size:0.95rem;">💬 Notas / Observaciones</h3>
+    <p style="font-size:0.83rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      Dejá un comentario, número de operación o consulta para el superadmin.
+    </p>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="actualizar_notas">
+      <textarea name="notas_tesorero" rows="3"
+                placeholder="Número de operación, banco, consultas, aclaraciones...">{{ liq.notas_tesorero }}</textarea>
+      <button type="submit" class="btn btn-outline"
+              style="margin-top:0.5rem; font-size:0.88rem;">
+        💾 Guardar nota
+      </button>
+    </form>
+  </div>
+
   {% else %}
   <div class="alert alert-success" style="text-align:center;">
     ✅ Pago aprobado por el superadmin. No se requiere ninguna acción adicional.

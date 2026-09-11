@@ -1014,6 +1014,22 @@ def detalle_liquidacion_plataforma(request, liquidacion_id):
                 liq.save(update_fields=["estado", "actualizado_en"])
                 messages.info(request, "Liquidación reactivada a pendiente de pago.")
 
+        elif accion == "solicitar_comprobante":
+            # El superadmin le pide al tesorero que suba el comprobante de pago.
+            # Registra la solicitud en notas para que el tesorero lo vea al abrir el detalle.
+            if liq.estado == "aprobada":
+                messages.warning(request, "La liquidación ya fue aprobada.")
+            elif liq.comprobante_pago:
+                messages.info(request, "El tesorero ya subió un comprobante.")
+            else:
+                from django.utils import timezone as _tz
+                timestamp = _tz.localtime().strftime("%d/%m/%Y %H:%M")
+                nota_solicitud = f"⚠️ El superadmin solicita el comprobante de pago ({timestamp})."
+                notas_previas = liq.notas_superadmin or ""
+                liq.notas_superadmin = f"{nota_solicitud}\n{notas_previas}".strip()
+                liq.save(update_fields=["notas_superadmin", "actualizado_en"])
+                messages.success(request, "Solicitud de comprobante registrada. El tesorero la verá en el detalle.")
+
         return redirect("detalle_liquidacion_plataforma", liquidacion_id=liq.id)
 
     return render(request, "superadmin/detalle_liquidacion_plataforma.html", {

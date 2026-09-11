@@ -64,6 +64,34 @@
       --color-footer-bg: {{ municipio_branding.color_secundario|default:"#444444" }};
     }
   </style>
+  <script>
+    /* Ajustar texto del navbar según la luminancia del color primario del municipio.
+       Si el primario es claro (ej: amarillo #bed630, celeste claro), el texto blanco
+       quedaría ilegible → sobreescribimos las variables --color-nav-text* con valores
+       oscuros. Este script corre sincrónicamente en <head> para evitar flash. */
+    (function() {
+      var hex = "{{ municipio_branding.color_primario }}".replace('#', '');
+      if (hex.length === 3) {
+        hex = hex[0]+hex[0] + hex[1]+hex[1] + hex[2]+hex[2];
+      }
+      var rC = parseInt(hex.substr(0,2), 16) / 255;
+      var gC = parseInt(hex.substr(2,2), 16) / 255;
+      var bC = parseInt(hex.substr(4,2), 16) / 255;
+      // Linearización sRGB → luminancia relativa (fórmula WCAG 2.x)
+      function lin(c) {
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      }
+      var luminancia = 0.2126*lin(rC) + 0.7152*lin(gC) + 0.0722*lin(bC);
+      // Umbral 0.35: si el fondo es claro, el texto oscuro asegura contraste suficiente.
+      // Funciona tanto en light mode como en dark mode (el navbar siempre muestra el primario).
+      if (luminancia > 0.35) {
+        var root = document.documentElement;
+        root.style.setProperty('--color-nav-text',       'rgba(30,30,30,0.9)');
+        root.style.setProperty('--color-nav-text-hover',  '#000000');
+        root.style.setProperty('--color-nav-hover-bg',    'rgba(0,0,0,0.1)');
+      }
+    })();
+  </script>
   {% endif %}
 
   {% block extra_head %}{% endblock %}

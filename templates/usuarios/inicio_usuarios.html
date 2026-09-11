@@ -215,13 +215,15 @@
       </a>
     </div>
   {% else %}
-    {# Sin solicitud → invitar a verificarse #}
-    <div class="alert alert-info" style="margin-top:1rem;">
-      <span>ℹ️ Tu cuenta aún <strong>no está verificada</strong>.</span>
-      <a href="{% url 'solicitar_verificacion' %}" class="btn btn-outline"
-         style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
-        Verificar mi cuenta
-      </a>
+    {# Sin solicitud → invitar a verificarse (opcional, no bloquea ninguna función) #}
+    <div style="margin-top:1rem; font-size:0.85rem; color:var(--color-text-muted);
+                display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+      <span>💡 Opcional: podés
+        <a href="{% url 'solicitar_verificacion' %}" style="color:var(--color-primary);">
+          verificar tu identidad
+        </a>
+        para acceder a exenciones (discapacidad, frentista, etc.).
+      </span>
     </div>
   {% endif %}
 {% endif %}

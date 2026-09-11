@@ -17,22 +17,24 @@
       <label style="font-weight:600; display:block; margin-bottom:.3rem;">Título *</label>
       <input type="text" name="titulo" required maxlength="200"
         placeholder="Resumí tu sugerencia en una línea"
-        style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;
-               font-size:.95rem; box-sizing:border-box;">
+        style="width:100%; padding:.6rem; border:1px solid var(--color-border); border-radius:6px;
+               font-size:.95rem; box-sizing:border-box; background:var(--color-surface);
+               color:var(--color-text);">
     </div>
 
     <div style="margin-bottom:1rem;">
       <label style="font-weight:600; display:block; margin-bottom:.3rem;">Descripción *</label>
       <textarea name="descripcion" required rows="5"
         placeholder="Describí el problema o mejora con el mayor detalle posible..."
-        style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;
-               font-size:.95rem; resize:vertical; box-sizing:border-box;"></textarea>
+        style="width:100%; padding:.6rem; border:1px solid var(--color-border); border-radius:6px;
+               font-size:.95rem; resize:vertical; box-sizing:border-box;
+               background:var(--color-surface); color:var(--color-text);"></textarea>
     </div>
 
     <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
       <div style="flex:1; min-width:180px;">
         <label style="font-weight:600; display:block; margin-bottom:.3rem;">Área</label>
-        <select name="area" style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;">
+        <select name="area" style="width:100%; padding:.6rem; border:1px solid var(--color-border); border-radius:6px; background:var(--color-surface); color:var(--color-text);">
           {% for valor, etiqueta in areas %}
             <option value="{{ valor }}"{% if valor == rol_actual or valor == "general" %} selected{% endif %}>
               {{ etiqueta }}
@@ -42,7 +44,7 @@
       </div>
       <div style="flex:1; min-width:180px;">
         <label style="font-weight:600; display:block; margin-bottom:.3rem;">Criticidad</label>
-        <select name="criticidad" style="width:100%; padding:.6rem; border:1px solid #ccc; border-radius:6px;">
+        <select name="criticidad" style="width:100%; padding:.6rem; border:1px solid var(--color-border); border-radius:6px; background:var(--color-surface); color:var(--color-text);">
           {% for valor, etiqueta in criticidades %}
             <option value="{{ valor }}"{% if valor == "funcional" %} selected{% endif %}>{{ etiqueta }}</option>
           {% endfor %}
@@ -57,7 +59,8 @@
         Enviar sugerencia
       </button>
       <a href="{% url 'mis_sugerencias' %}"
-         style="background:var(--color-bg-alt,#eee); color:var(--color-text,#333);
+         style="background:var(--color-surface-2); color:var(--color-text);
+                border:1px solid var(--color-border);
                 padding:.7rem 1.4rem; border-radius:6px; text-decoration:none; font-size:1rem;">
         Ver mis sugerencias
       </a>

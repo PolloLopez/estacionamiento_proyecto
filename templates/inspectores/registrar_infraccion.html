@@ -51,8 +51,34 @@
     <!-- Foto -->
     <div class="inf-field">
       <label>📸 FOTO</label>
+
+      <!-- Input real oculto: el capture="environment" abre la cámara trasera en móvil -->
       <input type="file" id="foto" name="foto"
-             accept="image/*" capture="environment" required />
+             accept="image/*" capture="environment" required
+             style="display:none;"
+             onchange="mostrarPreviewFoto(this)" />
+
+      <!-- Botón custom "Tomar foto" -->
+      <button type="button" id="btn-tomar-foto" class="btn btn-outline"
+              style="width:100%; padding:0.75rem; font-size:1rem; font-weight:700;
+                     border:2px dashed var(--color-border); border-radius:10px;"
+              onclick="document.getElementById('foto').click()">
+        📷 Tomar foto
+      </button>
+
+      <!-- Preview de la foto tomada (oculto hasta que se tome una) -->
+      <div id="preview-foto" style="display:none; margin-top:0.75rem; text-align:center;">
+        <img id="img-preview" src="" alt="Vista previa"
+             style="max-width:100%; max-height:220px; border-radius:8px;
+                    border:2px solid var(--color-border);" />
+        <div style="margin-top:0.5rem;">
+          <button type="button" class="btn btn-outline"
+                  style="font-size:0.85rem; padding:0.3rem 0.8rem;"
+                  onclick="retakePhoto()">
+            🔄 Retomar foto
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- GPS: coordenadas visibles -->
@@ -172,6 +198,29 @@ var SUBCUADRAS_INF = [
     }
   }
 })();
+</script>
+
+<script>
+// Muestra preview de la foto tomada y oculta el botón "Tomar foto"
+function mostrarPreviewFoto(input) {
+  var archivo = input.files && input.files[0];
+  if (!archivo) return;
+  var url = URL.createObjectURL(archivo);
+  document.getElementById("img-preview").src = url;
+  document.getElementById("preview-foto").style.display = "block";
+  document.getElementById("btn-tomar-foto").style.display = "none";
+}
+
+// Limpia la foto y vuelve a mostrar el botón para tomar otra
+function retakePhoto() {
+  var input = document.getElementById("foto");
+  input.value = "";  // limpiar el valor del input
+  document.getElementById("img-preview").src = "";
+  document.getElementById("preview-foto").style.display = "none";
+  document.getElementById("btn-tomar-foto").style.display = "";
+  // Abrir cámara directamente
+  input.click();
+}
 </script>
 
 {% endblock %}

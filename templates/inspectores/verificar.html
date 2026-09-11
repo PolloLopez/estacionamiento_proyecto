@@ -83,7 +83,7 @@
             class="input-patente"
             placeholder="AAA111"
             autocomplete="off"
-            autofocus
+            {% if not resultado %}autofocus{% endif %}
         />
     </form>
     {% endif %}{# fin {% if not horario_activo %} / {% else %} #}
@@ -270,8 +270,11 @@ if (form && input) {
 }
 
 window.onload = () => {
-    if (input) input.focus();
     const estado = "{{ resultado.estado.name|default:'' }}";
+    // Si no hay resultado, enfocar para que el inspector pueda escribir la patente.
+    // Si ya hay resultado, no enfocar: el teclado quedaría abierto tapando el resultado.
+    if (input && !estado) input.focus();
+    else if (input) input.blur();
     const exentoEnSub = "{{ resultado.exento_en_subcuadra_actual|default:'' }}";
 
     if (!estado) return;

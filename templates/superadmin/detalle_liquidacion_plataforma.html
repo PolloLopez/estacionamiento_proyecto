@@ -110,6 +110,18 @@
     </form>
     {% endif %}
 
+    {# Solicitar comprobante — cuando el tesorero no lo subió todavía #}
+    {% if not liq.comprobante_pago and liq.estado != "aprobada" %}
+    <form method="post" style="margin-bottom:0.75rem;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="solicitar_comprobante">
+      <button type="submit" class="btn btn-outline"
+              style="border-color:var(--color-warning); color:var(--color-warning); font-size:0.85rem;">
+        📧 Solicitar comprobante al tesorero
+      </button>
+    </form>
+    {% endif %}
+
     {# Observar / Reactivar #}
     {% if liq.estado == "observada" %}
     <form method="post" style="display:inline;">

@@ -74,8 +74,14 @@
           </div>
         </div>
 
+        {# Cuando no hay opciones de duración (horario finaliza en breve), el botón
+           queda visualmente deshabilitado además del atributo HTML disabled.
+           El JS solo habilita el botón al seleccionar una duración, así que cuando
+           no hay botones de duración nunca se habilita. #}
         <button class="btn" type="submit" id="btn-cobrar"
-                style="width:100%; font-size:1.2rem; padding:1rem;" disabled>
+                style="width:100%; font-size:1.2rem; padding:1rem;
+                       {% if not opciones_duracion %}opacity:0.35;cursor:not-allowed;{% endif %}"
+                disabled>
           💵 Cobrar y registrar
         </button>
 

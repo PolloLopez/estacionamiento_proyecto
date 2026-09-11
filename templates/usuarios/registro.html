@@ -3,7 +3,7 @@
 
 {% block content %}
 <section class="container" style="max-width:460px;">
-  <div class="panel auth-panel" style="margin-top:2rem;">
+  <div class="panel auth-panel">
 
     <div style="text-align:center; margin-bottom:1.5rem;">
       {# Logo/ícono del municipio: fijo si hay uno solo, dinámico si hay varios #}
@@ -46,7 +46,7 @@
 
       {# Nombre y Apellido #}
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-        <div class="form-row" style="flex:1; min-width:120px;">
+        <div class="form-group" style="flex:1; min-width:120px;">
           <label for="id_nombre">Nombre <span style="color:#c0392b;">*</span></label>
           <input type="text"
                  id="id_nombre"
@@ -59,7 +59,7 @@
             <span style="color:#c0392b; font-size:0.85rem;">{{ form.nombre.errors|join:", " }}</span>
           {% endif %}
         </div>
-        <div class="form-row" style="flex:1; min-width:120px;">
+        <div class="form-group" style="flex:1; min-width:120px;">
           <label for="id_apellido">
             Apellido <span style="font-weight:400; color:var(--color-text-muted);">(opcional)</span>
           </label>
@@ -73,7 +73,7 @@
       </div>
 
       {# Campo correo #}
-      <div class="form-row">
+      <div class="form-group">
         <label for="id_correo">Correo electrónico</label>
         <input type="email"
                id="id_correo"
@@ -88,7 +88,7 @@
       </div>
 
       {# Contraseña #}
-      <div class="form-row">
+      <div class="form-group">
         <label for="id_password1">Contraseña</label>
         <input type="password"
                id="id_password1"
@@ -101,7 +101,7 @@
         {% endif %}
       </div>
 
-      <div class="form-row">
+      <div class="form-group">
         <label for="id_password2">Repetí la contraseña</label>
         <input type="password"
                id="id_password2"
@@ -116,7 +116,7 @@
 
       {% if municipios|length > 1 %}
       {# Selector de municipio (solo cuando hay más de uno) #}
-      <div class="form-row">
+      <div class="form-group">
         <label for="municipio_id">Municipio <span style="color:#c0392b;">*</span></label>
         <select id="municipio_id" name="municipio_id" required>
           <option value="" disabled selected>— Seleccioná tu municipio —</option>

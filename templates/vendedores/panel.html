@@ -80,14 +80,21 @@
         <a class="btn" href="{% url 'vendedores_registrar_estacionamiento' %}">
           ➕ Registrar estacionamiento
         </a>
+        {% if request.user.puede_vender_abono %}
+        <a class="btn btn-outline" href="{% url 'cobrar_abono' %}">
+          📅 Cobrar abono
+        </a>
+        {% endif %}
+        {% if request.user.puede_cobrar_infraccion %}
+        <a class="btn btn-outline" href="{% url 'vendedores_cobrar_infraccion' %}">
+          ⚠️ Cobrar infracción
+        </a>
+        {% endif %}
         <a class="btn btn-outline" href="{% url 'vendedores_caja' %}">
           🧾 Mi caja
         </a>
         <a class="btn btn-outline" href="{% url 'vendedores_resumen_caja' %}">
           📊 Ver resumen
-        </a>
-        <a class="btn btn-outline" href="{% url 'vendedores_cobrar_infraccion' %}">
-          ⚠️ Cobrar infracción
         </a>
         <a class="btn btn-outline" href="{% url 'mis_comisiones' %}">
           💵 Mis comisiones

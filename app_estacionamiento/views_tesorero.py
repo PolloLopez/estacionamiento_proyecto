@@ -291,10 +291,40 @@ def gestionar_liquidacion_plataforma(request, liquidacion_id):
                 if liq.comprobante_pago:
                     liq.comprobante_pago.delete(save=False)
                 liq.comprobante_pago = request.FILES["comprobante_pago"]
-                liq.notas_tesorero   = request.POST.get("notas_tesorero", liq.notas_tesorero).strip()
+                liq.notas_tesorero   = request.POST.get("notas_tesorero", liq.notas_tesorero or "").strip()
                 liq.estado           = "comprobante_enviado"
                 liq.save(update_fields=["comprobante_pago", "notas_tesorero", "estado", "actualizado_en"])
                 messages.success(request, "Comprobante enviado al superadmin.")
+
+        elif accion == "actualizar_notas":
+            # El tesorero deja una observación o consulta sin cambiar el estado.
+            # El superadmin la ve al abrir el detalle de la liquidación.
+            if liq.estado == "aprobada":
+                messages.warning(request, "La liquidación ya fue aprobada.")
+            else:
+                notas = request.POST.get("notas_tesorero", "").strip()
+                liq.notas_tesorero = notas
+                liq.save(update_fields=["notas_tesorero", "actualizado_en"])
+                messages.success(request, "Nota guardada. El superadmin la verá al revisar la liquidación.")
+
+        elif accion == "solicitar_factura":
+            # El tesorero le pide al superadmin que emita/adjunte la factura.
+            # Registra la solicitud en notas y cambia el estado a pendiente_pago si era borrador.
+            if liq.estado == "aprobada":
+                messages.warning(request, "La liquidación ya fue aprobada.")
+            elif liq.factura:
+                messages.info(request, "La factura ya está disponible — descargala desde el botón correspondiente.")
+            else:
+                from django.utils import timezone as _tz
+                timestamp = _tz.localtime().strftime("%d/%m/%Y %H:%M")
+                nota_solicitud = f"⚠️ Solicitud de factura enviada el {timestamp}."
+                # Agregar la solicitud a las notas sin reemplazar texto anterior
+                notas_previas = liq.notas_tesorero or ""
+                liq.notas_tesorero = f"{nota_solicitud}\n{notas_previas}".strip()
+                if liq.estado == "borrador":
+                    liq.estado = "pendiente_pago"
+                liq.save(update_fields=["notas_tesorero", "estado", "actualizado_en"])
+                messages.success(request, "Solicitud de factura registrada. El superadmin la verá en el detalle.")
 
         return redirect("gestionar_liquidacion_plataforma", liquidacion_id=liq.id)
 
@@ -334,7 +364,7 @@ def detalle_rendicion(request, rendicion_id):
         LiquidacionComision.objects
         .filter(rendicion=rendicion)
         .select_related("vendedor")
-        .order_by("vendedor__apellido")
+        .order_by("vendedor__last_name")
     )
 
     return render(request, "tesorero/detalle_rendicion.html", {

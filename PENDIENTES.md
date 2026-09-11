@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-06 (sesión 5)
+Última actualización: 2026-09-10 (sesión 6)
 
 ---
 
@@ -14,16 +14,33 @@
 
 ## 🔴 Alta prioridad
 
-_Sin ítems pendientes._
+- **Bug #1 — Admin puede editar texto de infracciones**
+  Superadmin siempre puede gestionar plantillas de infracciones. Admin municipio puede si superadmin lo autoriza (nuevo flag en `Municipio` o en `PlantillaDocumento`).
+  Pendiente: diseñar el modelo de autorización y la UI.
 
 ---
 
 ## 🟡 Media prioridad
 
+- **Bug #9 — Preguntas de negocio (pendiente respuesta de Leandro)**
+  - Notificaciones: ¿el conductor puede activar/desactivar qué notificaciones recibe?
+  - Pago fuera de horario: ¿un usuario no registrado puede pagar una infracción fuera de horario?
+  - Comentario Django en panel superadmin de plantillas: ¿es un TODO o se puede borrar?
+  - Facturación de la plataforma: ¿cómo se calcula el cobro mensual al municipio?
+
+- **Bug #10 — Features para texto de ventas (pendiente respuesta de Leandro)**
+  - SIA: revalidación cada 6 meses — ¿implementar flag/cron?
+  - Precio diferido/descuento para vecinos (frentistas) — ¿modelo de descuento automático?
+  - Geolocalización del inspector al verificar — ¿guardar lat/lon en `Infraccion`?
+
 - **Inspector — impresora BLE: no volver a pedir vinculación al imprimir**
   `imprimirActa()` hace `reconectarImpresora()` silencioso primero. Si falla (bug conocido de Chrome con `getDevices()`), abre el diálogo de selección igual.
   Workaround actual implementado: reconectar por nombre (`requestDevice` pre-filtrado). Evaluar si Chrome corrigió el bug o documentar como límite del navegador.
   Archivo: `static/.../js/impresora_bluetooth.js` (función `reconectarImpresora`).
+
+- **Comisiones de vendedores — flujo completo**
+  El flujo actual: rendición → `LiquidacionComision` creada → tesorero deposita → vendedor certifica.
+  Pendiente verificar: ¿los vendedores pueden ver y certificar sus liquidaciones desde su panel? Revisar `panel_vendedor.html` y la vista de certificación.
 
 ---
 
@@ -39,7 +56,58 @@ _Sin ítems pendientes._
 
 ---
 
+## ℹ️ No son bugs del sistema
+
+- **Error `contentscript.js: [object Object] Resetting the streams.`** en `/tesorero/rendicion`:
+  Este error viene de una extensión del navegador (Grammarly, Loom, u otra extensión de Chrome que inyecta scripts). No es un error del sistema Django. Solución: desactivar extensiones en esa tab o usar modo incógnito sin extensiones.
+
+---
+
+## ⚠️ Deploy pendiente
+
+El error 500 en `/tesorero/rendicion/` en Railway se debe a que los cambios de esta sesión
+aún no están en `main`. Para deployar:
+
+```powershell
+git add -A
+git commit -m "fix: modal infracciones, abonos vendedor, 500 page, columnas panel"
+git push
+git checkout main
+git merge develop
+git push       # ← esto dispara el deploy en Railway
+git checkout develop
+```
+
+Adicionalmente hay que correr la migración `0073` en Railway (lo hace automático al deploy).
+
+---
+
 ## ✅ Resuelto
+
+### Sesión 2026-09-10 (tarde) — Modal, 500, columnas, vendedores
+
+| Ítem | Detalle |
+|---|---|
+| panel_admin.html: reordenar infracciones_recientes | Nuevo orden: Patente, Monto, Estado, Fecha, Inspector. |
+| infracciones.html: modal no cierra tras anulación | `views_admin.py`: redirect post-anulación ahora va a `reverse("admin_infracciones")` (sin `?detalle=ID`), así el modal no reabre. |
+| Error 500: no hereda colores del municipio | Custom `handler500 = server_error` en `views.py` + `urls.py`. `500.html` ahora extiende `base.html` → tiene acceso a `--color-primary` del municipio. |
+| Vendedor: btn-cobrar blur cuando horario en breve | `registrar_estacionamiento.html`: botón tiene `opacity:0.35;cursor:not-allowed` cuando `not opciones_duracion`. |
+| Vendedor: botón "Cobrar abono" faltante en panel | `panel.html`: agregado con guard `{% if puede_vender_abono %}`. Abonos disponibles fuera de horario (la vista no valida horario). |
+| Vendedor: permiso `puede_cobrar_infraccion` | `models.py`: nuevo campo `BooleanField(default=True)`. Migración `0073`. `editar_vendedor.html`: checkbox. `views_admin.py`: guarda el campo. `views_vendedor.py`: check en `cobrar_infraccion_vendedor`. `panel.html`: botón infracciones visible solo si `puede_cobrar_infraccion`. |
+
+### Sesión 2026-09-10 — Bugs UI, navbar, tesorero/liquidaciones, medio_pago_selector
+
+| Ítem | Detalle |
+|---|---|
+| Bug #6 navbar color claro → fondo negro en dark mode | `global.css`: regla `[data-theme="dark"] .nav-items { background: var(--color-surface) }` tenía mayor especificidad que el override de desktop. Fix: override dentro de `@media (min-width: 1050px)` con misma especificidad + orden posterior → `background: transparent`. |
+| Navbar texto adaptativo según luminancia | `global.css`: variables `--color-nav-text`, `--color-nav-text-hover`, `--color-nav-hover-bg`. Script en `base.html`: calcula luminancia relativa del color primario (WCAG 2.x) y, si L > 0.35 (primario claro), setea texto oscuro. Sin flash porque el script corre en `<head>` antes del paint. |
+| Bug #7 responsive /registro/ y /cambiar-password/ | `global.css`: `.auth-panel` sin `max-width: 100%` en mobile. Templates: `form-row` → `form-group` para layout columna. |
+| Bug #8 crash tesorero /tesorero/rendicion/4/ | `views_tesorero.py`: `.order_by("vendedor__apellido")` → `.order_by("vendedor__last_name")` (`apellido` es `@property`, no columna DB). |
+| Conductor nuevo puede estacionar sin verificación | `views_conductor.py`: mensaje warning al redirigir a MP. `inicio_usuarios.html`: banner verificación → texto sutil opcional. `mis_infracciones`: elimina redirect a verificación. |
+| Nombres usuarios en mayúsculas | `views_admin.py`: `.title()` en `editar_inspector` y `editar_vendedor`. |
+| Tesorero: notas + solicitar factura en liquidaciones | `views_tesorero.py`: acciones `actualizar_notas` y `solicitar_factura`. Template: formulario de notas + botón "Solicitar factura" cuando no hay factura subida. |
+| Superadmin: solicitar comprobante al tesorero | `views_superadmin.py`: acción `solicitar_comprobante`. Template superadmin: botón cuando no hay comprobante. |
+| Fix `medio_pago_selector.html` | Comentario reescrito. Preserva selección en redisplay de formulario con `request.POST.medio_pago` + soporte `medio_pago_inicial`. |
 
 ### Sesión 2026-09-06 (tarde 5) — Rendiciones: 3 mejoras
 
