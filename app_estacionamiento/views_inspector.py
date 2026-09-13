@@ -363,15 +363,38 @@ def gestion_infracciones(request):
 def resumen_infracciones(request):
     """
     Resumen general de infracciones del municipio para el inspector y admin.
-    """
-    usuario = request.user
 
-    infracciones = Infraccion.objects.filter(
-        municipio=usuario.municipio
-    ).select_related("vehiculo", "subcuadra", "inspector").order_by("-creado_en")
+    Acceso:
+      - Admin: ve todas las infracciones del municipio.
+      - Inspector: solo ve sus propias infracciones, y únicamente si el superadmin
+        habilitó inspector_ve_sus_infracciones=True en la configuración del municipio.
+        Si está desactivado, se muestra un mensaje explicativo y la lista queda vacía.
+    """
+    usuario   = request.user
+    municipio = usuario.municipio
+
+    es_solo_inspector = getattr(usuario, "es_inspector", False) and not getattr(usuario, "es_admin", False)
+
+    if es_solo_inspector:
+        # El superadmin controla si el inspector puede ver sus propias infracciones.
+        puede_ver = getattr(municipio, "inspector_ve_sus_infracciones", False)
+        if not puede_ver:
+            return render(request, "inspectores/resumen_infracciones.html", {
+                "infracciones":      [],
+                "acceso_bloqueado":  True,
+            })
+        # Puede ver: solo muestra sus propias infracciones
+        infracciones = Infraccion.objects.filter(
+            municipio=municipio, inspector=usuario
+        ).select_related("vehiculo", "subcuadra", "inspector").order_by("-creado_en")
+    else:
+        # Admin: ve todo
+        infracciones = Infraccion.objects.filter(
+            municipio=municipio
+        ).select_related("vehiculo", "subcuadra", "inspector").order_by("-creado_en")
 
     return render(request, "inspectores/resumen_infracciones.html", {
-        "infracciones": infracciones
+        "infracciones": infracciones,
     })
 
 

@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-10 (sesión 6)
+Última actualización: 2026-09-13 (sesión 7)
 
 ---
 
@@ -21,6 +21,18 @@
 ---
 
 ## 🟡 Media prioridad
+
+- **Comisiones — flujo completo de certificación por vendedor**
+  Verificar que el vendedor puede ver sus liquidaciones pendientes desde `panel_vendedor.html` y certificar la recepción. Vista y template de certificación pueden estar incompletos.
+
+- **`/tesorero/rendicion/<id>/` — verificar que no haya 500 tras el deploy**
+  El crash de `depositar_comision` está corregido. Pero el detalle de la rendición en sí puede tener otro problema no confirmado (sin traceback todavía). Testear manualmente post-deploy.
+
+- **Superadmin: toggle visibilidad de infracciones propias del inspector**
+  El superadmin debería poder configurar por municipio si el inspector ve o no las infracciones que él mismo realizó. Diseño pendiente (flag en `Municipio` o en permisos del inspector).
+
+- **`/pagar/` anónimo: permite pagar estacionamiento por hora fuera de horario**
+  El flujo público de pago no llama a `puede_estacionar_ahora()`. Definir si debe bloquearse o no (decisión de negocio antes de implementar).
 
 - **Bug #9 — Preguntas de negocio (pendiente respuesta de Leandro)**
   - Notificaciones: ¿el conductor puede activar/desactivar qué notificaciones recibe? 
@@ -70,26 +82,17 @@
 
 ---
 
-## ⚠️ Deploy pendiente
-
-El error 500 en `/tesorero/rendicion/` en Railway se debe a que los cambios de esta sesión
-aún no están en `main`. Para deployar:
-
-```powershell
-git add -A
-git commit -m "fix: modal infracciones, abonos vendedor, 500 page, columnas panel"
-git push
-git checkout main
-git merge develop
-git push       # ← esto dispara el deploy en Railway
-git checkout develop
-```
-
-Adicionalmente hay que correr la migración `0073` en Railway (lo hace automático al deploy).
-
----
-
 ## ✅ Resuelto
+
+### Sesión 2026-09-13 (sesión 7) — Crashes 500, depositar comisiones, horario abonos
+
+| Ítem | Detalle |
+|---|---|
+| Fix raíz `medio_pago_selector.html` (Error 500 múltiple) | Django 5.x/Python 3.12 no atrapa `ValueError` de `int('medio_pago_inicial')` al resolver variables de template. Reescrito con `{% if %}` en lugar de `\|default:variable`. Creado `_medio_pago_radios.html` como fragmento compartido. Afectaba `/vendedores/abono/`, `/admin-infracciones/?detalle=N` y cualquier template que incluya el selector sin pasar `medio_pago_inicial`. |
+| Fix `depositar_comision.html` (Error 500) | Template usaba `liq` en todos lados; la vista pasaba `liquidacion`. Renombrado. También: `name="notas"` → `name="notas_tesorero"` para que las notas no se pierdan silenciosamente en el POST. |
+| Fix `depositar_comision` view: admin también puede depositar | Cambiado `@require_role("tesorero")` → `@require_role("tesorero", "admin")`. Redirect y `volver_url` dinámicos según rol. |
+| Fix `caja_inspector`: modal-cierre sin período | La vista no pasaba `periodos` al contexto. Agregado `"periodos": CierreCaja.PERIODOS`. |
+| Abonos sin restricción horaria | Se intentó agregar chequeo de horario a `cobrar_abono` (incorrecto). Revertido: los abonos se pueden cobrar en cualquier momento. Solo el estacionamiento por hora tiene restricción de franja horaria. |
 
 ### Sesión 2026-09-10 (tarde) — Modal, 500, columnas, vendedores
 

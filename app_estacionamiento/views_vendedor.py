@@ -66,9 +66,12 @@ def panel_vendedor(request):
         usuario=user, tipo="ingreso", cerrado=False
     ).aggregate(total=Sum("monto"))["total"] or 0
 
-    comisiones_pendientes = MovimientoCaja.objects.filter(
-        usuario=user, tipo="ingreso", comision_monto__gt=0,
-    ).aggregate(total=Sum("comision_monto"))["total"] or 0
+    # Comisiones pendientes = liquidaciones creadas pero no certificadas aún
+    # (estado "pendiente" = tesorero no depositó; "depositada" = falta certificar)
+    # No incluye las ya certificadas para no confundir con el total histórico.
+    comisiones_pendientes = LiquidacionComision.objects.filter(
+        vendedor=user, estado__in=["pendiente", "depositada"]
+    ).aggregate(total=Sum("monto_total"))["total"] or 0
 
     # Cierres de caja que el admin todavía no certificó
     cierres_sin_certificar = CierreCaja.objects.filter(
@@ -115,7 +118,9 @@ def registrar_estacionamiento_manual(request):
     if not patente:
         return _render_form("Ingresá la patente del vehículo.")
 
-    permitido, msg_horario = puede_estacionar_ahora(vendedor.municipio)
+    # bloquear_sin_horario=True: si el día no tiene horario configurado (ej: domingo),
+    # el vendedor no puede cobrar, igual que el inspector.
+    permitido, msg_horario = puede_estacionar_ahora(vendedor.municipio, bloquear_sin_horario=True)
     if not permitido:
         return _render_form(msg_horario)
 
@@ -203,7 +208,9 @@ def registrar_estacionamiento_vendedor(request):
     if not patente:
         return _render_form("Ingresá la patente del vehículo.")
 
-    permitido, msg_horario = puede_estacionar_ahora(vendedor.municipio)
+    # bloquear_sin_horario=True: sin horario para el día de hoy (ej: domingo sin configurar)
+    # el vendedor queda bloqueado igual que el inspector.
+    permitido, msg_horario = puede_estacionar_ahora(vendedor.municipio, bloquear_sin_horario=True)
     if not permitido:
         return _render_form(msg_horario)
 

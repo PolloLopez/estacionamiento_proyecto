@@ -137,14 +137,20 @@ def depositar_comision(request, liquidacion_id):
         return redirect(nombre_panel)
 
     if request.method == "POST":
-        notas = request.POST.get("notas_tesorero", "").strip()
+        notas              = request.POST.get("notas_tesorero", "").strip()
+        numero_comprobante = request.POST.get("numero_comprobante", "").strip()
+        archivo            = request.FILES.get("comprobante_archivo")
         with transaction.atomic():
-            liquidacion.estado         = "depositada"
-            liquidacion.depositada_en  = timezone.now()
-            liquidacion.depositada_por = usuario
-            liquidacion.notas_tesorero = notas
+            liquidacion.estado             = "depositada"
+            liquidacion.depositada_en      = timezone.now()
+            liquidacion.depositada_por     = usuario
+            liquidacion.notas_tesorero     = notas
+            liquidacion.numero_comprobante = numero_comprobante
+            if archivo:
+                liquidacion.comprobante_archivo = archivo
             liquidacion.save(update_fields=[
-                "estado", "depositada_en", "depositada_por", "notas_tesorero"
+                "estado", "depositada_en", "depositada_por",
+                "notas_tesorero", "numero_comprobante", "comprobante_archivo",
             ])
         messages.success(request, f"Depósito registrado para {liquidacion.vendedor.nombre_completo()}.")
         return redirect(nombre_panel)

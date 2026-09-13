@@ -6,20 +6,20 @@
   <h1 style="margin-bottom:1.5rem;">✅ Certificar recibo de comisión</h1>
 
   <div class="card" style="margin-bottom:1.5rem;">
-    <p><strong>Período:</strong> {{ liq.fecha_desde|date:"d/m/Y" }} → {{ liq.fecha_hasta|date:"d/m/Y" }}</p>
-    {% if liq.depositada_por %}
+    <p><strong>Período:</strong> {{ liquidacion.fecha_desde|date:"d/m/Y" }} → {{ liquidacion.fecha_hasta|date:"d/m/Y" }}</p>
+    {% if liquidacion.depositada_por %}
       <p><strong>Depositado por:</strong>
-        {% if liq.depositada_por.nombre %}{{ liq.depositada_por.nombre }} {{ liq.depositada_por.apellido }}{% else %}{{ liq.depositada_por.correo }}{% endif %}
+        {{ liquidacion.depositada_por.nombre_completo|default:liquidacion.depositada_por.correo }}
       </p>
     {% endif %}
-    {% if liq.depositada_en %}
-      <p><strong>Fecha depósito:</strong> {{ liq.depositada_en|date:"d/m/Y H:i" }}hs</p>
+    {% if liquidacion.depositada_en %}
+      <p><strong>Fecha depósito:</strong> {{ liquidacion.depositada_en|date:"d/m/Y H:i" }}hs</p>
     {% endif %}
-    {% if liq.notas_tesorero %}
-      <p><strong>Notas:</strong> {{ liq.notas_tesorero }}</p>
+    {% if liquidacion.notas_tesorero %}
+      <p><strong>Notas del tesorero:</strong> {{ liquidacion.notas_tesorero }}</p>
     {% endif %}
     <p style="font-size:1.8rem; font-weight:900; color:var(--color-primary); margin-top:0.75rem; text-align:center;">
-      ${{ liq.monto_total }}
+      ${{ liquidacion.monto_total }}
     </p>
   </div>
 

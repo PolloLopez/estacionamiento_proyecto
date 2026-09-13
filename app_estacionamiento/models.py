@@ -333,6 +333,15 @@ class Municipio(models.Model):
         verbose_name="Mostrar estadísticas a inspectores",
         help_text="Si está desactivado, el inspector no ve sus métricas en el panel (infracciones del día, etc.).",
     )
+    inspector_ve_sus_infracciones = models.BooleanField(
+        default=False,
+        verbose_name="Inspector ve sus propias infracciones",
+        help_text=(
+            "Si está activado, el inspector puede ver en su panel las infracciones "
+            "que él mismo labrό. Por defecto desactivado: el inspector solo carga "
+            "infracciones, el admin las gestiona."
+        ),
+    )
 
     # Token de solo lectura para el dashboard en pantalla/TV del municipio.
     # Se genera automáticamente desde el superadmin; vacío = dashboard desactivado.
@@ -1316,7 +1325,15 @@ class LiquidacionComision(models.Model):
         Usuario, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='liquidaciones_depositadas',
     )
-    notas_tesorero = models.TextField(blank=True)
+    notas_tesorero     = models.TextField(blank=True)
+    numero_comprobante = models.CharField(
+        max_length=100, blank=True,
+        help_text='Número o referencia de la transferencia/pago al vendedor.',
+    )
+    comprobante_archivo = models.FileField(
+        upload_to='comprobantes_deposito/', null=True, blank=True,
+        help_text='Archivo del comprobante bancario (imagen o PDF).',
+    )
 
     # Vendedor certifica recibo
     certificada_en = models.DateTimeField(null=True, blank=True)
