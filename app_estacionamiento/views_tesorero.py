@@ -12,6 +12,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from .decorators import require_role
@@ -112,39 +113,45 @@ def validar_rendicion(request, rendicion_id):
     return redirect("panel_tesorero")
 
 
-@require_role("tesorero")
+@require_role("tesorero", "admin")
 def depositar_comision(request, liquidacion_id):
     """
     Registra el depósito de una liquidación de comisión al vendedor.
 
-    Parámetros:
-        liquidacion_id: ID de la LiquidacionComision a depositar
+    Acceso: tesorero o admin (el superadmin puede configurar por municipio
+    cuál de los dos roles confirma los depósitos).
 
     Solo procesa liquidaciones en estado 'pendiente'.
     Guarda quién depositó, cuándo y notas opcionales.
     """
-    municipio   = request.user.municipio
+    usuario     = request.user
+    municipio   = usuario.municipio
     liquidacion = get_object_or_404(LiquidacionComision, id=liquidacion_id, municipio=municipio)
+
+    # Redirección de vuelta según el rol de quien confirma
+    nombre_panel = "panel_tesorero" if getattr(usuario, "es_tesorero", False) else "panel_admin"
+    volver_url   = reverse(nombre_panel)
 
     if liquidacion.estado != "pendiente":
         messages.warning(request, "Esta liquidación ya fue procesada.")
-        return redirect("panel_tesorero")
+        return redirect(nombre_panel)
 
     if request.method == "POST":
         notas = request.POST.get("notas_tesorero", "").strip()
         with transaction.atomic():
             liquidacion.estado         = "depositada"
             liquidacion.depositada_en  = timezone.now()
-            liquidacion.depositada_por = request.user
+            liquidacion.depositada_por = usuario
             liquidacion.notas_tesorero = notas
             liquidacion.save(update_fields=[
                 "estado", "depositada_en", "depositada_por", "notas_tesorero"
             ])
         messages.success(request, f"Depósito registrado para {liquidacion.vendedor.nombre_completo()}.")
-        return redirect("panel_tesorero")
+        return redirect(nombre_panel)
 
     return render(request, "tesorero/depositar_comision.html", {
         "liquidacion": liquidacion,
+        "volver_url":  volver_url,
     })
 
 
