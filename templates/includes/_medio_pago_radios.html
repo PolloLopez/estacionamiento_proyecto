@@ -1,0 +1,71 @@
+{% comment %}
+Fragmento interno — NO incluir directamente.
+Usar siempre a través de medio_pago_selector.html, que define pago_actual en el contexto.
+
+Espera pago_actual en el contexto (valores válidos: "efectivo", "transferencia",
+"debito", "credito", "qr"). Si no coincide con ninguno, ningún botón queda activo.
+{% endcomment %}
+
+<div style="margin-bottom:1.2rem;">
+  <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.5rem; color:var(--color-text-muted);">
+    Medio de pago
+  </label>
+  <div class="medio-pago-group" style="display:flex; flex-wrap:wrap; gap:0.4rem;">
+    <label class="medio-btn {% if pago_actual == 'efectivo' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="efectivo"
+             {% if pago_actual == 'efectivo' %}checked{% endif %}> 💵 Efectivo
+    </label>
+    <label class="medio-btn {% if pago_actual == 'transferencia' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="transferencia"
+             {% if pago_actual == 'transferencia' %}checked{% endif %}> 📲 Transferencia
+    </label>
+    <label class="medio-btn {% if pago_actual == 'debito' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="debito"
+             {% if pago_actual == 'debito' %}checked{% endif %}> 💳 Débito
+    </label>
+    <label class="medio-btn {% if pago_actual == 'credito' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="credito"
+             {% if pago_actual == 'credito' %}checked{% endif %}> 💳 Crédito
+    </label>
+    <label class="medio-btn {% if pago_actual == 'qr' %}medio-activo{% endif %}">
+      <input type="radio" name="medio_pago" value="qr"
+             {% if pago_actual == 'qr' %}checked{% endif %}> 📱 QR
+    </label>
+  </div>
+</div>
+
+<style>
+.medio-btn {
+  cursor: pointer;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--color-border, #ddd);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  user-select: none;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+/* El radio está oculto: el label wrapeado actúa como control visual */
+.medio-btn input[type="radio"] { display: none; }
+.medio-activo {
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+  border-color: var(--color-primary, #2563eb);
+}
+</style>
+
+<script>
+(function () {
+  // Actualizar la clase .medio-activo al hacer click, para feedback visual inmediato.
+  // Sin este script el radio sigue funcionando nativamente (el label wrappea el input).
+  document.querySelectorAll('.medio-pago-group').forEach(function (grupo) {
+    grupo.querySelectorAll('.medio-btn').forEach(function (lbl) {
+      lbl.addEventListener('click', function () {
+        grupo.querySelectorAll('.medio-btn').forEach(function (l) {
+          l.classList.remove('medio-activo');
+        });
+        this.classList.add('medio-activo');
+      });
+    });
+  });
+})();
+</script>
