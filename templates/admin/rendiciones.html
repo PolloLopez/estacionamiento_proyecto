@@ -314,6 +314,7 @@
         <th style="text-align:center;">Estado</th>
         <th>Depositada</th>
         <th>Certificada</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -339,6 +340,15 @@
         </td>
         <td style="font-size:0.85rem;">
           {% if liq.certificada_en %}{{ liq.certificada_en|date:"d/m/Y" }}{% else %}—{% endif %}
+        </td>
+        <td>
+          {# Botón de depositar: solo si está pendiente. El superadmin define si admin puede depositar. #}
+          {% if liq.estado == "pendiente" %}
+            <a href="{% url 'depositar_comision' liq.id %}" class="btn btn-outline"
+               style="font-size:0.82rem; padding:0.3rem 0.75rem; white-space:nowrap;">
+              💳 Depositar
+            </a>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

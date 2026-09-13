@@ -20,11 +20,29 @@
       Al confirmar indicás que ya realizaste la transferencia o pago al vendedor.
       El vendedor deberá certificar que lo recibió.
     </p>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <div style="margin-bottom:1rem;">
-        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">Notas (opcional)</label>
-        <textarea name="notas_tesorero" rows="3" placeholder="Nro de transferencia, medio de pago, etc."
+        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">
+          Número de comprobante (opcional)
+        </label>
+        <input name="numero_comprobante" type="text"
+               placeholder="Ej: 0001234567, CBU destino, referencia MP..."
+               style="width:100%;">
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">
+          Archivo de comprobante (opcional)
+        </label>
+        <input name="comprobante_archivo" type="file" accept="image/*,.pdf"
+               style="width:100%;">
+        <small class="text-muted">Imagen o PDF del comprobante bancario.</small>
+      </div>
+      <div style="margin-bottom:1rem;">
+        <label style="font-weight:600; display:block; margin-bottom:0.3rem;">
+          Notas adicionales (opcional)
+        </label>
+        <textarea name="notas_tesorero" rows="2" placeholder="Medio de pago, aclaraciones..."
                   style="width:100%; resize:vertical;"></textarea>
       </div>
       <div style="display:flex; gap:0.75rem;">

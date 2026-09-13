@@ -274,7 +274,8 @@ def editar_municipio(request, municipio_id):
             municipio.monto_maximo_carga         = _entero("monto_maximo_carga",         municipio.monto_maximo_carga)
             municipio.minutos_entre_infracciones  = _entero("minutos_entre_infracciones",  municipio.minutos_entre_infracciones)
             municipio.segundos_pausa_doble_copia  = _entero("segundos_pausa_doble_copia",  municipio.segundos_pausa_doble_copia)
-            municipio.activo                     = request.POST.get("activo") == "on"
+            municipio.activo                          = request.POST.get("activo") == "on"
+            municipio.inspector_ve_sus_infracciones   = request.POST.get("inspector_ve_sus_infracciones") == "on"
             municipio.reintegro_minutos          = _entero("reintegro_minutos",          municipio.reintegro_minutos)
             municipio.reintegro_max_por_dia      = _entero("reintegro_max_por_dia",      municipio.reintegro_max_por_dia)
             alcance = request.POST.get("reintegro_alcance", "").strip()

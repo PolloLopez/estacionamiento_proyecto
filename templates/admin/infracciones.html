@@ -272,7 +272,8 @@
     <div id="m-acciones-pagada" style="display:none;">
       <hr style="border:none; border-top:1px solid var(--color-border); margin:0 0 1.2rem;">
       <a id="m-comprobante-link" href="#" target="_blank" class="btn btn-outline"
-         style="display:block; text-align:center; padding:0.65rem;">
+         style="display:block; text-align:center; padding:0.65rem;"
+         onclick="cerrarModal()">
         🖨️ Ver comprobante
       </a>
     </div>
@@ -343,6 +344,8 @@
     overlay.style.display = "none";
     document.body.style.overflow = "";
   }
+  // Exponer globalmente para onclick en links del modal
+  window.cerrarModal = cerrarModal;
 
   cerrarBtn.addEventListener("click", cerrarModal);
   overlay.addEventListener("click", function (e) {

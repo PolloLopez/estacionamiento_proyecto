@@ -34,10 +34,14 @@
       <div class="text-muted" style="font-size:0.85rem;">Rendiciones pendientes</div>
       <div style="font-size:2rem; font-weight:800; color:var(--color-warning);">{{ pendientes_rendicion }}</div>
     </div>
-    <div class="card" style="text-align:center;">
-      <div class="text-muted" style="font-size:0.85rem;">Comisiones a depositar</div>
+    <a href="{% url 'admin_rendiciones' %}?seccion=comisiones"
+       class="card" style="text-align:center; text-decoration:none; display:block;">
+      <div class="text-muted" style="font-size:0.85rem;">💵 Comisiones a depositar</div>
       <div style="font-size:2rem; font-weight:800; color:var(--color-primary);">{{ pendientes_liquidacion }}</div>
-    </div>
+      {% if pendientes_liquidacion > 0 %}
+        <div style="font-size:0.78rem; color:var(--color-warning); margin-top:0.2rem;">Ver comisiones →</div>
+      {% endif %}
+    </a>
   </div>
 
   {# RENDICIONES PENDIENTES (requieren acción) #}
