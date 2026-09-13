@@ -430,6 +430,11 @@ def cobrar_abono(request):
             _messages.error(request, "No tenés permiso para cobrar abonos. Consultá con el administrador.")
             return redirect("panel_vendedor")
 
+    # Los abonos se pueden cobrar en cualquier horario (sin restricción de franja).
+    # Solo el estacionamiento por hora tiene restricción de horario.
+    _fuera_de_horario = False
+    _msg_horario      = None
+
     from datetime import date
 
     MESES_ES = [
@@ -762,6 +767,8 @@ def caja_inspector(request):
         "movimientos_abiertos": movimientos_pendientes.count(),
         "total_a_cerrar":    total_a_cerrar,
         "historial_cierres": historial_cierres,
+        # Opciones de período para el select del modal-cierre
+        "periodos":          CierreCaja.PERIODOS,
     })
 
 
