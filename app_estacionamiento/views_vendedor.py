@@ -490,16 +490,29 @@ def cobrar_abono(request):
         if not patente:
             error = "Ingresá la patente del vehículo."
         else:
+            # Tipo de vehículo seleccionado por el operador (auto por defecto)
+            tipo_elegido = request.POST.get("tipo_vehiculo", "auto")
+            if tipo_elegido not in ("auto", "moto"):
+                tipo_elegido = "auto"
+
             # Crear el vehículo si no existe — el abono no requiere registro previo
-            vehiculo, _ = Vehiculo.objects.get_or_create(
+            vehiculo, creado = Vehiculo.objects.get_or_create(
                 patente=patente,
-                defaults={"municipio": municipio},
+                defaults={"municipio": municipio, "tipo": tipo_elegido},
             )
+            # Actualizar campos si el vehículo ya existía sin municipio,
+            # o si el tipo seleccionado difiere del registrado (permite corrección).
+            campos_a_actualizar = []
             if not vehiculo.municipio:
                 vehiculo.municipio = municipio
-                vehiculo.save(update_fields=["municipio"])
+                campos_a_actualizar.append("municipio")
+            if vehiculo.tipo != tipo_elegido:
+                vehiculo.tipo = tipo_elegido
+                campos_a_actualizar.append("tipo")
+            if campos_a_actualizar:
+                vehiculo.save(update_fields=campos_a_actualizar)
 
-            es_moto     = getattr(vehiculo, "tipo", "auto") == "moto"
+            es_moto     = vehiculo.tipo == "moto"
             precio_moto = getattr(tarifa_obj, "precio_abono_moto", None) if tarifa_obj else None
             precio_auto = getattr(tarifa_obj, "precio_abono_auto", None) if tarifa_obj else None
 
