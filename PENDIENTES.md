@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-13 (sesión 7)
+Última actualización: 2026-09-16 (sesión 8)
 
 ---
 
@@ -22,17 +22,7 @@
 
 ## 🟡 Media prioridad
 
-- **Comisiones — flujo completo de certificación por vendedor**
-  Verificar que el vendedor puede ver sus liquidaciones pendientes desde `panel_vendedor.html` y certificar la recepción. Vista y template de certificación pueden estar incompletos.
-
-- **`/tesorero/rendicion/<id>/` — verificar que no haya 500 tras el deploy**
-  El crash de `depositar_comision` está corregido. Pero el detalle de la rendición en sí puede tener otro problema no confirmado (sin traceback todavía). Testear manualmente post-deploy.
-
-- **Superadmin: toggle visibilidad de infracciones propias del inspector**
-  El superadmin debería poder configurar por municipio si el inspector ve o no las infracciones que él mismo realizó. Diseño pendiente (flag en `Municipio` o en permisos del inspector).
-
-- **`/pagar/` anónimo: permite pagar estacionamiento por hora fuera de horario**
-  El flujo público de pago no llama a `puede_estacionar_ahora()`. Definir si debe bloquearse o no (decisión de negocio antes de implementar).
+- **`/pagar/` anónimo: sin restricción horaria** — confirmado por Leandro, no hay que bloquear el pago anónimo por horario. Cerrado.
 
 - **Bug #9 — Preguntas de negocio (pendiente respuesta de Leandro)**
   - Notificaciones: ¿el conductor puede activar/desactivar qué notificaciones recibe? 
@@ -57,9 +47,8 @@
   Workaround actual implementado: reconectar por nombre (`requestDevice` pre-filtrado). Evaluar si Chrome corrigió el bug o documentar como límite del navegador.
   Archivo: `static/.../js/impresora_bluetooth.js` (función `reconectarImpresora`).
 
-- **Comisiones de vendedores — flujo completo**
-  El flujo actual: rendición → `LiquidacionComision` creada → tesorero deposita → vendedor certifica.
-  Pendiente verificar: ¿los vendedores pueden ver y certificar sus liquidaciones desde su panel? Revisar `panel_vendedor.html` y la vista de certificación.
+- **Comisiones de vendedores — test completo del flujo**
+  El flujo: rendición → `LiquidacionComision` creada (estado=pendiente) → tesorero deposita → vendedor certifica. Los fixes de sesión 8 cubren el acceso del tesorero y la variable de template. Pendiente: hacer una prueba end-to-end completa con un ciclo real en Railway (crear rendición → tesorero deposita → vendedor certifica).
 
 ---
 
@@ -83,6 +72,22 @@
 ---
 
 ## ✅ Resuelto
+
+### Sesión 2026-09-16 (sesión 8) — Tests post-deploy, correcciones horario/abono/tesorero
+
+| Ítem | Detalle |
+|---|---|
+| Fix horario estacionamiento vendedor (crítico) | `views_vendedor.py`: `puede_estacionar_ahora()` llamado sin `bloquear_sin_horario=True`. Días sin horario (ej: domingo) devolvían `(True, None)` → vendedor podía registrar. Fix: `bloquear_sin_horario=True` en `registrar_estacionamiento_manual` y `registrar_estacionamiento_vendedor`. |
+| Fix: patente-input habilitado fuera de horario | `registrar_estacionamiento.html`: aviso de fuera de horario ahora aparece ANTES del input de patente. Input deshabilitado (`disabled` + `opacity:0.45`) cuando no hay opciones de duración. |
+| Fix abono — selector tipo auto/moto | `cobrar_abono.html`: radio auto/moto en el form de búsqueda. `views_vendedor.py`: captura `tipo_vehiculo` del POST, lo aplica al vehículo al crearlo o si el tipo difiere del registrado. |
+| Fix: admin_rendiciones 403 para tesorero | `views_admin.py`: `@require_role("admin")` → `@require_role("admin", "tesorero")`. El tesorero ahora puede acceder a `/admin-rendiciones/?seccion=comisiones` para ver y gestionar comisiones. |
+| Fix: tesorero card "Comisiones" es clickable | `panel_tesorero.html`: card "Comisiones a depositar" como `<a>` apuntando a `admin_rendiciones?seccion=comisiones`. |
+| Fix: modal cierre al imprimir infracción | `admin/infracciones.html`: `window.cerrarModal = cerrarModal` + `onclick="cerrarModal()"` en link del comprobante. |
+| Fix: certificar comisión — variable liq→liquidacion | `certificar_comision.html`: todas las referencias `liq.` → `liquidacion.`. |
+| Fix: botón Depositar en tab comisiones admin | `admin/rendiciones.html`: columna de acción con `<a>` a `depositar_comision` para liquidaciones pendientes. |
+| Fix: comprobante de depósito (número + archivo) | `models.py`: `numero_comprobante` + `comprobante_archivo` en `LiquidacionComision`. Migración `0075`. Template y view actualizados. |
+| Fix: vendedor — comisiones_pendientes | `views_vendedor.py panel_vendedor`: cambiado de `MovimientoCaja` (suma histórica confusa) a `LiquidacionComision.filter(estado__in=["pendiente","depositada"])`. |
+| Fix: superadmin toggle — inspector ve infracciones | `models.py`: `Municipio.inspector_ve_sus_infracciones` BooleanField. Migración `0076`. `views_inspector.py`: resumen_infracciones filtra según el toggle. `views_superadmin.py`: guarda el campo desde el POST. Template y editar_municipio actualizados. |
 
 ### Sesión 2026-09-13 (sesión 7) — Crashes 500, depositar comisiones, horario abonos
 

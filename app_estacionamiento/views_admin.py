@@ -1291,11 +1291,12 @@ def gestionar_dias_especiales(request):
 # Rendiciones y cierres de caja
 # ─────────────────────────────────────────────────────────────────────────────
 
-@require_role("admin")
+@require_role("admin", "tesorero")
 def admin_rendiciones(request):
     """
     Lista todos los cierres de caja del municipio con filtros.
     Permite filtrar por estado (pendiente/certificado), usuario y rango de fechas.
+    Accesible también por el tesorero para ver y gestionar comisiones de vendedores.
     """
     municipio = getattr(request.user, "municipio", None)
 
