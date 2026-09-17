@@ -273,9 +273,12 @@ def _verificar_firma_mp(request, data_id: str) -> bool:
         logger.warning("mp_webhook: header x-signature ausente — request rechazado")
         return False
 
-    # Parsear "ts=...;v1=..." → {"ts": "...", "v1": "..."}
+    # Parsear "ts=...;v1=..." o "ts=...,v1=..." → {"ts": "...", "v1": "..."}
+    # MP puede usar coma o punto y coma como separador según la versión/región.
+    # Normalizamos a coma para soportar ambos formatos.
     partes = {}
-    for fragmento in firma_header.split(";"):
+    separador = "," if "," in firma_header else ";"
+    for fragmento in firma_header.split(separador):
         if "=" in fragmento:
             clave, valor = fragmento.split("=", 1)
             partes[clave.strip()] = valor.strip()
