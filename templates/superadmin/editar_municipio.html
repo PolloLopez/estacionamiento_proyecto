@@ -49,6 +49,30 @@
             <small style="color:var(--color-text-muted);">Tiempo mínimo antes de poder infraccionar de nuevo al mismo vehículo. Defecto: 15 min.</small>
           </div>
 
+          <!-- Coordenadas de la sede municipal — aparecen en el mapa de zonas -->
+          <div style="margin-bottom:0.75rem;">
+            <label style="font-size:0.85rem; font-weight:600;">Ubicación de la sede municipal (para mapa de zonas)</label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-top:0.25rem;">
+              <div>
+                <small style="color:var(--color-text-muted);">Latitud</small>
+                <input type="number" name="sede_lat" step="0.000001" min="-90" max="90"
+                       value="{{ municipio.sede_lat|default:'' }}"
+                       placeholder="Ej: -34.603722"
+                       style="width:100%; margin-top:0.15rem;">
+              </div>
+              <div>
+                <small style="color:var(--color-text-muted);">Longitud</small>
+                <input type="number" name="sede_lon" step="0.000001" min="-180" max="180"
+                       value="{{ municipio.sede_lon|default:'' }}"
+                       placeholder="Ej: -58.381592"
+                       style="width:100%; margin-top:0.15rem;">
+              </div>
+            </div>
+            <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem;">
+              Se muestra como pin 🏛️ en el mapa de zonas. Podés obtener las coordenadas desde Google Maps.
+            </small>
+          </div>
+
           <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Pausa entre copias del acta (segundos)</label>
             <input type="number" name="segundos_pausa_doble_copia" min="0" max="30" step="1"

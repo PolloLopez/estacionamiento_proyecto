@@ -111,6 +111,7 @@
             <tr>
               <th>Subcuadra</th>
               <th style="text-align:center;">GPS</th>
+              <th style="text-align:center;">Tipo zona</th>
               <th></th>
             </tr>
           </thead>
@@ -124,6 +125,27 @@
                 {% else %}
                   <span class="badge-gps no">Sin GPS</span>
                 {% endif %}
+              </td>
+              <td style="text-align:center;">
+                <!-- Selector inline tipo de zona (pagado / libre) -->
+                <form method="post" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="accion" value="guardar_tipo_zona">
+                  <input type="hidden" name="subcuadra_id" value="{{ s.id }}">
+                  <select name="tipo_zona"
+                          onchange="this.form.submit()"
+                          style="font-size:0.78rem; padding:0.2rem 0.35rem;
+                                 border-radius:6px; border:1px solid var(--color-border);
+                                 background:var(--color-surface); color:var(--color-text);
+                                 cursor:pointer;">
+                    <option value="pagado" {% if s.tipo_zona == "pagado" %}selected{% endif %}>
+                      💳 Pagada
+                    </option>
+                    <option value="libre" {% if s.tipo_zona == "libre" %}selected{% endif %}>
+                      🟢 Libre
+                    </option>
+                  </select>
+                </form>
               </td>
               <td style="white-space:nowrap;">
                 {% if s.lat %}

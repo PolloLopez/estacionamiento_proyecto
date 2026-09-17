@@ -343,6 +343,22 @@ class Municipio(models.Model):
         ),
     )
 
+    # ── Coordenadas de la sede municipal ────────────────────────────────────────
+    # Usadas para mostrar la oficina del admin en el mapa de zonas.
+    # El superadmin las configura desde editar_municipio.
+    sede_lat = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        null=True, blank=True,
+        verbose_name="Latitud sede municipal",
+        help_text="Latitud de la oficina o sede del administrador. Se muestra en el mapa de zonas.",
+    )
+    sede_lon = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        null=True, blank=True,
+        verbose_name="Longitud sede municipal",
+        help_text="Longitud de la oficina o sede del administrador. Se muestra en el mapa de zonas.",
+    )
+
     # Token de solo lectura para el dashboard en pantalla/TV del municipio.
     # Se genera automáticamente desde el superadmin; vacío = dashboard desactivado.
     token_tv = models.CharField(
@@ -583,6 +599,18 @@ class Subcuadra(models.Model):
         max_digits=9, decimal_places=6,
         null=True, blank=True,
         verbose_name='Longitud',
+    )
+
+    TIPOS_ZONA = [
+        ("pagado", "Zona pagada"),
+        ("libre",  "Zona libre"),
+    ]
+    tipo_zona = models.CharField(
+        max_length=10,
+        choices=TIPOS_ZONA,
+        default="pagado",
+        verbose_name="Tipo de zona",
+        help_text="Pagado = estacionamiento medido. Libre = sin cobro (zona céntrica liberada u otra).",
     )
 
     class Meta:

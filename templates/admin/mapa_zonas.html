@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Mapa de zonas{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+<div class="container">
+
+  <div style="display:flex; justify-content:space-between; align-items:center;
+              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+    <h2 style="margin:0;">🗺️ Mapa de zonas</h2>
+    {% if request.user.es_admin %}
+      <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.85rem;">← Panel admin</a>
+    {% elif request.user.es_inspector %}
+      <a href="{% url 'panel_inspectores' %}" class="btn btn-outline" style="font-size:0.85rem;">← Panel inspector</a>
+    {% elif request.user.es_vendedor %}
+      <a href="{% url 'panel_vendedor' %}" class="btn btn-outline" style="font-size:0.85rem;">← Panel vendedor</a>
+    {% endif %}
+  </div>
+
+  <!-- Leyenda -->
+  <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:0.75rem;
+              font-size:0.85rem; align-items:center;">
+    <span style="display:flex; align-items:center; gap:0.35rem;">
+      <span style="display:inline-block; width:14px; height:14px; border-radius:50%;
+                   background:#3b82f6; opacity:0.75;"></span>
+      Zona pagada
+    </span>
+    <span style="display:flex; align-items:center; gap:0.35rem;">
+      <span style="display:inline-block; width:14px; height:14px; border-radius:50%;
+                   background:#22c55e; opacity:0.75;"></span>
+      Zona libre
+    </span>
+    <span style="display:flex; align-items:center; gap:0.35rem;">
+      <span style="font-size:1rem;">🛒</span>
+      Punto de carga (vendedor)
+    </span>
+    {% if sede %}
+    <span style="display:flex; align-items:center; gap:0.35rem;">
+      <span style="font-size:1rem;">🏛️</span>
+      Sede municipal
+    </span>
+    {% endif %}
+  </div>
+
+  {% if total_subcuadras == 0 and total_vendedores == 0 and not sede %}
+  <div class="card" style="text-align:center; padding:2rem;">
+    <p style="color:var(--color-text-muted);">
+      No hay coordenadas cargadas aún.<br>
+      Cargá lat/lon en <a href="{% url 'gestionar_subcuadras' %}">Gestionar subcuadras</a>
+      y registrá ubicaciones en los perfiles de vendedores.
+    </p>
+  </div>
+  {% else %}
+
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div id="mapa" style="height:540px; width:100%; border-radius:8px;"></div>
+  </div>
+
+  <!-- Resumen -->
+  <div style="display:flex; gap:1.5rem; flex-wrap:wrap; margin-top:0.6rem;
+              font-size:0.82rem; color:var(--color-text-muted);">
+    <span>📍 {{ total_subcuadras }} subcuadra{{ total_subcuadras|pluralize:"s" }} con GPS</span>
+    <span>🛒 {{ total_vendedores }} punto{{ total_vendedores|pluralize:"s" }} de carga</span>
+    {% if sede %}<span>🏛️ Sede configurada</span>{% endif %}
+  </div>
+
+  {% endif %}
+
+</div>
+
+{% if total_subcuadras > 0 or total_vendedores > 0 or sede %}
+<script>
+// ── Datos pasados desde la vista Django ────────────────────────────────────
+const subcuadras  = {{ subcuadras_json|safe }};
+const vendedores  = {{ vendedores_json|safe }};
+const sede        = {{ sede|default:"null" }};
+const centroLat   = {{ centro_lat }};
+const centroLon   = {{ centro_lon }};
+
+// ── Mapa base ──────────────────────────────────────────────────────────────
+const mapa = L.map("mapa").setView([centroLat, centroLon], 15);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© <a href='https://www.openstreetmap.org/'>OpenStreetMap</a>",
+  maxZoom: 19,
+}).addTo(mapa);
+
+// ── Subcuadras: círculo azul (pagado) o verde (libre) ─────────────────────
+subcuadras.forEach(function(s) {
+  const color = s.tipo_zona === "libre" ? "#22c55e" : "#3b82f6";
+  const label = s.tipo_zona === "libre" ? "Zona libre" : "Zona pagada";
+
+  L.circle([s.lat, s.lon], {
+    radius:      35,        // metros
+    color:       color,
+    fillColor:   color,
+    fillOpacity: 0.55,
+    weight:      2,
+  }).addTo(mapa)
+    .bindPopup(
+      `<strong>${s.nombre}</strong><br>
+       <span style="color:${color}; font-weight:600;">${label}</span>`
+    );
+});
+
+// ── Vendedores: icono 🛒 (puntos de carga) ────────────────────────────────
+const iconoVendedor = L.divIcon({
+  className: "",
+  html: '<div style="font-size:1.4rem; line-height:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));">🛒</div>',
+  iconSize:   [28, 28],
+  iconAnchor: [14, 28],
+  popupAnchor:[0, -28],
+});
+
+vendedores.forEach(function(v) {
+  L.marker([v.lat, v.lon], { icon: iconoVendedor })
+    .addTo(mapa)
+    .bindPopup(
+      `<strong>🛒 Punto de carga</strong><br>${v.nombre}` +
+      (v.domicilio ? `<br><small style="color:#666;">${v.domicilio}</small>` : "")
+    );
+});
+
+// ── Sede municipal ─────────────────────────────────────────────────────────
+if (sede) {
+  const iconoSede = L.divIcon({
+    className: "",
+    html: '<div style="font-size:1.5rem; line-height:1; filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));">🏛️</div>',
+    iconSize:   [30, 30],
+    iconAnchor: [15, 30],
+    popupAnchor:[0, -30],
+  });
+
+  L.marker([sede.lat, sede.lon], { icon: iconoSede })
+    .addTo(mapa)
+    .bindPopup(`<strong>${sede.nombre}</strong>`)
+    .openPopup();
+}
+</script>
+{% endif %}
+
+{% endblock %}
