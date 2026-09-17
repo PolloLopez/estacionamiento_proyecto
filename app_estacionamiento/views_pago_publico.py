@@ -464,7 +464,8 @@ def subcuadra_cercana_publica(request):
     if not subcuadras.exists():
         return JsonResponse({})
 
-    mas_cercana = min(subcuadras, key=lambda s: (s.lat - lat) ** 2 + (s.lon - lon) ** 2)
+    # Convertir Decimal a float para poder operar con las coordenadas del request (que son float)
+    mas_cercana = min(subcuadras, key=lambda s: (float(s.lat) - lat) ** 2 + (float(s.lon) - lon) ** 2)
     return JsonResponse({
         "id":     mas_cercana.id,
         "nombre": str(mas_cercana),
