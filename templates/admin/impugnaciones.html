@@ -10,7 +10,6 @@
 
   <!-- Filtro por estado -->
   <div style="display:flex; gap:0.5rem; margin-bottom:1rem; flex-wrap:wrap;">
-    {% for key, label in "pendiente:Pendientes,aceptada:Aceptadas,rechazada:Rechazadas"|make_list %}{% endfor %}
     <a href="?estado=pendiente"
        class="btn {% if estado_filtro == 'pendiente' %}btn-primary{% else %}btn-outline{% endif %}"
        style="font-size:0.85rem; padding:0.3rem 0.75rem;">⏳ Pendientes</a>

@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-16 (sesión 8)
+Última actualización: 2026-09-17 (sesión 9)
 
 ---
 
@@ -72,6 +72,16 @@
 ---
 
 ## ✅ Resuelto
+
+### Sesión 2026-09-17 (sesión 9) — Dos 500 de Railway + archivos de audio
+
+| Ítem | Detalle |
+|---|---|
+| Fix `/admin/impugnaciones/` Error 500 | `templates/admin/impugnaciones.html` línea 13: `{% for key, label in "..."\|make_list %}` era código muerto (sin cuerpo, `{% endfor %}` inmediato). `make_list` convierte el string en caracteres individuales → `ValueError: Need 2 values to unpack in for loop; got 1`. Fix: eliminar esa línea. Los botones de filtro ya estaban hardcodeados en las líneas siguientes. |
+| Fix `/pagar/subcuadra-cercana/` Error 500 | `views_pago_publico.py subcuadra_cercana_publica`: `s.lat` y `s.lon` son `Decimal` (campo Django) pero `lat` y `lon` son `float` (del `request.GET`). Python lanza `TypeError` al mezclarlos en aritmética. Fix: `float(s.lat)` y `float(s.lon)` en el `min()`. |
+| Archivos de audio 404 | Creados `app_estacionamiento/static/sounds/ok.mp3`, `warning.mp3`, `error.mp3` con frames MP3 silenciosos válidos (MPEG1 Layer3, 32kbps, 44100Hz). Usados en `templates/inspectores/verificar.html` para feedback auditivo del scanner. |
+
+**Pendiente sin código fix**: El error `mp_webhook: x-signature mal formado` en los logs de Railway es un problema de configuración: verificar que la variable de entorno `MP_WEBHOOK_SECRET` en Railway tenga el valor correcto del panel de MercadoPago (Credenciales → Producción → Clave secreta webhook). No es un bug de código.
 
 ### Sesión 2026-09-16 (sesión 8) — Tests post-deploy, correcciones horario/abono/tesorero
 
