@@ -147,6 +147,7 @@ urlpatterns = [
     path("admin/caja-vendedores/<int:vendedor_id>/forzar/", views.forzar_cierre_vendedor, name="admin_forzar_cierre_vendedor"),
     path("admin/exentos-sia/", views.vehiculos_exentos_sia, name="vehiculos_exentos_sia"),
     path("admin/mapa-infracciones/", views.mapa_calor_infracciones, name="mapa_calor_infracciones"),
+    path("mapa-zonas/", views.mapa_zonas, name="mapa_zonas"),
     path("admin/impugnaciones/", views.admin_impugnaciones, name="admin_impugnaciones"),
     path("admin/impugnaciones/<int:impug_id>/resolver/", views.resolver_impugnacion, name="resolver_impugnacion"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),

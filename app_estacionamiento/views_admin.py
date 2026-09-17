@@ -2767,6 +2767,19 @@ def gestionar_subcuadras(request):
                 else:
                     messages.warning(request, f"Ya existía la subcuadra '{calle} {altura}'.")
 
+        elif accion == "guardar_tipo_zona":
+            # Cambia si la subcuadra es zona pagada o zona libre
+            sub = get_object_or_404(
+                Subcuadra, id=request.POST.get("subcuadra_id"), municipio=municipio
+            )
+            tipo = request.POST.get("tipo_zona", "pagado")
+            if tipo in ("pagado", "libre"):
+                sub.tipo_zona = tipo
+                sub.save(update_fields=["tipo_zona"])
+                messages.success(request, f"✅ Tipo de zona actualizado para {sub}.")
+            else:
+                messages.error(request, "Tipo de zona inválido.")
+
         elif accion == "eliminar":
             sub = get_object_or_404(
                 Subcuadra, id=request.POST.get("subcuadra_id"), municipio=municipio
@@ -3441,6 +3454,88 @@ def mapa_calor_infracciones(request):
         "centro_lat":         centro_lat,
         "centro_lon":         centro_lon,
         "total_subcuadras":   len(datos),
+    })
+
+
+@require_role("admin", "inspector", "vendedor", "tesorero")
+def mapa_zonas(request):
+    """
+    Mapa de zonas del municipio — visible para todos los roles internos.
+
+    Muestra:
+    - Subcuadras coloreadas según tipo_zona: azul=pagado, verde=libre.
+    - Puntos de carga: ubicaciones registradas de los vendedores (lat/lon del local).
+    - Sede del admin: coordenadas configuradas en el municipio (sede_lat/sede_lon).
+
+    El conductor accede a una versión simplificada desde su propio panel
+    para saber dónde puede comprar tiempo de estacionamiento.
+    """
+    import json
+
+    municipio = request.user.municipio
+
+    # ── Subcuadras con coordenadas ─────────────────────────────────────────
+    subcuadras_qs = Subcuadra.objects.filter(
+        municipio=municipio,
+        lat__isnull=False,
+        lon__isnull=False,
+    )
+    subcuadras_json = json.dumps([
+        {
+            "lat":       float(s.lat),
+            "lon":       float(s.lon),
+            "nombre":    str(s),
+            "tipo_zona": s.tipo_zona,  # "pagado" o "libre"
+        }
+        for s in subcuadras_qs
+    ])
+
+    # ── Vendedores con ubicación registrada (puntos de carga) ─────────────
+    vendedores_qs = Usuario.objects.filter(
+        municipio=municipio,
+        es_vendedor=True,
+        ubicacion_lat__isnull=False,
+        ubicacion_lon__isnull=False,
+    )
+    vendedores_json = json.dumps([
+        {
+            "lat":    float(v.ubicacion_lat),
+            "lon":    float(v.ubicacion_lon),
+            "nombre": v.nombre_completo() or v.correo,
+            "domicilio": getattr(v, "domicilio_comercial", "") or "",
+        }
+        for v in vendedores_qs
+    ])
+
+    # ── Centro del mapa: promedio de subcuadras o Buenos Aires por defecto ──
+    todas = list(subcuadras_qs)
+    if todas:
+        centro_lat = sum(float(s.lat) for s in todas) / len(todas)
+        centro_lon = sum(float(s.lon) for s in todas) / len(todas)
+    elif municipio.sede_lat and municipio.sede_lon:
+        centro_lat = float(municipio.sede_lat)
+        centro_lon = float(municipio.sede_lon)
+    else:
+        centro_lat, centro_lon = -34.6037, -58.3816  # Buenos Aires por defecto
+
+    # ── Sede del admin ─────────────────────────────────────────────────────
+    sede = None
+    if municipio.sede_lat and municipio.sede_lon:
+        sede = {
+            "lat":    float(municipio.sede_lat),
+            "lon":    float(municipio.sede_lon),
+            "nombre": f"Sede {municipio.nombre}",
+        }
+
+    return render(request, "admin/mapa_zonas.html", {
+        "subcuadras_json":    subcuadras_json,
+        "vendedores_json":    vendedores_json,
+        "centro_lat":         centro_lat,
+        "centro_lon":         centro_lon,
+        "sede":               sede,
+        "total_subcuadras":   subcuadras_qs.count(),
+        "total_vendedores":   vendedores_qs.count(),
+        "municipio":          municipio,
     })
 
 

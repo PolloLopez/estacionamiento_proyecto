@@ -276,6 +276,20 @@ def editar_municipio(request, municipio_id):
             municipio.segundos_pausa_doble_copia  = _entero("segundos_pausa_doble_copia",  municipio.segundos_pausa_doble_copia)
             municipio.activo                          = request.POST.get("activo") == "on"
             municipio.inspector_ve_sus_infracciones   = request.POST.get("inspector_ve_sus_infracciones") == "on"
+
+            # Coordenadas de la sede municipal (para el mapa de zonas)
+            def _decimal(nombre, fallback):
+                val = request.POST.get(nombre, "").strip()
+                if not val:
+                    return fallback
+                try:
+                    from decimal import Decimal
+                    return Decimal(val)
+                except Exception:
+                    return fallback
+
+            municipio.sede_lat = _decimal("sede_lat", municipio.sede_lat)
+            municipio.sede_lon = _decimal("sede_lon", municipio.sede_lon)
             municipio.reintegro_minutos          = _entero("reintegro_minutos",          municipio.reintegro_minutos)
             municipio.reintegro_max_por_dia      = _entero("reintegro_max_por_dia",      municipio.reintegro_max_por_dia)
             alcance = request.POST.get("reintegro_alcance", "").strip()
