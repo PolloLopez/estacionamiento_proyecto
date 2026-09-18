@@ -152,6 +152,7 @@ urlpatterns = [
     path("admin/impugnaciones/<int:impug_id>/resolver/", views.resolver_impugnacion, name="resolver_impugnacion"),
     path("admin-exenciones/", views.panel_exenciones, name="exenciones"),
     path("admin-subcuadras/", views.gestionar_subcuadras, name="gestionar_subcuadras"),
+    path("superadmin/municipio/<int:municipio_id>/subcuadras/", views.gestionar_subcuadras, name="gestionar_subcuadras_superadmin"),
     path("admin-exenciones/importar/", views.importar_exenciones, name="importar_exenciones"),
     path("admin-usuarios/", views.gestionar_usuarios, name="gestionar_usuarios"),
     path("admin-crear-conductor/", views.crear_conductor, name="crear_conductor"),
