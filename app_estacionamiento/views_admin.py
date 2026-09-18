@@ -203,7 +203,7 @@ def panel_admin(request):
         {
             "titulo": "Configuración",
             "items": [
-                {"label": "📍 Subcuadras GPS",   "url": _reverse("gestionar_subcuadras"),     "badge": None},
+                # Subcuadras GPS lo gestiona el superadmin (no aparece aquí)
                 {"label": "📊 Cobertura",        "url": _reverse("reportes_subcuadras"),      "badge": None},
                 {"label": "💲 Tarifas",          "url": _reverse("gestionar_tarifas"),        "badge": None},
                 {"label": "🕐 Horarios",         "url": _reverse("gestionar_horarios"),       "badge": None},
