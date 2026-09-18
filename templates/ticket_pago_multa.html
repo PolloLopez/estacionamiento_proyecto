@@ -95,9 +95,11 @@
 
 </body>
 <script>
-  // Botón volver: al panel del rol actual
+  var VOLVER_URL = "{{ volver_url }}";
+
+  // Botón volver: al panel del rol actual (no history.back() para no reabrir modal)
   document.getElementById("btn-volver").onclick = function() {
-    history.back();
+    window.location.href = VOLVER_URL;
   };
 
   // Imprimir automáticamente al cargar
@@ -105,9 +107,9 @@
     window.print();
   };
 
-  // Después de imprimir, volver
+  // Después de imprimir, volver al panel sin ?detalle=ID en la URL
   window.onafterprint = function() {
-    history.back();
+    window.location.href = VOLVER_URL;
   };
 </script>
 </html>

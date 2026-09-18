@@ -745,10 +745,24 @@ def ticket_pago_multa(request, infraccion_id):
             "motivo_anulacion":  infraccion.motivo_anulacion or "",
         })
 
+    # URL de retorno según rol, para no depender de history.back() que
+    # puede reabrir el modal si la página anterior tenía ?detalle=ID en la URL.
+    from django.urls import reverse as _rev
+    u = request.user
+    if u.es_admin or u.es_tesorero:
+        volver_url = _rev("admin_infracciones")
+    elif u.es_vendedor:
+        volver_url = _rev("panel_vendedor")
+    elif u.es_inspector:
+        volver_url = _rev("panel_inspectores")
+    else:
+        volver_url = _rev("inicio_usuarios")
+
     return render(request, "ticket_pago_multa.html", {
         "infraccion":      infraccion,
         "cobrado_por":     request.user,
         "texto_plantilla": texto_plantilla,
+        "volver_url":      volver_url,
     })
 
 
