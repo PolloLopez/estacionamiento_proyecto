@@ -203,7 +203,7 @@ def panel_admin(request):
         {
             "titulo": "Configuración",
             "items": [
-                # Subcuadras GPS lo gestiona el superadmin (no aparece aquí)
+                {"label": "📍 Subcuadras",       "url": _reverse("gestionar_subcuadras"),     "badge": None},
                 {"label": "📊 Cobertura",        "url": _reverse("reportes_subcuadras"),      "badge": None},
                 {"label": "💲 Tarifas",          "url": _reverse("gestionar_tarifas"),        "badge": None},
                 {"label": "🕐 Horarios",         "url": _reverse("gestionar_horarios"),       "badge": None},
@@ -2709,18 +2709,33 @@ def responder_observacion(request, rendicion_id):
 # Gestión de subcuadras y coordenadas GPS
 # ─────────────────────────────────────────────────────────────────────────────
 
-@require_role("admin")
-def gestionar_subcuadras(request):
+@require_role("admin", "superadmin")
+def gestionar_subcuadras(request, municipio_id=None):
     """
-    Permite al admin ver, crear, editar y eliminar subcuadras del municipio,
+    Permite al admin (y al superadmin) ver, crear, editar y eliminar subcuadras,
     y asignarles coordenadas GPS haciendo click en un mapa Leaflet/OSM.
+
+    Para el admin municipal: usa su propio municipio (municipio_id ignorado).
+    Para el superadmin:      recibe municipio_id en la URL y gestiona ese municipio.
 
     POST accion=guardar_coordenadas: guarda lat/lon para una subcuadra.
     POST accion=limpiar_coordenadas: elimina lat/lon de una subcuadra.
     POST accion=crear:              crea una nueva subcuadra.
+    POST accion=editar:             cambia calle/altura de una subcuadra existente.
     POST accion=eliminar:           elimina una subcuadra sin infracciones.
+    POST accion=guardar_tipo_zona:  cambia el tipo de zona (pagado/libre).
     """
-    municipio = getattr(request.user, "municipio", None)
+    from app_estacionamiento.models import Municipio as _Municipio
+
+    es_superadmin = getattr(request.user, "es_superadmin", False)
+
+    if es_superadmin and municipio_id:
+        # Superadmin gestionando un municipio específico por URL
+        municipio = get_object_or_404(_Municipio, pk=municipio_id)
+    else:
+        # Admin municipal usa su propio municipio
+        municipio = getattr(request.user, "municipio", None)
+
     if not municipio:
         return redirect("login")
 
@@ -2734,6 +2749,8 @@ def gestionar_subcuadras(request):
                 lon = float(request.POST.get("lon", ""))
             except (TypeError, ValueError):
                 messages.error(request, "Coordenadas inválidas.")
+                if municipio_id:
+                    return redirect("gestionar_subcuadras_superadmin", municipio_id=municipio_id)
                 return redirect("gestionar_subcuadras")
 
             sub = get_object_or_404(Subcuadra, id=subcuadra_id, municipio=municipio)
@@ -2766,6 +2783,26 @@ def gestionar_subcuadras(request):
                     messages.success(request, f"✅ Subcuadra '{calle} {altura}' creada.")
                 else:
                     messages.warning(request, f"Ya existía la subcuadra '{calle} {altura}'.")
+
+        elif accion == "editar":
+            # Permite renombrar una subcuadra (cambiar calle y/o altura).
+            # Solo se puede si el nuevo nombre no entra en conflicto con otra existente.
+            sub = get_object_or_404(
+                Subcuadra, id=request.POST.get("subcuadra_id"), municipio=municipio
+            )
+            nueva_calle  = request.POST.get("calle", "").strip()
+            nueva_altura = request.POST.get("altura", "").strip()
+            if not nueva_calle or not nueva_altura.lstrip("-").isdigit():
+                messages.error(request, "Calle y altura son obligatorias.")
+            elif Subcuadra.objects.filter(
+                municipio=municipio, calle=nueva_calle, altura=int(nueva_altura)
+            ).exclude(pk=sub.pk).exists():
+                messages.error(request, f"Ya existe la subcuadra '{nueva_calle} {nueva_altura}'.")
+            else:
+                sub.calle  = nueva_calle
+                sub.altura = int(nueva_altura)
+                sub.save(update_fields=["calle", "altura"])
+                messages.success(request, f"✅ Subcuadra renombrada a '{sub}'.")
 
         elif accion == "guardar_tipo_zona":
             # Cambia si la subcuadra es zona pagada o zona libre
@@ -2800,26 +2837,32 @@ def gestionar_subcuadras(request):
                 sub.delete()
                 messages.success(request, f"Subcuadra '{nombre}' eliminada.")
 
+        # Redirigir de vuelta a la misma URL (con municipio_id si viene del superadmin)
+        if municipio_id:
+            return redirect("gestionar_subcuadras_superadmin", municipio_id=municipio_id)
         return redirect("gestionar_subcuadras")
 
     # GET: listar subcuadras del municipio
     subcuadras = Subcuadra.objects.filter(municipio=municipio).order_by("calle", "altura")
 
-    # Datos para el mapa: solo las que tienen coordenadas cargadas
+    # Datos para el mapa: las que tienen coordenadas, con tipo_zona para colorearlas
     import json as _json
     marcadores = _json.dumps([
         {
-            "id":     s.id,
-            "nombre": str(s),
-            "lat":    float(s.lat),
-            "lon":    float(s.lon),
+            "id":       s.id,
+            "nombre":   str(s),
+            "lat":      float(s.lat),
+            "lon":      float(s.lon),
+            "tipo_zona": s.tipo_zona,  # "pagado" o "libre" (para el color del pin)
         }
         for s in subcuadras if s.lat is not None and s.lon is not None
     ])
 
     return render(request, "admin/subcuadras.html", {
-        "subcuadras": subcuadras,
-        "marcadores": marcadores,
+        "subcuadras":  subcuadras,
+        "marcadores":  marcadores,
+        "municipio":   municipio,    # para el template (nombre, link de vuelta al superadmin)
+        "municipio_id": municipio_id,  # None si viene del admin municipal
     })
 
 
