@@ -128,6 +128,29 @@
         <input type="hidden" name="subcuadra_id" id="sel-subcuadra" required>
       </div>
 
+      <!-- Banner zona libre (se muestra cuando GPS o cascade detecta tipo_zona=libre) -->
+      <div id="banner-zona-libre" style="display:none; background:#f0fff4; border:1.5px solid #c8e6c9;
+           border-radius:10px; padding:1rem; margin-top:0.5rem; text-align:center;">
+        <p style="font-size:1.1rem; font-weight:700; color:#1b5e20; margin:0 0 0.3rem;">
+          🟢 Zona de estacionamiento libre
+        </p>
+        <p id="txt-zona-libre-nombre" style="font-size:0.9rem; color:#2e7d32; margin:0 0 0.75rem;"></p>
+        <p style="font-size:0.85rem; color:#388e3c; margin:0 0 0.75rem;">
+          No necesitás registrar pago en esta zona.
+        </p>
+        <button type="button" id="btn-confirmar-libre" onclick="confirmarZonaLibre()"
+                class="btn" style="background:#1b5e20; color:#fff; font-size:0.9rem; padding:0.5rem 1.2rem;">
+          ✅ Confirmar ubicación
+        </button>
+        <p id="txt-zona-libre-confirmado" style="display:none; font-size:0.9rem;
+           color:#1b5e20; font-weight:600; margin:0.5rem 0 0;">
+          ✅ ¡Listo! Podés estacionar sin pagar.
+        </p>
+      </div>
+
+      <!-- Sección de pago (se oculta cuando la zona es libre) -->
+      <div id="seccion-pago-estacionar">
+
       <!-- Duración -->
       <div style="margin-bottom:0.75rem;">
         <label style="font-size:0.85rem; font-weight:600;">Duración</label>
@@ -182,6 +205,8 @@
       <button type="submit" class="btn" style="width:100%; font-size:1rem; padding:0.8rem;">
         💳 Pagar con MercadoPago
       </button>
+
+      </div><!-- /seccion-pago-estacionar -->
     </form>
   </div>
   {% endif %}
@@ -310,10 +335,41 @@ document.querySelectorAll('input[type="radio"]').forEach(function(r) {
 });
 
 // ── Cascade Calle → Altura ────────────────────────────────────────
+// tipo_zona: "pagado" | "libre" — determina si se muestra el formulario de pago o el banner
 var SUBCUADRAS = [
-  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}"},
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}", tipo_zona: "{{ s.tipo_zona }}"},
   {% endfor %}
 ];
+
+// Muestra u oculta la sección de pago según el tipo de zona.
+// nombreSubcuadra: string visible para el conductor (ej. "Mitre 200")
+function actualizarVistaSegunZona(tipoZona, nombreSubcuadra) {
+  var seccionPago   = document.getElementById("seccion-pago-estacionar");
+  var bannerLibre   = document.getElementById("banner-zona-libre");
+  var txtNombre     = document.getElementById("txt-zona-libre-nombre");
+  var txtConfirmado = document.getElementById("txt-zona-libre-confirmado");
+  var btnConfirmar  = document.getElementById("btn-confirmar-libre");
+
+  if (tipoZona === "libre") {
+    if (seccionPago) seccionPago.style.display = "none";
+    if (bannerLibre) bannerLibre.style.display = "block";
+    if (txtNombre)   txtNombre.textContent = nombreSubcuadra || "";
+    // Resetear el estado de confirmación cada vez que se detecta una zona nueva
+    if (txtConfirmado) txtConfirmado.style.display = "none";
+    if (btnConfirmar)  btnConfirmar.style.display  = "inline-block";
+  } else {
+    if (seccionPago) seccionPago.style.display = "block";
+    if (bannerLibre) bannerLibre.style.display = "none";
+  }
+}
+
+// Botón "Confirmar ubicación" en zona libre: solo feedback visual, sin llamada al backend.
+function confirmarZonaLibre() {
+  var txtConfirmado = document.getElementById("txt-zona-libre-confirmado");
+  var btnConfirmar  = document.getElementById("btn-confirmar-libre");
+  if (txtConfirmado) txtConfirmado.style.display = "block";
+  if (btnConfirmar)  btnConfirmar.style.display  = "none";
+}
 
 (function initCascade() {
   var selCalle  = document.getElementById("sel-calle");
@@ -336,6 +392,8 @@ var SUBCUADRAS = [
     var calle = selCalle.value;
     selAltura.innerHTML = '<option value="">— Altura —</option>';
     hidden.value = "";
+    // Al cambiar la calle, volvemos a mostrar la sección de pago hasta que se elija altura
+    actualizarVistaSegunZona("pagado");
     if (!calle) { selAltura.disabled = true; return; }
 
     var filtradas = SUBCUADRAS.filter(function(s) { return s.calle === calle; });
@@ -346,29 +404,42 @@ var SUBCUADRAS = [
       selAltura.appendChild(opt);
     });
     selAltura.disabled = false;
-    // Si hay una sola altura, seleccionarla automáticamente
+    // Si hay una sola altura, seleccionarla automáticamente (y verificar su tipo_zona)
     if (filtradas.length === 1) {
       selAltura.value = filtradas[0].id;
       hidden.value = filtradas[0].id;
+      actualizarVistaSegunZona(filtradas[0].tipo_zona, filtradas[0].calle + " " + filtradas[0].altura);
     }
   });
 
   selAltura.addEventListener("change", function() {
     hidden.value = selAltura.value;
+    if (selAltura.value) {
+      // Verificar tipo_zona de la subcuadra seleccionada manualmente
+      var sub = SUBCUADRAS.find(function(s) { return s.id == selAltura.value; });
+      if (sub) actualizarVistaSegunZona(sub.tipo_zona, sub.calle + " " + sub.altura);
+    } else {
+      actualizarVistaSegunZona("pagado");
+    }
   });
 })();
 
-// Preseleccionar subcuadra por id (usado por GPS)
-function seleccionarSubcuadra(id) {
+// Preseleccionar subcuadra por id (usado por GPS) y actualizar la vista según tipo_zona.
+function seleccionarSubcuadra(id, tipoZona) {
   var sub = SUBCUADRAS.find(function(s) { return s.id == id; });
   if (!sub) return;
+  var tipo = tipoZona || sub.tipo_zona || "pagado";
+
   var selCalle  = document.getElementById("sel-calle");
   var selAltura = document.getElementById("sel-altura");
   var hidden    = document.getElementById("sel-subcuadra");
   selCalle.value = sub.calle;
-  selCalle.dispatchEvent(new Event("change")); // repobla alturas
+  selCalle.dispatchEvent(new Event("change")); // repobla alturas (también resetea actualizarVistaSegunZona)
   selAltura.value = id;
   hidden.value = id;
+
+  // Actualizar la vista según zona (sobreescribe el reset del dispatchEvent de arriba)
+  actualizarVistaSegunZona(tipo, sub.calle + " " + sub.altura);
 }
 
 // ── GPS ───────────────────────────────────────────────────────────
@@ -399,9 +470,16 @@ function detectarGPS() {
           icono.textContent = "📍";
           btn.disabled = false;
           if (data.id) {
-            seleccionarSubcuadra(data.id);
-            texto.textContent = "✅ " + data.nombre;
-            txt.textContent = "Subcuadra detectada automáticamente.";
+            // Preseleccionar subcuadra en cascade Y actualizar vista según tipo_zona
+            seleccionarSubcuadra(data.id, data.tipo_zona);
+
+            if (data.tipo_zona === "libre") {
+              texto.textContent = "🟢 Zona libre: " + data.nombre;
+              txt.textContent = "Esta zona no requiere pago.";
+            } else {
+              texto.textContent = "✅ " + data.nombre;
+              txt.textContent = "Subcuadra detectada automáticamente.";
+            }
           } else {
             texto.textContent = "Estacionar en mi ubicación actual";
             txt.textContent = "No se encontró subcuadra cercana. Seleccioná manualmente.";

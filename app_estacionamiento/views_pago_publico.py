@@ -293,6 +293,13 @@ def iniciar_pago_estacionamiento(request):
             "mensaje": "Subcuadra no válida."
         })
 
+    # Las zonas libres no requieren pago — no se debe llegar aquí por el frontend,
+    # pero lo validamos también en el backend por seguridad.
+    if subcuadra.tipo_zona == "libre":
+        return render(request, "pago_publico/error.html", {
+            "mensaje": "Esa zona es de estacionamiento libre. No necesitás registrar pago."
+        })
+
     # Validar duración
     try:
         duracion = Decimal(request.POST.get("duracion_horas", ""))
@@ -467,10 +474,11 @@ def subcuadra_cercana_publica(request):
     # Convertir Decimal a float para poder operar con las coordenadas del request (que son float)
     mas_cercana = min(subcuadras, key=lambda s: (float(s.lat) - lat) ** 2 + (float(s.lon) - lon) ** 2)
     return JsonResponse({
-        "id":     mas_cercana.id,
-        "nombre": str(mas_cercana),
-        "calle":  mas_cercana.calle,
-        "altura": mas_cercana.altura,
+        "id":       mas_cercana.id,
+        "nombre":   str(mas_cercana),
+        "calle":    mas_cercana.calle,
+        "altura":   mas_cercana.altura,
+        "tipo_zona": mas_cercana.tipo_zona,  # "pagado" o "libre"
     })
 
 
