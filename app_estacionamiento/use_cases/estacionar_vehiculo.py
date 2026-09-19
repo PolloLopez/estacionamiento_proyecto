@@ -13,6 +13,7 @@ from app_estacionamiento.services.horarios import obtener_tarifa_hora
 from app_estacionamiento.services.saldo import debitar_saldo_conductor
 from app_estacionamiento.services.infracciones import calcular_estado_tolerancia
 from app_estacionamiento.services.reintegro import aplicar_reintegro
+from app_estacionamiento.services.descuentos_verificados import aplicar_descuento_conductor
 
 REDIRECT_OK        = "inicio_usuarios"
 REDIRECT_SIN_SALDO = "mp_iniciar_carga"
@@ -54,7 +55,12 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
 
     tarifa_obj  = Tarifa.objects.filter(municipio=usuario.municipio).first()
     tarifa_hora = obtener_tarifa_hora(tarifa_obj, vehiculo)
-    costo       = duracion * tarifa_hora
+    costo_base  = duracion * tarifa_hora
+
+    # Descuento para conductores verificados (configurado por el superadmin).
+    # Se calcula antes del lock — es solo aritmética, sin race condition posible.
+    resultado_descuento = aplicar_descuento_conductor(costo_base, usuario, usuario.municipio)
+    costo = resultado_descuento["costo_final"]
 
     relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
     warnings   = VehiculoPolicy.generar_warnings(usuario, vehiculo, relaciones)
@@ -158,6 +164,8 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
         "ok": True,
         "redirect": REDIRECT_OK,
         "warnings": warnings,
-        "info_infraccion": info_infraccion,
-        "info_reintegro":  info_reintegro,
+        "info_infraccion":  info_infraccion,
+        "info_reintegro":   info_reintegro,
+        "descuento_pct":    resultado_descuento["descuento_pct"],
+        "descuento_motivo": resultado_descuento["motivo"],
     }

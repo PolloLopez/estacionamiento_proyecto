@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-19 (sesión 10 — continuación)
+Última actualización: 2026-09-19 (sesión 10 — continuación 2)
 
 ---
 
@@ -18,8 +18,7 @@
 
 ## 🟡 Media prioridad
 
-- **SIA: revalidación automática cada 6 meses** — cron o management command que marque vencimientos. Flag por implementar.
-- **Descuento para frentistas** — según autorización de admin (BooleanField en VehiculoUsuario o Vehiculo) con porcentaje configurable.
+- **SIA: configurar cron en Railway** — el management command `revocar_exenciones_vencidas` ya existe. Pendiente: activarlo como cron job diario en Railway (panel → Cron Jobs → `python manage.py revocar_exenciones_vencidas`).
 - **Inspector — impresora BLE: no volver a pedir vinculación al imprimir**
   Workaround actual: reconectar por nombre. Evaluar si Chrome corrigió el bug de `getDevices()` o documentar como límite del navegador.
   Archivo: `static/.../js/impresora_bluetooth.js` (función `reconectarImpresora`).
@@ -49,12 +48,19 @@
 
 ## ✅ Resuelto
 
-### Sesión 2026-09-19 (sesión 10 cont.) — GPS en Infraccion + preferencias de notificaciones
+### Sesión 2026-09-19 (sesión 10 cont. 2) — Descuento para conductores verificados
+
+| Ítem | Detalle |
+|---|---|
+| Descuento para conductores verificados | `Municipio.descuento_verificados_pct` (DecimalField, null=sin módulo) + `Municipio.descuento_solo_vecinos` (BooleanField). Migración 0082. Nuevo service `services/descuentos_verificados.py` con `calcular_descuento_conductor()` + `aplicar_descuento_conductor()`. Aplicado en `use_cases/estacionar_vehiculo.py` antes del débito de saldo. En el GET de estacionar: tarifa efectiva ya incluye el descuento → las opciones de duración muestran el precio real. Badge verde "X% de descuento" visible en el form si aplica. Config superadmin en `editar_municipio.html`. |
+
+### Sesión 2026-09-19 (sesión 10 cont.) — GPS en Infraccion + preferencias de notificaciones + SIA
 
 | Ítem | Detalle |
 |---|---|
 | Geolocalización inspector guardada en BD | `Infraccion.gps_lat/gps_lon/gps_acc` (migración 0080). `crear_infraccion()` los persiste. Panel admin de infracciones: modal muestra "📍 Ver en mapa" (OpenStreetMap) cuando hay coordenadas. |
 | Preferencias de notificaciones del conductor | `Notificacion.tipo` CharField (migración 0081). `Usuario.notif_verificacion/exencion/sugerencia` BooleanFields. Nuevo service `services/notificaciones.py` con `enviar_notificacion()` que respeta las preferencias. Vistas admin y superadmin migradas al helper. View `guardar_preferencias_notificaciones`. UI colapsable en footer del panel conductor. |
+| SIA revalidación 6 meses | Auto-fecha `vigencia_exencion = hoy + 180 días` al aprobar exención discapacitado (admin panel). Management command `revocar_exenciones_vencidas` con `--dry-run`. Alertas en `exenciones.html`: rojo (ya vencidas), amarillo (próximas 30 días). Pendiente: activar como cron job en Railway. |
 
 ### Sesión 2026-09-19 (sesión 10) — admin_puede_editar_plantillas + BLE segunda copia + landing/testing
 

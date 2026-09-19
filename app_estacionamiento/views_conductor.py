@@ -50,6 +50,7 @@ from .models import (
 )
 from .use_cases.estacionar_vehiculo import ejecutar_estacionamiento
 from .services.infracciones import calcular_descuento_infraccion
+from .services.descuentos_verificados import calcular_descuento_conductor
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
 from .use_cases.pagar_infraccion import ejecutar as pagar_infraccion_uc
 from .services.horarios import (
@@ -699,7 +700,18 @@ def estacionar_vehiculo(request):
     # informamos al conductor antes de que intente enviar el formulario.
     permitido_get, msg_horario_get = puede_estacionar_ahora(usuario.municipio)
 
-    opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto)
+    # Descuento para verificados: ajustar la tarifa mostrada si aplica.
+    # Así las opciones de duración ya muestran el precio real que se va a debitar.
+    descuento_pct = calcular_descuento_conductor(usuario, usuario.municipio)
+    if descuento_pct > 0:
+        factor = 1 - descuento_pct / 100
+        tarifa_hora_auto_efectiva = (tarifa_hora_auto * factor).quantize(Decimal("0.01"))
+        tarifa_hora_moto_efectiva = (tarifa_hora_moto * factor).quantize(Decimal("0.01"))
+    else:
+        tarifa_hora_auto_efectiva = Decimal(str(tarifa_hora_auto))
+        tarifa_hora_moto_efectiva = Decimal(str(tarifa_hora_moto))
+
+    opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto_efectiva)
 
     # Subcuadras disponibles para GPS / selección manual.
     # Excluimos "Zona Única" (el default silencioso) para no confundir al conductor.
@@ -710,9 +722,10 @@ def estacionar_vehiculo(request):
     return render(request, "usuarios/estacionar_vehiculo.html", {
         "vehiculos":              vehiculos,
         "usuario":                usuario,
-        "tarifa_hora":            tarifa_hora_auto,
-        "tarifa_hora_auto":       tarifa_hora_auto,
-        "tarifa_hora_moto":       tarifa_hora_moto,
+        "tarifa_hora":            tarifa_hora_auto_efectiva,
+        "tarifa_hora_auto":       tarifa_hora_auto_efectiva,
+        "tarifa_hora_moto":       tarifa_hora_moto_efectiva,
+        "descuento_pct":          descuento_pct,
         "patente_preseleccionada": patente_preseleccionada,
         "opciones_duracion":      opciones_duracion,
         "subcuadras":             subcuadras,
