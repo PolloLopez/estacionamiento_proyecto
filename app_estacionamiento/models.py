@@ -179,6 +179,25 @@ class Usuario(AbstractUser):
         help_text="El admin lo activa al establecer una contraseña temporal.",
     )
 
+    # 🔔 Preferencias de notificaciones del conductor
+    # Cada flag controla si el conductor recibe ese tipo de notificación en su panel.
+    # Solo relevante para usuarios con rol conductor; se ignoran en otros roles.
+    notif_verificacion = models.BooleanField(
+        default=True,
+        verbose_name="Notificaciones de verificación de identidad",
+        help_text="Avisa cuando el admin aprueba o rechaza tu solicitud de verificación.",
+    )
+    notif_exencion = models.BooleanField(
+        default=True,
+        verbose_name="Notificaciones de exención",
+        help_text="Avisa cuando el admin aprueba o rechaza tu solicitud de exención.",
+    )
+    notif_sugerencia = models.BooleanField(
+        default=True,
+        verbose_name="Notificaciones de sugerencias",
+        help_text="Avisa cuando el superadmin actualiza el estado de una sugerencia tuya.",
+    )
+
     # 🔐 Django admin / permisos
     #is_staff → acceso admin Django
     #es_admin → lógica de negocio
@@ -967,6 +986,28 @@ class Infraccion(models.Model):
     # Observación automática generada cuando el SIA no pudo verificarse
     sia_observacion   = models.TextField(blank=True, default="")
 
+    # ── Geolocalización del inspector al labrar el acta ───────────────────────
+    # Se captura desde el navegador del inspector (GPS del dispositivo móvil).
+    # La misma coordenada ya se estampa como marca de agua en la foto;
+    # guardarlo también en la BD permite filtros, reportes y auditoría sin
+    # necesidad de procesar la imagen.
+    # gps_acc: precisión en metros (puede ser alto si hay poca señal).
+    gps_lat = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        null=True, blank=True,
+        verbose_name="Latitud GPS (inspector)",
+    )
+    gps_lon = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        null=True, blank=True,
+        verbose_name="Longitud GPS (inspector)",
+    )
+    gps_acc = models.DecimalField(
+        max_digits=8, decimal_places=1,
+        null=True, blank=True,
+        verbose_name="Precisión GPS (metros)",
+    )
+
     def save(self, *args, **kwargs):
         if not self.municipio:
             if self.inspector and self.inspector.municipio:
@@ -1027,10 +1068,19 @@ class DiaEspecial(models.Model):
 
 
 class Notificacion(models.Model):
+    # Tipos de notificación — coincide con los flags de preferencia en Usuario.
+    # Vacío ("") = sin clasificar (compatibilidad con notificaciones antiguas).
+    TIPOS = [
+        ("verificacion", "Verificación de identidad"),
+        ("exencion",     "Exención"),
+        ("sugerencia",   "Sugerencia"),
+    ]
+
     destinatario = models.ForeignKey(Usuario, on_delete=models.CASCADE)  # Usuario
     mensaje = models.TextField()
-    fecha = models.DateTimeField(auto_now_add=True)
-    leida = models.BooleanField(default=False)
+    tipo    = models.CharField(max_length=20, choices=TIPOS, blank=True, default="")
+    fecha   = models.DateTimeField(auto_now_add=True)
+    leida   = models.BooleanField(default=False)
 
     def __str__(self):
         # Usamos 'correo' porque los tests esperan ese campo en Usuario

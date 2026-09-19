@@ -204,6 +204,18 @@ def crear_infraccion(
             patente=patente, inspector=inspector, subcuadra=subcuadra,
         )
 
+    # Convertir coordenadas GPS a Decimal para guardar en el modelo.
+    # Pueden venir como string desde el POST ("" = sin señal → None).
+    def _a_decimal(valor):
+        try:
+            return Decimal(str(valor)) if valor is not None else None
+        except Exception:
+            return None
+
+    lat_decimal = _a_decimal(gps_lat)
+    lon_decimal = _a_decimal(gps_lon)
+    acc_decimal = _a_decimal(gps_acc)
+
     # Intentar crear con foto. Si el storage (Cloudinary) falla, guardar sin foto
     # para no perder el acta. El inspector puede agregar la foto manualmente si hace falta.
     try:
@@ -215,6 +227,9 @@ def crear_infraccion(
             estacionamiento=estacionamiento,
             foto=foto_final,
             monto=monto,
+            gps_lat=lat_decimal,
+            gps_lon=lon_decimal,
+            gps_acc=acc_decimal,
         )
     except Exception as e:
         logger.error("Error al guardar foto de infraccion (¿Cloudinary?): %s", e)
@@ -226,6 +241,9 @@ def crear_infraccion(
             estacionamiento=estacionamiento,
             foto=None,
             monto=monto,
+            gps_lat=lat_decimal,
+            gps_lon=lon_decimal,
+            gps_acc=acc_decimal,
         )
 
     # Trazabilidad: marcar que la última verificación generó infracción

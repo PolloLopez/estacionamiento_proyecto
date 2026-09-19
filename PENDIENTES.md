@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-19 (sesión 10)
+Última actualización: 2026-09-19 (sesión 10 — continuación)
 
 ---
 
@@ -18,33 +18,13 @@
 
 ## 🟡 Media prioridad
 
-- **`/pagar/` anónimo: sin restricción horaria** — confirmado por Leandro, no hay que bloquear el pago anónimo por horario. Cerrado.
-
-- **Bug #9 — Preguntas de negocio (pendiente respuesta de Leandro)**
-  - Notificaciones: ¿el conductor puede activar/desactivar qué notificaciones recibe? 
-    - Respuesta: SI
-  - Pago fuera de horario: ¿un usuario no registrado puede pagar una infracción fuera de horario?
-    - Respuesta: SI
-  - Comentario Django en panel superadmin de plantillas: ¿es un TODO o se puede borrar?
-    - Respuesta: Entiendo que Se puede borrar
-  - Facturación de la plataforma: ¿cómo se calcula el cobro mensual al municipio?
-    - Respuesta: Como consideras que debe ser, teniendo en cuenta el hosting y soporte. (sueldo minimo de desarrollador y soporte)
-
-- **Bug #10 — Features para texto de ventas (pendiente respuesta de Leandro)**
-  - SIA: revalidación cada 6 meses — ¿implementar flag/cron?
-  - Respuesta: Si
-  - Precio diferido/descuento para vecinos (frentistas) — ¿modelo de descuento automático?
-  - Respuesta: Segun autorizacion de admin si esta aprobado y el porcentaje
-  - Geolocalización del inspector al verificar — ¿guardar lat/lon en `Infraccion`?
-  - Respuesta: Siempre, como en la imagen de la infraccion (la imagen lleva geoloclizacion, dia, horario e inspector)
-
+- **SIA: revalidación automática cada 6 meses** — cron o management command que marque vencimientos. Flag por implementar.
+- **Descuento para frentistas** — según autorización de admin (BooleanField en VehiculoUsuario o Vehiculo) con porcentaje configurable.
 - **Inspector — impresora BLE: no volver a pedir vinculación al imprimir**
-  `imprimirActa()` hace `reconectarImpresora()` silencioso primero. Si falla (bug conocido de Chrome con `getDevices()`), abre el diálogo de selección igual.
-  Workaround actual implementado: reconectar por nombre (`requestDevice` pre-filtrado). Evaluar si Chrome corrigió el bug o documentar como límite del navegador.
+  Workaround actual: reconectar por nombre. Evaluar si Chrome corrigió el bug de `getDevices()` o documentar como límite del navegador.
   Archivo: `static/.../js/impresora_bluetooth.js` (función `reconectarImpresora`).
-
-- **Comisiones de vendedores — test completo del flujo**
-  El flujo: rendición → `LiquidacionComision` creada (estado=pendiente) → tesorero deposita → vendedor certifica. Los fixes de sesión 8 cubren el acceso del tesorero y la variable de template. Pendiente: hacer una prueba end-to-end completa con un ciclo real en Railway (crear rendición → tesorero deposita → vendedor certifica).
+- **Comisiones de vendedores — test end-to-end en Railway**
+  Pendiente: prueba manual (rendición → tesorero deposita → vendedor certifica).
 
 ---
 
@@ -68,6 +48,13 @@
 ---
 
 ## ✅ Resuelto
+
+### Sesión 2026-09-19 (sesión 10 cont.) — GPS en Infraccion + preferencias de notificaciones
+
+| Ítem | Detalle |
+|---|---|
+| Geolocalización inspector guardada en BD | `Infraccion.gps_lat/gps_lon/gps_acc` (migración 0080). `crear_infraccion()` los persiste. Panel admin de infracciones: modal muestra "📍 Ver en mapa" (OpenStreetMap) cuando hay coordenadas. |
+| Preferencias de notificaciones del conductor | `Notificacion.tipo` CharField (migración 0081). `Usuario.notif_verificacion/exencion/sugerencia` BooleanFields. Nuevo service `services/notificaciones.py` con `enviar_notificacion()` que respeta las preferencias. Vistas admin y superadmin migradas al helper. View `guardar_preferencias_notificaciones`. UI colapsable en footer del panel conductor. |
 
 ### Sesión 2026-09-19 (sesión 10) — admin_puede_editar_plantillas + BLE segunda copia + landing/testing
 

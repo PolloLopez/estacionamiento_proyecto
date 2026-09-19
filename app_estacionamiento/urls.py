@@ -76,6 +76,7 @@ urlpatterns = [
     path("infracciones/<int:infraccion_id>/impugnar/", views.crear_impugnacion, name="crear_impugnacion"),
     path("estacionamiento/<int:est_id>/renovar/", views.renovar_estacionamiento, name="usuarios_renovar_estacionamiento"),
     path("notificacion/<int:notif_id>/leida/", views.marcar_notificacion_leida, name="marcar_notificacion_leida"),
+    path("notificaciones/preferencias/", views.guardar_preferencias_notificaciones, name="guardar_preferencias_notificaciones"),
     path("saldo/transferir/", views.transferir_saldo, name="transferir_saldo"),
     path("saldo/transferencias/", views.transferencias_saldo, name="transferencias_saldo"),
     path("saldo/transferencias/<int:transf_id>/responder/", views.responder_transferencia, name="responder_transferencia"),

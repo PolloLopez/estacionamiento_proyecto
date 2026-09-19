@@ -313,6 +313,48 @@
 })();
 </script>
 
+<!-- ── Preferencias de notificaciones (colapsable, al pie) ─────────── -->
+{% if request.user.es_conductor %}
+<details style="margin-top:1.5rem; border-top:1px solid var(--color-border); padding-top:1rem;">
+  <summary style="cursor:pointer; font-size:0.82rem; font-weight:600;
+                  color:var(--color-text-muted); list-style:none; user-select:none;
+                  display:flex; align-items:center; gap:0.4rem;">
+    🔔 Notificaciones
+  </summary>
+  <form method="post" action="{% url 'guardar_preferencias_notificaciones' %}"
+        style="margin-top:0.6rem; padding:0.9rem 1rem;
+               background:var(--color-surface); border-radius:8px;">
+    {% csrf_token %}
+    <p style="margin:0 0 0.75rem; font-size:0.82rem; color:var(--color-text-muted);">
+      Elegí qué tipo de notificaciones querés recibir en este panel:
+    </p>
+    <div style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.88rem;">
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="notif_verificacion"
+               {% if request.user.notif_verificacion %}checked{% endif %}>
+        Verificación de identidad (aprobada / rechazada)
+      </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="notif_exencion"
+               {% if request.user.notif_exencion %}checked{% endif %}>
+        Exención (aprobada / rechazada)
+      </label>
+      <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+        <input type="checkbox" name="notif_sugerencia"
+               {% if request.user.notif_sugerencia %}checked{% endif %}>
+        Estado de sugerencias enviadas
+      </label>
+    </div>
+    <button type="submit"
+            style="margin-top:0.9rem; padding:0.4rem 1.1rem; font-size:0.83rem;
+                   background:var(--color-primary); color:#fff;
+                   border:none; border-radius:6px; cursor:pointer;">
+      Guardar preferencias
+    </button>
+  </form>
+</details>
+{% endif %}
+
 <!-- ── Tutorial conductor (colapsable, al pie) ───────────────────── -->
 <details style="margin-top:2rem; border-top:1px solid var(--color-border); padding-top:1rem;">
   <summary style="cursor:pointer; font-size:0.82rem; font-weight:600;

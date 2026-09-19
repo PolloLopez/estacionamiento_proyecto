@@ -35,6 +35,7 @@ from django.core.validators import validate_email
 from .decorators import require_role
 from .services.caja import generar_cierre_caja
 from .services.infracciones import cobrar_infraccion_efectivo, MEDIOS_VALIDOS_COBRO
+from .services.notificaciones import enviar_notificacion
 from .services.saldo import cargar_saldo_conductor
 from .utils import sanitizar_patente
 from .models import (
@@ -1802,9 +1803,10 @@ def resolver_verificacion(request, solicitud_id):
             nombre=solicitud.nombre or solicitud.usuario.correo,
             aprobado=True,
         )
-        Notificacion.objects.create(
+        enviar_notificacion(
             destinatario=solicitud.usuario,
             mensaje="✅ ¡Tu identidad fue verificada! El municipio confirmó tu cuenta.",
+            tipo="verificacion",
         )
 
     elif accion == "rechazar":
@@ -1825,9 +1827,10 @@ def resolver_verificacion(request, solicitud_id):
             motivo=notas,
         )
         motivo_txt = f" Motivo: {notas}" if notas else ""
-        Notificacion.objects.create(
+        enviar_notificacion(
             destinatario=solicitud.usuario,
             mensaje=f"❌ Tu verificación fue rechazada.{motivo_txt} Podés reenviar tu solicitud.",
+            tipo="verificacion",
         )
 
     # ── Exención ─────────────────────────────────────────────────────────────
@@ -1864,9 +1867,10 @@ def resolver_verificacion(request, solicitud_id):
             f"✅ Exención '{tipo_label}' aplicada a {vehiculo.patente}."
             + (" Global." if es_global else f" {len(subcuadra_ids)} subcuadra(s)."),
         )
-        Notificacion.objects.create(
+        enviar_notificacion(
             destinatario=solicitud.usuario,
             mensaje=f"✅ Tu exención fue aprobada para el vehículo {vehiculo.patente}.",
+            tipo="exencion",
         )
 
     elif accion == "rechazar_exencion":
@@ -1879,9 +1883,10 @@ def resolver_verificacion(request, solicitud_id):
         messages.warning(request, f"❌ Exención rechazada para {vehiculo_patente}.")
 
         motivo_txt = f" Motivo: {notas_exencion_admin}" if notas_exencion_admin else ""
-        Notificacion.objects.create(
+        enviar_notificacion(
             destinatario=solicitud.usuario,
             mensaje=f"❌ Tu solicitud de exención fue rechazada.{motivo_txt}",
+            tipo="exencion",
         )
 
     return redirect("gestionar_verificaciones")
