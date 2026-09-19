@@ -65,6 +65,7 @@ from .views_vendedor import (
 from .views_conductor import (
     inicio_usuarios,
     marcar_notificacion_leida,
+    guardar_preferencias_notificaciones,
     solicitar_verificacion,
     pagar_infraccion,
     agregar_vehiculo,

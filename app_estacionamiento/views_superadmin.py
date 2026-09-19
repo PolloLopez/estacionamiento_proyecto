@@ -28,6 +28,7 @@ from django.utils import timezone
 from .decorators import require_role
 from .views_admin import _error_password
 from .models import CierreCaja, Estacionamiento, LiquidacionPlataforma, ModuloMunicipio, Municipio, Notificacion, PlantillaDocumento, Rendicion, Subcuadra, SugerenciaMejora, Usuario, Vehiculo
+from .services.notificaciones import enviar_notificacion
 from .utils import sanitizar_patente
 
 
@@ -1122,12 +1123,13 @@ def gestionar_sugerencia(request, sugerencia_id):
                 "descartada":   "descartada",
             }
             label = etiquetas.get(nuevo_estado, nuevo_estado)
-            Notificacion.objects.create(
+            enviar_notificacion(
                 destinatario = sugerencia.usuario,
                 mensaje      = (
                     f"Tu sugerencia «{sugerencia.titulo}» pasó a estado: {label}."
                     + (f" Respuesta: {respuesta}" if respuesta else "")
                 ),
+                tipo="sugerencia",
             )
 
         messages.success(request, "Sugerencia actualizada.")

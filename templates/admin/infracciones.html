@@ -96,7 +96,10 @@
                 data-estado="{{ inf.estado }}"
                 data-foto="{% if inf.foto %}{{ inf.foto.url }}{% endif %}"
                 data-motivo-anulacion="{{ inf.motivo_anulacion|default:'' }}"
-                data-comprobante="{% if inf.estado == 'pagada' %}{% url 'comprobante_infraccion' inf.id %}{% endif %}">
+                data-comprobante="{% if inf.estado == 'pagada' %}{% url 'comprobante_infraccion' inf.id %}{% endif %}"
+                data-gps-lat="{{ inf.gps_lat|default:'' }}"
+                data-gps-lon="{{ inf.gps_lon|default:'' }}"
+                data-gps-acc="{{ inf.gps_acc|default:'' }}">
               <td style="color:var(--color-text-muted); font-size:0.8rem;">{{ inf.id }}</td>
               <td><strong>{{ inf.vehiculo.patente }}</strong></td>
               <td style="font-size:0.88rem;">{{ inf.inspector.nombre|default:inf.inspector.correo }}</td>
@@ -213,6 +216,17 @@
       <div id="m-motivo-anulacion" style="color:#721c24; margin-top:0.25rem;"></div>
     </div>
 
+    <!-- GPS del inspector (visible solo si se capturó) -->
+    <div id="m-gps-wrap" style="display:none; margin-bottom:1.2rem;">
+      <div style="font-size:0.75rem; color:var(--color-text-muted); font-weight:700;
+                  text-transform:uppercase; letter-spacing:.05em; margin-bottom:0.3rem;">
+        📍 Ubicación del inspector
+      </div>
+      <a id="m-gps-link" href="#" target="_blank" rel="noopener"
+         style="font-size:0.88rem; color:var(--color-primary);">Ver en mapa</a>
+      <span id="m-gps-acc" style="font-size:0.78rem; color:var(--color-text-muted); margin-left:0.5rem;"></span>
+    </div>
+
     <!-- Acciones: pendiente -->
     <div id="m-acciones-pendiente" style="display:none;">
       <hr style="border:none; border-top:1px solid var(--color-border); margin:0 0 1.2rem;">
@@ -321,6 +335,18 @@
       motivoWrap.style.display = "block";
     } else {
       motivoWrap.style.display = "none";
+    }
+
+    // GPS del inspector
+    var gpsWrap = document.getElementById("m-gps-wrap");
+    var gpsLink = document.getElementById("m-gps-link");
+    var gpsAcc  = document.getElementById("m-gps-acc");
+    if (d.gpsLat && d.gpsLon) {
+      gpsLink.href = "https://www.openstreetmap.org/?mlat=" + d.gpsLat + "&mlon=" + d.gpsLon + "#map=17/" + d.gpsLat + "/" + d.gpsLon;
+      gpsAcc.textContent = d.gpsAcc ? "(±" + parseFloat(d.gpsAcc).toFixed(0) + " m)" : "";
+      gpsWrap.style.display = "block";
+    } else {
+      gpsWrap.style.display = "none";
     }
 
     // Acciones

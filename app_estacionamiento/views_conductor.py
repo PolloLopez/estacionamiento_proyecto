@@ -1298,3 +1298,27 @@ def mis_sugerencias(request):
     return render(request, "usuarios/mis_sugerencias.html", {
         "sugerencias": sugerencias,
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Preferencias de notificaciones del conductor
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("conductor")
+def guardar_preferencias_notificaciones(request):
+    """
+    Permite al conductor activar o desactivar cada tipo de notificación.
+    Solo acepta POST (el formulario está en inicio_usuarios.html).
+    """
+    if request.method != "POST":
+        return redirect("inicio_usuarios")
+
+    usuario = request.user
+    # Los checkboxes no envían nada si están desmarcados → valor "on" si marcado
+    usuario.notif_verificacion = request.POST.get("notif_verificacion") == "on"
+    usuario.notif_exencion     = request.POST.get("notif_exencion")     == "on"
+    usuario.notif_sugerencia   = request.POST.get("notif_sugerencia")   == "on"
+    usuario.save(update_fields=["notif_verificacion", "notif_exencion", "notif_sugerencia"])
+
+    messages.success(request, "✅ Preferencias de notificaciones guardadas.")
+    return redirect("inicio_usuarios")
