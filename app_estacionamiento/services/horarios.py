@@ -52,7 +52,8 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
     Verifica si el horario del municipio permite estacionar en este momento.
     Tiene en cuenta días especiales (feriados) y el horario semanal configurado.
 
-    Usa caché de 1 hora para evitar queries repetidas en cada verificación.
+    Usa caché de 60 segundos (clave por minuto) para evitar queries repetidas
+    sin dar margen a servir "permitido" fuera del horario real.
 
     Parámetros:
         bloquear_sin_horario: si True, devuelve False cuando no hay HorarioEstacionamiento
@@ -72,7 +73,10 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
     hoy_dia     = ahora.weekday()   # 0=Lunes … 6=Domingo
     hora_actual = ahora.time()
 
-    cache_key        = f"puede_estacionar_{municipio.id}_{hoy_fecha}_{ahora.hour}"
+    # Clave por minuto para no servir "permitido" cuando el horario acaba de terminar.
+    # Un caché por hora permitía hasta ~59 min de deriva post-cierre.
+    minuto_actual = ahora.strftime("%H%M")
+    cache_key     = f"puede_estacionar_{municipio.id}_{hoy_fecha}_{minuto_actual}"
     resultado_cached = cache.get(cache_key)
     if resultado_cached is not None:
         return resultado_cached
@@ -86,7 +90,7 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
             False,
             f"Hoy es {dia_especial.descripcion}. No hay cobro de estacionamiento.",
         )
-        cache.set(cache_key, resultado, timeout=3600)
+        cache.set(cache_key, resultado, timeout=60)
         return resultado
 
     # Horario semanal para el día actual.
@@ -104,7 +108,7 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
             return (False, "No hay horario de cobro configurado para hoy.")
         # Para conductores: sin horario = libre de cobro todo el día
         resultado = (True, None)
-        cache.set(cache_key, resultado, timeout=3600)
+        cache.set(cache_key, resultado, timeout=60)
         return resultado
 
     if hora_actual < horario.hora_inicio or hora_actual > horario.hora_fin:
@@ -117,11 +121,11 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
                 f"Actualmente son las {hora_actual.strftime('%H:%M')}."
             ),
         )
-        cache.set(cache_key, resultado, timeout=3600)
+        cache.set(cache_key, resultado, timeout=60)
         return resultado
 
     resultado = (True, None)
-    cache.set(cache_key, resultado, timeout=3600)
+    cache.set(cache_key, resultado, timeout=60)
     return resultado
 
 
