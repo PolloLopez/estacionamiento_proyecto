@@ -99,6 +99,18 @@
           </div>
 
           <div style="margin-bottom:0.75rem;">
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <input type="checkbox" name="admin_puede_editar_plantillas"
+                     {% if municipio.admin_puede_editar_plantillas %}checked{% endif %}>
+              <span style="font-size:0.85rem; font-weight:600;">Admin municipal puede editar plantillas de comprobantes</span>
+            </label>
+            <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+              Si está activado, el admin ve la sección "📄 Plantillas" en su panel y puede personalizar
+              los textos de actas e infracciones. Por defecto solo el superadmin puede hacerlo.
+            </small>
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Monto mínimo de carga MP ($)</label>
             <input type="number" name="monto_minimo_carga" min="1" step="1"
                    value="{{ municipio.monto_minimo_carga }}"

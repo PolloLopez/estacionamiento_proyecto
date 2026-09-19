@@ -342,6 +342,15 @@ class Municipio(models.Model):
             "infracciones, el admin las gestiona."
         ),
     )
+    admin_puede_editar_plantillas = models.BooleanField(
+        default=False,
+        verbose_name="Admin puede editar plantillas de comprobantes",
+        help_text=(
+            "Si está activo, el admin municipal puede editar los textos de "
+            "encabezado/cuerpo/pie de los comprobantes de su municipio. "
+            "Por defecto solo el superadmin puede hacerlo."
+        ),
+    )
 
     # ── Coordenadas de la sede municipal ────────────────────────────────────────
     # Usadas para mostrar la oficina del admin en el mapa de zonas.

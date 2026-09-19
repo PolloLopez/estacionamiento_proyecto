@@ -46,6 +46,7 @@ from .models import (
     ModuloMunicipio,
     MovimientoCaja,
     Notificacion,
+    PlantillaDocumento,
     Rendicion,
     LiquidacionComision,
     SolicitudVerificacion,
@@ -208,6 +209,11 @@ def panel_admin(request):
                 {"label": "💲 Tarifas",          "url": _reverse("gestionar_tarifas"),        "badge": None},
                 {"label": "🕐 Horarios",         "url": _reverse("gestionar_horarios"),       "badge": None},
                 {"label": "📅 Días especiales",  "url": _reverse("gestionar_dias_especiales"),"badge": None},
+                # Plantillas: solo visible si el superadmin habilitó el permiso
+                *(
+                    [{"label": "📄 Plantillas", "url": _reverse("gestionar_plantillas_admin"), "badge": None}]
+                    if municipio.admin_puede_editar_plantillas else []
+                ),
             ],
         },
         {
@@ -3768,4 +3774,96 @@ def editar_staff(request, usuario_id):
 
     return render(request, "admin/editar_staff.html", {
         "staff": staff,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plantillas de comprobantes (solo si superadmin habilitó el permiso)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Variables disponibles por tipo (mismo set que en views_superadmin)
+_VARIABLES_PLANTILLA_POR_TIPO = {
+    "acta":             ["{patente}", "{numero_acta}", "{fecha}", "{hora}", "{subcuadra}", "{monto}", "{inspector}", "{motivo}"],
+    "cobro_hora":       ["{patente}", "{fecha}", "{hora_inicio}", "{hora_fin}", "{duracion}", "{monto}"],
+    "abono":            ["{patente}", "{mes}", "{anio}", "{monto}", "{vendedor}"],
+    "cobro_infraccion": ["{patente}", "{numero_acta}", "{monto}", "{fecha_pago}"],
+    "anulacion":        ["{patente}", "{numero_acta}", "{motivo_anulacion}"],
+}
+
+
+@require_role("admin")
+def gestionar_plantillas_admin(request):
+    """
+    El admin municipal puede editar las plantillas de comprobantes de su propio
+    municipio, solo si el superadmin habilitó `admin_puede_editar_plantillas`.
+
+    Misma lógica que views_superadmin.gestionar_plantillas pero:
+    - municipio siempre es request.user.municipio (no viene por URL)
+    - requiere el flag de permiso
+    """
+    municipio = getattr(request.user, "municipio", None)
+    if not municipio:
+        return redirect("panel_admin")
+
+    if not municipio.admin_puede_editar_plantillas:
+        messages.error(request, "El superadmin no habilitó la edición de plantillas para tu municipio.")
+        return redirect("panel_admin")
+
+    if request.method == "POST":
+        tipo = request.POST.get("tipo", "").strip()
+        tipos_validos = [t[0] for t in PlantillaDocumento.TIPOS]
+
+        if tipo not in tipos_validos:
+            messages.error(request, "Tipo de plantilla inválido.")
+            return redirect("gestionar_plantillas_admin")
+
+        encabezado = request.POST.get("encabezado", "").strip()
+        cuerpo     = request.POST.get("cuerpo",     "").strip()
+        pie        = request.POST.get("pie",         "").strip()
+
+        if not encabezado and not cuerpo and not pie:
+            # Sin contenido → eliminar plantilla (vuelve al default hardcodeado)
+            eliminadas, _ = PlantillaDocumento.objects.filter(
+                municipio=municipio, tipo=tipo
+            ).delete()
+            if eliminadas:
+                messages.success(request, f"Plantilla '{tipo}' eliminada. El sistema usará el texto por defecto.")
+            else:
+                messages.info(request, "No había plantilla guardada para ese tipo.")
+        else:
+            plantilla, creada = PlantillaDocumento.objects.update_or_create(
+                municipio=municipio,
+                tipo=tipo,
+                defaults={
+                    "encabezado": encabezado,
+                    "cuerpo":     cuerpo,
+                    "pie":        pie,
+                },
+            )
+            accion = "guardada" if creada else "actualizada"
+            messages.success(request, f"Plantilla '{plantilla.get_tipo_display()}' {accion}.")
+
+        return redirect("gestionar_plantillas_admin")
+
+    # GET: armar contexto con las plantillas existentes indexadas por tipo
+    plantillas_existentes = {
+        p.tipo: p
+        for p in PlantillaDocumento.objects.filter(municipio=municipio)
+    }
+
+    tipos_con_plantilla = [
+        {
+            "tipo":      tipo,
+            "label":     label,
+            "plantilla": plantillas_existentes.get(tipo),
+            "variables": _VARIABLES_PLANTILLA_POR_TIPO.get(tipo, []),
+        }
+        for tipo, label in PlantillaDocumento.TIPOS
+    ]
+
+    return render(request, "superadmin/plantillas.html", {
+        "municipio":           municipio,
+        "tipos_con_plantilla": tipos_con_plantilla,
+        # Indica al template que el volver va al panel admin, no al superadmin
+        "modo_admin":          True,
     })

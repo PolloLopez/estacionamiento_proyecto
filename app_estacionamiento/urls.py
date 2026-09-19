@@ -162,6 +162,7 @@ urlpatterns = [
     path("admin-tarifas/", views.gestionar_tarifas, name="gestionar_tarifas"),
     path("admin-horarios/", views.gestionar_horarios, name="gestionar_horarios"),
     path("admin-dias-especiales/", views.gestionar_dias_especiales, name="gestionar_dias_especiales"),
+    path("admin-plantillas/", views.gestionar_plantillas_admin, name="gestionar_plantillas_admin"),
     path("admin-tarifas/guardar/", views.gestionar_tarifas, name="admin_guardar_tarifa"),
 
     # =========================
