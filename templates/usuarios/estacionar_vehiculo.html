@@ -43,7 +43,8 @@
         {% for v in vehiculos %}
         <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
              data-id="{{ v.id }}"
-             onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}')"
+             data-tipo="{{ v.tipo|default:'auto' }}"
+             onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
              style="
                flex:1; min-width:130px; max-width:200px;
                border:3px solid var(--color-border);
@@ -57,6 +58,9 @@
              ">
           <div style="font-size:1.6rem; font-weight:800; letter-spacing:3px;">
             {{ v.patente }}
+          </div>
+          <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
+            {% if v.tipo == "moto" %}🏍 Moto{% else %}🚗 Auto{% endif %}
           </div>
           {% if v.exento_global %}
             <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.3rem; font-weight:600;">
@@ -193,6 +197,15 @@
                    style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:1.1rem;"
                    oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
           </div>
+          <div style="min-width:110px;">
+            <label style="font-size:0.85rem;">Tipo</label>
+            <select name="tipo" style="padding:0.45rem 0.6rem; border-radius:6px;
+                    border:1px solid var(--color-border); background:var(--color-surface);
+                    font-size:0.95rem; width:100%;">
+              <option value="auto">🚗 Auto</option>
+              <option value="moto">🏍 Moto</option>
+            </select>
+          </div>
           <button type="submit" class="btn btn-outline" style="font-size:0.9rem;">Agregar</button>
         </form>
       </div>
@@ -214,14 +227,19 @@
 </form>
 
 <script>
-const PRECIO_HORA = parseFloat("{{ tarifa_hora|default:'100' }}");
+const PRECIO_HORA_AUTO = parseFloat("{{ tarifa_hora_auto|default:'100' }}");
+// Si la tarifa moto es 0 o no está configurada, usa la misma que auto.
+const PRECIO_HORA_MOTO = parseFloat("{{ tarifa_hora_moto|default:'0' }}") || PRECIO_HORA_AUTO;
 // Saldo actual del conductor — usado para validar antes de habilitar "Confirmar"
 const SALDO_CONDUCTOR = parseFloat("{{ usuario.saldo|default:'0' }}");
 const URL_SUBCUADRA_CERCANA = "{% url 'conductor_subcuadra_cercana' %}";
 let vehiculoActivo = null;
+let tipoVehiculoActivo = "auto";  // "auto" | "moto" — actualizado al seleccionar vehículo
 
 // Preseleccionar si viene de "agregar vehículo"
 const preseleccionada = "{{ patente_preseleccionada|default:'' }}";
+// Guardamos el tipo de la patente preseleccionada para usarlo al auto-seleccionar
+const tipoPreseleccionado = "{{ request.GET.tipo|default:'' }}";
 
 // ── GPS ──────────────────────────────────────────────────────────────────────
 // Estado del GPS: "pending" | "ok" | "error"
@@ -275,8 +293,31 @@ if (seccionSubcuadra && navigator.geolocation) {
   mostrarSelectorSubcuadra("Seleccioná tu zona:");
 }
 
-function seleccionarVehiculo(id, patente) {
+function actualizarCostosSegunTipo(tipo) {
+  // Cuando cambia el vehículo seleccionado, recalcula el costo de cada opción
+  // usando la tarifa correspondiente (auto o moto).
+  const precioHora = tipo === "moto" ? PRECIO_HORA_MOTO : PRECIO_HORA_AUTO;
+  const botones = document.querySelectorAll(".duracion-btn");
+  botones.forEach(btn => {
+    const horas = parseFloat(btn.dataset.horas);
+    const nuevoCosto = Math.round(horas * precioHora * 100) / 100;
+    btn.dataset.costo = nuevoCosto;
+    // Si este botón estaba seleccionado, actualizar también el resumen visible
+    if (btn.classList.contains("btn") && !btn.classList.contains("btn-outline")) {
+      document.getElementById("costoTexto").innerText = "$" + nuevoCosto.toFixed(2);
+      // Revalidar saldo
+      var avisoSaldo = document.getElementById("aviso-saldo-insuficiente");
+      var btnConfirmar = document.getElementById("btn-confirmar-est");
+      var saldoInsuficiente = nuevoCosto > SALDO_CONDUCTOR;
+      if (avisoSaldo) avisoSaldo.style.display = saldoInsuficiente ? "block" : "none";
+      if (btnConfirmar) btnConfirmar.disabled = saldoInsuficiente;
+    }
+  });
+}
+
+function seleccionarVehiculo(id, patente, tipo) {
   vehiculoActivo = id;
+  tipoVehiculoActivo = tipo || "auto";
 
   // Estilos visuales
   document.querySelectorAll(".tarjeta-vehiculo").forEach(t => {
@@ -286,6 +327,9 @@ function seleccionarVehiculo(id, patente) {
 
   // Actualizar input oculto
   document.getElementById("vehiculo_id_input").value = id;
+
+  // Recalcular costos según tipo de vehículo
+  actualizarCostosSegunTipo(tipoVehiculoActivo);
 
   // Mostrar sección de subcuadra GPS (si existe — solo cuando hay subcuadras configuradas)
   if (seccionSubcuadra) {
@@ -356,11 +400,11 @@ window.addEventListener("DOMContentLoaded", () => {
     tarjetas.forEach(t => {
       const patente = t.querySelector("div").innerText.trim();
       if (patente === preseleccionada) {
-        t.click();
+        t.click();  // data-tipo ya está en el elemento; seleccionarVehiculo lo lee
       }
     });
   } else if (tarjetas.length === 1) {
-    // Si solo tiene un auto, seleccionarlo automáticamente
+    // Si solo tiene un vehículo, seleccionarlo automáticamente
     tarjetas[0].click();
   }
 });
