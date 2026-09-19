@@ -354,9 +354,23 @@ def panel_exenciones(request):
             vehiculo = _buscar_vehiculo(patente)
 
             if vehiculo:
+                tipo_exencion_nuevo = request.POST.get("tipo_exencion") or None
                 vehiculo.exento_global  = request.POST.get("exento_global") == "on"
-                vehiculo.tipo_exencion  = request.POST.get("tipo_exencion") or None
+                vehiculo.tipo_exencion  = tipo_exencion_nuevo
                 vehiculo.notas_exencion = request.POST.get("notas_exencion", "").strip() or None
+
+                # Auto-vigencia SIA al editar desde el panel de exenciones también
+                vigencia_manual = request.POST.get("vigencia_exencion", "").strip()
+                if vigencia_manual:
+                    from datetime import datetime
+                    try:
+                        vehiculo.vigencia_exencion = datetime.strptime(vigencia_manual, "%Y-%m-%d").date()
+                    except ValueError:
+                        pass
+                elif tipo_exencion_nuevo == "discapacitado" and not vehiculo.vigencia_exencion:
+                    from datetime import date, timedelta
+                    vehiculo.vigencia_exencion = date.today() + timedelta(days=180)
+
                 vehiculo.save()
 
                 subcuadras_ids    = request.POST.getlist("subcuadras")
@@ -393,14 +407,28 @@ def panel_exenciones(request):
     vehiculos_pendientes = qs_exentos.filter(exencion_verificada=False).order_by("patente")
     vehiculos_exentos    = qs_exentos.filter(exencion_verificada=True).order_by("patente")
 
-    from datetime import date as _date
+    from datetime import date as _date, timedelta
+    hoy              = _date.today()
+    alerta_dias      = 30  # avisa si vence en menos de 30 días
+    fecha_alerta     = hoy + timedelta(days=alerta_dias)
+
+    # Exenciones vencidas (vigencia pasada pero aún activas — el cron no corrió o fue manual)
+    exentos_vencidos = qs_exentos.filter(vigencia_exencion__lt=hoy)
+    # Exenciones por vencer en los próximos 30 días
+    exentos_proximos = qs_exentos.filter(
+        vigencia_exencion__gte=hoy,
+        vigencia_exencion__lte=fecha_alerta,
+    )
+
     return render(request, "admin/exenciones.html", {
         "vehiculo":             vehiculo,
         "subcuadras":           subcuadras,
         "tipos_exencion":       TIPOS_EXENCION,
         "vehiculos_exentos":    vehiculos_exentos,
         "vehiculos_pendientes": vehiculos_pendientes,
-        "hoy":                  _date.today(),
+        "hoy":                  hoy,
+        "exentos_vencidos":     exentos_vencidos,
+        "exentos_proximos":     exentos_proximos,
     })
 
 
@@ -1847,6 +1875,16 @@ def resolver_verificacion(request, solicitud_id):
 
         vehiculo.tipo_exencion  = tipo_exencion
         vehiculo.notas_exencion = notas_exencion
+
+        # SIA (discapacitado): la exención vence a los 180 días.
+        # El admin puede sobreescribir esta fecha manualmente desde el panel de exenciones.
+        # Los demás tipos (frentista, jubilado, fuerzas) se dejan con vigencia indefinida (None).
+        if tipo_exencion == "discapacitado":
+            from datetime import date, timedelta
+            vehiculo.vigencia_exencion = date.today() + timedelta(days=180)
+        elif tipo_exencion not in ("discapacitado",):
+            # Para los otros tipos, respetar la vigencia que haya o dejar indefinida
+            pass  # no se toca vigencia_exencion
 
         if es_global:
             vehiculo.exento_global  = True

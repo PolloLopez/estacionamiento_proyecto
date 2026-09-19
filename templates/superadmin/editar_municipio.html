@@ -168,6 +168,39 @@
             </div>
           </div>
 
+          {# ── Descuento para conductores verificados ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.5px;">
+              Descuento para conductores verificados
+            </p>
+            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+              Aplica un porcentaje de descuento sobre el costo de estacionamiento para conductores que verificaron su identidad.
+              El conductor lo ve reflejado en los precios antes de estacionar.
+            </p>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.85rem; font-weight:600;">Descuento (%) — vacío = desactivado</label>
+              <input type="number" name="descuento_verificados_pct"
+                     min="1" max="100" step="1"
+                     value="{{ municipio.descuento_verificados_pct|default:'' }}"
+                     placeholder="Ej: 20"
+                     style="width:100%; margin-top:0.25rem; padding:0.5rem; border:1px solid var(--color-border); border-radius:6px; font-size:0.95rem;">
+              <small style="color:var(--color-text-muted);">Porcentaje de descuento (1–100). Dejar vacío para desactivar el módulo.</small>
+            </div>
+
+            <div style="margin-bottom:0.75rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.9rem;">
+                <input type="checkbox" name="descuento_solo_vecinos"
+                       {% if municipio.descuento_solo_vecinos %}checked{% endif %}>
+                Solo vecinos del municipio
+              </label>
+              <small style="color:var(--color-text-muted);">
+                Si está activo, el descuento aplica únicamente a conductores verificados <strong>y</strong> marcados como vecinos del municipio por el admin.
+                Si está inactivo, alcanza a todos los conductores verificados.
+              </small>
+            </div>
+          </div>
+
           {# ── Dashboard TV ── #}
           <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
             <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.5px;">

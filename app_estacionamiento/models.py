@@ -371,6 +371,32 @@ class Municipio(models.Model):
         ),
     )
 
+    # ── Descuento para conductores verificados ───────────────────────────────────
+    # El superadmin configura un porcentaje de descuento sobre el costo de
+    # estacionamiento para conductores que ya verificaron su identidad (es_verificado=True).
+    # descuento_solo_vecinos=True → solo aplica si además el conductor es vecino
+    # del municipio (es_vecino=True). False → aplica a todos los verificados.
+    # Null en descuento_verificados_pct = módulo desactivado (sin descuento).
+    descuento_verificados_pct = models.DecimalField(
+        max_digits=5, decimal_places=2,
+        null=True, blank=True,
+        verbose_name="Descuento para verificados (%)",
+        help_text=(
+            "Porcentaje de descuento sobre el costo de estacionamiento "
+            "para conductores con identidad verificada. "
+            "Vacío = descuento desactivado."
+        ),
+    )
+    descuento_solo_vecinos = models.BooleanField(
+        default=False,
+        verbose_name="Solo vecinos del municipio",
+        help_text=(
+            "Si está activo, el descuento solo aplica a conductores verificados "
+            "que además estén marcados como vecinos del municipio. "
+            "Si está inactivo, aplica a todos los conductores verificados."
+        ),
+    )
+
     # ── Coordenadas de la sede municipal ────────────────────────────────────────
     # Usadas para mostrar la oficina del admin en el mapa de zonas.
     # El superadmin las configura desde editar_municipio.

@@ -297,6 +297,11 @@ def editar_municipio(request, municipio_id):
             alcance = request.POST.get("reintegro_alcance", "").strip()
             if alcance in ("todos", "residentes"):
                 municipio.reintegro_alcance = alcance
+
+            # Descuento para conductores verificados
+            municipio.descuento_verificados_pct = _decimal("descuento_verificados_pct", None)
+            municipio.descuento_solo_vecinos    = request.POST.get("descuento_solo_vecinos") == "on"
+
             municipio.save()
             messages.success(request, "Configuración general guardada.")
             return redirect("editar_municipio", municipio_id=municipio.id)

@@ -260,6 +260,43 @@
   </div>
   {% endif %}
 
+  {# ── ALERTAS SIA: VENCIDAS Y POR VENCER ───────────────────── #}
+  {% if exentos_vencidos %}
+  <div style="margin-top:1.5rem; padding:0.9rem 1.1rem; background:#fdecea;
+              border:1px solid #f5c6cb; border-radius:10px; border-left:4px solid #c0392b;">
+    <strong style="color:#c0392b;">⛔ {{ exentos_vencidos|length }} exención(es) vencida(s)</strong>
+    <p style="margin:0.4rem 0 0; font-size:0.85rem; color:#721c24;">
+      Los siguientes vehículos tienen la exención SIA vencida pero siguen figurando como exentos.
+      Revisalos o ejecutá <code>python manage.py revocar_exenciones_vencidas</code> para revocarlas automáticamente.
+    </p>
+    <ul style="margin:0.5rem 0 0; padding-left:1.3rem; font-size:0.85rem; color:#721c24;">
+      {% for v in exentos_vencidos %}
+      <li>
+        <strong>{{ v.patente }}</strong> — venció el {{ v.vigencia_exencion|date:"d/m/Y" }}
+        {% if v.tipo_exencion %}({{ v.get_tipo_exencion_display }}){% endif %}
+        <a href="?patente={{ v.patente }}" style="margin-left:0.4rem; font-size:0.8rem;">editar →</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if exentos_proximos %}
+  <div style="margin-top:1rem; padding:0.9rem 1.1rem; background:#fff8e1;
+              border:1px solid #ffe082; border-radius:10px; border-left:4px solid #f59e0b;">
+    <strong style="color:#b7791f;">⚠️ {{ exentos_proximos|length }} exención(es) por vencer (próximos 30 días)</strong>
+    <ul style="margin:0.5rem 0 0; padding-left:1.3rem; font-size:0.85rem; color:#7d5a00;">
+      {% for v in exentos_proximos %}
+      <li>
+        <strong>{{ v.patente }}</strong> — vence el {{ v.vigencia_exencion|date:"d/m/Y" }}
+        {% if v.tipo_exencion %}({{ v.get_tipo_exencion_display }}){% endif %}
+        <a href="?patente={{ v.patente }}" style="margin-left:0.4rem; font-size:0.8rem;">ver →</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
   {# ── LISTADO GLOBAL DE EXENCIONES ──────────────────────────── #}
   <div style="margin-top:2rem;">
     <h3 style="margin-bottom:0.75rem;">📋 Todos los vehículos con exención verificada</h3>
