@@ -248,19 +248,24 @@ if (form && input) {
     // Cambiar placeholder según tipo de vehículo
     function actualizarPlaceholder() {
         const esMoto = document.getElementById("tipo-moto").checked;
-        input.placeholder = esMoto ? "123-ABC" : "AAA111";
+        input.placeholder = esMoto ? "123ABC" : "AAA111";
     }
     document.getElementById("tipo-auto").addEventListener("change", actualizarPlaceholder);
     document.getElementById("tipo-moto").addEventListener("change", actualizarPlaceholder);
     actualizarPlaceholder();
 
     input.addEventListener("input", () => {
+        // Normalizar: solo letras y números, todo mayúscula.
+        // Para motos: el guion "123-ABC" no se guarda, solo "123ABC".
         input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
-        const val = input.value;
+        const val    = input.value;
+        const esMoto = document.getElementById("tipo-moto").checked;
+
         const esValida =
-            /^[A-Z]{3}[0-9]{3}$/.test(val) ||
-            /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val) ||
-            /^[A-Z]{1}[0-9]{3}[A-Z]{3}$/.test(val);
+            /^[A-Z]{3}[0-9]{3}$/.test(val)        ||  // AAA111   — autos viejos
+            /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val)||  // AA111BB  — autos nuevos (Mercosur)
+            (esMoto && /^[0-9]{3}[A-Z]{3}$/.test(val)); // 123ABC — motos
+
         if (esValida) form.submit();
     });
 
