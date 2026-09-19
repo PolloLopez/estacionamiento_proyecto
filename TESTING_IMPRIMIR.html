@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Testing por roles — Estacionamiento</title>
+<style>
+  /* ── Base ── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 11pt; color: #111; background: #fff; }
+
+  /* ── Hoja por rol ── */
+  .hoja {
+    width: 100%;
+    padding: 18mm 20mm 14mm 20mm;
+    page-break-after: always;
+  }
+  .hoja:last-child { page-break-after: avoid; }
+
+  /* ── Encabezado del rol ── */
+  .rol-header {
+    border-bottom: 3px solid #1565c0;
+    padding-bottom: 6px;
+    margin-bottom: 14px;
+  }
+  .rol-header h1 {
+    font-size: 16pt;
+    color: #1565c0;
+    margin-bottom: 2px;
+  }
+  .rol-header .meta {
+    font-size: 9pt;
+    color: #555;
+  }
+
+  /* ── Secciones ── */
+  h2 {
+    font-size: 11pt;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #e3eaf5;
+    color: #1a3a6b;
+    padding: 4px 8px;
+    margin: 14px 0 8px 0;
+    border-left: 4px solid #1565c0;
+  }
+  h3 {
+    font-size: 10.5pt;
+    color: #1a3a6b;
+    margin: 10px 0 5px 0;
+  }
+
+  /* ── Flujos ── */
+  .flujo {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    background: #fafafa;
+  }
+  .flujo-titulo {
+    font-weight: bold;
+    font-size: 10pt;
+    margin-bottom: 5px;
+    color: #1565c0;
+  }
+
+  /* Pasos numerados */
+  ol { padding-left: 18px; margin: 0; }
+  ol li { margin-bottom: 2px; font-size: 10pt; line-height: 1.4; }
+
+  /* Checklist de verificación */
+  .check-lista { margin: 6px 0 0 0; list-style: none; padding: 0; }
+  .check-lista li { font-size: 9.5pt; margin-bottom: 2px; padding-left: 18px; position: relative; color: #333; }
+  .check-lista li::before {
+    content: "☐";
+    position: absolute;
+    left: 0;
+    font-size: 11pt;
+    color: #1565c0;
+  }
+
+  /* ── Cuestionario UX ── */
+  .cuestionario {
+    border: 2px solid #1565c0;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-top: 14px;
+  }
+  .cuestionario h2 {
+    background: #1565c0;
+    color: #fff;
+    margin: -10px -12px 10px -12px;
+    border-left: none;
+    padding: 6px 12px;
+    font-size: 10.5pt;
+  }
+  .pregunta {
+    margin-bottom: 10px;
+  }
+  .pregunta p {
+    font-size: 10pt;
+    font-weight: bold;
+    margin-bottom: 3px;
+  }
+  .opciones {
+    font-size: 9.5pt;
+    color: #333;
+    margin-bottom: 3px;
+  }
+  .linea-respuesta {
+    border-bottom: 1px solid #999;
+    min-height: 16px;
+    margin-top: 2px;
+    width: 100%;
+  }
+  .linea-respuesta-lg {
+    border: 1px solid #999;
+    min-height: 36px;
+    margin-top: 2px;
+    width: 100%;
+    border-radius: 3px;
+  }
+
+  /* ── Tabla de casos borde ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 9.5pt;
+  }
+  th {
+    background: #1565c0;
+    color: white;
+    padding: 5px 8px;
+    text-align: left;
+  }
+  td {
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f4f8ff; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 14px;
+    border-top: 1px solid #ccc;
+    padding-top: 6px;
+    font-size: 8pt;
+    color: #888;
+    display: flex;
+    justify-content: space-between;
+  }
+  .firma {
+    border-top: 1px solid #333;
+    width: 180px;
+    margin-top: 20px;
+    padding-top: 4px;
+    font-size: 9pt;
+    color: #555;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { background: white; }
+    .hoja { padding: 12mm 15mm 10mm 15mm; }
+    @page { size: A4; margin: 0; }
+  }
+
+  /* ── Pantalla: separador visual entre hojas ── */
+  @media screen {
+    body { background: #e0e0e0; }
+    .hoja {
+      background: white;
+      max-width: 210mm;
+      margin: 20px auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════
+     HOJA 1: CONDUCTOR
+════════════════════════════════════════════════════════ -->
+<div class="hoja">
+  <div class="rol-header">
+    <h1>🚗 Rol: Conductor</h1>
+    <div class="meta">Estacionamiento Medido &nbsp;|&nbsp; URL: /usuarios/ &nbsp;|&nbsp; Fecha: _______________ &nbsp;|&nbsp; Tester: _______________</div>
+  </div>
+
+  <h2>Flujos a testear</h2>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F1.1 — Estacionar con saldo (GPS)</div>
+    <ol>
+      <li>Ir a /usuarios/ → panel con saldo y vehículos.</li>
+      <li>Clic en "Estacionar" → activar GPS → esperar detección de subcuadra.</li>
+      <li>Si subcuadra <strong>libre</strong> → debe aparecer banner verde, formulario oculto.</li>
+      <li>Si subcuadra <strong>pagada</strong> → seleccionar duración → ver precio → confirmar.</li>
+      <li>Verificar que el saldo disminuyó y el estacionamiento aparece activo.</li>
+    </ol>
+    <ul class="check-lista">
+      <li>GPS detecta subcuadra correctamente</li>
+      <li>Zona libre: banner verde aparece, formulario de pago oculto</li>
+      <li>Zona libre: al confirmar → "Podés estacionar sin pagar" (sin backend)</li>
+      <li>Zona pagada: precio correcto según tarifa del municipio</li>
+      <li>Saldo se debita exactamente</li>
+      <li>Estacionamiento activo aparece en el panel con temporizador</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F1.2 — Selección manual en cascada (sin GPS)</div>
+    <ol>
+      <li>Seleccionar calle del dropdown → se repopula altura.</li>
+      <li>Seleccionar altura → sistema detecta tipo_zona inmediatamente.</li>
+      <li>Verificar banner verde si libre / formulario de pago si pagada.</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Cambiar calle repopula alturas solas</li>
+      <li>Seleccionar altura → tipo_zona detectado sin recargar</li>
+      <li>Zona libre: banner verde, sin formulario de pago</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F1.3 — Cargar saldo MP &nbsp;|&nbsp; F1.4 — Pagar infracción &nbsp;|&nbsp; F1.5 — Impugnar &nbsp;|&nbsp; F1.6 — Historial</div>
+    <ul class="check-lista">
+      <li>Monto mínimo validado en carga de saldo</li>
+      <li>Infracción pendiente avisa al intentar estacionar</li>
+      <li>Dentro de gracia: infracción se anula automáticamente al estacionar</li>
+      <li>Impugnación: formulario enviado correctamente, confirmación visible</li>
+      <li>Historial muestra fechas, duración y costo</li>
+      <li>Sugerencia: solo áreas de conductor + general aparecen en el select</li>
+    </ul>
+  </div>
+
+  <div class="cuestionario">
+    <h2>📋 Cuestionario de experiencia — Conductor</h2>
+
+    <div class="pregunta">
+      <p>¿Cuánto tardaste en hacer tu primer estacionamiento desde cero?</p>
+      <div class="opciones">_____ minutos</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El GPS funcionó a la primera?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué pasó?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Quedó claro qué significa "zona libre"?</p>
+      <div class="opciones">☐ Sí, el banner fue claro &nbsp;&nbsp; ☐ No, no entendí qué hacer</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Quedó claro cuánto te iba a costar antes de confirmar?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué confundió?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El panel principal muestra lo que necesitás en el día a día?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué falta?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Encontraste el botón de cargar saldo fácilmente?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Qué mejorarías en la experiencia del conductor?</p>
+      <div class="linea-respuesta-lg"></div>
+    </div>
+
+    <div class="firma">Firma del tester</div>
+  </div>
+
+  <div class="footer">
+    <span>Sistema de Estacionamiento Medido — Guía de testing</span>
+    <span>Conductor | Hoja 1</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     HOJA 2: INSPECTOR
+════════════════════════════════════════════════════════ -->
+<div class="hoja">
+  <div class="rol-header">
+    <h1>👮 Rol: Inspector</h1>
+    <div class="meta">Estacionamiento Medido &nbsp;|&nbsp; URL: /usuarios/inspectores/ &nbsp;|&nbsp; Fecha: _______________ &nbsp;|&nbsp; Tester: _______________</div>
+  </div>
+
+  <h2>Flujos a testear</h2>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F2.1 — Verificar una patente</div>
+    <ol>
+      <li>Ir a /usuarios/inspectores/verificar/.</li>
+      <li>Ingresar patente → ver estado (activo/vencido/sin registro).</li>
+      <li>Verificar sonido correcto (ok / warning / error).</li>
+      <li>Verificar color de pantalla (verde / rojo / amarillo).</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Resultado aparece en menos de 3 segundos</li>
+      <li>Sonidos suenan en Chrome Android</li>
+      <li>Exento: aparece claramente la razón de exención</li>
+      <li>Sin horario para hoy: inspector no puede operar</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F2.2 — Labrar una infracción</div>
+    <ol>
+      <li>Vehículo sin estacionamiento activo + dentro del horario.</li>
+      <li>Clic en "Labrar infracción" → tomar/subir foto → seleccionar motivo → confirmar.</li>
+      <li>Verificar auto-impresión en impresora BLE (si vinculada).</li>
+      <li>Verificar doble copia (comportamiento según segundos_pausa_doble_copia).</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Solo se puede labrar dentro del horario</li>
+      <li>Foto sube a Cloudinary con watermark (GPS, fecha, inspector)</li>
+      <li>Pausa=0: el inspector confirma manualmente antes de la copia 2</li>
+      <li>Pausa>0: pausa automática en segundos configurados</li>
+      <li>Infracción aparece en "Mis infracciones del día"</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F2.3 — Casos borde del inspector</div>
+    <ul class="check-lista">
+      <li>Infraccionar dentro del período de tolerancia: sistema avisa</li>
+      <li>Resumen del día: si toggle desactivado → menú no aparece</li>
+      <li>GPS subcuadra: detecta correctamente desde la pantalla de verificar</li>
+    </ul>
+  </div>
+
+  <div class="cuestionario">
+    <h2>📋 Cuestionario de experiencia — Inspector</h2>
+
+    <div class="pregunta">
+      <p>¿El feedback visual (colores) y sonoro fue claro para saber el estado?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué cambiarías?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿La impresora BLE se conectó sin problemas?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No conectó &nbsp;&nbsp; ☐ No tengo impresora</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Sin impresora, quedó claro cómo ver el acta igualmente?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El flujo de labrar una infracción es rápido (menos de 2 minutos)?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué paso demora más?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El mensaje de "fuera de horario" es claro y aparece en el momento correcto?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Qué información le falta a la pantalla de verificar patente?</p>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Qué mejorarías en tu panel?</p>
+      <div class="linea-respuesta-lg"></div>
+    </div>
+
+    <div class="firma">Firma del tester</div>
+  </div>
+
+  <div class="footer">
+    <span>Sistema de Estacionamiento Medido — Guía de testing</span>
+    <span>Inspector | Hoja 2</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     HOJA 3: VENDEDOR
+════════════════════════════════════════════════════════ -->
+<div class="hoja">
+  <div class="rol-header">
+    <h1>💳 Rol: Vendedor</h1>
+    <div class="meta">Estacionamiento Medido &nbsp;|&nbsp; URL: /usuarios/vendedores/ &nbsp;|&nbsp; Fecha: _______________ &nbsp;|&nbsp; Tester: _______________</div>
+  </div>
+
+  <h2>Flujos a testear</h2>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F3.1 — Registrar estacionamiento / cobro en persona</div>
+    <ol>
+      <li>Panel → "Registrar estacionamiento" → ingresar patente.</li>
+      <li>Seleccionar duración → elegir medio de pago → confirmar.</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Solo disponible dentro del horario</li>
+      <li>Sin horario (ej: domingo): formulario deshabilitado</li>
+      <li>Precio coincide con tarifa del municipio</li>
+      <li>saldo_operativo del vendedor aumentó</li>
+      <li>Se creó un MovimientoCaja</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F3.2 — Cobrar infracción &nbsp;|&nbsp; F3.3 — Cobrar abono mensual</div>
+    <ul class="check-lista">
+      <li>Infracciones: solo si puede_cobrar_infraccion=True en el perfil</li>
+      <li>Infracción pasa a "pagada" tras el cobro</li>
+      <li>Abono: se puede cobrar fuera de horario</li>
+      <li>Abono duplicado (mismo mes+vehículo+municipio): error claro</li>
+      <li>Precio abono diferencia auto vs moto</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F3.4 — Cerrar caja</div>
+    <ol>
+      <li>Ir a /vendedores/caja/ → ver resumen por medio de pago.</li>
+      <li>Clic "Cerrar caja" → seleccionar período → confirmar.</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Desglose efectivo/digital correcto</li>
+      <li>saldo_operativo se resetea a 0 tras el cierre</li>
+      <li>Cierre queda pendiente de certificación por el admin</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F3.5/F3.6 — Comisiones y certificación</div>
+    <ul class="check-lista">
+      <li>Estados claros: pendiente / depositada / certificada</li>
+      <li>Solo puede certificar cuando el tesorero ya depositó</li>
+      <li>Se puede subir archivo de factura</li>
+    </ul>
+  </div>
+
+  <div class="cuestionario">
+    <h2>📋 Cuestionario de experiencia — Vendedor</h2>
+
+    <div class="pregunta">
+      <p>¿El formulario de cobro fue rápido de completar?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué demora?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Los medios de pago disponibles son los que usás en el día a día?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué falta?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El resumen de caja muestra claramente cuánto tenés que rendir?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué falta?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Encontraste el botón de "Cobrar abono" sin dificultad?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El proceso de cierre de caja fue claro?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué confundió?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Entendiste para qué es la sección de comisiones?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Qué mejorarías en tu panel?</p>
+      <div class="linea-respuesta-lg"></div>
+    </div>
+
+    <div class="firma">Firma del tester</div>
+  </div>
+
+  <div class="footer">
+    <span>Sistema de Estacionamiento Medido — Guía de testing</span>
+    <span>Vendedor | Hoja 3</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     HOJA 4: ADMIN MUNICIPAL
+════════════════════════════════════════════════════════ -->
+<div class="hoja">
+  <div class="rol-header">
+    <h1>🏛️ Rol: Admin Municipal</h1>
+    <div class="meta">Estacionamiento Medido &nbsp;|&nbsp; URL: /usuarios/admin-inicio/ &nbsp;|&nbsp; Fecha: _______________ &nbsp;|&nbsp; Tester: _______________</div>
+  </div>
+
+  <h2>Flujos a testear</h2>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F4.1/F4.2 — Panel y conductores</div>
+    <ul class="check-lista">
+      <li>Badges del sidebar muestran número correcto (infracciones, impugnaciones)</li>
+      <li>Búsqueda de conductores funciona por nombre/email</li>
+      <li>Detalle conductor: historial, saldo, vehículos visibles</li>
+      <li>Responder impugnación: estado cambia, conductor lo ve</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F4.3/F4.4 — Gestionar inspectores y vendedores</div>
+    <ul class="check-lista">
+      <li>Crear inspector: puede loguearse correctamente</li>
+      <li>Estadísticas de inspector: datos reales del período</li>
+      <li>Exportar Excel: descarga y se puede abrir</li>
+      <li>Nombres guardados con formato título (primer letra mayúscula)</li>
+      <li>Permiso cobrar_infraccion del vendedor activa/desactiva el botón</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F4.5 — Infracciones</div>
+    <ul class="check-lista">
+      <li>Filtrar por estado (pendiente / pagada / anulada)</li>
+      <li>Modal se cierra correctamente tras anular</li>
+      <li>Descuento voluntario se aplica al monto</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F4.6/F4.7 — Cierres y rendiciones</div>
+    <ol>
+      <li>Certificar un cierre de caja de vendedor.</li>
+      <li>Crear rendición con cierres certificados.</li>
+      <li>Verificar que LiquidacionComision se creó automáticamente.</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Solo cierres certificados aparecen seleccionables</li>
+      <li>Totales calculados correctos (efectivo + digital)</li>
+      <li>Liquidaciones de comisión generadas automáticamente en estado "pendiente"</li>
+      <li>Rendición queda en "pendiente" esperando al tesorero</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F4.8 — Subcuadras y mapa</div>
+    <ol>
+      <li>Ir a /admin-subcuadras/ → ver mapa con pins azules y verdes.</li>
+      <li>Agregar subcuadra haciendo clic en el mapa.</li>
+      <li>Editar nombre de subcuadra existente (botón ✏️).</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Mapa carga correctamente (OpenStreetMap)</li>
+      <li>Pins azul=pagado, verde=libre</li>
+      <li>Popup del pin muestra nombre y tipo</li>
+      <li>Edición guarda correctamente calle y altura</li>
+      <li>No permite duplicar calle+altura</li>
+    </ul>
+  </div>
+
+  <div class="cuestionario">
+    <h2>📋 Cuestionario de experiencia — Admin Municipal</h2>
+
+    <div class="pregunta">
+      <p>¿El panel principal da una vista clara del estado del sistema?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué falta?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El proceso de crear una rendición fue claro?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué confundió?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Las liquidaciones de comisión se crearon automáticamente sin hacer nada extra?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿La gestión de subcuadras en el mapa fue fácil?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué fue difícil?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El modal de infracciones se cierra correctamente tras anular?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Qué mejorarías en tu panel?</p>
+      <div class="linea-respuesta-lg"></div>
+    </div>
+
+    <div class="firma">Firma del tester</div>
+  </div>
+
+  <div class="footer">
+    <span>Sistema de Estacionamiento Medido — Guía de testing</span>
+    <span>Admin Municipal | Hoja 4</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     HOJA 5: TESORERO
+════════════════════════════════════════════════════════ -->
+<div class="hoja">
+  <div class="rol-header">
+    <h1>🏦 Rol: Tesorero</h1>
+    <div class="meta">Estacionamiento Medido &nbsp;|&nbsp; URL: /usuarios/tesorero/ &nbsp;|&nbsp; Fecha: _______________ &nbsp;|&nbsp; Tester: _______________</div>
+  </div>
+
+  <h2>Flujos a testear</h2>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F5.1 — Panel y acceso a comisiones</div>
+    <ul class="check-lista">
+      <li>Card "Comisiones a depositar" es clickable</li>
+      <li>Redirige a /admin-rendiciones/?seccion=comisiones</li>
+      <li>Solo datos del propio municipio</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F5.2 — Validar una rendición</div>
+    <ol>
+      <li>Abrir detalle de rendición pendiente.</li>
+      <li>Opción A: validar → rendición pasa a "validada".</li>
+      <li>Opción B: observar → campo notas <strong>obligatorio</strong>.</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Detalle muestra cierres incluidos, totales y liquidaciones</li>
+      <li>Observar sin notas: formulario NO se envía (JS + backend)</li>
+      <li>Al observar con notas: pasa a "observada", admin lo ve</li>
+      <li>Al validar: pasa a "validada"</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F5.3 — Depositar comisiones de vendedores</div>
+    <ol>
+      <li>Ver liquidaciones en estado "pendiente".</li>
+      <li>Depositar: ingresar número de comprobante + subir archivo.</li>
+      <li>Confirmar el depósito.</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Monto a depositar es correcto</li>
+      <li>Número de comprobante se guarda</li>
+      <li>Archivo se sube correctamente</li>
+      <li>Liquidación pasa a estado "depositada"</li>
+      <li>Vendedor ahora puede certificar el recibo</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F5.4 — Historial de rendiciones</div>
+    <ul class="check-lista">
+      <li>Historial ordenado por fecha</li>
+      <li>Detalle de rendición validada accesible (solo lectura)</li>
+    </ul>
+  </div>
+
+  <div class="cuestionario">
+    <h2>📋 Cuestionario de experiencia — Tesorero</h2>
+
+    <div class="pregunta">
+      <p>¿El panel principal muestra lo que necesitás de un vistazo?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué falta?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El proceso de validar/observar una rendición fue claro?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué confundió?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿La obligatoriedad de las notas al observar fue clara (no se puede enviar sin notas)?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El proceso de depositar la comisión fue intuitivo?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué fue difícil?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Qué información extra necesitarías ver en el panel?</p>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Qué mejorarías en tu experiencia como tesorero?</p>
+      <div class="linea-respuesta-lg"></div>
+    </div>
+
+    <div class="firma">Firma del tester</div>
+  </div>
+
+  <div class="footer">
+    <span>Sistema de Estacionamiento Medido — Guía de testing</span>
+    <span>Tesorero | Hoja 5</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     HOJA 6: SUPERADMIN
+════════════════════════════════════════════════════════ -->
+<div class="hoja">
+  <div class="rol-header">
+    <h1>⚙️ Rol: Superadmin</h1>
+    <div class="meta">Estacionamiento Medido &nbsp;|&nbsp; URL: /superadmin/municipios/ &nbsp;|&nbsp; Fecha: _______________ &nbsp;|&nbsp; Tester: _______________</div>
+  </div>
+
+  <h2>Flujos a testear</h2>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F6.1 — Gestionar municipios</div>
+    <ol>
+      <li>Ver listado → editar municipio: tarifas, horarios, colores, logo.</li>
+      <li>Modificar algo sin guardar → verificar alerta JS de "cambios sin guardar".</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Alerta de cambios sin guardar aparece al intentar salir</li>
+      <li>Colores se reflejan en el sistema tras guardar</li>
+      <li>Logo se sube correctamente (Cloudinary)</li>
+      <li>Cada sección guarda de forma independiente</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F6.2 — Subcuadras desde superadmin</div>
+    <ol>
+      <li>En editar municipio → clic en "📍 Subcuadras".</li>
+      <li>Redirige a /superadmin/municipio/[id]/subcuadras/.</li>
+      <li>Agregar/editar subcuadras → botón "← Volver al municipio".</li>
+    </ol>
+    <ul class="check-lista">
+      <li>Botón volver lleva a editar_municipio</li>
+      <li>Cambios de subcuadras se guardan correctamente</li>
+      <li>Mapa colorea azul/verde según tipo_zona</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F6.3 — Módulos premium &nbsp;|&nbsp; F6.4 — Token TV</div>
+    <ul class="check-lista">
+      <li>Activar/desactivar módulos: funcionalidad afectada en el municipio</li>
+      <li>Regenerar token TV → URL /tv/[token]/ muestra dashboard público</li>
+    </ul>
+  </div>
+
+  <div class="flujo">
+    <div class="flujo-titulo">F6.5 — Sugerencias &nbsp;|&nbsp; F6.6 — Toggle inspector &nbsp;|&nbsp; F6.7 — Limpieza</div>
+    <ul class="check-lista">
+      <li>Sugerencias: cambiar estado (en revisión / implementada / descartada)</li>
+      <li>Toggle inspector_ve_infracciones: el menú aparece/desaparece para el inspector</li>
+      <li>Limpieza datos: requiere escribir CONFIRMAR+NOMBRE exacto</li>
+      <li>Limpieza: solo borra datos del municipio seleccionado</li>
+    </ul>
+  </div>
+
+  <div class="cuestionario">
+    <h2>📋 Cuestionario de experiencia — Superadmin</h2>
+
+    <div class="pregunta">
+      <p>¿La configuración por secciones del municipio fue clara?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué sección fue confusa?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿La alerta de "cambios sin guardar" funcionó correctamente?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Pudiste gestionar subcuadras desde la vista de superadmin?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No — ¿qué falló?</div>
+      <div class="linea-respuesta"></div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿El dashboard TV funcionó con el token?</p>
+      <div class="opciones">☐ Sí &nbsp;&nbsp; ☐ No</div>
+    </div>
+
+    <div class="pregunta">
+      <p>¿Qué mejorarías en el panel de superadmin?</p>
+      <div class="linea-respuesta-lg"></div>
+    </div>
+
+    <div class="firma">Firma del tester</div>
+  </div>
+
+  <div class="footer">
+    <span>Sistema de Estacionamiento Medido — Guía de testing</span>
+    <span>Superadmin | Hoja 6</span>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     HOJA 7: CASOS BORDE + CHECKLIST FINAL
+════════════════════════════════════════════════════════ -->
+<div class="hoja">
+  <div class="rol-header">
+    <h1>🔍 Casos borde y checklist final cross-rol</h1>
+    <div class="meta">Estacionamiento Medido &nbsp;|&nbsp; Fecha de testing: _______________ &nbsp;|&nbsp; Responsable: _______________</div>
+  </div>
+
+  <h2>Casos borde</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Caso</th>
+        <th>Qué probar</th>
+        <th>Resultado esperado</th>
+        <th>☐ OK</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Fuera de horario</td>
+        <td>Inspector labra a las 00:00</td>
+        <td>Pantalla bloqueada con mensaje</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Gracia — dentro</td>
+        <td>Conductor estaciona inmediatamente tras recibir multa</td>
+        <td>Infracción anulada automáticamente</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Gracia — fuera</td>
+        <td>Conductor estaciona pasado el período de gracia</td>
+        <td>Infracción queda pendiente + aviso claro</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Saldo insuficiente</td>
+        <td>Conductor sin saldo suficiente intenta estacionar</td>
+        <td>Error claro, no se registra el estacionamiento</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Abono duplicado</td>
+        <td>Vendedor cobra el mismo mes dos veces al mismo vehículo</td>
+        <td>Error "ya existe abono para este mes"</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Zona libre + submit</td>
+        <td>Conductor envía el formulario de estacionar en zona libre</td>
+        <td>Backend rechaza el intento de pago</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Acceso cruzado</td>
+        <td>Inspector accede a /usuarios/admin-inicio/</td>
+        <td>Redirige al panel correcto del inspector</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Multi-municipio</td>
+        <td>Admin municipio A intenta ver datos del municipio B</td>
+        <td>Error 404 o redirección</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Patente nueva</td>
+        <td>Cualquier rol busca una patente inexistente</td>
+        <td>El sistema la crea como nuevo vehículo (verificar)</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Flujo financiero completo</h2>
+
+  <div style="border:1px solid #1565c0; border-radius:4px; padding:10px; margin-bottom:12px; font-size:10pt;">
+    <strong>El flujo completo de principio a fin:</strong>
+    <ol style="margin-top:8px;">
+      <li>Conductor activa estacionamiento → saldo se debita</li>
+      <li>Vendedor cobra estacionamiento en persona → saldo_operativo sube</li>
+      <li>Vendedor cierra caja → CierreCaja creado</li>
+      <li>Admin certifica el cierre</li>
+      <li>Admin crea rendición con los cierres certificados → LiquidacionComision generada automáticamente</li>
+      <li>Tesorero valida la rendición</li>
+      <li>Tesorero deposita la comisión del vendedor (con comprobante)</li>
+      <li>Vendedor certifica el recibo y adjunta factura</li>
+    </ol>
+  </div>
+
+  <ul class="check-lista">
+    <li>Flujo financiero completo ejecutado sin errores de punta a punta</li>
+    <li>Zona libre de punta a punta: mapa → GPS conductor → cascada manual → pago público (ninguno genera cobro)</li>
+    <li>Infracción de punta a punta: inspector labró → conductor impugnó → admin respondió → conductor pagó → estado = pagada</li>
+    <li>Dark mode: todos los paneles se ven correctamente (sin textos ilegibles)</li>
+    <li>Mobile (Chrome Android): inspectores y conductores — pantalla chica, touch funciona</li>
+    <li>Sin errores 500 en ningún flujo (verificar Sentry / logs Railway al final)</li>
+  </ul>
+
+  <h2 style="margin-top:16px;">Observaciones generales</h2>
+  <div style="border:1px solid #ccc; border-radius:4px; min-height:60px; padding:8px; font-size:10pt; margin-bottom:12px;"></div>
+
+  <h2>Bugs encontrados</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Rol</th>
+        <th>URL / pantalla</th>
+        <th>Descripción del bug</th>
+        <th>Severidad</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>2</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>3</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>4</td><td></td><td></td><td></td><td></td></tr>
+      <tr><td>5</td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <span>Sistema de Estacionamiento Medido — Guía de testing</span>
+    <span>Casos borde + Checklist | Hoja 7</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -269,12 +269,15 @@ async function imprimirActa() {
   }
 
   // 3. Enviar ticket × 2 (copia inspector + copia conductor)
+  // copia1Enviada permite distinguir en el catch si falló antes o después de la 1ra copia.
+  var copia1Enviada = false;
   try {
     var bytes = generarTicketInfraccion(DATOS_ACTA);
 
     btn.textContent = '⏳ Imprimiendo (1/2)...';
     estado.textContent = '⏳ Imprimiendo copia 1 de 2...';
     await enviarImpresion(conexion.caracteristica, bytes);
+    copia1Enviada = true;  // copia 1 enviada con éxito
 
     // Pausa entre copias: configurable desde superadmin.
     // 0 = pedir confirmación; >0 = pausa automática en segundos.
@@ -301,6 +304,20 @@ async function imprimirActa() {
       btn.onclick = imprimirActa;
     }
 
+    // Reconexión preventiva antes de la copia 2:
+    // la impresora puede haberse desconectado durante la pausa o la espera manual.
+    if (!conexion.device.gatt.connected) {
+      estado.textContent = '⏳ Reconectando para copia 2...';
+      try {
+        var reconCopia2 = await reconectarImpresora();
+        if (reconCopia2) conexion = reconCopia2;
+      } catch (eReconect) {
+        // Si falla la reconexión, el enviarImpresion siguiente lanzará el error
+        // y el catch externo lo maneja con copia1Enviada = true
+        console.warn('[BLE] reconexión pre-copia2 falló:', eReconect.message);
+      }
+    }
+
     btn.textContent = '⏳ Imprimiendo (2/2)...';
     estado.textContent = '⏳ Imprimiendo copia 2 de 2...';
     await enviarImpresion(conexion.caracteristica, bytes);
@@ -312,11 +329,46 @@ async function imprimirActa() {
     }, 1800);
   } catch (e) {
     console.warn('[BLE] envío falló:', e.message);
-    estado.textContent = '❌ Error al enviar datos: ' + e.message;
-    btn.disabled = false;
-    btn.textContent = '🔄 Reintentar impresión';
-    btn.style.display = 'block';
-    btnVer.style.display = 'block';
+
+    if (copia1Enviada) {
+      // Copia 1 llegó a la impresora; solo falló la copia 2.
+      // Ofrecemos reintentar solo la 2da sin volver a imprimir la 1ra.
+      estado.textContent = '✅ Copia 1 enviada. ❌ Copia 2 no se pudo enviar.';
+      btn.textContent = '🔄 Reintentar copia 2';
+      btn.disabled = false;
+      btn.style.display = 'block';
+      btnVer.style.display = 'block';
+
+      // Override temporal del handler: al clickear solo envía la 2da copia
+      btn.onclick = async function() {
+        btn.disabled = true;
+        btn.textContent = '⏳ Reconectando...';
+        estado.textContent = '⏳ Buscando impresora...';
+        try {
+          var cx = await reconectarImpresora();
+          if (!cx) {
+            estado.textContent = '📡 Seleccioná la impresora en el diálogo...';
+            cx = await conectarImpresora();
+          }
+          estado.textContent = '⏳ Enviando copia 2...';
+          await enviarImpresion(cx.caracteristica, bytes);
+          cx.device.gatt.disconnect();
+          estado.textContent = '✅ Copia 2 enviada. Redirigiendo...';
+          btn.style.display = 'none';
+          setTimeout(function() { window.location.href = URL_VERIFICAR; }, 1800);
+        } catch (eReintentar) {
+          estado.textContent = '❌ Copia 2 falló nuevamente: ' + (eReintentar.message || 'Error desconocido');
+          btn.disabled = false;
+        }
+      };
+    } else {
+      // Error total: ni la copia 1 se envió
+      estado.textContent = '❌ Error al enviar datos: ' + e.message;
+      btn.disabled = false;
+      btn.textContent = '🔄 Reintentar impresión';
+      btn.style.display = 'block';
+      btnVer.style.display = 'block';
+    }
   }
 }
 

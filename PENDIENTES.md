@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-17 (sesión 9)
+Última actualización: 2026-09-19 (sesión 10)
 
 ---
 
@@ -13,10 +13,6 @@
 ---
 
 ## 🔴 Alta prioridad
-
-- **Bug #1 — Admin puede editar texto de infracciones**
-  Superadmin siempre puede gestionar plantillas de infracciones. Admin municipio puede si superadmin lo autoriza (nuevo flag en `Municipio` o en `PlantillaDocumento`).
-  Pendiente: diseñar el modelo de autorización y la UI.
 
 ---
 
@@ -72,6 +68,17 @@
 ---
 
 ## ✅ Resuelto
+
+### Sesión 2026-09-19 (sesión 10) — admin_puede_editar_plantillas + BLE segunda copia + landing/testing
+
+| Ítem | Detalle |
+|---|---|
+| Bug #1 — Admin puede editar plantillas de comprobantes | `Municipio.admin_puede_editar_plantillas` BooleanField (migración 0079). Toggle en `editar_municipio.html`. Guardado en `views_superadmin.py`. Nueva view `gestionar_plantillas_admin` en `views_admin.py` (chequea el flag, reutiliza template de superadmin con `modo_admin=True`). URL `admin-plantillas/` en `urls.py`. Sidebar en panel_admin condicional. Link "← Panel admin" en template de plantillas. |
+| BLE segunda copia — distinción de fallo | `ticket_infraccion.html`: variable `copia1Enviada` rastreada. Reconexión preventiva antes de copia 2 si `!gatt.connected`. En catch: si `copia1Enviada=true` → mensaje "✅ Copia 1 enviada. ❌ Copia 2 no se pudo enviar" + botón "🔄 Reintentar copia 2" que solo envía la 2da. Si `copia1Enviada=false` → error total como antes. |
+| Guía de testing (digital + imprimible) | `GUIA_TESTING_ROLES.md` y `TESTING_IMPRIMIR.html` creados con coverage de los 6 roles + casos borde. |
+| Landing actualizada | Zona libre + mapa interactivo de subcuadras cards. Contador de modelos: 18→25+. |
+| Tutorial "Cómo usar la app" movido al footer | Conductor panel: bloque `<details>` movido de arriba al pie (colapsable). |
+| Conflicto merge subcuadras.html resuelto | `crearIcono()` + iconoPagado/iconoLibre/iconoNaranja preservados. Deploy Railway OK (migración 0078). |
 
 ### Sesión 2026-09-17 (sesión 9) — Dos 500 de Railway + archivos de audio
 

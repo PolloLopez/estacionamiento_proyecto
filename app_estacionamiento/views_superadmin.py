@@ -276,6 +276,7 @@ def editar_municipio(request, municipio_id):
             municipio.segundos_pausa_doble_copia  = _entero("segundos_pausa_doble_copia",  municipio.segundos_pausa_doble_copia)
             municipio.activo                          = request.POST.get("activo") == "on"
             municipio.inspector_ve_sus_infracciones   = request.POST.get("inspector_ve_sus_infracciones") == "on"
+            municipio.admin_puede_editar_plantillas   = request.POST.get("admin_puede_editar_plantillas") == "on"
 
             # Coordenadas de la sede municipal (para el mapa de zonas)
             def _decimal(nombre, fallback):

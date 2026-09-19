@@ -619,6 +619,20 @@
         <p data-lang="es">Cada usuario ve en su panel de inicio un tutorial colapsable con los pasos clave de su rol: conductor, inspector, vendedor, admin y tesorero. Sin manuales externos ni videos.</p>
         <p data-lang="en">Each user sees a collapsible step-by-step guide in their home panel, tailored to their role: driver, inspector, vendor, admin, and treasurer. No external manuals or videos needed.</p>
       </div>
+      <div class="card" style="border-top: 3px solid var(--accent2);">
+        <div class="card-icon">🟢</div>
+        <h3 data-lang="es">Detección de zona libre</h3>
+        <h3 data-lang="en">Free-parking zone detection</h3>
+        <p data-lang="es">Las calles linderas a la zona de cobro se marcan como "zona libre". Cuando el conductor activa el GPS o selecciona su ubicación manualmente, el sistema detecta si está en zona libre y muestra un banner verde — sin registrar pago. El backend rechaza cualquier intento de cobro en esas zonas.</p>
+        <p data-lang="en">Streets adjacent to the paid zone are marked as "free zones". When the driver activates GPS or selects their location manually, the system detects free zones and shows a green banner — no payment registered. The backend rejects any payment attempt in those zones.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🗺️</div>
+        <h3 data-lang="es">Mapa interactivo de subcuadras</h3>
+        <h3 data-lang="en">Interactive block map</h3>
+        <p data-lang="es">El admin y el superadmin gestionan las subcuadras sobre un mapa OpenStreetMap real (sin API key). Pin azul = zona pagada, pin verde = zona libre. Se agregan coordenadas con un clic, se renombran calles y alturas, y los colores se actualizan en tiempo real.</p>
+        <p data-lang="en">Admins and superadmins manage blocks on a real OpenStreetMap (no API key needed). Blue pin = paid zone, green pin = free zone. Add GPS coordinates with one click, rename streets, and colors update instantly.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -658,6 +672,8 @@
           <li data-lang="en">Buy monthly pass with digital balance</li>
           <li data-lang="es">Login con Google (sin contraseña)</li>
           <li data-lang="en">Sign in with Google — no password needed</li>
+          <li data-lang="es">Detección de zona libre por GPS: si la subcuadra no cobra, aparece banner verde y no se registra pago</li>
+          <li data-lang="en">Free-zone GPS detection: if the block doesn't charge, a green banner shows and no payment is recorded</li>
           <li data-lang="es">Pagar sin registro vía QR o link directo</li>
           <li data-lang="en">Pay without an account via QR or direct link</li>
           <li data-lang="es">Notificaciones internas del sistema</li>
@@ -741,8 +757,8 @@
           <li data-lang="en">Billing hours per weekday (start and end times)</li>
           <li data-lang="es">Feriados y días especiales (cobro activo o inactivo)</li>
           <li data-lang="en">Holidays and special days (billing on or off)</li>
-          <li data-lang="es">Subcuadras: mapa GPS interactivo Leaflet/OSM, sin API key</li>
-          <li data-lang="en">Blocks: interactive GPS map Leaflet/OSM, no API key</li>
+          <li data-lang="es">Subcuadras: mapa GPS interactivo Leaflet/OSM (sin API key) — pin azul para zona pagada, verde para zona libre. Edición de nombre y coordenadas directamente desde el mapa</li>
+          <li data-lang="en">Blocks: interactive GPS map Leaflet/OSM (no API key) — blue pin for paid zone, green for free zone. Edit name and coordinates directly on the map</li>
           <li data-lang="es">Exenciones: global, parcial o por subcuadra — individual o importación CSV masiva</li>
           <li data-lang="en">Exemptions: global, partial, or per block — individual or bulk CSV import</li>
           <li data-lang="es">Tolerancia de gracia (minutos) y comisión vendedor (%)</li>
@@ -988,8 +1004,8 @@
       <div class="tech-detail-card">
         <h4 data-lang-inline="es">Modelos bien definidos</h4>
         <h4 data-lang-inline="en">Well-defined models</h4>
-        <p data-lang="es">18 modelos con constraints de integridad. Por ejemplo: un vehículo solo puede tener un estacionamiento ACTIVO a la vez — enforced en base de datos.</p>
-        <p data-lang="en">18 models with integrity constraints. For example: a vehicle can only have one ACTIVE parking at a time — enforced at the database level.</p>
+        <p data-lang="es">25+ modelos con constraints de integridad. Por ejemplo: un vehículo solo puede tener un estacionamiento ACTIVO a la vez — enforced en base de datos.</p>
+        <p data-lang="en">25+ models with integrity constraints. For example: a vehicle can only have one ACTIVE parking at a time — enforced at the database level.</p>
       </div>
       <div class="tech-detail-card">
         <h4 data-lang-inline="es">Deploy simple</h4>

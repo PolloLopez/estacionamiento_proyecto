@@ -129,6 +129,7 @@ from .views_admin import (
     editar_staff,
     responder_observacion,
     mapa_zonas,
+    gestionar_plantillas_admin,
 )
 from .views_mp import (
     mp_iniciar_carga,

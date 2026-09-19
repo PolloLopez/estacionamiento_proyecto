@@ -1,0 +1,665 @@
+# Guía de testing completo por rol
+> Sistema de Estacionamiento Medido — Railway: https://estacionamiento.up.railway.app
+> Última actualización: 2026-09-18
+
+Esta guía cubre cada rol con: flujos a testear paso a paso, qué verificar en cada pantalla, y un cuestionario de experiencia de usuario (UX) para registrar observaciones durante la prueba.
+
+**Antes de empezar:** tener al menos un municipio configurado con tarifa, horario activo y subcuadras cargadas.
+
+---
+
+## Preparación previa
+
+Crear o verificar que existan los siguientes usuarios de prueba en Railway (crear desde `/sistema-interno/`):
+
+| Rol | Email sugerido | Datos necesarios |
+|-----|---------------|-----------------|
+| Conductor | conductor@test.com | saldo > $0, al menos 1 vehículo vinculado |
+| Inspector | inspector@test.com | municipio asignado, es_inspector=True |
+| Vendedor | vendedor@test.com | municipio asignado, porcentaje_ganancia > 0 |
+| Admin | admin@test.com | municipio asignado, es_admin=True |
+| Tesorero | tesorero@test.com | municipio asignado, es_tesorero=True |
+| Superadmin | superadmin@test.com | es_superadmin=True |
+
+Tener una patente de prueba lista (ej: `AA123BB`) que NO tenga infracciones pendientes.
+
+---
+
+## ROL 1: Conductor
+
+**URL de entrada:** `/usuarios/` (redirige desde login)
+
+### Flujos a testear
+
+#### F1.1 — Registrar estacionamiento con saldo
+1. Ir a `/usuarios/` → ver panel con saldo actual y vehículos vinculados.
+2. Clic en "Estacionar".
+3. Activar GPS (botón de ubicación) → esperar que detecte la subcuadra automáticamente.
+4. Verificar que muestre el nombre de la subcuadra detectada.
+5. Si la subcuadra es libre → verificar que aparece el **banner verde** "Zona de estacionamiento libre" y que el formulario de pago queda oculto.
+6. Si la subcuadra es pagada → seleccionar duración → ver precio calculado.
+7. Completar el estacionamiento. Verificar que el saldo disminuyó.
+8. Volver al panel → verificar que aparece el estacionamiento activo con temporizador.
+
+**Qué verificar:**
+- [ ] GPS detecta subcuadra correctamente (o muestra error si no hay permiso de ubicación)
+- [ ] Zona libre: el formulario de pago se oculta y aparece el botón "Confirmar ubicación"
+- [ ] Zona libre: al confirmar, aparece mensaje "Podés estacionar sin pagar" (sin llamar al backend)
+- [ ] Zona pagada: el precio se calcula correctamente según tarifa del municipio
+- [ ] El saldo se debita exactamente (no más, no menos)
+- [ ] El estacionamiento activo aparece en el panel con tiempo restante
+
+#### F1.2 — Selección manual en cascada (sin GPS)
+1. En el formulario de estacionar, seleccionar calle desde el dropdown.
+2. Seleccionar altura.
+3. Verificar que si la subcuadra seleccionada es **libre**, aparece el banner verde (sin hacer submit del formulario).
+4. Verificar que si es **pagada**, aparece el formulario de duración/precio.
+
+**Qué verificar:**
+- [ ] Al cambiar calle, el selector de altura se repopula solo
+- [ ] Al seleccionar altura, el sistema detecta el tipo_zona inmediatamente (sin recargar)
+- [ ] Zona libre: banner verde aparece, formulario de pago desaparece
+- [ ] Zona pagada: formulario de pago aparece, banner oculto
+
+#### F1.3 — Cargar saldo con MercadoPago
+1. Ir a `/usuarios/mp/cargar/`.
+2. Ingresar un monto (ej: $1000).
+3. Verificar que redirige a la pantalla de pago de MP.
+4. Completar el pago (en modo prueba si está configurado).
+5. Verificar que el saldo se actualiza en el panel del conductor.
+
+**Qué verificar:**
+- [ ] El monto mínimo se valida (error si está por debajo del mínimo del municipio)
+- [ ] Redirige correctamente a MP
+- [ ] Después del pago, el saldo refleja la carga
+
+#### F1.4 — Ver y pagar una infracción propia
+1. Tener una infracción pendiente en el vehículo (crearla como inspector previamente).
+2. Ir a `/usuarios/mis-infracciones/`.
+3. Ver la infracción con monto y estado.
+4. Intentar estacionar el mismo vehículo → verificar que el sistema avisa sobre la infracción pendiente.
+5. Pagar la infracción (con saldo o MP).
+6. Verificar que la infracción pasa a "pagada".
+
+**Qué verificar:**
+- [ ] Las infracciones aparecen con monto, fecha, inspector y estado
+- [ ] Al intentar estacionar con infracción pendiente → mensaje de aviso claro
+- [ ] Si la infracción está dentro del período de gracia → se anula automáticamente al estacionar
+- [ ] Pago con saldo: se debita correctamente
+- [ ] Estado cambia a "pagada" tras el pago
+
+#### F1.5 — Impugnar una infracción
+1. Ir a `/usuarios/mis-infracciones/`.
+2. Clic en "Impugnar" en una infracción pendiente.
+3. Completar el formulario de impugnación con motivo.
+4. Enviar.
+
+**Qué verificar:**
+- [ ] El formulario se envía correctamente
+- [ ] Aparece mensaje de confirmación
+- [ ] La impugnación queda registrada (visible para el admin)
+
+#### F1.6 — Historial y vehículos
+1. Ir al historial de estacionamientos.
+2. Verificar que muestra fechas, duración y costo.
+3. Ir a "Mis vehículos" → ver y agregar un vehículo.
+
+#### F1.7 — Enviar sugerencia de mejora
+1. Ir a `/usuarios/sugerencias/nueva/`.
+2. Verificar que solo aparecen las áreas del conductor (conductor + general).
+3. Completar y enviar.
+
+---
+
+### Cuestionario de experiencia — Conductor
+
+Completar con observaciones reales durante el testing:
+
+**¿Cuánto tiempo tardaste en hacer tu primer estacionamiento desde cero?**
+`_____ minutos`
+
+**¿El GPS funcionó a la primera?**
+`[ ] Sí  [ ] No — ¿qué pasó?` _______________
+
+**¿Quedó claro qué significa "zona libre"?**
+`[ ] Sí, el banner fue claro  [ ] No, no entendí qué hacer`
+
+**¿Quedó claro cuánto dinero te iba a costar antes de confirmar?**
+`[ ] Sí  [ ] No — ¿qué confundió?` _______________
+
+**¿El panel principal muestra la información que necesitás en el día a día?**
+`[ ] Sí  [ ] Le falta: _______________`
+
+**¿Encontraste el botón de cargar saldo fácilmente?**
+`[ ] Sí  [ ] No`
+
+**¿El flujo de impugnación fue claro?**
+`[ ] Sí  [ ] No`
+
+**¿Qué mejorarías en la experiencia del conductor?**
+(espacio libre)
+_______________
+
+---
+
+## ROL 2: Inspector
+
+**URL de entrada:** `/usuarios/inspectores/`
+
+### Flujos a testear
+
+#### F2.1 — Verificar una patente
+1. Ir a `/usuarios/inspectores/verificar/`.
+2. Ingresar la patente `AA123BB`.
+3. Verificar que muestra el estado del vehículo (activo/vencido/sin registro).
+4. Si tiene estacionamiento activo: ver tiempo restante, subcuadra, nombre del conductor.
+5. Verificar que suena el sonido correcto (ok.mp3 / warning.mp3 / error.mp3).
+
+**Qué verificar:**
+- [ ] El resultado aparece rápido (< 3 segundos)
+- [ ] Los sonidos suenan en Chrome Android
+- [ ] El color de la pantalla cambia según el estado (verde/rojo/amarillo)
+- [ ] Si es exento: aparece claramente la razón de exención
+- [ ] Si el horario no está configurado para hoy: el inspector no puede operar
+
+#### F2.2 — Labrar una infracción
+1. Desde la pantalla de verificar, con un vehículo **sin** estacionamiento activo y dentro del horario.
+2. Clic en "Labrar infracción".
+3. Tomar o subir una foto del vehículo.
+4. Seleccionar el motivo.
+5. Confirmar.
+6. Verificar que se imprime el acta (si hay impresora BLE vinculada).
+7. Si no hay impresora: verificar que aparece el ticket en pantalla con la opción de reimprimir.
+
+**Qué verificar:**
+- [ ] Solo se puede labrar si el inspector está dentro del horario
+- [ ] La foto se sube correctamente a Cloudinary
+- [ ] El acta tiene watermark con GPS, fecha y nombre del inspector
+- [ ] El sistema hace doble copia (según configuración de `segundos_pausa_doble_copia`)
+- [ ] Si pausa=0: el inspector debe confirmar manualmente antes de imprimir la copia 2
+- [ ] La infracción aparece en "Mis infracciones del día" del inspector
+
+#### F2.3 — Intentar infraccionar dentro del período de gracia
+1. Tener un vehículo que acaba de ser infraccionado (hace < X minutos, donde X = tolerancia del municipio).
+2. Intentar infraccionar nuevamente.
+
+**Qué verificar:**
+- [ ] El sistema informa que el vehículo ya tiene una infracción reciente
+- [ ] Respeta el `minutos_entre_infracciones` configurado en el municipio
+
+#### F2.4 — Detección de subcuadra por GPS (inspector)
+1. Activar GPS en la pantalla de verificar.
+2. Verificar que detecta la subcuadra correcta.
+
+#### F2.5 — Verificación SIA (si está habilitado)
+1. Verificar un vehículo con patente de persona con discapacidad.
+2. Confirmar que el sistema consulta SIA/ANDIS y muestra el resultado.
+
+#### F2.6 — Resumen del día
+1. Ir a `/usuarios/inspectores/resumen/`.
+2. Ver las infracciones propias del día.
+3. Verificar que si `inspector_ve_sus_infracciones` está desactivado → no aparece el menú.
+
+---
+
+### Cuestionario de experiencia — Inspector
+
+**¿El scanner de patentes (lectura QR/manual) fue rápido y confiable?**
+`[ ] Sí  [ ] No — ¿qué pasó?` _______________
+
+**¿El feedback visual (colores) y sonoro fue claro para saber el estado del vehículo?**
+`[ ] Sí  [ ] No — ¿qué cambiarías?` _______________
+
+**¿La impresora BLE se conectó sin problemas?**
+`[ ] Sí  [ ] No conectó  [ ] No tengo impresora`
+
+**¿Si no tenés impresora, quedó claro cómo ver el acta igualmente?**
+`[ ] Sí  [ ] No`
+
+**¿El flujo de labrar una infracción es rápido (menos de 2 minutos)?**
+`[ ] Sí  [ ] No — ¿qué paso demora más?` _______________
+
+**¿El mensaje de "fuera de horario" es claro y aparece en el momento correcto?**
+`[ ] Sí  [ ] No`
+
+**¿Qué información le falta a la pantalla de verificar patente?**
+_______________
+
+**¿Qué mejorarías en tu panel?**
+_______________
+
+---
+
+## ROL 3: Vendedor
+
+**URL de entrada:** `/usuarios/vendedores/`
+
+### Flujos a testear
+
+#### F3.1 — Registrar un estacionamiento en persona (cobro efectivo)
+1. Ir al panel vendedor → "Registrar estacionamiento".
+2. Ingresar patente (ej: `BB456CC`).
+3. Seleccionar duración.
+4. Elegir medio de pago (efectivo, transferencia, débito, crédito, QR).
+5. Confirmar el cobro.
+
+**Qué verificar:**
+- [ ] Solo disponible dentro del horario configurado
+- [ ] Si es domingo/día sin horario: el formulario está deshabilitado
+- [ ] El precio coincide con la tarifa del municipio
+- [ ] El `saldo_operativo` del vendedor aumentó
+- [ ] Se creó un `MovimientoCaja`
+
+#### F3.2 — Cobrar una infracción (si tiene permiso)
+1. Ir a `/usuarios/vendedores/cobrar-infraccion/`.
+2. Ingresar patente con infracción pendiente.
+3. Seleccionar la infracción y el medio de pago.
+4. Confirmar el cobro.
+
+**Qué verificar:**
+- [ ] Solo aparece si `puede_cobrar_infraccion=True` en el perfil del vendedor
+- [ ] La infracción pasa a "pagada"
+- [ ] El cobro aparece en el resumen de caja
+
+#### F3.3 — Cobrar un abono mensual
+1. Ir a "Cobrar abono".
+2. Ingresar patente y tipo (auto/moto).
+3. Seleccionar el mes.
+4. Elegir medio de pago.
+5. Confirmar.
+
+**Qué verificar:**
+- [ ] Se puede cobrar fuera de horario (los abonos no tienen restricción horaria)
+- [ ] No se puede cobrar un abono duplicado (mismo mes + vehículo + municipio)
+- [ ] El precio corresponde al tipo (auto vs moto)
+
+#### F3.4 — Ver y cerrar la caja
+1. Ir a `/usuarios/vendedores/caja/`.
+2. Ver el resumen de cobros del turno (efectivo, digital, total).
+3. Clic en "Cerrar caja".
+4. Seleccionar el período (mañana, tarde, noche, etc.).
+5. Confirmar el cierre.
+
+**Qué verificar:**
+- [ ] El resumen muestra desglose por medio de pago
+- [ ] El cierre genera un `CierreCaja`
+- [ ] El `saldo_operativo` se resetea a 0 tras el cierre
+- [ ] El cierre aparece pendiente de certificación por el admin
+
+#### F3.5 — Ver mis comisiones
+1. Ir a `/usuarios/vendedores/comisiones/`.
+2. Ver liquidaciones pendientes, depositadas y certificadas.
+
+**Qué verificar:**
+- [ ] Solo aparecen liquidaciones del propio vendedor
+- [ ] Los estados son claros (pendiente / depositada / certificada)
+
+#### F3.6 — Certificar una comisión y adjuntar factura
+1. Cuando una comisión está en estado "depositada".
+2. Ir al detalle → confirmar recibo → subir factura (si corresponde).
+
+**Qué verificar:**
+- [ ] El vendedor puede certificar solo cuando el tesorero ya depositó
+- [ ] Se puede subir el archivo de factura
+- [ ] El estado cambia a "certificada"
+
+---
+
+### Cuestionario de experiencia — Vendedor
+
+**¿El formulario de cobro de estacionamiento fue rápido de completar?**
+`[ ] Sí  [ ] No — ¿qué demora?` _______________
+
+**¿Los medios de pago disponibles son los que usás en el día a día?**
+`[ ] Sí  [ ] Le falta: _______________`
+
+**¿El resumen de caja muestra claramente cuánto tenés que rendir?**
+`[ ] Sí  [ ] No — ¿qué falta?` _______________
+
+**¿Encontraste el botón de "Cobrar abono" sin dificultad?**
+`[ ] Sí  [ ] No`
+
+**¿El proceso de cierre de caja fue claro?**
+`[ ] Sí  [ ] No — ¿qué confundió?` _______________
+
+**¿Entendiste para qué es la sección de comisiones?**
+`[ ] Sí  [ ] No`
+
+**¿Qué mejorarías en tu panel?**
+_______________
+
+---
+
+## ROL 4: Admin Municipal
+
+**URL de entrada:** `/usuarios/admin-inicio/`
+
+### Flujos a testear
+
+#### F4.1 — Panel principal y navegación
+1. Entrar al panel admin.
+2. Recorrer el sidebar: Conductores, Inspectores, Vendedores, Infracciones, Rendiciones, Exenciones, Subcuadras, Cobertura, Auditoría, Dashboard.
+3. Verificar que los badges de notificación (infracciones, impugnaciones) muestran el número correcto.
+
+#### F4.2 — Gestionar conductores
+1. Ir a `/usuarios/admin-usuarios/`.
+2. Buscar un conductor por nombre o email.
+3. Entrar al detalle de un conductor → ver historial, saldo, vehículos.
+4. Editar el perfil (cambiar datos básicos).
+5. Ver las impugnaciones pendientes y responder una.
+
+**Qué verificar:**
+- [ ] La búsqueda funciona
+- [ ] El detalle muestra historial completo
+- [ ] Responder una impugnación: el estado cambia y el conductor puede verla
+
+#### F4.3 — Gestionar inspectores
+1. Ir a `/usuarios/admin-inspectores/`.
+2. Crear un nuevo inspector.
+3. Editar nombre/apellido (verificar que se guarda con formato título).
+4. Ir a estadísticas → ver infracciones por inspector + exportar Excel.
+5. Resetear la contraseña de un inspector.
+
+**Qué verificar:**
+- [ ] El inspector nuevo puede loguearse correctamente
+- [ ] Las estadísticas muestran datos reales del período
+- [ ] El Excel se descarga y se puede abrir
+
+#### F4.4 — Gestionar vendedores
+1. Crear un nuevo vendedor con un porcentaje de comisión.
+2. Activar/desactivar el permiso de cobrar infracciones.
+3. Resetear contraseña.
+
+#### F4.5 — Gestionar infracciones
+1. Ir a `/usuarios/admin-infracciones/`.
+2. Filtrar por estado (pendiente / pagada / anulada).
+3. Abrir el modal de detalle de una infracción.
+4. Anular una infracción pendiente → verificar que el modal se cierra correctamente.
+5. Aplicar un descuento voluntario a una infracción.
+
+**Qué verificar:**
+- [ ] El modal se cierra después de anular (no queda abierto)
+- [ ] La infracción pasa a "anulada" en la lista
+- [ ] El descuento se aplica correctamente al monto
+
+#### F4.6 — Certificar un cierre de caja
+1. Ir a rendiciones → sección "Cierres pendientes".
+2. Revisar el desglose de un cierre de vendedor o inspector.
+3. Certificar el cierre.
+
+**Qué verificar:**
+- [ ] El desglose efectivo/digital es correcto
+- [ ] El cierre queda marcado como certificado
+- [ ] Solo aparecen cierres del propio municipio
+
+#### F4.7 — Crear una rendición
+1. Ir a `/usuarios/admin-rendiciones/`.
+2. Seleccionar cierres de caja certificados para incluir en la rendición.
+3. Crear la rendición.
+4. Verificar que se generaron automáticamente las `LiquidacionComision` para cada vendedor.
+
+**Qué verificar:**
+- [ ] Solo se pueden incluir cierres certificados
+- [ ] Los totales calculados son correctos (efectivo + digital)
+- [ ] Las liquidaciones de comisión aparecen creadas automáticamente en estado "pendiente"
+- [ ] La rendición queda en estado "pendiente" esperando al tesorero
+
+#### F4.8 — Gestionar subcuadras
+1. Ir a `/usuarios/admin-subcuadras/`.
+2. Ver el mapa con los pins (azul = pagado, verde = libre).
+3. Agregar una subcuadra nueva haciendo clic en el mapa (poner latitud/longitud).
+4. Editar el nombre (calle/altura) de una subcuadra existente con el botón ✏️.
+5. Verificar que el pin del mapa se actualiza al agregar coordenadas.
+
+**Qué verificar:**
+- [ ] El mapa carga correctamente (OpenStreetMap)
+- [ ] Los pins tienen el color correcto según tipo_zona
+- [ ] Al hacer clic en un pin: muestra popup con nombre y tipo
+- [ ] La edición guarda correctamente calle y altura
+- [ ] No se puede duplicar una subcuadra con la misma calle+altura
+
+#### F4.9 — Dashboard con filtro de fechas
+1. Ir a `/usuarios/admin-dashboard/`.
+2. Filtrar por un rango de fechas.
+3. Verificar totales de infracciones, estacionamientos y recaudación.
+
+#### F4.10 — Auditoría de staff
+1. Ir a auditoría de staff.
+2. Filtrar por vendedor/inspector en un rango de fechas.
+3. Verificar que se muestran los movimientos de caja y las infracciones.
+
+---
+
+### Cuestionario de experiencia — Admin Municipal
+
+**¿El panel principal te da una vista clara del estado del sistema?**
+`[ ] Sí  [ ] No — ¿qué falta?` _______________
+
+**¿La navegación del sidebar es intuitiva?**
+`[ ] Sí  [ ] No — ¿qué confundió?` _______________
+
+**¿El proceso de crear una rendición fue claro (qué cierres incluir, qué pasa al crearla)?**
+`[ ] Sí  [ ] No — ¿qué confundió?` _______________
+
+**¿Las liquidaciones de comisión se crearon solas sin que tengas que hacer nada extra?**
+`[ ] Sí  [ ] No`
+
+**¿La gestión de subcuadras en el mapa fue fácil de usar?**
+`[ ] Sí  [ ] No — ¿qué fue difícil?` _______________
+
+**¿El modal de detalle de infracciones funciona correctamente (se cierra tras anular)?**
+`[ ] Sí  [ ] No`
+
+**¿La exportación de Excel de inspectores funcionó?**
+`[ ] Sí  [ ] No`
+
+**¿Qué mejorarías en tu panel?**
+_______________
+
+---
+
+## ROL 5: Tesorero
+
+**URL de entrada:** `/usuarios/tesorero/`
+
+### Flujos a testear
+
+#### F5.1 — Panel y acceso a comisiones
+1. Entrar al panel tesorero.
+2. Ver las cards disponibles: rendiciones, comisiones a depositar.
+3. Clic en "Comisiones a depositar" → redirige a `/usuarios/admin-rendiciones/?seccion=comisiones`.
+
+**Qué verificar:**
+- [ ] La card "Comisiones a depositar" es clickable y lleva al lugar correcto
+- [ ] Solo aparecen rendiciones y liquidaciones del propio municipio
+
+#### F5.2 — Validar una rendición
+1. Ir al listado de rendiciones pendientes.
+2. Abrir el detalle de una rendición.
+3. Opción A: validar → la rendición pasa a "validada".
+4. Opción B: observar → el campo de notas es **obligatorio** (no se puede enviar sin notas).
+
+**Qué verificar:**
+- [ ] El detalle muestra cierres incluidos, totales y liquidaciones
+- [ ] Observar sin notas: el formulario no se envía (validación JS + backend)
+- [ ] Al observar con notas: la rendición pasa a "observada" y el admin puede verlo
+- [ ] Al validar: la rendición pasa a "validada"
+
+#### F5.3 — Depositar comisiones de vendedores
+1. Ir a la sección de comisiones.
+2. Ver las liquidaciones en estado "pendiente".
+3. Depositar una comisión: ingresar número de comprobante + subir archivo de comprobante.
+4. Confirmar el depósito.
+
+**Qué verificar:**
+- [ ] El monto a depositar es correcto (suma de comisiones del período)
+- [ ] El número de comprobante se guarda
+- [ ] El archivo se sube correctamente
+- [ ] La liquidación pasa a estado "depositada"
+- [ ] El vendedor ahora puede certificar el recibo
+
+#### F5.4 — Ver historial de rendiciones
+1. Ver las rendiciones pasadas en todos los estados (pendiente, validada, observada).
+2. Entrar al detalle de una rendición validada.
+
+**Qué verificar:**
+- [ ] El historial está ordenado por fecha
+- [ ] El detalle de rendición validada es accesible (solo lectura)
+
+---
+
+### Cuestionario de experiencia — Tesorero
+
+**¿El panel principal te muestra lo que necesitás de un vistazo?**
+`[ ] Sí  [ ] No — ¿qué falta?` _______________
+
+**¿El proceso de validar/observar una rendición fue claro?**
+`[ ] Sí  [ ] No — ¿qué confundió?` _______________
+
+**¿La obligatoriedad de las notas al observar quedó clara (no se puede enviar sin notas)?**
+`[ ] Sí  [ ] No`
+
+**¿El proceso de depositar la comisión fue intuitivo?**
+`[ ] Sí  [ ] No — ¿qué fue difícil?` _______________
+
+**¿Qué información extra necesitarías ver en el panel?**
+_______________
+
+**¿Qué mejorarías en tu experiencia como tesorero?**
+_______________
+
+---
+
+## ROL 6: Superadmin
+
+**URL de entrada:** `/superadmin/municipios/`
+
+### Flujos a testear
+
+#### F6.1 — Gestionar municipios
+1. Ver el listado de municipios.
+2. Entrar a editar un municipio: configurar tarifas, horarios, colores, logo.
+3. Guardar cada sección por separado (las secciones son independientes).
+4. Verificar la alerta JS de "cambios sin guardar".
+
+**Qué verificar:**
+- [ ] La alerta de cambios sin guardar aparece si se intenta salir sin guardar
+- [ ] Los colores del municipio se reflejan en tiempo real (o tras refresh)
+- [ ] El logo se sube correctamente
+
+#### F6.2 — Gestionar subcuadras de un municipio desde superadmin
+1. En la pantalla de editar municipio, clic en "📍 Subcuadras".
+2. Verificar que redirige a `/superadmin/municipio/<id>/subcuadras/`.
+3. Agregar, editar y asignar coordenadas a subcuadras.
+4. Volver al municipio con el botón "← Volver al municipio".
+
+**Qué verificar:**
+- [ ] El botón de volver lleva de vuelta a `editar_municipio`
+- [ ] Los cambios de subcuadras se guardan correctamente
+- [ ] El mapa colorea correctamente (azul/verde) según tipo_zona
+
+#### F6.3 — Gestionar módulos premium
+1. Activar/desactivar módulos en un municipio.
+2. Verificar que el cambio afecta las funcionalidades disponibles para ese municipio.
+
+#### F6.4 — Generar token TV
+1. En editar municipio → sección "Dashboard TV".
+2. Regenerar el token.
+3. Abrir la URL `/tv/<token>/` → verificar que muestra el dashboard público.
+
+#### F6.5 — Gestionar sugerencias de mejora
+1. Ir a `/superadmin/sugerencias/`.
+2. Ver sugerencias enviadas por conductores/inspectores.
+3. Cambiar el estado de una sugerencia (en revisión, implementada, descartada).
+
+#### F6.6 — Toggle inspector ve sus infracciones
+1. En editar municipio → sección de configuración.
+2. Activar/desactivar `inspector_ve_sus_infracciones`.
+3. Loguearse como inspector y verificar que el menú de resumen aparece/desaparece.
+
+#### F6.7 — Limpiar datos de prueba
+1. En editar municipio → "Zona de peligro".
+2. Escribir `CONFIRMAR+<NOMBRE>` en el campo.
+3. Verificar que limpia solo los datos de ese municipio.
+
+---
+
+### Cuestionario de experiencia — Superadmin
+
+**¿La configuración del municipio por secciones (tarifas, horarios, colores...) fue clara?**
+`[ ] Sí  [ ] No — ¿qué sección fue confusa?` _______________
+
+**¿La alerta de "cambios sin guardar" funcionó correctamente?**
+`[ ] Sí  [ ] No`
+
+**¿Pudiste gestionar las subcuadras del municipio desde la vista de superadmin?**
+`[ ] Sí  [ ] No — ¿qué falló?` _______________
+
+**¿Los módulos premium son fáciles de activar/desactivar?**
+`[ ] Sí  [ ] No`
+
+**¿El dashboard TV público funciona correctamente con el token?**
+`[ ] Sí  [ ] No`
+
+**¿Qué mejorarías en tu panel de superadmin?**
+_______________
+
+---
+
+## Pago público sin registro
+
+**URL de entrada:** `/usuarios/pagar/`
+
+### Flujos a testear
+
+#### FP.1 — Consultar deuda por patente
+1. Ir a `/usuarios/pagar/`.
+2. Ingresar una patente con infracciones pendientes.
+3. Verificar que muestra la deuda correctamente.
+4. Pagar la infracción con MercadoPago.
+
+**Qué verificar:**
+- [ ] La búsqueda funciona sin estar logueado
+- [ ] El precio de la infracción es correcto
+- [ ] Después del pago (webhook MP), la infracción pasa a "pagada"
+
+#### FP.2 — Estacionar sin registro
+1. Ir a `/usuarios/pagar/`.
+2. Ingresar una patente.
+3. Activar GPS → verificar que detecta subcuadra.
+4. Si es zona libre: ver banner verde, no hay opción de pago.
+5. Si es zona pagada: seleccionar duración y pagar con MP.
+
+**Qué verificar:**
+- [ ] GPS funciona en el flujo público (sin login)
+- [ ] Zona libre: no se registra pago
+- [ ] La selección en cascada (sin GPS) también detecta zona libre
+
+---
+
+## Casos borde — testear en cualquier rol
+
+| Caso | Qué probar | Resultado esperado |
+|------|-----------|-------------------|
+| Fuera de horario | Inspector intenta labrar a las 00:00 | Pantalla bloqueada con mensaje |
+| Infracción dentro de gracia | Conductor estaciona inmediatamente tras recibir multa | Infracción anulada automáticamente |
+| Infracción fuera de gracia | Conductor estaciona pasado el período de gracia | La infracción queda pendiente, se puede estacionar pero aparece aviso |
+| Saldo insuficiente | Conductor intenta estacionar sin saldo suficiente | Error claro, no se registra el estacionamiento |
+| Abono duplicado | Vendedor intenta cobrar el mismo mes dos veces | Error "ya existe abono para este mes" |
+| Patente inexistente | Cualquier rol busca una patente que no existe | El sistema la crea como nuevo vehículo (verificar) |
+| Acceso cruzado | Inspector intenta acceder a `/usuarios/admin-inicio/` | Redirige al panel correcto del inspector |
+| Multi-municipio | Admin de municipio A intenta ver datos del municipio B | Error 404 o redirección |
+| Zona libre + submit manual | Conductor envía el formulario de estacionar en zona libre | Backend rechaza el intento de pago |
+
+---
+
+## Checklist final cross-rol
+
+Después de testear todos los roles:
+
+- [ ] **Flujo financiero completo:** conductor pagó → vendedor cobró → vendedor cerró caja → admin certificó cierre → admin creó rendición → tesorero validó → tesorero depositó comisión → vendedor certificó.
+- [ ] **Zona libre de punta a punta:** inspector confirma que una subcuadra es libre en el mapa → conductor la detecta por GPS y no paga → conductor la detecta en cascada manual y no paga → pago público tampoco genera pago.
+- [ ] **Infracción de punta a punta:** inspector labró → conductor impugnó → admin respondió la impugnación → conductor pagó → estado = pagada.
+- [ ] **Dark mode:** todos los paneles se ven correctamente en modo oscuro (sin textos ilegibles ni fondos raros).
+- [ ] **Mobile:** las pantallas que usan los inspectores y conductores se ven bien en Chrome Android (pantalla chica, touch).
+- [ ] **Sin errores 500 en ningún flujo** (revisar Sentry o los logs de Railway al final del testing).
