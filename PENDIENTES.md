@@ -1,29 +1,124 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-19 (sesión 10 — continuación 2)
+Última actualización: 2026-09-19 (sesión 10 — continuación 3)
 
 ---
 
 ## 🗺️ Contexto de deploy
 
-- **Railway** → ambiente de prueba (inspectores + admin testeando). No es producción municipal real.
-- **Digital Ocean** → deploy definitivo cuando el sistema vaya a municipios reales pagando.
+- **Railway** → ambiente de prueba activo. No es producción municipal real.
+- **Digital Ocean App Platform** → deploy definitivo antes de entregar a un municipio real.
 - El código es el mismo; los cambios son de infraestructura y configuración.
+
+### Orden recomendado antes del go-live municipal
+
+```
+1. Corregir bug rendiciones (🔴 abajo)
+2. Test end-to-end comisiones (🟡 abajo)  
+3. Migrar a Digital Ocean App Platform (🔴 abajo)
+4. Smoke test en DO con URL temporal (sin tocar DNS)
+5. Corte al municipio real → switch de dominio
+```
+
+No migrar a DO con bugs conocidos: si algo falla en producción, no sabrás si es el bug o la migración.
 
 ---
 
 ## 🔴 Alta prioridad
 
+### Bug: admin puede certificar su propio cierre en `/admin-rendiciones/`
+
+El flujo correcto es:
+1. Vendedores rinden sus cierres → **admin los certifica** ✓
+2. Admin consolida esos cierres + su propia caja → hace la rendición a tesorería
+3. **Tesorero certifica la rendición del admin** ✓
+
+El problema: la validación bloquea el paso 3. Leer `views_admin.py` y `templates/admin/rendiciones.html` → ajustar para que:
+- Admin **no** pueda certificar su propio cierre de caja.
+- Tesorero **sí** pueda certificar el cierre/rendición del admin.
+
+---
+
+### Migración a Digital Ocean App Platform
+
+**Contexto:** Railway es el ambiente de prueba actual. DO App Platform es el destino de producción municipal. Hacer en paralelo — no apagar Railway hasta confirmar que DO funciona.
+
+#### Paso 1 — Preparar DO (sin tocar Railway)
+
+1. Crear cuenta DO → **App Platform** → "Create App" → conectar el repo de GitHub (rama `main`).
+2. DO detecta Python automáticamente. Configurar:
+   - **Run command:** `gunicorn estacionamiento.wsgi --bind 0.0.0.0:$PORT`
+   - **Build command:** `pip install -r requirements.txt && python manage.py collectstatic --noinput`
+   - **Post-deploy job:** `python manage.py migrate`
+3. Agregar base de datos: en el wizard de App Platform → "Add Resource" → **PostgreSQL** (el managed de DO, ~$7/mes dev o $15/mes básico). DO inyecta `DATABASE_URL` automáticamente.
+
+#### Paso 2 — Variables de entorno en DO
+
+En App Platform → Settings → Environment Variables. Copiar de Railway cambiando solo lo que aplique:
+
+| Variable | ¿Cambia? | Acción |
+|---|---|---|
+| `SECRET_KEY` | No | Copiar igual |
+| `DATABASE_URL` | Sí | DO la inyecta automático — no setear manualmente |
+| `DEBUG` | No | Debe ser `False` |
+| `ALLOWED_HOSTS` | Sí | Agregar URL temporal de DO (`app-nombre-xyz.ondigitalocean.app`) + dominio final del municipio |
+| `CLOUDINARY_*` | No | Copiar igual |
+| `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY` | No | Copiar igual |
+| `MP_WEBHOOK_SECRET` | No | Copiar igual (el valor lo define MP, no el hosting) |
+| `ANYMAIL_*` (Brevo/Resend) | No | Copiar igual |
+| `SENTRY_DSN` | No | Copiar igual (o crear nuevo proyecto en Sentry para separar prod de prueba) |
+
+#### Paso 3 — Migrar la base de datos
+
+```bash
+# En Railway (o desde local con la URL de Railway):
+pg_dump $RAILWAY_DATABASE_URL > backup_railway_$(date +%Y%m%d).sql
+
+# En DO (con la URL del managed PostgreSQL de DO):
+psql $DO_DATABASE_URL < backup_railway_YYYYMMDD.sql
+
+# Verificar migraciones aplicadas:
+python manage.py migrate --check
+```
+
+Si los datos de Railway son solo de prueba y el municipio va a arrancar desde cero, se puede saltear la migración de datos (solo correr `python manage.py migrate` sobre la BD vacía de DO).
+
+#### Paso 4 — Cron jobs en DO App Platform
+
+DO App Platform tiene "Jobs" que corren en schedule. Crear:
+- **Nombre:** `revocar-exenciones`
+- **Command:** `python manage.py revocar_exenciones_vencidas`
+- **Schedule:** `0 3 * * *` (3am todos los días)
+
+Esto reemplaza el pendiente de Railway del cron de SIA.
+
+#### Paso 5 — Smoke test en DO (con URL temporal, sin cambiar DNS)
+
+Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
+- [ ] Login de cada rol (conductor, inspector, vendedor, admin, tesorero, superadmin)
+- [ ] Registrar estacionamiento completo (incluyendo débito de saldo)
+- [ ] Registrar infracción y cobrarla
+- [ ] Hacer rendición de vendedor → admin la certifica → tesorero deposita
+- [ ] Verificar que los emails (Brevo/Resend) salen correctamente
+- [ ] Verificar que Cloudinary sirve imágenes si hay logos de municipio cargados
+
+#### Paso 6 — Corte: switch de dominio
+
+1. En DO App Platform → Settings → Domains → agregar el dominio del municipio. DO gestiona SSL automáticamente (Let's Encrypt).
+2. En el registrador de dominio → apuntar DNS al valor que da DO (CNAME o A record). Propagación: 5–30 min.
+3. **Actualizar el webhook de MercadoPago** en el panel de MP: Credenciales → Webhooks → cambiar URL a `https://dominio-municipio.com/mp/webhook/`. Este es el paso más fácil de olvidar.
+4. Actualizar UptimeRobot con la nueva URL.
+5. En Railway: dejar activo 3–5 días más como fallback. Después, apagar.
+
 ---
 
 ## 🟡 Media prioridad
 
-- **SIA: configurar cron en Railway** — el management command `revocar_exenciones_vencidas` ya existe. Pendiente: activarlo como cron job diario en Railway (panel → Cron Jobs → `python manage.py revocar_exenciones_vencidas`).
+- **Comisiones de vendedores — test end-to-end** (hacer ANTES de la migración a DO)
+  Prueba manual completa: rendición del vendedor → tesorero deposita → vendedor certifica. Confirmar que los montos coinciden con lo registrado en `LiquidacionComision`.
 - **Inspector — impresora BLE: no volver a pedir vinculación al imprimir**
   Workaround actual: reconectar por nombre. Evaluar si Chrome corrigió el bug de `getDevices()` o documentar como límite del navegador.
   Archivo: `static/.../js/impresora_bluetooth.js` (función `reconectarImpresora`).
-- **Comisiones de vendedores — test end-to-end en Railway**
-  Pendiente: prueba manual (rendición → tesorero deposita → vendedor certifica).
 
 ---
 
