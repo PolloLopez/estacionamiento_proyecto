@@ -34,7 +34,7 @@ Tener una patente de prueba lista (ej: `AA123BB`) que NO tenga infracciones pend
 #### F1.1 — Registrar estacionamiento con saldo
 1. Ir a `/usuarios/` → ver panel con saldo actual y vehículos vinculados.
 2. Clic en "Estacionar".
-3. Activar GPS (botón de ubicación) → esperar que detecte la subcuadra automáticamente.
+3. Hacer clic en el botón "Detectar mi cuadra" → esperar el spinner de detección.
 4. Verificar que muestre el nombre de la subcuadra detectada.
 5. Si la subcuadra es libre → verificar que aparece el **banner verde** "Zona de estacionamiento libre" y que el formulario de pago queda oculto.
 6. Si la subcuadra es pagada → seleccionar duración → ver precio calculado.
@@ -107,7 +107,16 @@ Tener una patente de prueba lista (ej: `AA123BB`) que NO tenga infracciones pend
 #### F1.7 — Enviar sugerencia de mejora
 1. Ir a `/usuarios/sugerencias/nueva/`.
 2. Verificar que solo aparecen las áreas del conductor (conductor + general).
-3. Completar y enviar.
+3. En el campo **Edad (opcional)**, seleccionar un rango (ej: 26–35).
+4. Completar y enviar → verificar que aparece en la lista de "Mis sugerencias".
+5. Enviar una segunda sugerencia **sin** seleccionar rango de edad (dejar "Prefiero no decir").
+
+**Qué verificar:**
+- [ ] Solo aparecen áreas "conductor" y "general" en el select de área
+- [ ] El select de rango de edad está visible y tiene las opciones correctas (menor18, 18-25, 26-35, 36-50, 51-65, mayor65)
+- [ ] Enviar con rango seleccionado → funciona correctamente
+- [ ] Enviar sin seleccionar rango → también funciona (campo opcional)
+- [ ] Las sugerencias enviadas aparecen en `/usuarios/sugerencias/`
 
 #### F1.8 — Estacionar en la última franja horaria 🆕 *sesión 11*
 > **Contexto:** antes del fix, si quedaban menos de 60 minutos para el cierre del horario, el sistema no mostraba opciones y el conductor no podía estacionar — pero el inspector sí podía multar. Ahora siempre aparece al menos una opción.
@@ -131,6 +140,76 @@ Para testear este flujo necesitás estar cerca del cierre del horario (ej. falta
 - [ ] Con 15 min restantes → botón "30 min" disponible
 - [ ] Con horario ya cerrado → pantalla de "fuera de horario" (no opciones)
 - [ ] En ningún caso el mensaje dice "finaliza en breve, no registres" cuando el horario sigue activo
+
+#### F1.9 — GPS on demand: "Detectar mi cuadra" 🆕 *sesión 11*
+> **Contexto:** antes el GPS se activaba automáticamente al cargar la página, lo que mostraba un popup de permiso sin contexto. Ahora el conductor debe hacer clic en "Detectar mi cuadra" para activarlo. El flag `gpsYaCorrio` evita que un segundo clic dispare un segundo pedido.
+
+**Caso A — GPS disponible:**
+1. Ir a `/usuarios/estacionar/`.
+2. Verificar que **no aparece ningún popup de permiso de GPS** al cargar la página.
+3. Hacer clic en el botón "Detectar mi cuadra".
+4. Aceptar el permiso cuando el navegador lo pida → ver el spinner "Detectando...".
+5. Verificar que aparece el nombre de la subcuadra detectada y su tipo (pagada/libre).
+6. Hacer clic en "Detectar mi cuadra" una segunda vez (sin recargar) → verificar que **no** hace un segundo pedido de GPS (el botón no actúa si `gpsYaCorrio=true`).
+
+**Caso B — GPS denegado o sin cobertura:**
+1. Ir a `/usuarios/estacionar/`.
+2. Hacer clic en "Detectar mi cuadra" → denegar el permiso (o estar en zona sin señal).
+3. Verificar que aparece el selector manual calle→altura en cascada (no pantalla de error).
+4. Seleccionar calle → el selector de altura se repopula solo.
+5. Seleccionar altura → verificar que detecta tipo_zona y muestra la respuesta correcta (banner libre o formulario pagado).
+
+**Qué verificar:**
+- [ ] Al cargar la página: no aparece popup de GPS automático
+- [ ] Botón "Detectar mi cuadra" visible y clicable
+- [ ] Spinner aparece mientras se detecta
+- [ ] Subcuadra detectada: muestra nombre + tipo (pagada/libre)
+- [ ] Segundo clic en el botón: no dispara un nuevo fetch (flag gpsYaCorrio)
+- [ ] GPS fallido/denegado → selector manual aparece correctamente, la página no se rompe
+- [ ] Link "Ingresar manualmente" también activa el selector sin esperar al GPS
+
+#### F1.10 — Sugerencias de vehículos: últimos usados + otros vinculados 🆕 *sesión 11*
+> **Contexto:** antes todos los vehículos aparecían en una lista plana. Ahora se muestran en dos secciones: "Últimos usados" (últimos 3 vehículos con estacionamiento, sin repetidos) y "Otros vinculados" (los restantes). Los emojis indican el tipo.
+
+**Con estacionamientos previos:**
+1. Asegurarse de tener al menos 2 vehículos vinculados con estacionamientos registrados.
+2. Ir a `/usuarios/estacionar/`.
+3. Verificar que aparece la sección "Últimos usados" con hasta 3 vehículos.
+4. Verificar que son los últimos 3 usados (más reciente arriba), sin repetidos.
+5. Verificar que los vehículos restantes aparecen en "Otros vinculados".
+6. Verificar que ningún vehículo aparece en ambas secciones al mismo tiempo.
+7. Verificar los emojis: 🛵 para motos, 🚗 para autos.
+
+**Con cuenta sin estacionamientos previos:**
+1. Loguearse con un conductor nuevo (sin estacionamientos registrados).
+2. Ir a `/usuarios/estacionar/`.
+3. Verificar que la sección "Últimos usados" no aparece (o está vacía, sin error).
+4. Los vehículos vinculados aparecen directamente en "Otros vinculados".
+
+**Qué verificar:**
+- [ ] "Últimos usados" muestra máximo 3 vehículos, sin repetidos
+- [ ] El orden es por uso más reciente (más reciente primero)
+- [ ] "Otros vinculados" muestra los restantes (no incluye los de "últimos usados")
+- [ ] 🛵 para moto, 🚗 para auto en ambas secciones
+- [ ] Sin estacionamientos previos: no rompe la página, "Últimos usados" no aparece o está vacía
+
+#### F1.11 — Agregar vehículo inline (sin salir de la página) 🆕 *sesión 11*
+> **Contexto:** antes, hacer clic en "Agregar vehículo" navegaba a otra página y el conductor perdía el contexto del estacionamiento que estaba por registrar. Ahora el formulario se expande inline, en la misma página.
+
+1. Ir a `/usuarios/estacionar/`.
+2. Hacer clic en "➕ Agregar vehículo".
+3. Verificar que el panel de formulario se expande **en la misma página** (no navega a otra URL).
+4. Completar patente y tipo de vehículo.
+5. Hacer clic en "Guardar" → el panel se cierra y el nuevo vehículo aparece en la lista.
+6. Hacer clic de nuevo en "➕ Agregar vehículo" → hacer clic en "Cancelar" → el panel se cierra sin guardar nada.
+7. Abrir y cerrar el panel varias veces → verificar que no hay errores.
+
+**Qué verificar:**
+- [ ] Clic en "➕ Agregar vehículo" → panel se expande inline (sin cambiar de URL)
+- [ ] El formulario tiene campos de patente + tipo de vehículo
+- [ ] Guardar correctamente → vehículo aparece en la lista de vehículos
+- [ ] "Cancelar" colapsa el panel sin hacer submit
+- [ ] Abrir/cerrar múltiples veces → no hay errores JavaScript en consola
 
 ---
 
