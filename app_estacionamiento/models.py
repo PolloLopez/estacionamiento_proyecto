@@ -226,6 +226,7 @@ class Usuario(AbstractUser):
     def apellido(self, valor):
         self.last_name = valor
 
+    @property
     def nombre_completo(self):
         """Devuelve nombre y apellido, o correo si no tiene datos."""
         partes = [self.first_name, self.last_name]
@@ -374,8 +375,8 @@ class Municipio(models.Model):
     # ── Descuento para conductores verificados ───────────────────────────────────
     # El superadmin configura un porcentaje de descuento sobre el costo de
     # estacionamiento para conductores que ya verificaron su identidad (es_verificado=True).
-    # descuento_solo_vecinos=True → solo aplica si además el conductor es vecino
-    # del municipio (es_vecino=True). False → aplica a todos los verificados.
+    # descuento_solo_vecinos=True → solo aplica si además el conductor tiene
+    # es_residente_verificado=True. False → aplica a todos los verificados.
     # Null en descuento_verificados_pct = módulo desactivado (sin descuento).
     descuento_verificados_pct = models.DecimalField(
         max_digits=5, decimal_places=2,
@@ -392,7 +393,7 @@ class Municipio(models.Model):
         verbose_name="Solo vecinos del municipio",
         help_text=(
             "Si está activo, el descuento solo aplica a conductores verificados "
-            "que además estén marcados como vecinos del municipio. "
+            "que además tengan 'Residente verificado' (es_residente_verificado=True). "
             "Si está inactivo, aplica a todos los conductores verificados."
         ),
     )
@@ -838,6 +839,16 @@ class MovimientoCaja(models.Model):
         verbose_name='ID de pago MercadoPago',
     )
 
+    class Meta:
+        indexes = [
+            # Query más frecuente: filter(usuario=..., cerrado=False, creado_en__gte=...)
+            # Se usa al calcular totales de rendición y al generar cierres de caja.
+            models.Index(
+                fields=["usuario", "cerrado", "creado_en"],
+                name="idx_movcaja_cerrado_fecha",
+            ),
+        ]
+
     def save(self, *args, **kwargs):
         if self.pk:
             # values_list trae solo el booleano "cerrado" en vez del objeto completo.
@@ -922,6 +933,21 @@ class CierreCaja(models.Model):
 
     class Meta:
         ordering = ["-fecha_cierre"]
+        indexes = [
+            # Queries del panel admin/tesorero: cierres sin certificar de un municipio.
+            # El municipio se alcanza via JOIN (usuario__municipio), pero certificado
+            # y usuario son columnas directas — este índice cubre el filtro más selectivo.
+            models.Index(
+                fields=["usuario", "certificado"],
+                name="idx_cierre_usuario_certificado",
+            ),
+            # Query de crear_rendicion: cierres certificados y aún sin rendir de un usuario.
+            # filter(usuario__municipio=..., certificado=True, rendicion__isnull=True)
+            models.Index(
+                fields=["usuario", "certificado", "rendicion"],
+                name="idx_cierre_cert_rendicion",
+            ),
+        ]
 
     def __str__(self):
         estado = "✅" if self.certificado else "⏳"
@@ -1033,6 +1059,27 @@ class Infraccion(models.Model):
         null=True, blank=True,
         verbose_name="Precisión GPS (metros)",
     )
+
+    class Meta:
+        indexes = [
+            # Panel admin: filter(municipio=municipio).order_by("-creado_en")
+            # Con 50K-100K infracciones/año, sin este índice cada listado hace full scan.
+            models.Index(
+                fields=["municipio", "creado_en"],
+                name="idx_infraccion_municipio_fecha",
+            ),
+            # Inspector: filter(vehiculo=v, estado="pendiente") — chequeo anti-duplicado
+            # y verificación del estado del vehículo en tiempo real.
+            models.Index(
+                fields=["vehiculo", "estado"],
+                name="idx_infraccion_vehiculo_estado",
+            ),
+            # Estadísticas por inspector: filter(inspector=..., creado_en__date__gte=...)
+            models.Index(
+                fields=["inspector", "creado_en"],
+                name="idx_infraccion_inspector_fecha",
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         if not self.municipio:

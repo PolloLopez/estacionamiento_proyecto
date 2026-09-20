@@ -19,7 +19,7 @@ def calcular_descuento_conductor(conductor, municipio):
     Reglas:
       1. Si municipio.descuento_verificados_pct es None/0 → sin descuento (retorna 0).
       2. Si el conductor no tiene es_verificado=True → sin descuento.
-      3. Si municipio.descuento_solo_vecinos=True y el conductor no tiene es_vecino=True
+      3. Si municipio.descuento_solo_vecinos=True y el conductor no tiene es_residente_verificado=True
          → sin descuento.
       4. Si pasa todos los filtros → retorna el porcentaje configurado.
 
@@ -40,8 +40,9 @@ def calcular_descuento_conductor(conductor, municipio):
     if not getattr(conductor, "es_verificado", False):
         return Decimal("0")
 
-    # Alcance restringido a vecinos
-    if municipio.descuento_solo_vecinos and not getattr(conductor, "es_vecino", False):
+    # Alcance restringido a residentes verificados del municipio.
+    # El campo en Usuario es es_residente_verificado (no es_vecino — nombre viejo).
+    if municipio.descuento_solo_vecinos and not getattr(conductor, "es_residente_verificado", False):
         return Decimal("0")
 
     return Decimal(str(pct))

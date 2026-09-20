@@ -351,6 +351,8 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "loggers": {
-        "django.request": {"handlers": ["console"], "level": "DEBUG", "propagate": False},
+        # WARNING en producción para no llenar los logs con requests normales.
+        # En local (DEBUG=True) baja a DEBUG para ver todo.
+        "django.request": {"handlers": ["console"], "level": "WARNING" if not DEBUG else "DEBUG", "propagate": False},
     },
 }
