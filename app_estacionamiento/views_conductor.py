@@ -530,7 +530,13 @@ def subcuadra_cercana_conductor(request):
         return math.sqrt(dlat ** 2 + dlon ** 2)
 
     mas_cercana = min(subcuadras, key=distancia)
-    return JsonResponse({"id": mas_cercana.id, "nombre": str(mas_cercana)})
+    return JsonResponse({
+        "id":        mas_cercana.id,
+        "nombre":    str(mas_cercana),
+        # tipo_zona es "pagado" o "libre" — el template lo usa para mostrar
+        # el banner de zona libre y ocultar el formulario de pago.
+        "tipo_zona": mas_cercana.tipo_zona,
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────

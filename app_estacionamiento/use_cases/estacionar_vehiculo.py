@@ -53,14 +53,24 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             "info_reintegro":  None,
         }
 
-    tarifa_obj  = Tarifa.objects.filter(municipio=usuario.municipio).first()
-    tarifa_hora = obtener_tarifa_hora(tarifa_obj, vehiculo)
-    costo_base  = duracion * tarifa_hora
+    # Zona libre: la subcuadra no tiene cobro. El estacionamiento se registra
+    # igualmente (para que el inspector vea "PAGADO") pero el costo es $0.
+    # Esto es la red de seguridad del backend: el frontend ya oculta el formulario
+    # de pago, pero si alguien enviara el POST igual, no se le cobra.
+    if subcuadra and getattr(subcuadra, "tipo_zona", None) == "libre":
+        tarifa_hora = Decimal("0")
+        costo_base  = Decimal("0")
+        resultado_descuento = {"costo_final": Decimal("0"), "descuento_pct": Decimal("0"), "motivo": ""}
+        costo = Decimal("0")
+    else:
+        tarifa_obj  = Tarifa.objects.filter(municipio=usuario.municipio).first()
+        tarifa_hora = obtener_tarifa_hora(tarifa_obj, vehiculo)
+        costo_base  = duracion * tarifa_hora
 
-    # Descuento para conductores verificados (configurado por el superadmin).
-    # Se calcula antes del lock — es solo aritmética, sin race condition posible.
-    resultado_descuento = aplicar_descuento_conductor(costo_base, usuario, usuario.municipio)
-    costo = resultado_descuento["costo_final"]
+        # Descuento para conductores verificados (configurado por el superadmin).
+        # Se calcula antes del lock — es solo aritmética, sin race condition posible.
+        resultado_descuento = aplicar_descuento_conductor(costo_base, usuario, usuario.municipio)
+        costo = resultado_descuento["costo_final"]
 
     relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
     warnings   = VehiculoPolicy.generar_warnings(usuario, vehiculo, relaciones)

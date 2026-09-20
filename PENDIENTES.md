@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-19 (sesión 10 — continuación 3)
+Última actualización: 2026-09-20 (sesión 11)
 
 ---
 
@@ -13,7 +13,7 @@
 ### Orden recomendado antes del go-live municipal
 
 ```
-1. Corregir bug rendiciones (🔴 abajo)
+1. Corregir bugs detectados en testing (🔴 abajo)
 2. Test end-to-end comisiones (🟡 abajo)  
 3. Migrar a Digital Ocean App Platform (🔴 abajo)
 4. Smoke test en DO con URL temporal (sin tocar DNS)
@@ -26,16 +26,9 @@ No migrar a DO con bugs conocidos: si algo falla en producción, no sabrás si e
 
 ## 🔴 Alta prioridad
 
-### Bug: admin puede certificar su propio cierre en `/admin-rendiciones/`
+### ~~Bug: horario libre cobra al conductor y no bloquea al inspector~~ ✅ Resuelto sesión 11
 
-El flujo correcto es:
-1. Vendedores rinden sus cierres → **admin los certifica** ✓
-2. Admin consolida esos cierres + su propia caja → hace la rendición a tesorería
-3. **Tesorero certifica la rendición del admin** ✓
-
-El problema: la validación bloquea el paso 3. Leer `views_admin.py` y `templates/admin/rendiciones.html` → ajustar para que:
-- Admin **no** pueda certificar su propio cierre de caja.
-- Tesorero **sí** pueda certificar el cierre/rendición del admin.
+### ~~Bug: inspector — verificación de moto no captura la patente~~ ✅ Resuelto sesión 11
 
 ---
 
@@ -115,15 +108,28 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 ## 🟡 Media prioridad
 
 - **Comisiones de vendedores — test end-to-end** (hacer ANTES de la migración a DO)
-  Prueba manual completa: rendición del vendedor → tesorero deposita → vendedor certifica. Confirmar que los montos coinciden con lo registrado en `LiquidacionComision`.
+  Prueba manual completa según `GUIA_TESTING_ROLES.md` → sección "TEST COMPLETO: Flujo de comisiones de vendedores".
+- **Inspector — impresora BLE: duplicado sigue sin imprimir**
+  Detectado en testing (2026-09-20). El acta de segunda copia no se envía a la impresora. En sesión 10 se mejoró la distinción de fallo (mensaje diferenciado si copia 1 salió o no), pero el duplicado en sí sigue sin funcionar. Revisar el flujo de `imprimirActa()` segunda pasada en `ticket_infraccion.html`.
 - **Inspector — impresora BLE: no volver a pedir vinculación al imprimir**
   Workaround actual: reconectar por nombre. Evaluar si Chrome corrigió el bug de `getDevices()` o documentar como límite del navegador.
   Archivo: `static/.../js/impresora_bluetooth.js` (función `reconectarImpresora`).
+- **Div notificaciones del conductor no es responsive en mobile**
+  Detectado en testing (2026-09-20). El bloque de preferencias de notificaciones en el panel conductor se rompe en pantalla chica. Revisar `templates/conductores/inicio_usuarios.html` — el `<div>` colapsable de notificaciones en el footer.
+- **Abono: mostrar el precio antes del botón de confirmar**
+  Detectado en testing (2026-09-20). En el flujo de cobro de abono del vendedor, el precio aparece recién después de hacer clic en "Ver precio y confirmar". Debería mostrarse en la vista antes de que el usuario tenga que hacer clic en ese botón. Archivo: `templates/vendedores/cobrar_abono.html`.
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
+- **Notificación antes de que venza el estacionamiento / abono**
+  Detectado en testing (2026-09-20). El conductor no recibe aviso cuando le queda poco tiempo. Implementar: push notification o email con X minutos de antelación configurable por municipio.
+- **Horario con valor diferido (módulo premium por municipio)**
+  Detectado en testing (2026-09-20). Feature: superadmin puede habilitar por municipio un "horario libre diario" con valor diferido — un horario especial donde el cobro se aplica de forma distinta (ej: primeras 2 hs libres, luego cobro normal). Requiere diseño de modelo antes de implementar.
+- **Billetera por municipio — flujo de selección de ciudad**
+  Detectado en testing (2026-09-20). Hoy el saldo del conductor es global entre municipios. Largo plazo: cada billetera debería ser por municipio para evitar que se use saldo de un municipio en otro. Requiere diseño arquitectural (nuevo modelo o campo en `MovimientoCaja`/`Estacionamiento`).
+- **URL / configuración desde Digital Ocean** — revisar las configuraciones específicas de URL al migrar (ver plan de migración en 🔴 arriba).
 - **Migración a Digital Ocean** — disparador: cuando el sistema pase a municipio real pagando. Ver `CHECKLIST_PRODUCCION_2026-09-01.md`.
 - **OCR de patentes** — Google ML Kit o Tesseract.js. Botón "📷 Escanear" en `verificar.html`.
 - **Alertas de vencimiento al conductor** — push / WhatsApp.
@@ -142,6 +148,13 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 ---
 
 ## ✅ Resuelto
+
+### Sesión 2026-09-20 (sesión 11) — Zona libre, moto inspector
+
+| Ítem | Detalle |
+|---|---|
+| Bug zona libre cobra al conductor | `views_conductor.py` → `subcuadra_cercana_conductor()` ahora devuelve `tipo_zona` en el JSON. `estacionar_vehiculo.html`: `data-tipo-zona` en las `<option>`, función `actualizarZonaLibre()`, listener en GPS y selector manual, banner verde. `use_cases/estacionar_vehiculo.py`: backend safety — si `tipo_zona="libre"` el costo es $0. |
+| Bug inspector — moto no captura patente / zona libre | `verificar.html`: `SUBCUADRAS_INS` incluye `tipo_zona`. Función `aplicarZonaLibreInspector()` oculta el input cuando la subcuadra activa es libre y muestra banner. Botón "🔍 Verificar" aparece con ≥3 chars (permite submit manual para motos sin depender del auto-submit). Cambiar tipo auto↔moto limpia el input y enfoca. |
 
 ### Sesión 2026-09-19 (sesión 10 cont. 2) — Descuento para conductores verificados
 

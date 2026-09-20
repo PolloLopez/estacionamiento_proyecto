@@ -110,13 +110,24 @@
                        background:var(--color-surface);">
           <option value="">— Sin informar zona —</option>
           {% for s in subcuadras %}
-          <option value="{{ s.id }}">{{ s }}</option>
+          <option value="{{ s.id }}" data-tipo-zona="{{ s.tipo_zona }}">{{ s }}</option>
           {% endfor %}
         </select>
       </div>
 
     </div>
     {% endif %}
+
+    <!-- ─── BANNER ZONA LIBRE (se muestra solo cuando la subcuadra es tipo_zona=libre) ─── -->
+    <div id="banner-zona-libre" style="display:none; background:#d4edda; color:#155724;
+         border:1px solid #c3e6cb; border-radius:10px; padding:1rem 1.2rem;
+         margin-bottom:1.2rem; text-align:center;">
+      <div style="font-size:1.6rem; margin-bottom:0.3rem;">🟢</div>
+      <strong>Zona de estacionamiento libre</strong>
+      <p style="margin:0.3rem 0 0; font-size:0.9rem;">
+        No hay cobro en esta área. Podés estacionar sin pagar.
+      </p>
+    </div>
 
     <!-- ─── DURACIÓN (solo visible si hay vehículo seleccionado) ─── -->
     <div id="seccion-duracion" style="display:none;">
@@ -248,6 +259,22 @@ const tipoPreseleccionado = "{{ request.GET.tipo|default:'' }}";
 let estadoGps = "pending";
 let subcuadraCercanaId = null;
 
+// ── Zona libre ──────────────────────────────────────────────────────────────
+// Cuando la subcuadra detectada es tipo_zona=libre, muestra el banner y oculta
+// el formulario de pago. Se llama desde GPS y desde el selector manual.
+function actualizarZonaLibre(esLibre) {
+  const banner   = document.getElementById("banner-zona-libre");
+  const seccion  = document.getElementById("seccion-duracion");
+  if (esLibre) {
+    if (banner)  banner.style.display  = "block";
+    if (seccion) seccion.style.display = "none";
+  } else {
+    if (banner)  banner.style.display  = "none";
+    // La sección de duración solo se muestra si hay un vehículo activo
+    // — la función seleccionarVehiculo() la controla por su cuenta.
+  }
+}
+
 const seccionSubcuadra = document.getElementById("seccion-subcuadra");
 
 function mostrarSelectorSubcuadra(label) {
@@ -273,6 +300,8 @@ if (seccionSubcuadra && navigator.geolocation) {
             const sel = document.getElementById("select-subcuadra");
             if (sel) sel.value = data.id;
             mostrarSelectorSubcuadra(`📍 Subcuadra detectada: ${data.nombre}`);
+            // Si la subcuadra detectada es libre, mostrar banner y ocultar pago
+            actualizarZonaLibre(data.tipo_zona === "libre");
           } else {
             // GPS ok pero municipio sin coordenadas cargadas
             mostrarSelectorSubcuadra("Seleccioná tu zona:");
@@ -345,8 +374,15 @@ function seleccionarVehiculo(id, patente, tipo) {
     }
   }
 
-  // Mostrar sección de duración
-  document.getElementById("seccion-duracion").style.display = "block";
+  // Mostrar sección de duración solo si la subcuadra no es libre.
+  // Si es libre, mostrar el banner y ocultar el formulario de pago.
+  const selSubc = document.getElementById("select-subcuadra");
+  const optActiva = selSubc ? selSubc.selectedOptions[0] : null;
+  const esZonaLibre = optActiva && optActiva.dataset.tipoZona === "libre";
+  actualizarZonaLibre(esZonaLibre);
+  if (!esZonaLibre) {
+    document.getElementById("seccion-duracion").style.display = "block";
+  }
   document.getElementById("vehiculo-seleccionado-label").innerText = patente;
 
   // Scroll suave a la sección de subcuadra (o duración si no hay GPS)
@@ -390,6 +426,22 @@ function eliminarVehiculo(url, patente) {
   const form = document.getElementById("form-eliminar-vehiculo");
   form.action = url;
   form.submit();
+}
+
+// Cuando el conductor cambia la subcuadra manualmente, verificar si es libre
+// y actualizar el banner/formulario en consecuencia.
+const selSubcuadraManual = document.getElementById("select-subcuadra");
+if (selSubcuadraManual) {
+  selSubcuadraManual.addEventListener("change", () => {
+    const opt = selSubcuadraManual.selectedOptions[0];
+    const esLibre = opt && opt.dataset.tipoZona === "libre";
+    actualizarZonaLibre(esLibre);
+    if (!esLibre && vehiculoActivo) {
+      document.getElementById("seccion-duracion").style.display = "block";
+    } else if (esLibre) {
+      document.getElementById("seccion-duracion").style.display = "none";
+    }
+  });
 }
 
 // Preseleccionar el primer vehículo si solo hay uno, o el que vino por URL
