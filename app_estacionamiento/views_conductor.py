@@ -627,13 +627,14 @@ def estacionar_vehiculo(request):
         # ── Duración ─────────────────────────────────────────────────────────
         try:
             duracion = Decimal(duracion)
-            # Mínimo 1 hora — las opciones del selector ya lo reflejan,
-            # pero validamos también en el servidor por si viene manipulado.
-            if duracion < 1:
+            # Mínimo 30 min: el selector siempre ofrece al menos esa opción
+            # (en la franja final del horario). Validamos en servidor por si
+            # el POST viene manipulado.
+            if duracion < Decimal("0.5"):
                 raise ValueError()
         except Exception:
             return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error":    "La duración mínima es 1 hora.",
+                "error":    "La duración mínima es 30 minutos.",
                 "warning":  warning,
                 "vehiculos": vehiculos,
                 "usuario":  usuario,
@@ -701,6 +702,21 @@ def estacionar_vehiculo(request):
 
     patente_preseleccionada = sanitizar_patente(request.GET.get("patente", ""))
 
+    # Últimos 3 vehículos distintos usados por este conductor (para sugerencia rápida).
+    # Recorremos los últimos 30 estacionamientos y nos quedamos con los primeros 3 únicos.
+    vehiculos_recientes = []
+    visto_ids = set()
+    for est in (Estacionamiento.objects
+                .filter(usuario=usuario)
+                .order_by("-hora_inicio")
+                .select_related("vehiculo")[:30]):
+        if est.vehiculo_id not in visto_ids:
+            visto_ids.add(est.vehiculo_id)
+            vehiculos_recientes.append(est.vehiculo)
+        if len(vehiculos_recientes) >= 3:
+            break
+    ids_recientes = {v.id for v in vehiculos_recientes}
+
     # Chequeo de horario en GET: si está fuera de horario se muestra el banner
     # y el formulario queda bloqueado. Mismo chequeo que en POST, pero acá
     # informamos al conductor antes de que intente enviar el formulario.
@@ -727,6 +743,8 @@ def estacionar_vehiculo(request):
 
     return render(request, "usuarios/estacionar_vehiculo.html", {
         "vehiculos":              vehiculos,
+        "vehiculos_recientes":    vehiculos_recientes,
+        "ids_recientes":          ids_recientes,
         "usuario":                usuario,
         "tarifa_hora":            tarifa_hora_auto_efectiva,
         "tarifa_hora_auto":       tarifa_hora_auto_efectiva,
@@ -1263,6 +1281,12 @@ def enviar_sugerencia(request):
         descripcion = request.POST.get("descripcion", "").strip()
         area        = request.POST.get("area", "general")
         criticidad  = request.POST.get("criticidad", "funcional")
+        rango_edad  = request.POST.get("rango_edad", "")
+
+        # Validar que rango_edad sea un valor permitido (o vacío)
+        valores_validos = [v for v, _ in SugerenciaMejora.RANGOS_EDAD]
+        if rango_edad not in valores_validos:
+            rango_edad = ""
 
         if not titulo or not descripcion:
             messages.error(request, "El título y la descripción son obligatorios.")
@@ -1275,6 +1299,7 @@ def enviar_sugerencia(request):
                 criticidad  = criticidad,
                 titulo      = titulo,
                 descripcion = descripcion,
+                rango_edad  = rango_edad,
                 estado      = "recibida",
                 notificado  = True,   # empieza notificado (no hay cambio que avisar aún)
             )

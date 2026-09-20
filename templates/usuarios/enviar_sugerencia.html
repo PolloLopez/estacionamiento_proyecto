@@ -52,6 +52,25 @@
       </div>
     </div>
 
+    <!-- Rango de edad: opcional, nos ayuda a entender qué grupos de usuarios reportan más -->
+    <div style="margin-bottom:1rem;">
+      <label style="font-weight:600; display:block; margin-bottom:.3rem;">
+        Edad <span style="font-weight:400; color:var(--color-text-muted);">(opcional)</span>
+      </label>
+      <select name="rango_edad"
+              style="width:100%; padding:.6rem; border:1px solid var(--color-border);
+                     border-radius:6px; background:var(--color-surface); color:var(--color-text);
+                     max-width:220px;">
+        <option value="">Prefiero no decir</option>
+        <option value="menor18">Menor de 18</option>
+        <option value="18-25">18–25</option>
+        <option value="26-35">26–35</option>
+        <option value="36-50">36–50</option>
+        <option value="51-65">51–65</option>
+        <option value="mayor65">Mayor de 65</option>
+      </select>
+    </div>
+
     <div style="display:flex; gap:1rem; margin-top:1.4rem;">
       <button type="submit"
         style="background:var(--color-primary,#2980b9); color:#fff; border:none;

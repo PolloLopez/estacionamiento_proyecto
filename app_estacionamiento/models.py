@@ -1873,6 +1873,24 @@ class SugerenciaMejora(models.Model):
         default=True,
         help_text="False cuando el superadmin cambió el estado y el usuario todavía no lo vio.",
     )
+
+    RANGOS_EDAD = [
+        ("menor18", "Menor de 18"),
+        ("18-25",   "18–25"),
+        ("26-35",   "26–35"),
+        ("36-50",   "36–50"),
+        ("51-65",   "51–65"),
+        ("mayor65", "Mayor de 65"),
+    ]
+    # Campo opcional — el usuario decide si lo completa.
+    # Nos permite entender qué grupos etarios reportan más problemas
+    # y personalizar la experiencia en el futuro.
+    rango_edad   = models.CharField(
+        max_length=10, choices=RANGOS_EDAD,
+        blank=True, default="",
+        verbose_name="Rango de edad",
+    )
+
     creado_en    = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 

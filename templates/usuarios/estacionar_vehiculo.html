@@ -8,7 +8,7 @@
   <div style="display:flex; justify-content:space-between; align-items:center;
               background:var(--color-surface); border:1px solid var(--color-border);
               border-radius:10px; padding:0.75rem 1.1rem; margin-bottom:1.2rem;">
-    <span style="font-size:0.9rem; color:var(--color-text-muted);">Saldo</span>
+    <span style="font-size:0.9rem; color:var(--color-text-muted);">Saldo disponible</span>
     <span style="font-size:1.5rem; font-weight:800;
           color:{% if usuario.saldo < 100 %}var(--color-danger){% else %}var(--color-primary){% endif %};">
       ${{ usuario.saldo }}
@@ -22,88 +22,171 @@
   {% endif %}
 
   {% if error %}
-    <div class="alert alert-danger" style="margin-bottom:1rem;">
-      {{ error }}
-    </div>
+    <div class="alert alert-danger" style="margin-bottom:1rem;">{{ error }}</div>
   {% endif %}
 
   <form method="post" id="form-estacionar"
         {% if fuera_de_horario %}style="pointer-events:none; opacity:0.45; filter:grayscale(50%);"{% endif %}>
     {% csrf_token %}
     <input type="hidden" name="vehiculo_id" id="vehiculo_id_input">
-    <input type="hidden" name="horas" id="horas" value="1">
+    <input type="hidden" name="horas"       id="horas" value="1">
 
-    <!-- ─── VEHÍCULOS ─────────────────────────────── -->
-    {% if vehiculos %}
+    <!-- ─── VEHÍCULOS ────────────────────────────────────────────────── -->
+    <h3 style="margin-bottom:0.75rem;">🚗🛵 ¿Con qué vehículo?</h3>
 
-      <h3 style="margin-bottom:0.75rem;">🚗 ¿Con qué vehículo?</h3>
+    {% if vehiculos_recientes %}
+    <!-- Acceso rápido: últimos 3 usados -->
+    <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0 0 0.5rem;">
+      Últimos usados
+    </p>
+    <div id="tarjetas-vehiculos"
+         style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:{% if vehiculos|length > vehiculos_recientes|length %}0.4rem{% else %}1.4rem{% endif %};">
+      {% for v in vehiculos_recientes %}
+      <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
+           data-id="{{ v.id }}"
+           data-tipo="{{ v.tipo|default:'auto' }}"
+           onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
+           style="flex:1; min-width:120px; max-width:180px;
+                  border:3px solid var(--color-border); border-radius:14px;
+                  padding:1rem 0.9rem; text-align:center; cursor:pointer;
+                  background:var(--color-surface); transition:border-color 0.15s, background 0.15s;
+                  position:relative;">
+        <div style="font-size:1.4rem; font-weight:800; letter-spacing:2px;">
+          {{ v.patente }}
+        </div>
+        <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
+          {% if v.tipo == "moto" %}🛵 Moto{% else %}🚗 Auto{% endif %}
+        </div>
+        {% if v.exento_global %}
+          <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.3rem; font-weight:600;">
+            ✅ Exento
+          </div>
+        {% endif %}
+        <button type="button"
+                onclick="event.stopPropagation(); eliminarVehiculo('{% url 'eliminar_vehiculo' v.id %}', '{{ v.patente }}');"
+                title="Quitar vehículo"
+                style="position:absolute; top:5px; right:5px; background:none; border:none;
+                       cursor:pointer; font-size:0.85rem; color:var(--color-text-muted);
+                       padding:2px 5px; border-radius:4px;"
+                onmouseenter="this.style.color='var(--color-danger)'"
+                onmouseleave="this.style.color='var(--color-text-muted)'">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
 
-      <div id="tarjetas-vehiculos"
-           style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.4rem;">
-        {% for v in vehiculos %}
+    {% with otros=vehiculos|dictsortreversed:"id" %}
+    {% if vehiculos|length > vehiculos_recientes|length %}
+    <!-- Otros vehículos vinculados (no recientes) -->
+    <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0.6rem 0 0.4rem;">
+      Otros vinculados
+    </p>
+    <div {% if not vehiculos_recientes %}id="tarjetas-vehiculos"{% endif %}
+         style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.4rem;">
+      {% for v in vehiculos %}
+        {% if v.id not in ids_recientes %}
         <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
              data-id="{{ v.id }}"
              data-tipo="{{ v.tipo|default:'auto' }}"
              onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
-             style="
-               flex:1; min-width:130px; max-width:200px;
-               border:3px solid var(--color-border);
-               border-radius:14px;
-               padding:1.2rem 1rem;
-               text-align:center;
-               cursor:pointer;
-               background:var(--color-surface);
-               transition:border-color 0.15s, background 0.15s;
-               position:relative;
-             ">
-          <div style="font-size:1.6rem; font-weight:800; letter-spacing:3px;">
-            {{ v.patente }}
-          </div>
+             style="flex:1; min-width:120px; max-width:180px;
+                    border:3px solid var(--color-border); border-radius:14px;
+                    padding:1rem 0.9rem; text-align:center; cursor:pointer;
+                    background:var(--color-surface); transition:border-color 0.15s, background 0.15s;
+                    position:relative;">
+          <div style="font-size:1.4rem; font-weight:800; letter-spacing:2px;">{{ v.patente }}</div>
           <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
-            {% if v.tipo == "moto" %}🏍 Moto{% else %}🚗 Auto{% endif %}
+            {% if v.tipo == "moto" %}🛵 Moto{% else %}🚗 Auto{% endif %}
           </div>
           {% if v.exento_global %}
             <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.3rem; font-weight:600;">
               ✅ Exento
             </div>
           {% endif %}
-
-          <!-- Botón eliminar: no puede ser form anidado, usamos JS -->
           <button type="button"
                   onclick="event.stopPropagation(); eliminarVehiculo('{% url 'eliminar_vehiculo' v.id %}', '{{ v.patente }}');"
                   title="Quitar vehículo"
-                  style="position:absolute; top:6px; right:6px; background:none; border:none;
-                         cursor:pointer; font-size:0.9rem; color:var(--color-text-muted);
+                  style="position:absolute; top:5px; right:5px; background:none; border:none;
+                         cursor:pointer; font-size:0.85rem; color:var(--color-text-muted);
                          padding:2px 5px; border-radius:4px;"
                   onmouseenter="this.style.color='var(--color-danger)'"
-                  onmouseleave="this.style.color='var(--color-text-muted)'">
-            ✕
-          </button>
+                  onmouseleave="this.style.color='var(--color-text-muted)'">✕</button>
         </div>
-        {% endfor %}
-      </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
 
-    {% else %}
-      <p class="text-muted" style="margin-bottom:1rem;">
-        Todavía no tenés vehículos. Agregá uno abajo para empezar.
-      </p>
+    {% if not vehiculos %}
+    <p class="text-muted" style="margin-bottom:1rem;">
+      Todavía no tenés vehículos. Agregá uno abajo para empezar.
+    </p>
     {% endif %}
 
-    <!-- ─── SUBCUADRA GPS (solo visible si hay vehículo y hay subcuadras con GPS) ─── -->
+    <!-- ─── AGREGAR VEHÍCULO (inline) ────────────────────────────────── -->
+    <div id="panel-agregar-vehiculo" style="margin-bottom:1.4rem;">
+      <button type="button" id="btn-mostrar-agregar"
+              onclick="toggleAgregarVehiculo()"
+              style="background:none; border:1px dashed var(--color-border);
+                     border-radius:10px; width:100%; padding:0.7rem 1rem;
+                     cursor:pointer; color:var(--color-text-muted); font-size:0.9rem;
+                     display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+        ➕ Agregar vehículo
+      </button>
+      <div id="form-agregar-vehiculo" style="display:none; margin-top:0.6rem;
+           background:var(--color-surface-2); border-radius:10px; padding:0.9rem 1rem;">
+        <form method="post" action="{% url 'agregar_vehiculo' %}"
+              style="display:flex; gap:0.6rem; align-items:flex-end; flex-wrap:wrap;">
+          {% csrf_token %}
+          <div style="flex:1; min-width:140px;">
+            <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">Patente</label>
+            <input name="patente" placeholder="ABC123" required
+                   style="text-transform:uppercase; letter-spacing:2px; font-weight:700;
+                          font-size:1.05rem; width:100%;"
+                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
+          </div>
+          <div style="min-width:110px;">
+            <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">Tipo</label>
+            <select name="tipo" style="padding:0.45rem 0.6rem; border-radius:6px;
+                    border:1px solid var(--color-border); background:var(--color-surface);
+                    font-size:0.95rem; width:100%;">
+              <option value="auto">🚗 Auto</option>
+              <option value="moto">🛵 Moto</option>
+            </select>
+          </div>
+          <button type="submit" class="btn" style="font-size:0.9rem; padding:0.5rem 1rem;">
+            Agregar
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ─── SUBCUADRA: botón GPS + cascade manual ─────────────────────── -->
     {% if subcuadras %}
     <div id="seccion-subcuadra" style="display:none; margin-bottom:1.4rem;">
 
       <h3 style="margin-bottom:0.75rem;">📍 ¿Dónde estás?</h3>
 
-      <!-- Estado 1: esperando respuesta del GPS -->
-      <div id="gps-detectando"
-           style="font-size:0.9rem; color:var(--color-text-muted); padding:0.5rem 0;">
+      <!-- Botón principal: detectar cuadra -->
+      <button type="button" id="btn-detectar-cuadra"
+              onclick="iniciarDeteccionGps()"
+              style="width:100%; padding:0.9rem 1rem; font-size:1rem; font-weight:700;
+                     background:var(--color-primary); color:#fff; border:none;
+                     border-radius:10px; cursor:pointer; display:flex;
+                     align-items:center; justify-content:center; gap:0.5rem;">
+        📍 Detectar mi cuadra
+      </button>
+
+      <!-- Estado GPS: detectando -->
+      <div id="gps-detectando" style="display:none; text-align:center;
+           font-size:0.9rem; color:var(--color-text-muted); padding:0.75rem 0;">
         ⏳ Detectando ubicación…
       </div>
 
-      <!-- Estado 2: GPS ok o selección manual (mismo selector, diferente label) -->
-      <div id="gps-selector" style="display:none;">
-        <p id="gps-label" style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.5rem;"></p>
+      <!-- Estado GPS: resultado (subcuadra detectada o fallo) -->
+      <div id="gps-resultado" style="display:none; margin-top:0.6rem;">
+        <p id="gps-label" style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.4rem;"></p>
         <select name="subcuadra_id" id="select-subcuadra"
                 style="width:100%; padding:0.5rem 0.75rem; border-radius:8px;
                        border:1px solid var(--color-border); font-size:1rem;
@@ -115,10 +198,45 @@
         </select>
       </div>
 
+      <!-- Opción de selección manual -->
+      <div style="text-align:center; margin-top:0.6rem;">
+        <button type="button"
+                onclick="mostrarSelectorManual()"
+                id="btn-manual"
+                style="background:none; border:none; font-size:0.85rem;
+                       color:var(--color-text-muted); cursor:pointer; text-decoration:underline;">
+          ¿No funciona el GPS? Ingresá la dirección manualmente
+        </button>
+      </div>
+
+      <!-- Selector manual (empieza oculto) -->
+      <div id="selector-manual" style="display:none; margin-top:0.75rem;
+           background:var(--color-surface-2); border-radius:10px; padding:0.75rem 1rem;">
+        <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.5rem;">
+          Seleccioná tu ubicación:
+        </p>
+        <select id="sel-calle" onchange="filtrarAlturas()"
+                style="width:100%; padding:0.5rem 0.75rem; border-radius:8px;
+                       border:1px solid var(--color-border); font-size:1rem;
+                       background:var(--color-surface); margin-bottom:0.5rem;">
+          <option value="">— Calle —</option>
+          {% regroup subcuadras by calle as calles_list %}
+          {% for calle_group in calles_list %}
+            <option value="{{ calle_group.grouper }}">{{ calle_group.grouper }}</option>
+          {% endfor %}
+        </select>
+        <select id="sel-altura" onchange="seleccionarSubcuadraManual()"
+                style="width:100%; padding:0.5rem 0.75rem; border-radius:8px;
+                       border:1px solid var(--color-border); font-size:1rem;
+                       background:var(--color-surface);">
+          <option value="">— Altura —</option>
+        </select>
+      </div>
+
     </div>
     {% endif %}
 
-    <!-- ─── BANNER ZONA LIBRE (se muestra solo cuando la subcuadra es tipo_zona=libre) ─── -->
+    <!-- ─── BANNER ZONA LIBRE ──────────────────────────────────────────── -->
     <div id="banner-zona-libre" style="display:none; background:#d4edda; color:#155724;
          border:1px solid #c3e6cb; border-radius:10px; padding:1rem 1.2rem;
          margin-bottom:1.2rem; text-align:center;">
@@ -129,7 +247,7 @@
       </p>
     </div>
 
-    <!-- ─── DURACIÓN (solo visible si hay vehículo seleccionado) ─── -->
+    <!-- ─── DURACIÓN (solo cuando hay vehículo y subcuadra pagada) ─────── -->
     <div id="seccion-duracion" style="display:none;">
 
       <h3 style="margin-bottom:0.75rem;">⏱ ¿Cuánto tiempo?</h3>
@@ -172,7 +290,7 @@
         </span>
       </div>
 
-      <!-- Aviso de saldo insuficiente (se muestra por JS si costo > saldo) -->
+      <!-- Aviso saldo insuficiente -->
       <div id="aviso-saldo-insuficiente" style="display:none; margin-bottom:0.75rem;
            background:var(--color-danger-bg); color:var(--color-danger);
            border:1px solid var(--color-danger); border-radius:8px; padding:0.75rem 1rem;
@@ -191,38 +309,6 @@
 
   </form>
 
-  <!-- ─── AGREGAR VEHÍCULO (secundario) ─────────── -->
-  <div style="margin-top:2rem; border-top:1px solid var(--color-border); padding-top:1.2rem;">
-    <details>
-      <summary style="cursor:pointer; font-size:0.9rem; color:var(--color-text-muted);
-                      font-weight:600; list-style:none; display:flex; align-items:center; gap:0.4rem;">
-        <span>➕</span> Agregar nuevo vehículo
-      </summary>
-      <div style="margin-top:0.75rem;">
-        <form method="post" action="{% url 'agregar_vehiculo' %}"
-              style="display:flex; gap:0.6rem; align-items:flex-end; flex-wrap:wrap;">
-          {% csrf_token %}
-          <div style="flex:1; min-width:150px;">
-            <label style="font-size:0.85rem;">Patente</label>
-            <input name="patente" placeholder="ABC123" required
-                   style="text-transform:uppercase; letter-spacing:3px; font-weight:700; font-size:1.1rem;"
-                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
-          </div>
-          <div style="min-width:110px;">
-            <label style="font-size:0.85rem;">Tipo</label>
-            <select name="tipo" style="padding:0.45rem 0.6rem; border-radius:6px;
-                    border:1px solid var(--color-border); background:var(--color-surface);
-                    font-size:0.95rem; width:100%;">
-              <option value="auto">🚗 Auto</option>
-              <option value="moto">🏍 Moto</option>
-            </select>
-          </div>
-          <button type="submit" class="btn btn-outline" style="font-size:0.9rem;">Agregar</button>
-        </form>
-      </div>
-    </details>
-  </div>
-
 </div>
 
 <style>
@@ -238,169 +324,201 @@
 </form>
 
 <script>
-const PRECIO_HORA_AUTO = parseFloat("{{ tarifa_hora_auto|default:'100' }}");
-// Si la tarifa moto es 0 o no está configurada, usa la misma que auto.
-const PRECIO_HORA_MOTO = parseFloat("{{ tarifa_hora_moto|default:'0' }}") || PRECIO_HORA_AUTO;
-// Saldo actual del conductor — usado para validar antes de habilitar "Confirmar"
-const SALDO_CONDUCTOR = parseFloat("{{ usuario.saldo|default:'0' }}");
+// ── Constantes ──────────────────────────────────────────────────────────────
+const PRECIO_HORA_AUTO   = parseFloat("{{ tarifa_hora_auto|default:'100' }}");
+const PRECIO_HORA_MOTO   = parseFloat("{{ tarifa_hora_moto|default:'0' }}") || PRECIO_HORA_AUTO;
+const SALDO_CONDUCTOR    = parseFloat("{{ usuario.saldo|default:'0' }}");
 const URL_SUBCUADRA_CERCANA = "{% url 'conductor_subcuadra_cercana' %}";
-let vehiculoActivo = null;
-let tipoVehiculoActivo = "auto";  // "auto" | "moto" — actualizado al seleccionar vehículo
 
-// Preseleccionar si viene de "agregar vehículo"
-const preseleccionada = "{{ patente_preseleccionada|default:'' }}";
-// Guardamos el tipo de la patente preseleccionada para usarlo al auto-seleccionar
-const tipoPreseleccionado = "{{ request.GET.tipo|default:'' }}";
+// Array de subcuadras para el selector manual en cascada
+var SUBCUADRAS = [
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: {{ s.altura }}, tipo_zona: "{{ s.tipo_zona }}"},
+  {% endfor %}
+];
 
-// ── GPS ──────────────────────────────────────────────────────────────────────
-// Estado del GPS: "pending" | "ok" | "error"
-// Arranca la detección apenas carga la página para que cuando el conductor
-// seleccione el vehículo ya tengamos la ubicación (o sepamos que falló).
-let estadoGps = "pending";
-let subcuadraCercanaId = null;
+let vehiculoActivo     = null;
+let tipoVehiculoActivo = "auto";
+let gpsYaCorrio        = false;   // evita lanzar el fetch de GPS dos veces
+
+const preseleccionada    = "{{ patente_preseleccionada|default:'' }}";
+const seccionSubcuadra   = document.getElementById("seccion-subcuadra");
 
 // ── Zona libre ──────────────────────────────────────────────────────────────
-// Cuando la subcuadra detectada es tipo_zona=libre, muestra el banner y oculta
-// el formulario de pago. Se llama desde GPS y desde el selector manual.
+// Muestra/oculta banner y formulario de pago según si la subcuadra es libre.
 function actualizarZonaLibre(esLibre) {
-  const banner   = document.getElementById("banner-zona-libre");
-  const seccion  = document.getElementById("seccion-duracion");
+  const banner  = document.getElementById("banner-zona-libre");
+  const seccion = document.getElementById("seccion-duracion");
   if (esLibre) {
     if (banner)  banner.style.display  = "block";
     if (seccion) seccion.style.display = "none";
   } else {
-    if (banner)  banner.style.display  = "none";
-    // La sección de duración solo se muestra si hay un vehículo activo
-    // — la función seleccionarVehiculo() la controla por su cuenta.
+    if (banner) banner.style.display = "none";
+    // La sección de duración se muestra solo si hay vehículo activo
   }
 }
 
-const seccionSubcuadra = document.getElementById("seccion-subcuadra");
+// ── GPS ──────────────────────────────────────────────────────────────────────
+// El GPS ya no se lanza automáticamente al cargar la página.
+// El conductor lo activa con el botón "Detectar mi cuadra".
+function iniciarDeteccionGps() {
+  if (gpsYaCorrio) return;
+  gpsYaCorrio = true;
 
-function mostrarSelectorSubcuadra(label) {
-  const detectando = document.getElementById("gps-detectando");
-  const selector   = document.getElementById("gps-selector");
-  const labelEl    = document.getElementById("gps-label");
-  if (detectando) detectando.style.display = "none";
-  if (selector)   selector.style.display   = "block";
-  if (labelEl && label) labelEl.textContent = label;
-}
+  const btnDetectar = document.getElementById("btn-detectar-cuadra");
+  const gpsDetectando = document.getElementById("gps-detectando");
+  const gpsResultado  = document.getElementById("gps-resultado");
+  const btnManual     = document.getElementById("btn-manual");
 
-if (seccionSubcuadra && navigator.geolocation) {
+  if (btnDetectar)   { btnDetectar.style.display   = "none"; }
+  if (gpsDetectando) { gpsDetectando.style.display  = "block"; }
+
+  if (!navigator.geolocation) {
+    mostrarSelectorManual();
+    return;
+  }
+
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      estadoGps = "ok";
       const { latitude: lat, longitude: lon } = pos.coords;
       fetch(`${URL_SUBCUADRA_CERCANA}?lat=${lat}&lon=${lon}`)
         .then(r => r.json())
         .then(data => {
+          if (gpsDetectando) gpsDetectando.style.display = "none";
+          if (gpsResultado)  gpsResultado.style.display  = "block";
+          if (btnManual)     btnManual.style.display      = "block";
           if (data.id) {
-            subcuadraCercanaId = data.id;
-            // Pre-seleccionar en el <select> si ya está visible
             const sel = document.getElementById("select-subcuadra");
             if (sel) sel.value = data.id;
-            mostrarSelectorSubcuadra(`📍 Subcuadra detectada: ${data.nombre}`);
-            // Si la subcuadra detectada es libre, mostrar banner y ocultar pago
+            const gpsLabel = document.getElementById("gps-label");
+            if (gpsLabel) gpsLabel.textContent = `📍 Cuadra detectada: ${data.nombre}`;
             actualizarZonaLibre(data.tipo_zona === "libre");
+            // Si hay vehículo activo y no es zona libre, mostrar duración
+            if (vehiculoActivo && data.tipo_zona !== "libre") {
+              document.getElementById("seccion-duracion").style.display = "block";
+            }
           } else {
-            // GPS ok pero municipio sin coordenadas cargadas
-            mostrarSelectorSubcuadra("Seleccioná tu zona:");
+            const gpsLabel = document.getElementById("gps-label");
+            if (gpsLabel) gpsLabel.textContent = "No encontramos tu cuadra — seleccionala manualmente:";
           }
         })
-        .catch(() => mostrarSelectorSubcuadra("Seleccioná tu zona:"));
+        .catch(() => {
+          if (gpsDetectando) gpsDetectando.style.display = "none";
+          mostrarSelectorManual();
+        });
     },
     () => {
-      // GPS denegado o error
-      estadoGps = "error";
-      mostrarSelectorSubcuadra("Seleccioná tu zona:");
+      if (gpsDetectando) gpsDetectando.style.display = "none";
+      mostrarSelectorManual();
     },
     { timeout: 8000 }
   );
-} else if (seccionSubcuadra) {
-  // Navegador sin soporte GPS
-  estadoGps = "error";
-  mostrarSelectorSubcuadra("Seleccioná tu zona:");
 }
 
+function mostrarSelectorManual() {
+  const btnDetectar    = document.getElementById("btn-detectar-cuadra");
+  const gpsDetectando  = document.getElementById("gps-detectando");
+  const selectorManual = document.getElementById("selector-manual");
+  const btnManual      = document.getElementById("btn-manual");
+  if (btnDetectar)    btnDetectar.style.display    = "none";
+  if (gpsDetectando)  gpsDetectando.style.display  = "none";
+  if (selectorManual) selectorManual.style.display = "block";
+  if (btnManual)      btnManual.style.display       = "none";
+}
+
+// ── Cascade manual ───────────────────────────────────────────────────────────
+function filtrarAlturas() {
+  const calleSeleccionada = document.getElementById("sel-calle").value;
+  const selAltura = document.getElementById("sel-altura");
+  selAltura.innerHTML = '<option value="">— Altura —</option>';
+
+  const filtradas = SUBCUADRAS.filter(s => s.calle === calleSeleccionada);
+  filtradas.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = s.altura === 0 ? s.calle : `${s.calle} ${s.altura}`;
+    opt.dataset.tipoZona = s.tipo_zona;
+    selAltura.appendChild(opt);
+  });
+
+  // Si hay una sola opción, seleccionarla automáticamente
+  if (filtradas.length === 1) {
+    selAltura.value = filtradas[0].id;
+    seleccionarSubcuadraManual();
+  }
+}
+
+function seleccionarSubcuadraManual() {
+  const selAltura = document.getElementById("sel-altura");
+  const opt = selAltura.selectedOptions[0];
+  if (!opt || !opt.value) return;
+
+  // Sincronizar con el select oculto del GPS (mismo name="subcuadra_id")
+  const selPrincipal = document.getElementById("select-subcuadra");
+  if (selPrincipal) selPrincipal.value = opt.value;
+
+  const esLibre = opt.dataset.tipoZona === "libre";
+  actualizarZonaLibre(esLibre);
+  if (!esLibre && vehiculoActivo) {
+    document.getElementById("seccion-duracion").style.display = "block";
+  }
+}
+
+// ── Vehículos ────────────────────────────────────────────────────────────────
 function actualizarCostosSegunTipo(tipo) {
-  // Cuando cambia el vehículo seleccionado, recalcula el costo de cada opción
-  // usando la tarifa correspondiente (auto o moto).
   const precioHora = tipo === "moto" ? PRECIO_HORA_MOTO : PRECIO_HORA_AUTO;
-  const botones = document.querySelectorAll(".duracion-btn");
-  botones.forEach(btn => {
+  document.querySelectorAll(".duracion-btn").forEach(btn => {
     const horas = parseFloat(btn.dataset.horas);
     const nuevoCosto = Math.round(horas * precioHora * 100) / 100;
     btn.dataset.costo = nuevoCosto;
-    // Si este botón estaba seleccionado, actualizar también el resumen visible
     if (btn.classList.contains("btn") && !btn.classList.contains("btn-outline")) {
       document.getElementById("costoTexto").innerText = "$" + nuevoCosto.toFixed(2);
-      // Revalidar saldo
-      var avisoSaldo = document.getElementById("aviso-saldo-insuficiente");
+      var avisoSaldo   = document.getElementById("aviso-saldo-insuficiente");
       var btnConfirmar = document.getElementById("btn-confirmar-est");
       var saldoInsuficiente = nuevoCosto > SALDO_CONDUCTOR;
-      if (avisoSaldo) avisoSaldo.style.display = saldoInsuficiente ? "block" : "none";
-      if (btnConfirmar) btnConfirmar.disabled = saldoInsuficiente;
+      if (avisoSaldo)   avisoSaldo.style.display   = saldoInsuficiente ? "block" : "none";
+      if (btnConfirmar) btnConfirmar.disabled       = saldoInsuficiente;
     }
   });
 }
 
 function seleccionarVehiculo(id, patente, tipo) {
-  vehiculoActivo = id;
+  vehiculoActivo     = id;
   tipoVehiculoActivo = tipo || "auto";
 
-  // Estilos visuales
-  document.querySelectorAll(".tarjeta-vehiculo").forEach(t => {
-    t.classList.remove("seleccionada");
-  });
-  document.querySelector(`[data-id="${id}"]`).classList.add("seleccionada");
+  document.querySelectorAll(".tarjeta-vehiculo").forEach(t => t.classList.remove("seleccionada"));
+  const tarjetaActual = document.querySelector(`.tarjeta-vehiculo[data-id="${id}"]`);
+  if (tarjetaActual) tarjetaActual.classList.add("seleccionada");
 
-  // Actualizar input oculto
   document.getElementById("vehiculo_id_input").value = id;
-
-  // Recalcular costos según tipo de vehículo
   actualizarCostosSegunTipo(tipoVehiculoActivo);
 
-  // Mostrar sección de subcuadra GPS (si existe — solo cuando hay subcuadras configuradas)
+  // Mostrar sección de subcuadra si hay subcuadras configuradas
   if (seccionSubcuadra) {
     seccionSubcuadra.style.display = "block";
-    // Si el GPS ya respondió, mostrar el selector; si sigue pendiente, se mostrará
-    // cuando llegue la respuesta del fetch de arriba
-    if (estadoGps !== "pending") {
-      mostrarSelectorSubcuadra(
-        subcuadraCercanaId
-          ? `📍 Subcuadra detectada: ${document.getElementById("select-subcuadra")?.selectedOptions[0]?.text ?? ""}`
-          : "Seleccioná tu zona:"
-      );
-    }
   }
 
-  // Mostrar sección de duración solo si la subcuadra no es libre.
-  // Si es libre, mostrar el banner y ocultar el formulario de pago.
-  const selSubc = document.getElementById("select-subcuadra");
-  const optActiva = selSubc ? selSubc.selectedOptions[0] : null;
-  const esZonaLibre = optActiva && optActiva.dataset.tipoZona === "libre";
+  // Mostrar sección de duración solo si la subcuadra activa no es libre
+  const selPrincipal = document.getElementById("select-subcuadra");
+  const optActiva    = selPrincipal ? selPrincipal.selectedOptions[0] : null;
+  const esZonaLibre  = optActiva && optActiva.dataset.tipoZona === "libre";
   actualizarZonaLibre(esZonaLibre);
   if (!esZonaLibre) {
     document.getElementById("seccion-duracion").style.display = "block";
   }
   document.getElementById("vehiculo-seleccionado-label").innerText = patente;
 
-  // Scroll suave a la sección de subcuadra (o duración si no hay GPS)
   const scrollTarget = seccionSubcuadra || document.getElementById("seccion-duracion");
-  scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (scrollTarget) scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-// Botones de duración (generados desde el servidor, con opciones recortadas al horario)
-const botones = document.querySelectorAll(".duracion-btn");
+// ── Botones de duración ──────────────────────────────────────────────────────
+const botones    = document.querySelectorAll(".duracion-btn");
 const horasInput = document.getElementById("horas");
 const btnConfirmar = document.getElementById("btn-confirmar-est");
 
 botones.forEach(btn => {
   btn.addEventListener("click", () => {
-    botones.forEach(b => {
-      b.classList.remove("btn");
-      b.classList.add("btn-outline");
-    });
+    botones.forEach(b => { b.classList.remove("btn"); b.classList.add("btn-outline"); });
     btn.classList.remove("btn-outline");
     btn.classList.add("btn");
 
@@ -410,17 +528,26 @@ botones.forEach(btn => {
 
     horasInput.value = horas;
     document.getElementById("duracionTexto").innerText = label;
-    document.getElementById("costoTexto").innerText = "$" + costo.toFixed(2);
+    document.getElementById("costoTexto").innerText    = "$" + costo.toFixed(2);
 
-    // Si el costo supera el saldo, aviso inline y bloquea el submit
-    var avisoSaldo = document.getElementById("aviso-saldo-insuficiente");
+    var avisoSaldo      = document.getElementById("aviso-saldo-insuficiente");
     var saldoInsuficiente = costo > SALDO_CONDUCTOR;
-    if (avisoSaldo) avisoSaldo.style.display = saldoInsuficiente ? "block" : "none";
-    if (btnConfirmar) btnConfirmar.disabled = saldoInsuficiente;
+    if (avisoSaldo)    avisoSaldo.style.display  = saldoInsuficiente ? "block" : "none";
+    if (btnConfirmar)  btnConfirmar.disabled      = saldoInsuficiente;
   });
 });
 
-// Eliminar vehículo: usa el form oculto de arriba (evita forms anidados)
+// ── Agregar vehículo inline ──────────────────────────────────────────────────
+function toggleAgregarVehiculo() {
+  const form = document.getElementById("form-agregar-vehiculo");
+  const btn  = document.getElementById("btn-mostrar-agregar");
+  const visible = form.style.display !== "none";
+  form.style.display = visible ? "none" : "block";
+  btn.style.display  = visible ? "flex" : "none";
+  if (!visible) form.querySelector("input[name='patente']").focus();
+}
+
+// ── Eliminar vehículo ────────────────────────────────────────────────────────
 function eliminarVehiculo(url, patente) {
   if (!confirm(`¿Eliminar ${patente} de tu cuenta?`)) return;
   const form = document.getElementById("form-eliminar-vehiculo");
@@ -428,35 +555,15 @@ function eliminarVehiculo(url, patente) {
   form.submit();
 }
 
-// Cuando el conductor cambia la subcuadra manualmente, verificar si es libre
-// y actualizar el banner/formulario en consecuencia.
-const selSubcuadraManual = document.getElementById("select-subcuadra");
-if (selSubcuadraManual) {
-  selSubcuadraManual.addEventListener("change", () => {
-    const opt = selSubcuadraManual.selectedOptions[0];
-    const esLibre = opt && opt.dataset.tipoZona === "libre";
-    actualizarZonaLibre(esLibre);
-    if (!esLibre && vehiculoActivo) {
-      document.getElementById("seccion-duracion").style.display = "block";
-    } else if (esLibre) {
-      document.getElementById("seccion-duracion").style.display = "none";
-    }
-  });
-}
-
-// Preseleccionar el primer vehículo si solo hay uno, o el que vino por URL
+// ── Preselección automática ──────────────────────────────────────────────────
 window.addEventListener("DOMContentLoaded", () => {
   const tarjetas = document.querySelectorAll(".tarjeta-vehiculo");
-
   if (preseleccionada) {
     tarjetas.forEach(t => {
-      const patente = t.querySelector("div").innerText.trim();
-      if (patente === preseleccionada) {
-        t.click();  // data-tipo ya está en el elemento; seleccionarVehiculo lo lee
-      }
+      const pat = t.querySelector("div")?.innerText.trim();
+      if (pat === preseleccionada) t.click();
     });
   } else if (tarjetas.length === 1) {
-    // Si solo tiene un vehículo, seleccionarlo automáticamente
     tarjetas[0].click();
   }
 });
