@@ -134,6 +134,14 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
     Retorna lista de opciones de duración disponibles en múltiplos de 30 minutos,
     limitadas al cierre del horario del día.
 
+    Regla de mínimo de duración:
+    - Normal (>= 60 min disponibles): mínimo 1 hora, opciones en bloques de 30 min.
+    - Franja penúltima (30–59 min disponibles): solo 1 hora, aunque exceda el cierre.
+      El estacionamiento se cierra automáticamente al vencerse el horario, así que
+      ofrecer 1 hora es correcto y evita la inconsistencia de que el inspector pueda
+      multar en ese tramo pero el conductor no pueda comprar ticket.
+    - Franja final (< 30 min disponibles): solo 30 minutos.
+
     Parámetros:
         municipio: instancia de Municipio
         tarifa_hora: precio por hora (Decimal o float)
@@ -142,7 +150,7 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
 
     Retorna:
         Lista de dicts [{horas, label, costo}].
-        Lista vacía si no queda tiempo disponible.
+        Lista vacía solo cuando la renovación ya cubre hasta el cierre.
     """
     from datetime import datetime as _dt
 
@@ -161,8 +169,10 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
             timezone.get_current_timezone(),
         )
         if hora_inicio_est:
+            # Renovación: calcular desde el vencimiento del ticket actual
             vencimiento_actual = hora_inicio_est + timedelta(hours=float(duracion_actual_h))
             if vencimiento_actual >= cierre:
+                # El ticket activo ya cubre hasta el cierre; no hay nada que renovar.
                 return []
             minutos_disponibles = int((cierre - vencimiento_actual).total_seconds() / 60)
         else:
@@ -171,8 +181,27 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
         # Sin horario configurado → permitimos hasta 8 horas como máximo
         minutos_disponibles = 8 * 60
 
+    # ── Casos de franja final ────────────────────────────────────────────────
+    # Se aplican solo para estacionamientos nuevos (no para renovaciones),
+    # porque en renovaciones el límite es el vencimiento del ticket actual,
+    # no el tiempo hasta el cierre desde ahora.
+    # Igual aplican a renovaciones también: si quedan < 30 min desde el vencimiento
+    # del ticket actual hasta el cierre, ofrecemos 30 min aunque exceda levemente.
+
+    if minutos_disponibles < 30:
+        # Últimos minutos del horario: única opción es 30 min.
+        costo = round(0.5 * float(tarifa_hora), 2)
+        return [{"horas": 0.5, "label": "30 min", "costo": costo}]
+
+    if minutos_disponibles < 60:
+        # Entre 30 y 60 min disponibles: ofrecer 1 hora aunque exceda el cierre.
+        # El sistema cierra el estacionamiento al finalizar el horario de todas formas.
+        costo = round(1.0 * float(tarifa_hora), 2)
+        return [{"horas": 1.0, "label": "1 hora", "costo": costo}]
+
+    # ── Normal: mínimo 1 hora, bloques de 30 min hasta el cierre ────────────
     opciones = []
-    for n in range(2, 17):      # mínimo 1 hora (n=2 → 1.0h); hasta 8 horas
+    for n in range(2, 17):      # n=2 → 1.0h mínimo; hasta 8 horas (n=16 → 8h)
         horas   = n * 0.5
         minutos = int(horas * 60)
         if minutos > minutos_disponibles:

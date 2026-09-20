@@ -30,6 +30,8 @@ No migrar a DO con bugs conocidos: si algo falla en producción, no sabrás si e
 
 ### ~~Bug: inspector — verificación de moto no captura la patente~~ ✅ Resuelto sesión 11
 
+### ~~Bug: última franja horaria bloquea al conductor pero no al inspector~~ ✅ Resuelto sesión 11
+
 ---
 
 ### Migración a Digital Ocean App Platform
@@ -149,12 +151,13 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 
 ## ✅ Resuelto
 
-### Sesión 2026-09-20 (sesión 11) — Zona libre, moto inspector
+### Sesión 2026-09-20 (sesión 11) — Zona libre, moto inspector, última franja
 
 | Ítem | Detalle |
 |---|---|
 | Bug zona libre cobra al conductor | `views_conductor.py` → `subcuadra_cercana_conductor()` ahora devuelve `tipo_zona` en el JSON. `estacionar_vehiculo.html`: `data-tipo-zona` en las `<option>`, función `actualizarZonaLibre()`, listener en GPS y selector manual, banner verde. `use_cases/estacionar_vehiculo.py`: backend safety — si `tipo_zona="libre"` el costo es $0. |
 | Bug inspector — moto no captura patente / zona libre | `verificar.html`: `SUBCUADRAS_INS` incluye `tipo_zona`. Función `aplicarZonaLibreInspector()` oculta el input cuando la subcuadra activa es libre y muestra banner. Botón "🔍 Verificar" aparece con ≥3 chars (permite submit manual para motos sin depender del auto-submit). Cambiar tipo auto↔moto limpia el input y enfoca. |
+| Bug última franja — conductor bloqueado, inspector podía multar | `services/horarios.py` → `calcular_opciones_duracion()`: si quedan 30–59 min, ofrece "1 hora" aunque exceda el cierre (el sistema la cierra igual al vencer el horario). Si quedan < 30 min, ofrece solo "30 min". Siempre hay al menos una opción mientras el horario esté activo. |
 
 ### Sesión 2026-09-19 (sesión 10 cont. 2) — Descuento para conductores verificados
 

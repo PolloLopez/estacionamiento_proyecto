@@ -109,6 +109,29 @@ Tener una patente de prueba lista (ej: `AA123BB`) que NO tenga infracciones pend
 2. Verificar que solo aparecen las áreas del conductor (conductor + general).
 3. Completar y enviar.
 
+#### F1.8 — Estacionar en la última franja horaria 🆕 *sesión 11*
+> **Contexto:** antes del fix, si quedaban menos de 60 minutos para el cierre del horario, el sistema no mostraba opciones y el conductor no podía estacionar — pero el inspector sí podía multar. Ahora siempre aparece al menos una opción.
+
+Para testear este flujo necesitás estar cerca del cierre del horario (ej. faltan 45 min, 20 min). Podés simularlo editando el horario del municipio desde el panel admin para que el cierre sea en unos minutos.
+
+**Caso A — quedan entre 30 y 60 minutos:**
+1. Configurar cierre del horario para dentro de 45 min.
+2. Ir a `/usuarios/estacionar/`.
+3. Verificar que aparece **solo la opción "1 hora"** (aunque exceda el cierre).
+4. Completar el estacionamiento → el sistema lo cerrará automáticamente al vencer el horario.
+
+**Caso B — quedan menos de 30 minutos:**
+1. Configurar cierre del horario para dentro de 15 min.
+2. Ir a `/usuarios/estacionar/`.
+3. Verificar que aparece **solo la opción "30 min"**.
+4. Completar el estacionamiento.
+
+**Qué verificar:**
+- [ ] Con 45 min restantes → botón "1 hora" disponible (no pantalla en blanco)
+- [ ] Con 15 min restantes → botón "30 min" disponible
+- [ ] Con horario ya cerrado → pantalla de "fuera de horario" (no opciones)
+- [ ] En ningún caso el mensaje dice "finaliza en breve, no registres" cuando el horario sigue activo
+
 ---
 
 ### Cuestionario de experiencia — Conductor
