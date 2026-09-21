@@ -5,52 +5,118 @@
 <section class="container">
   <div class="panel">
 
-    <div style="display:flex; justify-content:space-between; align-items:center;
-                flex-wrap:wrap; gap:0.5rem; margin-bottom:1.2rem;">
+    <div class="page-header" style="margin-bottom:1.2rem;">
       <h2>🚗 Historial de estacionamientos</h2>
-      <a href="{% url 'inicio' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
+      <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
     </div>
+
+    {% if patente_filtro %}
+    <div class="alert alert-warning" style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+      <span>🔍 Filtrando por <strong>{{ patente_filtro }}</strong></span>
+      <a href="{% url 'usuarios_historial_estacionamientos' %}" class="btn btn-outline"
+         style="font-size:0.82rem; padding:0.2rem 0.6rem;">Ver todos</a>
+    </div>
+    {% endif %}
 
     {% if estacionamientos %}
 
+      <div style="display:flex; flex-direction:column; gap:0.6rem;">
       {% for e in estacionamientos %}
-      <div class="card" style="margin-bottom:0.75rem; padding:0.9rem 1rem;">
+      <div class="card" style="padding:0; overflow:hidden;">
 
-        <div style="display:flex; justify-content:space-between; align-items:flex-start;
-                    gap:0.5rem; flex-wrap:wrap;">
+        {# Resumen tap-para-expandir #}
+        <button type="button"
+                onclick="toggleDetalle('est-{{ e.id }}')"
+                style="width:100%; background:none; border:none; cursor:pointer;
+                       text-align:left; padding:0.85rem 1rem;">
+          <div class="page-header">
 
-          {# Columna izquierda: fechas + zona #}
-          <div>
-            <div style="font-size:0.88rem; color:var(--color-text-muted);">
-              {{ e.hora_inicio|date:"d/m/Y" }}
+            {# Icono de estado #}
+            {% if e.estado == "ACTIVO" %}
+              <span style="font-size:1.2rem;" title="Activo">🟢</span>
+            {% elif e.estado == "FINALIZADO" %}
+              <span style="font-size:1.2rem; opacity:0.5;" title="Finalizado">⚪</span>
+            {% else %}
+              <span style="font-size:1.2rem; opacity:0.5;">⚫</span>
+            {% endif %}
+
+            {# Info principal #}
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:baseline; gap:0.5rem; flex-wrap:wrap;">
+                <strong style="letter-spacing:1px;">{{ e.vehiculo.patente }}</strong>
+                <span style="color:var(--color-text-muted); font-size:0.82rem;">
+                  {{ e.hora_inicio|date:"d/m/Y" }}
+                </span>
+              </div>
+              <div style="font-size:0.88rem; color:var(--color-text-muted); margin-top:0.1rem;">
+                {{ e.hora_inicio|date:"H:i" }}
+                {% if e.hora_fin %}→ {{ e.hora_fin|date:"H:i" }}
+                {% else %}<span style="color:var(--color-success, green);">→ Activo</span>{% endif %}
+                &nbsp;·&nbsp; 📍 {{ e.subcuadra|default:"—" }}
+              </div>
             </div>
-            <div style="font-size:1rem; font-weight:600;">
-              {{ e.hora_inicio|date:"H:i" }}
-              {% if e.hora_fin %}
-                → {{ e.hora_fin|date:"H:i" }}
-              {% else %}
-                <span style="color:var(--color-success);">→ Activo</span>
-              {% endif %}
+
+            {# Costo + flecha #}
+            <div style="text-align:right; flex-shrink:0;">
+              <div style="font-size:1.1rem; font-weight:800; color:var(--color-primary);">
+                ${{ e.costo_final|default:e.costo_base }}
+              </div>
+              <div style="font-size:0.75rem; color:var(--color-text-muted);">ver más ›</div>
             </div>
-            <div style="font-size:0.88rem; color:var(--color-text-muted); margin-top:0.2rem;">
-              📍 {{ e.subcuadra|default:"—" }}
-            </div>
+
           </div>
+        </button>
 
-          {# Columna derecha: patente + costo #}
-          <div style="text-align:right;">
-            <div style="font-weight:700; letter-spacing:2px; font-size:1rem;">
-              {{ e.vehiculo.patente }}
-            </div>
-            <div style="font-size:1.1rem; font-weight:800; color:var(--color-primary); margin-top:0.2rem;">
-              ${{ e.costo_final|default:e.costo_base }}
-            </div>
+        {# Detalle expandible #}
+        <div id="est-{{ e.id }}" style="display:none; border-top:1px solid var(--color-border);
+             padding:1rem; background:var(--color-surface);">
+          <table style="width:100%; font-size:0.88rem; border-collapse:collapse;">
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">#</td>
+              <td>{{ e.id }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Inicio</td>
+              <td>{{ e.hora_inicio|date:"d/m/Y H:i:s" }}</td>
+            </tr>
+            {% if e.hora_fin %}
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Fin</td>
+              <td>{{ e.hora_fin|date:"d/m/Y H:i:s" }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Zona</td>
+              <td>{{ e.subcuadra|default:"—" }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Duración</td>
+              <td>{{ e.duracion_horas }}h</td>
+            </tr>
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Costo</td>
+              <td><strong>${{ e.costo_final|default:e.costo_base }}</strong></td>
+            </tr>
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Estado</td>
+              <td>{{ e.estado }}</td>
+            </tr>
+          </table>
+          {% if e.estado == "ACTIVO" %}
+          <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
+            <a class="btn btn-outline"
+               href="{% url 'usuarios_renovar_estacionamiento' e.id %}"
+               style="font-size:0.88rem;">🔄 Renovar</a>
+            <a class="btn btn-danger"
+               href="{% url 'usuarios_finalizar_estacionamiento' e.id %}"
+               style="font-size:0.88rem;">⛔ Finalizar</a>
           </div>
-
+          {% endif %}
         </div>
 
       </div>
       {% endfor %}
+      </div>
 
       {% if estacionamientos.has_other_pages %}
       <nav style="display:flex; justify-content:center; align-items:center; gap:0.5rem;
@@ -77,4 +143,11 @@
 
   </div>
 </section>
+
+<script>
+function toggleDetalle(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+</script>
 {% endblock %}

@@ -22,7 +22,7 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, Max, Min, Q, Sum
+from django.db.models import Count, DecimalField, Max, Min, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -36,7 +36,7 @@ from .decorators import require_role
 from .services.caja import generar_cierre_caja
 from .services.infracciones import cobrar_infraccion_efectivo, MEDIOS_VALIDOS_COBRO
 from .services.notificaciones import enviar_notificacion
-from .services.saldo import cargar_saldo_conductor
+from .services.saldo import cargar_saldo_conductor, obtener_saldo_conductor
 from .utils import sanitizar_patente
 from .models import (
     CierreCaja,
@@ -47,6 +47,7 @@ from .models import (
     ModuloMunicipio,
     MovimientoCaja,
     Notificacion,
+    AuditoriaPassword,
     PlantillaDocumento,
     Rendicion,
     LiquidacionComision,
@@ -449,11 +450,9 @@ def cargar_saldo(request, usuario_id):
         try:
             monto = Decimal(monto_str)
             cargar_saldo_conductor(admin=admin, conductor=usuario, monto=monto)
-            # Refresca el usuario para obtener el saldo actualizado
-            usuario.refresh_from_db()
             comprobante = {
                 "monto":      monto,
-                "saldo_nuevo": usuario.saldo,
+                "saldo_nuevo": obtener_saldo_conductor(usuario, admin.municipio),
                 "fecha":      timezone.localtime(),
                 "admin":      admin,
             }
@@ -464,8 +463,9 @@ def cargar_saldo(request, usuario_id):
             })
 
     return render(request, "admin/cargar_saldo.html", {
-        "usuario":     usuario,
-        "comprobante": comprobante,
+        "usuario":         usuario,
+        "comprobante":     comprobante,
+        "saldo_conductor": obtener_saldo_conductor(usuario, admin.municipio),
     })
 
 
@@ -787,10 +787,18 @@ def gestionar_usuarios(request):
     usuario   = request.user
     municipio = usuario.municipio
 
+    from .models import BilleteraConductor as BilleteraConductorModel
     q = request.GET.get("q", "").strip()
+    # Anotar el saldo de billetera para evitar N+1 queries en el template.
+    saldo_sub = Subquery(
+        BilleteraConductorModel.objects.filter(
+            conductor=OuterRef("pk"), municipio=municipio,
+        ).values("saldo")[:1],
+        output_field=DecimalField(max_digits=10, decimal_places=2),
+    )
     qs = Usuario.objects.filter(
         es_conductor=True, municipio=municipio
-    ).prefetch_related("vehiculos").order_by("first_name", "last_name")
+    ).annotate(saldo_billetera=saldo_sub).prefetch_related("vehiculos").order_by("first_name", "last_name")
 
     if q:
         qs = qs.filter(
@@ -880,11 +888,67 @@ def detalle_usuario_admin(request, usuario_id):
             # es temporal; el usuario debe elegir la suya propia.
             conductor.cambio_password_requerido = True
             conductor.save()
+            # Registrar la acción para trazabilidad
+            AuditoriaPassword.objects.create(
+                admin=request.user,
+                conductor=conductor,
+                municipio=request.user.municipio,
+                tipo="personalizada",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
             messages.success(
                 request,
                 f"Contraseña temporal establecida. {conductor.correo} deberá cambiarla al próximo login. "
                 "Comunicale la contraseña temporal por fuera del sistema."
             )
+
+    elif accion == "resetear_password_dni":
+        # Atajo: resetear la contraseña al DNI del conductor.
+        # Si no tiene DNI, el admin debe cargarlo primero (editar_datos) o usar la
+        # sección de contraseña personalizada.
+        dni = (conductor.numero_dni or "").strip()
+        if not dni:
+            messages.error(
+                request,
+                "Este conductor no tiene DNI cargado. Editá sus datos primero, "
+                "o usá la sección de contraseña personalizada."
+            )
+        elif len(dni) < 6:
+            messages.error(request, f"El DNI '{dni}' es muy corto para usarse como contraseña (mín. 6 caracteres).")
+        else:
+            conductor.set_password(dni)
+            conductor.cambio_password_requerido = True
+            conductor.save()
+            # Registrar la acción para trazabilidad
+            AuditoriaPassword.objects.create(
+                admin=request.user,
+                conductor=conductor,
+                municipio=request.user.municipio,
+                tipo="dni",
+                ip=request.META.get("REMOTE_ADDR"),
+            )
+            messages.success(
+                request,
+                f"Contraseña reseteada al DNI ({dni}). "
+                f"{conductor.correo} deberá cambiarla al próximo login."
+            )
+            # Intentar notificar al conductor por email. fail_silently=True para
+            # no interrumpir el flujo si el servicio de email no está configurado.
+            try:
+                nombre_municipio = request.user.municipio.nombre if request.user.municipio else "Sistema de Estacionamiento"
+                asunto = f"Tu contraseña fue reseteada — {nombre_municipio}"
+                cuerpo = (
+                    f"Hola{' ' + conductor.first_name if conductor.first_name else ''},\n\n"
+                    f"Un administrador de {nombre_municipio} reseteó tu contraseña.\n\n"
+                    f"Tu contraseña temporal es tu número de DNI: {dni}\n\n"
+                    "Ingresá al sistema y cambiala antes de continuar. "
+                    "El sistema te lo pedirá automáticamente al iniciar sesión.\n\n"
+                    "Si no reconocés esta acción, contactá al administrador de tu municipio.\n\n"
+                    f"— {nombre_municipio}"
+                )
+                send_mail(asunto, cuerpo, None, [conductor.correo], fail_silently=True)
+            except Exception:
+                pass  # Si el email falla, el admin ya vio el mensaje de éxito
 
     elif accion == "verificar_residencia":
         # El admin confirma que este conductor es vecino verificado del municipio.
@@ -918,12 +982,19 @@ def detalle_usuario_admin(request, usuario_id):
         municipio=request.user.municipio,
     ).distinct().order_by("-creado_en")[:5]
 
+    # Historial de resets de contraseña para mostrar en la sección de contraseña
+    historial_passwords = AuditoriaPassword.objects.filter(
+        conductor=conductor
+    ).select_related("admin").order_by("-fecha")[:10]
+
     return render(request, "admin/detalle_usuario.html", {
-        "conductor":        conductor,
-        "vehiculos":        vehiculos,
-        "infracciones":     infracciones,
-        "modulo_reintegro": modulo_reintegro,
-        "reintegro_alcance": reintegro_alcance,
+        "conductor":          conductor,
+        "vehiculos":          vehiculos,
+        "infracciones":       infracciones,
+        "modulo_reintegro":   modulo_reintegro,
+        "reintegro_alcance":  reintegro_alcance,
+        "saldo_conductor":    obtener_saldo_conductor(conductor, request.user.municipio),
+        "historial_passwords": historial_passwords,
     })
 
 
@@ -1384,6 +1455,12 @@ def admin_rendiciones(request):
 
     seccion = request.GET.get("seccion", "cierres")  # cierres / rendiciones / comisiones / informes
 
+    # El tab "Informes" solo se muestra si el superadmin habilitó el módulo para este municipio.
+    modulo_informes_activo = getattr(municipio, "modulo_informes_activo", False)
+    # Si el admin llega a ?seccion=informes sin el módulo activo, redirigir a cierres.
+    if seccion == "informes" and not modulo_informes_activo:
+        seccion = "cierres"
+
     # ── Tab Informes ────────────────────────────────────────────────────────
     from .models import DestinatarioInforme
     from datetime import date as date_type
@@ -1554,9 +1631,10 @@ def admin_rendiciones(request):
         "mis_rendiciones":    mis_rendiciones,
         "liquidaciones":      liquidaciones,
         "seccion":            seccion,
-        "destinatarios":      destinatarios,
-        "informe_enviado":    informe_enviado,
-        "informe_error":      informe_error,
+        "destinatarios":           destinatarios,
+        "informe_enviado":         informe_enviado,
+        "informe_error":           informe_error,
+        "modulo_informes_activo":  modulo_informes_activo,
     })
 
 
@@ -2115,7 +2193,7 @@ def _generar_pdf_infracciones_juzgado(municipio, desde, hasta, infracciones_qs=N
             str(inf.id),
             timezone.localtime(inf.creado_en).strftime("%d/%m/%Y"),
             inf.vehiculo.patente if inf.vehiculo else "—",
-            inf.inspector.nombre_completo() if inf.inspector else "—",
+            inf.inspector.nombre_completo if inf.inspector else "—",
             str(inf.subcuadra) if inf.subcuadra else "—",
             f"${inf.monto:,.0f}",
             str(dias),
@@ -2568,7 +2646,7 @@ def _generar_pdf_rendicion(rendicion):
     )
 
     municipio_nombre = rendicion.municipio.nombre if rendicion.municipio else "Municipio"
-    admin_nombre = rendicion.admin.nombre_completo() if rendicion.admin else "—"
+    admin_nombre = rendicion.admin.nombre_completo if rendicion.admin else "—"
     generado_en = timezone.localtime().strftime("%d/%m/%Y %H:%M")
 
     # Estado con color de texto (no hay color en PDF inline, usamos texto)
@@ -2633,7 +2711,7 @@ def _generar_pdf_rendicion(rendicion):
 
         for cierre in cierres:
             filas.append([
-                cierre.usuario.nombre_completo() if cierre.usuario else "—",
+                cierre.usuario.nombre_completo if cierre.usuario else "—",
                 timezone.localtime(cierre.fecha_cierre).strftime("%d/%m/%Y"),
                 cierre.get_periodo_display() if cierre.periodo else "—",
                 f"${cierre.total_efectivo:,.0f}",
@@ -2668,7 +2746,7 @@ def _generar_pdf_rendicion(rendicion):
         partes.append(Paragraph("Validación de tesorería", estilo_seccion))
         validado_en = timezone.localtime(rendicion.validado_en).strftime("%d/%m/%Y %H:%M")
         partes.append(Paragraph(
-            f"Validada por: <b>{rendicion.tesorero.nombre_completo()}</b> el {validado_en}",
+            f"Validada por: <b>{rendicion.tesorero.nombre_completo}</b> el {validado_en}",
             estilos["Normal"],
         ))
 
@@ -2761,11 +2839,13 @@ def responder_observacion(request, rendicion_id):
 @require_role("admin", "superadmin")
 def gestionar_subcuadras(request, municipio_id=None):
     """
-    Permite al admin (y al superadmin) ver, crear, editar y eliminar subcuadras,
-    y asignarles coordenadas GPS haciendo click en un mapa Leaflet/OSM.
+    Gestión de subcuadras: superadmin siempre, admin municipal si
+    Municipio.puede_gestionar_subcuadras está activo.
 
-    Para el admin municipal: usa su propio municipio (municipio_id ignorado).
-    Para el superadmin:      recibe municipio_id en la URL y gestiona ese municipio.
+    El superadmin habilita el flag por municipio desde /superadmin/editar-municipio/<id>/.
+    Mientras el flag esté desactivado, el admin recibe 403 con mensaje explicativo.
+
+    Para el superadmin: recibe municipio_id en la URL y gestiona ese municipio.
 
     POST accion=guardar_coordenadas: guarda lat/lon para una subcuadra.
     POST accion=limpiar_coordenadas: elimina lat/lon de una subcuadra.
@@ -2787,6 +2867,16 @@ def gestionar_subcuadras(request, municipio_id=None):
 
     if not municipio:
         return redirect("login")
+
+    # Gate de autorización: el admin municipal solo puede entrar si el superadmin
+    # habilitó el flag puede_gestionar_subcuadras para su municipio.
+    # El superadmin siempre puede.
+    if not es_superadmin and not getattr(municipio, "puede_gestionar_subcuadras", False):
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden(
+            "No tenés autorización para gestionar subcuadras. "
+            "Pedí al superadmin que active este módulo para tu municipio."
+        )
 
     if request.method == "POST":
         accion = request.POST.get("accion")
@@ -3487,9 +3577,9 @@ def forzar_cierre_vendedor(request, vendedor_id):
     )
     cierre = generar_cierre_caja(vendedor, periodo="Cierre forzado por admin")
     if cierre:
-        messages.success(request, f"Caja de {vendedor.nombre_completo()} cerrada correctamente.")
+        messages.success(request, f"Caja de {vendedor.nombre_completo} cerrada correctamente.")
     else:
-        messages.info(request, f"{vendedor.nombre_completo()} no tiene movimientos abiertos para cerrar.")
+        messages.info(request, f"{vendedor.nombre_completo} no tiene movimientos abiertos para cerrar.")
 
     return redirect("admin_caja_vendedores")
 
@@ -3593,7 +3683,7 @@ def mapa_zonas(request):
         {
             "lat":    float(v.ubicacion_lat),
             "lon":    float(v.ubicacion_lon),
-            "nombre": v.nombre_completo() or v.correo,
+            "nombre": v.nombre_completo or v.correo,
             "domicilio": getattr(v, "domicilio_comercial", "") or "",
         }
         for v in vendedores_qs

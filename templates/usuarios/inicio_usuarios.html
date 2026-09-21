@@ -11,36 +11,39 @@
     <h2>👤 {% if request.user.nombre %}{{ request.user.nombre }}{% if request.user.apellido %} {{ request.user.apellido }}{% endif %}{% else %}{{ request.user.correo }}{% endif %}</h2>
 
     <p class="info">
-      💰 Saldo: ${{ usuario.saldo }}
+      💰 Saldo: ${{ saldo_conductor }}
     </p>
 
-    {% if usuario.saldo < 100 %}
+    {% if saldo_conductor < 100 %}
       <p class="danger">⚠️ Saldo bajo</p>
     {% endif %}
   </div>
 
   <!-- 🚗 ESTADO VEHÍCULO -->
+  {% if not puede_estacionar %}
+
+  {# Fuera de horario: reemplazar el card por el aviso, sin botón blureado #}
   <div class="card">
     <h3>🚗 Estado del vehículo</h3>
+    <div class="alert alert-warning" style="margin:0;">⏰ {{ mensaje_horario }}</div>
+  </div>
 
-    {% if estacionamiento_activo and estacionamiento_activo.estado == "ACTIVO" %}
+  {% elif estacionamiento_activo %}
 
-      <div class="status-ok">
-        🟢 Estacionamiento activo
-      </div>
+  <div class="card">
+    <h3>🚗 Estado del vehículo</h3>
+    <div class="status-ok">🟢 {% if estacionamientos_activos|length > 1 %}{{ estacionamientos_activos|length }} vehículos activos{% else %}Estacionamiento activo{% endif %}</div>
 
-      <p><b>Patente:</b> {{ estacionamiento_activo.vehiculo.patente }}</p>
-      <p><b>Zona:</b> {{ estacionamiento_activo.subcuadra }}</p>
-      <p><b>Inicio:</b> {{ estacionamiento_activo.hora_inicio|date:"H:i" }}</p>
-
-      <!-- ⏱ VENCIMIENTO / TIMER -->
-      <div class="timer-box" style="margin:0.5rem 0;">
+    {# Si hay UN solo vehículo activo: vista detallada con timer #}
+    {% if estacionamientos_activos|length == 1 %}
+      <p style="font-size:1.5rem; font-weight:800; letter-spacing:2px; margin:0.5rem 0 0.2rem;">
+        {{ estacionamiento_activo.vehiculo.patente }}
+      </p>
+      <div class="timer-box" style="margin:0.3rem 0 0.5rem;">
         <span id="timer" style="font-size:1.3rem; font-weight:700;">calculando…</span>
       </div>
-
-      <!-- ⚠️ Aviso cuando quedan menos de 5 minutos -->
-      <div id="aviso-tiempo" style="display:none; margin-top:0.5rem;"
-           class="alert alert-warning">
+      <div class="progress-bar"><div id="progress"></div></div>
+      <div id="aviso-tiempo" style="display:none; margin-top:0.5rem;" class="alert alert-warning">
         ⚠️ <strong>¡Te quedan menos de 5 minutos!</strong>
         <a class="btn btn-outline"
            href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}"
@@ -48,61 +51,66 @@
           🔄 Renovar ahora
         </a>
       </div>
-
-      <!-- 📊 PROGRESS -->
-      <div class="progress-bar">
-        <div id="progress"></div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+        <a class="btn btn-outline" id="btn-renovar"
+           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}">🔄 Renovar</a>
+        <a class="btn btn-danger"
+           href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}">⛔ Finalizar</a>
       </div>
-
+      <p style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.75rem; margin-bottom:0;">
+        📍 {{ estacionamiento_activo.subcuadra }} &nbsp;·&nbsp; desde {{ estacionamiento_activo.hora_inicio|date:"H:i" }}
+      </p>
       <script>
         const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
         const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_horas }}");
       </script>
 
-      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
-        <a class="btn btn-outline" id="btn-renovar"
-           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}">
-          🔄 Renovar
-        </a>
-        <a class="btn btn-danger"
-           href="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}">
-          ⛔ Finalizar
-        </a>
-      </div>
-
+    {# Si hay VARIOS vehículos activos: lista compacta #}
     {% else %}
-
-      <div class="status-warn">
-        🟡 Sin estacionamiento activo
-      </div>
-
-      {% if puede_estacionar %}
-        <p class="info">
-          No hay ningún vehículo estacionado en este momento.
-        </p>
-        <a class="btn"
-           href="{% url 'usuarios_estacionar_vehiculo' %}">
-          🚗 Estacionar vehículo
-        </a>
-      {% else %}
-        <div class="alert alert-warning" style="margin-bottom:0.75rem;">
-          ⏰ {{ mensaje_horario }}
+      <div style="display:flex; flex-direction:column; gap:0.4rem; margin-top:0.5rem;">
+        {% for est in estacionamientos_activos %}
+        <div style="display:flex; align-items:center; justify-content:space-between;
+                    padding:0.35rem 0; border-bottom:1px solid var(--color-border); flex-wrap:wrap; gap:0.4rem;">
+          <div>
+            <strong style="letter-spacing:1px;">{{ est.vehiculo.patente }}</strong>
+            <span style="font-size:0.85rem; color:var(--color-text-muted); margin-left:0.4rem;">
+              desde {{ est.hora_inicio|date:"H:i" }}
+            </span>
+          </div>
+          <div style="display:flex; gap:0.3rem;">
+            <a class="btn btn-outline"
+               href="{% url 'usuarios_renovar_estacionamiento' est.id %}"
+               style="font-size:0.78rem; padding:0.2rem 0.5rem;">🔄</a>
+            <a class="btn btn-danger"
+               href="{% url 'usuarios_finalizar_estacionamiento' est.id %}"
+               style="font-size:0.78rem; padding:0.2rem 0.5rem;">⛔</a>
+          </div>
         </div>
-        <button class="btn" disabled
-                style="opacity:0.4; cursor:not-allowed; filter:grayscale(60%);">
-          🚗 Estacionar vehículo
-        </button>
-      {% endif %}
-
+        {% endfor %}
+      </div>
     {% endif %}
+
+    <div style="margin-top:0.75rem;">
+      <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">+ Estacionar otro vehículo</a>
+    </div>
   </div>
+
+  {% else %}
+
+  <div class="card">
+    <h3>🚗 Estado del vehículo</h3>
+    <div class="status-warn">🟡 Sin estacionamiento activo</div>
+    <p class="info">No hay ningún vehículo estacionado en este momento.</p>
+    <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">🚗 Estacionar vehículo</a>
+  </div>
+
+  {% endif %}
 
 </div>
 
 <!-- 📅 ABONOS MENSUALES ACTIVOS -->
 <div class="card" style="margin-top:1rem;">
-  <div style="display:flex; justify-content:space-between; align-items:center;
-              flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem;">
+  <div class="page-header" style="margin-bottom:0.5rem;">
     <h3 style="margin:0;">📅 Abono mensual</h3>
     <a href="{% url 'conductor_pagar_abono' %}" class="btn btn-outline"
        style="font-size:0.85rem; padding:0.3rem 0.8rem;">+ Pagar abono</a>
@@ -120,9 +128,57 @@
       </div>
     {% endfor %}
   {% else %}
-    <p class="text-muted" style="margin:0; font-size:0.9rem;">No tenés abono activo este mes.</p>
+    <p class="text-muted" style="margin:0; font-size:0.9rem;">No tenés abono activo.</p>
   {% endif %}
 </div>
+
+<!-- 🚗 MIS VEHÍCULOS -->
+{% if vehiculos_conductor %}
+<div class="card" style="margin-top:1rem;">
+  <h3 style="margin-bottom:0.75rem;">🚗 Mis vehículos</h3>
+  <div style="display:flex; flex-direction:column; gap:0;">
+    {% for v in vehiculos_conductor %}
+    <div style="display:flex; align-items:center; justify-content:space-between;
+                flex-wrap:wrap; gap:0.5rem; padding:0.5rem 0;
+                {% if not forloop.last %}border-bottom:1px solid var(--color-border);{% endif %}">
+      <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+        {% if v.tiene_estacionamiento_activo %}
+          <span title="Estacionado ahora">🟢</span>
+        {% else %}
+          <span style="opacity:0.35;" title="Sin estacionamiento">⚪</span>
+        {% endif %}
+        <strong style="letter-spacing:1px;">{{ v.patente }}</strong>
+        <span style="color:var(--color-text-muted); font-size:0.88rem;">{{ v.get_tipo_display }}</span>
+        {% if v.infracciones_pendientes > 0 %}
+          <span style="font-size:0.8rem; color:var(--color-danger, #c0392b); font-weight:700;"
+                title="{{ v.infracciones_pendientes }} infracción(es) pendiente(s)">
+            ⚠️ {{ v.infracciones_pendientes }}
+          </span>
+        {% endif %}
+        {% if v.exento_global or v.exento_parcial %}
+          <span style="font-size:0.75rem; background:var(--color-primary); color:#fff;
+                       border-radius:4px; padding:0.1rem 0.35rem;" title="Exento ANDIS/SIA">
+            🏷️ exento
+          </span>
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:0.35rem;">
+        <a href="{% url 'usuarios_historial_estacionamientos' %}?patente={{ v.patente }}"
+           class="btn btn-outline" style="font-size:0.78rem; padding:0.2rem 0.55rem;"
+           title="Historial de estacionamientos">📜</a>
+        <a href="{% url 'mis_infracciones' %}?patente={{ v.patente }}"
+           class="btn btn-outline" style="font-size:0.78rem; padding:0.2rem 0.55rem;"
+           title="Ver infracciones">⚠️</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="margin-top:0.6rem;">
+    <a href="{% url 'agregar_vehiculo' %}" class="btn btn-outline"
+       style="font-size:0.82rem;">+ Agregar vehículo</a>
+  </div>
+</div>
+{% endif %}
 
 <!-- ⚠️ INFRACCIÓN PENDIENTE DETECTADA AL ESTACIONAR -->
 {% if notif_infraccion %}
@@ -210,6 +266,13 @@
 
 <!-- 📊 ACCIONES -->
 <div class="grid grid-3" style="margin-top:1rem;">
+    <div class="card">
+    <h4>💰 Cargar saldo</h4>
+      <a class="btn btn-outline" href="{% url 'mp_iniciar_carga' %}">
+        Cargar con MercadoPago
+      </a>
+    </div>
+
 
   <div class="card">
     <h4>📜 Historial</h4>
@@ -219,12 +282,6 @@
     </a>
   </div>
 
-  <div class="card">
-    <h4>💰 Cargar saldo</h4>
-    <a class="btn btn-outline" href="{% url 'mp_iniciar_carga' %}">
-      Cargar con MercadoPago
-    </a>
-  </div>
 
   <div class="card">
     <h4>⚠️ Infracciones</h4>
@@ -329,16 +386,16 @@
     <p style="margin:0 0 0.75rem; font-size:0.82rem; color:var(--color-text-muted);">
       Elegí qué tipo de notificaciones querés recibir en este panel:
     </p>
-    <div style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.88rem;">
+    <div style="display:flex; gap:0.5rem; font-size:0.88rem;">
       <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; flex-wrap:wrap;">
         <input type="checkbox" name="notif_verificacion" style="margin-top:0.15rem; flex-shrink:0;"
                {% if request.user.notif_verificacion %}checked{% endif %}>
-        <span>Verificación de identidad (aprobada / rechazada)</span>
+        <span>Verificación de identidad </span>
       </label>
       <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; flex-wrap:wrap;">
         <input type="checkbox" name="notif_exencion" style="margin-top:0.15rem; flex-shrink:0;"
                {% if request.user.notif_exencion %}checked{% endif %}>
-        <span>Exención (aprobada / rechazada)</span>
+        <span>Exención</span>
       </label>
       <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; flex-wrap:wrap;">
         <input type="checkbox" name="notif_sugerencia" style="margin-top:0.15rem; flex-shrink:0;"
@@ -370,7 +427,7 @@
       <li>🅿️ <strong>Estacioná</strong> tocando "Estacionar" → ingresá la patente y la duración → confirmá. El sistema debita el costo de tu saldo.</li>
       <li>⏱ <strong>Seguí el tiempo</strong> desde esta pantalla: ves cuánto falta y podés renovar antes de que venza.</li>
       <li>⚠️ <strong>Si tenés una infracción</strong>, pagala desde "Mis infracciones". Si creés que fue incorrecta, podés impugnarla desde el detalle de la infracción.</li>
-      <li>📅 <strong>Abono mensual</strong>: si usás el estacionamiento a diario, preguntá a un vendedor por el abono — es más económico.</li>
+      <li>📅 <strong>Abono mensual</strong>: te olvidas de gestionarlo y es más económico.</li>
       <li>💡 <strong>¿Tenés alguna sugerencia?</strong> Usá "Enviar sugerencia" desde el menú.</li>
     </ol>
   </div>

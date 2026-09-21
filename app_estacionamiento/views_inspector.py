@@ -460,7 +460,7 @@ def pdf_infracciones_hoy(request):
     ))
     partes.append(Spacer(1, 0.3*cm))
     partes.append(Paragraph(
-        f"Inspector: {inspector.nombre_completo()} &nbsp;|&nbsp; Municipio: {municipio_nombre}",
+        f"Inspector: {inspector.nombre_completo} &nbsp;|&nbsp; Municipio: {municipio_nombre}",
         estilo_sub,
     ))
     partes.append(Spacer(1, 0.6*cm))

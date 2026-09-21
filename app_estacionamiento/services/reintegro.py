@@ -19,7 +19,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.utils import timezone
 
-from app_estacionamiento.models import ModuloMunicipio, Reintegro
+from app_estacionamiento.models import BilleteraConductor, ModuloMunicipio, Reintegro
 
 
 def modulo_reintegro_activo(municipio):
@@ -87,9 +87,15 @@ def aplicar_reintegro(conductor, municipio, estacionamiento, tarifa_hora):
     if monto <= 0:
         return {"reintegrado": False, "monto": Decimal("0")}
 
-    # Acreditar saldo y dejar registro contable
-    conductor.saldo += monto
-    conductor.save(update_fields=["saldo"])
+    # Acreditar en la billetera del municipio y dejar registro contable.
+    # El conductor ya está bloqueado con select_for_update() en el llamador.
+    billetera, _ = BilleteraConductor.objects.select_for_update().get_or_create(
+        conductor=conductor,
+        municipio=municipio,
+        defaults={"saldo": Decimal("0")},
+    )
+    billetera.saldo += monto
+    billetera.save(update_fields=["saldo"])
     Reintegro.objects.create(
         conductor=conductor,
         municipio=municipio,

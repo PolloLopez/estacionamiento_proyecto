@@ -371,6 +371,24 @@ class Municipio(models.Model):
             "Por defecto solo el superadmin puede hacerlo."
         ),
     )
+    modulo_informes_activo = models.BooleanField(
+        default=False,
+        verbose_name="Módulo de informes por mail",
+        help_text=(
+            "Activa el tab 'Informes' en /admin-rendiciones/ para que el admin "
+            "configure destinatarios y envíe resúmenes periódicos por mail. "
+            "Por defecto desactivado — el superadmin lo habilita por municipio."
+        ),
+    )
+    puede_gestionar_subcuadras = models.BooleanField(
+        default=False,
+        verbose_name="Admin puede gestionar subcuadras",
+        help_text=(
+            "Si está activo, el admin municipal puede crear, editar y asignar coordenadas GPS "
+            "a las subcuadras desde /admin-subcuadras/. "
+            "Por defecto solo el superadmin puede hacerlo."
+        ),
+    )
 
     # ── Descuento para conductores verificados ───────────────────────────────────
     # El superadmin configura un porcentaje de descuento sobre el costo de
@@ -1809,6 +1827,46 @@ class TransferenciaSaldo(models.Model):
         return f"Transferencia ${self.monto} de {self.emisor} → {self.receptor} [{self.estado}]"
 
 
+class BilleteraConductor(models.Model):
+    """
+    Billetera de saldo del conductor, aislada por municipio.
+
+    Un conductor puede operar en varios municipios (presente o futuro); cada uno
+    tiene su propio saldo independiente. Reemplaza el uso de Usuario.saldo para
+    el flujo de conductor.
+
+    Nota: Usuario.saldo se conserva como campo legacy para retrocompatibilidad
+    con scripts existentes; la fuente de verdad para operaciones de conductor
+    es este modelo.
+    """
+
+    conductor = models.ForeignKey(
+        "Usuario",
+        on_delete=models.CASCADE,
+        related_name="billeteras",
+        verbose_name="Conductor",
+    )
+    municipio = models.ForeignKey(
+        "Municipio",
+        on_delete=models.CASCADE,
+        related_name="billeteras",
+        verbose_name="Municipio",
+    )
+    saldo = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("0"),
+        verbose_name="Saldo disponible",
+    )
+
+    class Meta:
+        # Un conductor tiene una sola billetera por municipio.
+        unique_together = [("conductor", "municipio")]
+        verbose_name = "Billetera del conductor"
+        verbose_name_plural = "Billeteras de conductores"
+
+    def __str__(self):
+        return f"{self.conductor} — {self.municipio} — ${self.saldo}"
+
+
 class SugerenciaMejora(models.Model):
     """
     Sugerencia de mejora enviada por cualquier usuario del sistema.
@@ -1933,3 +1991,63 @@ class SolicitudEliminacionCuenta(models.Model):
 
     def __str__(self):
         return f"Eliminación: {self.usuario} [{self.estado}]"
+
+
+class AuditoriaPassword(models.Model):
+    """
+    Registro de cada vez que un admin resetea o cambia la contraseña de un conductor.
+
+    Queda guardado quién lo hizo, a quién, cuándo y de qué tipo fue el cambio.
+    Permite al superadmin y al propio admin tener trazabilidad de acciones sensibles.
+
+    Nota: no se guarda la contraseña en ninguna forma — solo el tipo de acción.
+    """
+
+    TIPO_CAMBIO = [
+        ("dni",          "Reset al DNI"),
+        ("personalizada", "Contraseña personalizada"),
+    ]
+
+    # Admin que realizó la acción
+    admin = models.ForeignKey(
+        "Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="auditorias_password_realizadas",
+        verbose_name="Admin que realizó el cambio",
+    )
+    # Conductor cuya contraseña fue modificada
+    conductor = models.ForeignKey(
+        "Usuario",
+        on_delete=models.CASCADE,
+        related_name="auditorias_password_recibidas",
+        verbose_name="Conductor afectado",
+    )
+    municipio = models.ForeignKey(
+        "Municipio",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="auditorias_password",
+    )
+    tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_CAMBIO,
+        verbose_name="Tipo de cambio",
+    )
+    # IP opcional — útil para detectar acciones sospechosas (ej. admin desde red externa)
+    ip = models.GenericIPAddressField(
+        null=True, blank=True,
+        verbose_name="IP del admin",
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha"]
+        verbose_name        = "Auditoría de contraseña"
+        verbose_name_plural = "Auditorías de contraseñas"
+
+    def __str__(self):
+        return (
+            f"{self.admin} → {self.conductor} "
+            f"[{self.get_tipo_display()}] {self.fecha:%Y-%m-%d %H:%M}"
+        )

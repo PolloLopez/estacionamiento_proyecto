@@ -4,7 +4,18 @@
 {% block content %}
 <section class="container">
 
-  <h2 style="margin-bottom:1rem;">⚠️ Mis infracciones</h2>
+  <div class="page-header" style="margin-bottom:1rem;">
+    <h2 style="margin:0;">⚠️ Mis infracciones</h2>
+    <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
+  </div>
+
+  {% if patente_filtro %}
+  <div class="alert alert-warning" style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+    <span>🔍 Filtrando por <strong>{{ patente_filtro }}</strong></span>
+    <a href="{% url 'mis_infracciones' %}" class="btn btn-outline"
+       style="font-size:0.82rem; padding:0.2rem 0.6rem;">Ver todas</a>
+  </div>
+  {% endif %}
 
   {# Aviso de visibilidad #}
   {% if not request.user.es_verificado %}
@@ -18,161 +29,224 @@
       </a>
     </div>
   {% else %}
-    <div class="alert alert-info" style="margin-bottom:1rem; display:block; font-size:0.9rem;">
-      ℹ️ Se muestran las infracciones de los vehículos vinculados a tu cuenta verificada.
+    <div class="alert alert-info" style="margin-bottom:1rem; font-size:0.9rem;">
+      ℹ️ Infracciones de los vehículos vinculados a tu cuenta.
     </div>
   {% endif %}
 
   {% if infracciones %}
 
-    {# Mostrar saldo si hay alguna pendiente #}
+    {# Saldo si hay pendientes #}
     {% if tiene_pendientes %}
-    <div class="card" style="margin-bottom:1rem; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
-      <span style="font-size:0.95rem;">💰 Saldo disponible: <strong>${{ saldo_usuario }}</strong></span>
-      <a href="{% url 'mp_iniciar_carga' %}" class="btn btn-outline" style="font-size:0.85rem;">Cargar saldo</a>
+    <div class="card" style="margin-bottom:1rem; display:flex; align-items:center;
+         justify-content:space-between; flex-wrap:wrap; gap:0.5rem;">
+      <span>💰 Saldo: <strong>${{ saldo_usuario }}</strong></span>
+      <a href="{% url 'mp_iniciar_carga' %}" class="btn btn-outline" style="font-size:0.85rem;">Cargar</a>
     </div>
     {% endif %}
 
-    <div class="card" style="overflow-x:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Patente</th>
-            <th>Ubicación</th>
-            <th style="text-align:right;">Monto</th>
-            <th style="text-align:center;">Estado</th>
-            <th style="text-align:center;">Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for i in infracciones %}
-          <tr>
-            <td style="font-size:0.85rem;">{{ i.creado_en|date:"d/m/Y H:i" }}</td>
-            <td><strong>{{ i.vehiculo.patente }}</strong></td>
-            <td style="font-size:0.85rem;">
-              {% if i.subcuadra %}{{ i.subcuadra }}{% else %}—{% endif %}
-            </td>
-            <td style="text-align:right; font-weight:600;">
-              ${{ i.monto }}
-              {% if i.descuento_preview %}
-                <br>
-                <span style="font-size:0.78rem; color:var(--color-primary); font-weight:600;">
-                  🏷️ -{{ i.descuento_preview.descuento_pct|floatformat:0 }}% → ${{ i.descuento_preview.monto_final|floatformat:2 }}
+    {# ── CARDS responsive, una por infracción ── #}
+    <div style="display:flex; flex-direction:column; gap:0.75rem;">
+    {% for i in infracciones %}
+
+      {# Card resumen — tap para expandir detalle #}
+      <div class="card" style="padding:0; overflow:hidden;">
+        <button type="button"
+                onclick="toggleDetalle('inf-{{ i.id }}')"
+                style="width:100%; background:none; border:none; cursor:pointer;
+                       text-align:left; padding:0.9rem 1rem;">
+          <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+
+            {# Icono de estado #}
+            {% if i.estado == "pagada" %}
+              <span style="font-size:1.3rem;" title="Pagada">✅</span>
+            {% elif i.estado == "anulada" %}
+              <span style="font-size:1.3rem; opacity:0.5;" title="Anulada">🚫</span>
+            {% else %}
+              <span style="font-size:1.3rem;" title="Pendiente">⚠️</span>
+            {% endif %}
+
+            {# Info compacta #}
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; align-items:baseline; gap:0.5rem; flex-wrap:wrap;">
+                <strong style="letter-spacing:1px;">{{ i.vehiculo.patente }}</strong>
+                <span style="color:var(--color-text-muted); font-size:0.82rem;">
+                  {{ i.creado_en|date:"d/m/Y H:i" }}
                 </span>
+              </div>
+              <div style="font-size:0.88rem; color:var(--color-text-muted); margin-top:0.15rem;
+                          white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                {% if i.subcuadra %}
+                  📍 {{ i.subcuadra.nombre_calle|default:i.subcuadra }}{% if i.subcuadra.altura %} {{ i.subcuadra.altura }}{% endif %}
+                {% else %}—{% endif %}
+              </div>
+            </div>
+
+            {# Monto + flecha #}
+            <div style="text-align:right; flex-shrink:0;">
+              <div style="font-size:1.1rem; font-weight:800;
+                          color:{% if i.estado == 'pendiente' %}var(--color-danger, #c0392b){% else %}var(--color-text-muted){% endif %};">
+                ${{ i.monto }}
+              </div>
+              {% if i.descuento_preview %}
+                <div style="font-size:0.75rem; color:var(--color-primary);">
+                  🏷️ ${{ i.descuento_preview.monto_final|floatformat:2 }}
+                </div>
               {% endif %}
-            </td>
-            <td style="text-align:center;">
-              {% if i.estado == "pagada" %}
-                <span style="color:var(--color-primary); font-weight:700;">✅ Pagada</span>
-              {% elif i.estado == "anulada" %}
-                <span class="text-muted">Anulada</span>
-              {% else %}
-                <span style="color:var(--color-danger); font-weight:700;">⚠️ Pendiente</span>
-              {% endif %}
-            </td>
-            <td style="text-align:center;">
-              {% if i.estado == "pendiente" and not es_vista_gestion %}
-                {% if saldo_usuario >= i.monto %}
-                  <button class="btn btn-sm"
-                          style="font-size:0.82rem;"
-                          onclick="document.getElementById('modal-pagar-{{ i.id }}').style.display='flex'">
-                    💳 Pagar con saldo
-                  </button>
-                  {# Modal de confirmación — contenido varía según tolerancia #}
-                  <div id="modal-pagar-{{ i.id }}"
-                       style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5);
-                              z-index:1000; align-items:center; justify-content:center;">
-                    <div class="card" style="max-width:400px; width:90%; padding:1.5rem;">
+              <div style="font-size:0.75rem; color:var(--color-text-muted); margin-top:0.15rem;">
+                ver más ›
+              </div>
+            </div>
 
-                      {% if i.id in ids_dentro_tolerancia %}
-                        {# Dentro del período de gracia: se anulará sin cobrar #}
-                        <h3 style="margin-bottom:0.75rem;">✅ Período de gracia</h3>
-                        <p style="margin-bottom:0.5rem;">
-                          Infracción <strong>#{{ i.id }}</strong> · Patente <strong>{{ i.vehiculo.patente }}</strong>
-                        </p>
-                        <p style="margin-bottom:1rem; color:var(--color-primary);">
-                          Estás dentro del período de gracia
-                          ({{ tolerancia_min }} min desde que fue labrada).
-                          <strong>La infracción se anulará sin costo.</strong>
-                        </p>
-                      {% else %}
-                        {# Fuera del período de gracia: se cobra monto completo o con descuento #}
-                        {% if i.descuento_preview %}
-                          <h3 style="margin-bottom:0.75rem;">🏷️ Descuento disponible</h3>
-                        {% else %}
-                          <h3 style="margin-bottom:0.75rem;">⚠️ Pago fuera de término</h3>
-                        {% endif %}
-                        <p style="margin-bottom:0.5rem;">
-                          Infracción <strong>#{{ i.id }}</strong> · Patente <strong>{{ i.vehiculo.patente }}</strong>
-                        </p>
-                        {% if i.descuento_preview %}
-                          <div style="background:#f0fdf4; border:1px solid var(--color-primary);
-                                      border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
-                            <strong style="color:var(--color-primary);">
-                              🏷️ {{ i.descuento_preview.motivo }}
-                            </strong><br>
-                            Monto original: <span style="text-decoration:line-through;">${{ i.monto }}</span><br>
-                            <strong>Pagás ahora: ${{ i.descuento_preview.monto_final|floatformat:2 }}</strong>
-                          </div>
-                        {% else %}
-                          <div style="background:var(--color-danger-light, #fff3cd);
-                                      border:1px solid var(--color-danger, #e5a000);
-                                      border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
-                            <strong>Estás pagando fuera del período de gracia{% if tolerancia_min %} ({{ tolerancia_min }} min){% endif %}.</strong><br>
-                            Se descontarán <strong>${{ i.monto }}</strong> de tu saldo.
-                          </div>
-                        {% endif %}
-                      {% endif %}
+          </div>
+        </button>
 
-                      <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
-                        <button class="btn btn-outline"
-                                onclick="document.getElementById('modal-pagar-{{ i.id }}').style.display='none'">
-                          Cancelar
-                        </button>
-                        <form method="post" action="{% url 'pagar_infraccion' i.id %}">
-                          {% csrf_token %}
-                          {% if i.id in ids_dentro_tolerancia %}
-                            <button type="submit" class="btn">Anular sin costo</button>
-                          {% elif i.descuento_preview %}
-                            <button type="submit" class="btn"
-                                    style="background:var(--color-primary); color:#fff;">
-                              Pagar ${{ i.descuento_preview.monto_final|floatformat:2 }}
-                            </button>
-                          {% else %}
-                            <button type="submit" class="btn btn-danger"
-                                    style="background:var(--color-danger, #c0392b); color:#fff;">
-                              Pagar ${{ i.monto }}
-                            </button>
-                          {% endif %}
-                        </form>
-                      </div>
+        {# Panel de detalle (colapsado por defecto) #}
+        <div id="inf-{{ i.id }}" style="display:none; border-top:1px solid var(--color-border);
+             padding:1rem; background:var(--color-surface);">
 
-                    </div>
-                  </div>
-                {% else %}
-                  <span style="font-size:0.82rem; color:var(--color-muted);">Saldo insuficiente</span>
+          {# Foto de la infracción #}
+          {% if i.foto %}
+            <div style="margin-bottom:0.75rem; text-align:center;">
+              <img src="{{ i.foto.url }}" alt="Foto de la infracción"
+                   style="max-width:100%; border-radius:8px; max-height:240px; object-fit:cover;">
+            </div>
+          {% endif %}
+
+          {# Datos detallados #}
+          <table style="width:100%; font-size:0.88rem; border-collapse:collapse; margin-bottom:0.75rem;">
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted); white-space:nowrap;">#</td>
+              <td><strong>{{ i.id }}</strong></td>
+            </tr>
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Fecha</td>
+              <td>{{ i.creado_en|date:"d/m/Y H:i:s" }}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Ubicación</td>
+              <td>{% if i.subcuadra %}{{ i.subcuadra }}{% else %}—{% endif %}</td>
+            </tr>
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Monto</td>
+              <td>
+                <strong>${{ i.monto }}</strong>
+                {% if i.descuento_preview %}
+                  <span style="font-size:0.82rem; color:var(--color-primary); margin-left:0.4rem;">
+                    🏷️ -{{ i.descuento_preview.descuento_pct|floatformat:0 }}% → ${{ i.descuento_preview.monto_final|floatformat:2 }}
+                  </span>
                 {% endif %}
-              {% elif i.estado == "pendiente" or i.estado == "pagada" %}
-                <a href="{% url 'crear_impugnacion' i.id %}"
-                   class="btn btn-outline"
-                   style="font-size:0.78rem; padding:0.2rem 0.55rem;">
-                  📋 Impugnar
-                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Estado</td>
+              <td>
+                {% if i.estado == "pagada" %}✅ Pagada
+                {% elif i.estado == "anulada" %}🚫 Anulada
+                {% else %}⚠️ Pendiente{% endif %}
+              </td>
+            </tr>
+          </table>
+
+          {# Acciones #}
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            {% if i.estado == "pendiente" and not es_vista_gestion %}
+              {% if saldo_usuario >= i.monto %}
+                <button class="btn"
+                        style="font-size:0.88rem;"
+                        onclick="document.getElementById('modal-pagar-{{ i.id }}').style.display='flex'">
+                  💳 Pagar con saldo
+                </button>
               {% else %}
-                <span class="text-muted" style="font-size:0.82rem;">—</span>
+                <a href="{% url 'mp_iniciar_carga' %}" class="btn btn-outline" style="font-size:0.88rem;">
+                  Cargar saldo para pagar
+                </a>
               {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+            {% endif %}
+            {% if i.estado == "pendiente" or i.estado == "pagada" %}
+              <a href="{% url 'crear_impugnacion' i.id %}" class="btn btn-outline"
+                 style="font-size:0.88rem;">📋 Impugnar</a>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+
+      {# Modal de confirmación de pago (fuera del card para evitar z-index issues) #}
+      {% if i.estado == "pendiente" and not es_vista_gestion and saldo_usuario >= i.monto %}
+      <div id="modal-pagar-{{ i.id }}"
+           style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
+                  z-index:1000; align-items:center; justify-content:center; padding:1rem;">
+        <div class="card" style="max-width:400px; width:100%; padding:1.5rem;">
+          {% if i.id in ids_dentro_tolerancia %}
+            <h3 style="margin-bottom:0.75rem;">✅ Período de gracia</h3>
+            <p style="margin-bottom:0.5rem;">
+              Infracción <strong>#{{ i.id }}</strong> · <strong>{{ i.vehiculo.patente }}</strong>
+            </p>
+            <p style="margin-bottom:1rem; color:var(--color-primary);">
+              Dentro del período de gracia ({{ tolerancia_min }} min).
+              <strong>Se anulará sin costo.</strong>
+            </p>
+          {% else %}
+            {% if i.descuento_preview %}
+              <h3 style="margin-bottom:0.75rem;">🏷️ Descuento disponible</h3>
+            {% else %}
+              <h3 style="margin-bottom:0.75rem;">⚠️ Confirmar pago</h3>
+            {% endif %}
+            <p style="margin-bottom:0.5rem;">
+              Infracción <strong>#{{ i.id }}</strong> · <strong>{{ i.vehiculo.patente }}</strong>
+            </p>
+            {% if i.descuento_preview %}
+              <div style="background:#f0fdf4; border:1px solid var(--color-primary);
+                          border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
+                <strong style="color:var(--color-primary);">🏷️ {{ i.descuento_preview.motivo }}</strong><br>
+                Original: <span style="text-decoration:line-through;">${{ i.monto }}</span><br>
+                <strong>Pagás: ${{ i.descuento_preview.monto_final|floatformat:2 }}</strong>
+              </div>
+            {% else %}
+              <div style="background:var(--color-danger-light, #fff3cd);
+                          border:1px solid var(--color-danger, #e5a000);
+                          border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
+                Fuera del período de gracia{% if tolerancia_min %} ({{ tolerancia_min }} min){% endif %}.<br>
+                Se descontarán <strong>${{ i.monto }}</strong> de tu saldo.
+              </div>
+            {% endif %}
+          {% endif %}
+          <div style="display:flex; gap:0.75rem; justify-content:flex-end;">
+            <button class="btn btn-outline"
+                    onclick="document.getElementById('modal-pagar-{{ i.id }}').style.display='none'">
+              Cancelar
+            </button>
+            <form method="post" action="{% url 'pagar_infraccion' i.id %}">
+              {% csrf_token %}
+              {% if i.id in ids_dentro_tolerancia %}
+                <button type="submit" class="btn">Anular sin costo</button>
+              {% elif i.descuento_preview %}
+                <button type="submit" class="btn">Pagar ${{ i.descuento_preview.monto_final|floatformat:2 }}</button>
+              {% else %}
+                <button type="submit" class="btn btn-danger">Pagar ${{ i.monto }}</button>
+              {% endif %}
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+    {% endfor %}
     </div>
+
   {% else %}
-    <div class="card" style="text-align:center; padding:2rem;">
+    <div class="card card-empty">
       <p class="text-muted">No tenés infracciones registradas.</p>
     </div>
   {% endif %}
+
+<script>
+function toggleDetalle(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+</script>
 
 </section>
 {% endblock %}

@@ -40,18 +40,20 @@ def panel_tesorero(request):
         rendiciones_pendientes.aggregate(total=Sum("total_neto"))["total"] or 0
     )
 
-    pendientes_rendicion   = rendiciones_pendientes.count()
-    pendientes_liquidacion = qs_liquidaciones.filter(estado="pendiente").count()
-
-    liquidaciones = qs_liquidaciones.order_by("-creado_en")[:50]
-
     # Cierres de admin sin certificar — válvula de escape para el tesorero.
     # Solo cierres de admins (es_admin=True): inspectores y vendedores los certifica el admin.
+    # Definida antes del conteo para evitar UnboundLocalError.
     cierres_admin_sin_certificar = CierreCaja.objects.filter(
         usuario__municipio=municipio,
         usuario__es_admin=True,
         certificado=False,
     ).select_related("usuario").order_by("-fecha_cierre")
+
+    pendientes_rendicion     = rendiciones_pendientes.count()
+    pendientes_liquidacion   = qs_liquidaciones.filter(estado="pendiente").count()
+    pendientes_cierres_admin = cierres_admin_sin_certificar.count()
+
+    liquidaciones = qs_liquidaciones.order_by("-creado_en")[:50]
 
     # Liquidaciones de plataforma (lo que el municipio le debe/pagó a Leandro)
     liq_plataforma_pendientes = LiquidacionPlataforma.objects.filter(
@@ -70,6 +72,7 @@ def panel_tesorero(request):
         "liquidaciones":                 liquidaciones,
         "pendientes_rendicion":          pendientes_rendicion,
         "pendientes_liquidacion":        pendientes_liquidacion,
+        "pendientes_cierres_admin":      pendientes_cierres_admin,
         "cierres_admin_sin_certificar":  cierres_admin_sin_certificar,
         "liq_plataforma_pendientes":     liq_plataforma_pendientes,
         "liq_plataforma_recientes":      liq_plataforma_recientes,
@@ -152,7 +155,7 @@ def depositar_comision(request, liquidacion_id):
                 "estado", "depositada_en", "depositada_por",
                 "notas_tesorero", "numero_comprobante", "comprobante_archivo",
             ])
-        messages.success(request, f"Depósito registrado para {liquidacion.vendedor.nombre_completo()}.")
+        messages.success(request, f"Depósito registrado para {liquidacion.vendedor.nombre_completo}.")
         return redirect(nombre_panel)
 
     return render(request, "tesorero/depositar_comision.html", {

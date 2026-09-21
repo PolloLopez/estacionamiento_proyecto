@@ -63,7 +63,7 @@
 {% else %}
 
   <!-- FORMULARIO -->
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+  <div class="page-header" style="margin-bottom:1.25rem;">
     <h2 style="font-size:1.4rem; margin:0;">💰 Cargar saldo</h2>
     <a href="{% url 'detalle_usuario_admin' usuario.id %}" class="btn btn-outline"
        style="font-size:0.9rem;">← Volver</a>
@@ -76,7 +76,7 @@
     </p>
     <p style="margin-bottom:0.25rem;"><strong>Correo:</strong> {{ usuario.correo }}</p>
     <p style="margin-bottom:1rem; font-size:1.1rem; font-weight:700; color:var(--color-primary);">
-      Saldo actual: ${{ usuario.saldo }}
+      Saldo actual: ${{ saldo_conductor }}
     </p>
 
     {% if error %}

@@ -47,6 +47,46 @@ def obtener_tarifa_hora(tarifa_obj, vehiculo, fallback=None):
         return precio_moto
     return tarifa_obj.precio_por_hora
 
+def es_dia_sin_horario(municipio):
+    """
+    Retorna True si hoy no tiene horario de cobro configurado para el municipio.
+    Eso significa que el día es libre: el conductor puede registrar estacionamiento
+    pero no se le cobra (costo $0).
+    """
+    hoy_dia = timezone.localtime().weekday()
+    return not HorarioEstacionamiento.objects.filter(
+        municipio=municipio, dia_semana=hoy_dia, activo=True
+    ).exists()
+
+
+def es_dia_libre_conductor(municipio):
+    """
+    Retorna True si hoy es un día sin cobro para el conductor.
+    Cubre dos casos:
+    - DiaEspecial con cobro_activo=False (feriado / día especial sin cobro)
+    - Sin horario configurado para el día de hoy (día destildado)
+
+    En ambos el conductor puede registrar estacionamiento con costo $0.
+    Diferencia con es_dia_sin_horario: también detecta DiaEspecial.
+    Usada en vistas y use cases para no duplicar esta lógica.
+    """
+    ahora     = timezone.localtime()
+    hoy_fecha = ahora.date()
+    hoy_dia   = ahora.weekday()
+
+    # DiaEspecial sin cobro tiene prioridad sobre el horario semanal
+    dia_especial = DiaEspecial.objects.filter(
+        municipio=municipio, fecha=hoy_fecha
+    ).first()
+    if dia_especial and not dia_especial.cobro_activo:
+        return True
+
+    # Sin horario configurado para hoy → día libre por defecto
+    return not HorarioEstacionamiento.objects.filter(
+        municipio=municipio, dia_semana=hoy_dia, activo=True
+    ).exists()
+
+
 def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
     """
     Verifica si el horario del municipio permite estacionar en este momento.

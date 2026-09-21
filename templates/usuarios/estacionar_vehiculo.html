@@ -10,10 +10,16 @@
               border-radius:10px; padding:0.75rem 1.1rem; margin-bottom:1.2rem;">
     <span style="font-size:0.9rem; color:var(--color-text-muted);">Saldo disponible</span>
     <span style="font-size:1.5rem; font-weight:800;
-          color:{% if usuario.saldo < 100 %}var(--color-danger){% else %}var(--color-primary){% endif %};">
-      ${{ usuario.saldo }}
+          color:{% if saldo_conductor < 100 %}var(--color-danger){% else %}var(--color-primary){% endif %};">
+      ${{ saldo_conductor }}
     </span>
   </div>
+
+  {% if dia_libre_hoy %}
+  <div class="alert alert-info" style="margin-bottom:1rem;">
+    🟢 <strong>Hoy no hay cobro.</strong> Podés registrar el estacionamiento sin costo ($0).
+  </div>
+  {% endif %}
 
   {% if fuera_de_horario %}
   <div class="alert alert-warning" style="margin-bottom:1rem;">
@@ -327,7 +333,8 @@
 // ── Constantes ──────────────────────────────────────────────────────────────
 const PRECIO_HORA_AUTO   = parseFloat("{{ tarifa_hora_auto|default:'100' }}");
 const PRECIO_HORA_MOTO   = parseFloat("{{ tarifa_hora_moto|default:'0' }}") || PRECIO_HORA_AUTO;
-const SALDO_CONDUCTOR    = parseFloat("{{ usuario.saldo|default:'0' }}");
+const SALDO_CONDUCTOR    = parseFloat("{{ saldo_conductor|default:'0' }}");
+const DIA_LIBRE          = {{ dia_libre_hoy|yesno:"true,false" }};
 const URL_SUBCUADRA_CERCANA = "{% url 'conductor_subcuadra_cercana' %}";
 
 // Array de subcuadras para el selector manual en cascada
@@ -351,6 +358,14 @@ function actualizarZonaLibre(esLibre) {
   if (esLibre) {
     if (banner)  banner.style.display  = "block";
     if (seccion) seccion.style.display = "none";
+    // Zona libre: no hay cobro ni selección de duración necesaria.
+    // Fijamos 1 hora por defecto y habilitamos el botón si hay vehículo activo.
+    const horasInp = document.getElementById("horas");
+    if (horasInp && !horasInp.value) horasInp.value = "1";
+    if (vehiculoActivo) {
+      const btnConf = document.getElementById("btn-confirmar-est");
+      if (btnConf) btnConf.disabled = false;
+    }
   } else {
     if (banner) banner.style.display = "none";
     // La sección de duración se muestra solo si hay vehículo activo
@@ -506,6 +521,16 @@ function seleccionarVehiculo(id, patente, tipo) {
     document.getElementById("seccion-duracion").style.display = "block";
   }
   document.getElementById("vehiculo-seleccionado-label").innerText = patente;
+
+  // Día libre: el costo siempre es $0, no hace falta comparar con el saldo.
+  // Habilitamos el botón directamente y fijamos 1 hora como duración por defecto
+  // (el conductor puede cambiarla eligiendo otra opción en la grilla de duración).
+  if (DIA_LIBRE && !esZonaLibre) {
+    const horasInp = document.getElementById("horas");
+    if (horasInp && !horasInp.value) horasInp.value = "1";
+    const btnConf = document.getElementById("btn-confirmar-est");
+    if (btnConf) btnConf.disabled = false;
+  }
 
   const scrollTarget = seccionSubcuadra || document.getElementById("seccion-duracion");
   if (scrollTarget) scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });

@@ -24,9 +24,10 @@ from django.utils import timezone
 from app_estacionamiento.models import (
     Usuario, Municipio, Subcuadra, Vehiculo,
     Infraccion, MovimientoCaja, Tarifa, AbonoMensual, LiquidacionComision,
+    BilleteraConductor,
 )
 from app_estacionamiento.services.infracciones import cobrar_infraccion_efectivo
-from app_estacionamiento.services.saldo import cargar_saldo_conductor
+from app_estacionamiento.services.saldo import cargar_saldo_conductor, obtener_saldo_conductor
 
 
 # ─────────────────────────────────────────────
@@ -58,8 +59,12 @@ def crear_conductor(municipio, correo="conductor@test.com", saldo=500):
         municipio=municipio, es_conductor=True,
         first_name="Test",  # evita redirección del middleware
     )
-    u.saldo = Decimal(str(saldo))
-    u.save()
+    # BilleteraConductor es la fuente de verdad del saldo; Usuario.saldo es legacy.
+    BilleteraConductor.objects.create(
+        conductor=u,
+        municipio=municipio,
+        saldo=Decimal(str(saldo)),
+    )
     return u
 
 
@@ -191,10 +196,10 @@ class TestCargarSaldoConductor(TestCase):
         self.conductor = crear_conductor(self.municipio, saldo=100)
 
     def test_saldo_se_acredita(self):
-        """El saldo del conductor aumenta en el monto cargado."""
+        """El saldo del conductor aumenta en el monto cargado (100 inicial + 500 = 600)."""
         cargar_saldo_conductor(admin=self.admin, conductor=self.conductor, monto=Decimal("500"))
-        self.conductor.refresh_from_db()
-        self.assertEqual(self.conductor.saldo, Decimal("600"))
+        saldo = obtener_saldo_conductor(self.conductor, self.municipio)
+        self.assertEqual(saldo, Decimal("600"))
 
     def test_crea_movimiento_en_caja(self):
         """Se genera un MovimientoCaja de tipo 'ingreso' a nombre del admin."""
@@ -213,11 +218,12 @@ class TestCargarSaldoConductor(TestCase):
         with self.assertRaises(ValueError):
             cargar_saldo_conductor(admin=self.admin, conductor=self.conductor, monto=Decimal("-50"))
 
-    def test_retorna_conductor_actualizado(self):
-        """La función retorna el conductor con el saldo ya actualizado."""
+    def test_retorna_billetera_actualizada(self):
+        """La función retorna la BilleteraConductor con el saldo ya actualizado."""
         resultado = cargar_saldo_conductor(
             admin=self.admin, conductor=self.conductor, monto=Decimal("200")
         )
+        # resultado es BilleteraConductor: saldo inicial 100 + 200 = 300
         self.assertEqual(resultado.saldo, Decimal("300"))
 
 
@@ -497,10 +503,10 @@ class TestToleranciaMulta(TestCase):
 
     def test_pago_dentro_tolerancia_no_descuenta_saldo(self):
         """Si se anula por gracia, el saldo del conductor no se toca."""
-        saldo_antes = self.conductor.saldo
+        saldo_antes = obtener_saldo_conductor(self.conductor, self.municipio)
         self._pagar_con_tiempo(delta_minutos=2)
-        self.conductor.refresh_from_db()
-        self.assertEqual(self.conductor.saldo, saldo_antes)
+        saldo_despues = obtener_saldo_conductor(self.conductor, self.municipio)
+        self.assertEqual(saldo_despues, saldo_antes)
 
     def test_pago_exactamente_en_limite_anula(self):
         """Pagar exactamente a los 5 min todavía está dentro del plazo (<=)."""
@@ -509,22 +515,22 @@ class TestToleranciaMulta(TestCase):
 
     def test_pago_fuera_tolerancia_cobra_normal(self):
         """Pagar a los 10 min (> 5 min de gracia) descuenta saldo y marca pagada."""
-        saldo_antes = self.conductor.saldo
+        saldo_antes = obtener_saldo_conductor(self.conductor, self.municipio)
         resultado = self._pagar_con_tiempo(delta_minutos=10)
         self.assertEqual(resultado.estado, "pagada")
         self.assertFalse(resultado.anulada_por_gracia)
-        self.conductor.refresh_from_db()
-        self.assertEqual(self.conductor.saldo, saldo_antes - Decimal("500"))
+        saldo_despues = obtener_saldo_conductor(self.conductor, self.municipio)
+        self.assertEqual(saldo_despues, saldo_antes - Decimal("500"))
 
     def test_tolerancia_cero_siempre_cobra(self):
         """Con tolerancia=0 no hay gracia: pagar al instante igual cobra."""
         self.municipio.tolerancia_multa_minutos = 0
         self.municipio.save()
-        saldo_antes = self.conductor.saldo
+        saldo_antes = obtener_saldo_conductor(self.conductor, self.municipio)
         resultado = self._pagar_con_tiempo(delta_minutos=0)
         self.assertEqual(resultado.estado, "pagada")
-        self.conductor.refresh_from_db()
-        self.assertLess(self.conductor.saldo, saldo_antes)
+        saldo_despues = obtener_saldo_conductor(self.conductor, self.municipio)
+        self.assertLess(saldo_despues, saldo_antes)
 
     def test_pago_doble_lanza_excepcion(self):
         """Intentar pagar una infracción ya pagada lanza Exception."""
@@ -1008,19 +1014,23 @@ class TestAcreditarSaldoMp(TestCase):
 
     def setUp(self):
         self.municipio = crear_municipio()
-        self.conductor = crear_conductor(self.municipio)
-        self.conductor.saldo = Decimal("0.00")
-        self.conductor.save()
+        # crear_conductor ya genera BilleteraConductor con saldo=500 (default).
+        # Empezamos con saldo 0 para que los montos de los tests sean predecibles.
+        self.conductor = crear_conductor(self.municipio, saldo=0)
 
     def _ejecutar(self, payment_id="PAY123", monto=Decimal("500.00")):
         from app_estacionamiento.use_cases.acreditar_saldo_mp import ejecutar
-        ejecutar(usuario=self.conductor, monto=monto, payment_id=payment_id)
+        ejecutar(usuario=self.conductor, monto=monto, payment_id=payment_id,
+                 municipio=self.municipio)
+
+    def _saldo(self):
+        """Saldo actual del conductor en la billetera del municipio."""
+        return obtener_saldo_conductor(self.conductor, self.municipio)
 
     def test_acredita_saldo_correctamente(self):
-        """Primera llamada: acredita el monto al conductor."""
+        """Primera llamada: acredita el monto al conductor en su billetera."""
         self._ejecutar(monto=Decimal("500.00"))
-        self.conductor.refresh_from_db()
-        self.assertEqual(self.conductor.saldo, Decimal("500.00"))
+        self.assertEqual(self._saldo(), Decimal("500.00"))
 
     def test_crea_movimiento_con_mp_payment_id(self):
         """El MovimientoCaja creado guarda el payment_id en el campo dedicado."""
@@ -1035,8 +1045,7 @@ class TestAcreditarSaldoMp(TestCase):
         """El mismo payment_id no debe acreditarse dos veces (idempotencia)."""
         self._ejecutar(payment_id="PAY_DOBLE", monto=Decimal("300.00"))
         self._ejecutar(payment_id="PAY_DOBLE", monto=Decimal("300.00"))
-        self.conductor.refresh_from_db()
-        self.assertEqual(self.conductor.saldo, Decimal("300.00"))
+        self.assertEqual(self._saldo(), Decimal("300.00"))
 
     def test_segunda_llamada_no_crea_movimiento_duplicado(self):
         """Solo existe un MovimientoCaja por payment_id, aunque se llame dos veces."""
@@ -1050,8 +1059,7 @@ class TestAcreditarSaldoMp(TestCase):
         """Dos pagos distintos se acreditan por separado sin interferencia."""
         self._ejecutar(payment_id="PAY_A", monto=Decimal("100.00"))
         self._ejecutar(payment_id="PAY_B", monto=Decimal("200.00"))
-        self.conductor.refresh_from_db()
-        self.assertEqual(self.conductor.saldo, Decimal("300.00"))
+        self.assertEqual(self._saldo(), Decimal("300.00"))
 
     def test_monto_invalido_lanza_error(self):
         """monto <= 0 debe lanzar ValueError antes de tocar la DB."""

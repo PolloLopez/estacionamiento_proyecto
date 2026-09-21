@@ -252,10 +252,17 @@ async function imprimirActa() {
     console.warn('[BLE] reconectar falló:', e.message);
   }
 
-  // 2. Si la reconexión falló, abrir diálogo para que el inspector elija
+  // 2. Si la reconexión falló, abrir diálogo para que el inspector elija.
+  // Esto ocurre cuando Chrome pierde la sesión BLE al navegar entre páginas
+  // (bug conocido: getDevices() devuelve vacío). Mostramos el alias de la
+  // impresora conocida para que el inspector sepa cuál seleccionar.
   if (!conexion) {
     try {
-      estado.textContent = '📡 Seleccioná la impresora en el diálogo...';
+      var infoGuardada = obtenerInfoImpresora();
+      var nombreConocido = infoGuardada ? (infoGuardada.alias || infoGuardada.name || '') : '';
+      estado.textContent = nombreConocido
+        ? '📡 Seleccioná "' + nombreConocido + '" en el diálogo...'
+        : '📡 Seleccioná la impresora en el diálogo...';
       conexion = await conectarImpresora();
     } catch (e) {
       // El inspector canceló el diálogo o el dispositivo no responde
@@ -279,6 +286,12 @@ async function imprimirActa() {
     await enviarImpresion(conexion.caracteristica, bytes);
     copia1Enviada = true;  // copia 1 enviada con éxito
 
+    // Desconectar explícitamente después de copia 1:
+    // - Libera la conexión BLE para que la impresora procese y avance el papel.
+    // - Garantiza que la reconexión pre-copia2 sea siempre fresca (sin estado stale).
+    //   gatt.connected puede mentir: devolver true con una conexión ya caída.
+    try { conexion.device.gatt.disconnect(); } catch (_) {}
+
     // Pausa entre copias: configurable desde superadmin.
     // 0 = pedir confirmación; >0 = pausa automática en segundos.
     var pausaSegundos = DATOS_ACTA.segundos_pausa_copias || 0;
@@ -293,30 +306,30 @@ async function imprimirActa() {
       estado.textContent = '✋ Retirá la copia 1 y presioná para imprimir la copia 2.';
       btn.textContent = '🖨 Imprimir copia 2';
       btn.disabled = false;
-      btn.style.display = 'block';   // ← el botón arranca oculto, hay que mostrarlo
+      btn.style.display = 'block';
       await new Promise(function(resolver) {
         btn.onclick = function () {
           btn.disabled = true;
           resolver();
         };
       });
-      // Restaurar el handler original para el finally
+      // Restaurar el handler original para el catch (si copia 2 falla)
       btn.onclick = imprimirActa;
     }
 
-    // Reconexión preventiva antes de la copia 2:
-    // la impresora puede haberse desconectado durante la pausa o la espera manual.
-    if (!conexion.device.gatt.connected) {
-      estado.textContent = '⏳ Reconectando para copia 2...';
-      try {
-        var reconCopia2 = await reconectarImpresora();
-        if (reconCopia2) conexion = reconCopia2;
-      } catch (eReconect) {
-        // Si falla la reconexión, el enviarImpresion siguiente lanzará el error
-        // y el catch externo lo maneja con copia1Enviada = true
-        console.warn('[BLE] reconexión pre-copia2 falló:', eReconect.message);
-      }
+    // Reconexión antes de copia 2 — siempre con conexión fresca.
+    // Usamos reconectarSilencioso(): solo getDevices(), sin diálogos.
+    // Por qué sin diálogo: después de múltiples awaits, el gesto del usuario
+    // (click en "Imprimir copia 2") ya expiró — requestDevice() sin gesto falla.
+    // Si getDevices() también falla (bug de Chrome al navegar entre páginas),
+    // lanzamos error → el catch con copia1Enviada=true muestra "Reintentar copia 2",
+    // ese click SÍ es un gesto fresco y reconectarImpresora() puede abrir el diálogo.
+    estado.textContent = '⏳ Reconectando para copia 2...';
+    var reconCopia2 = await reconectarSilencioso();
+    if (!reconCopia2) {
+      throw new Error('Impresora no encontrada para la copia 2. Usá el botón de reintento.');
     }
+    conexion = reconCopia2;
 
     btn.textContent = '⏳ Imprimiendo (2/2)...';
     estado.textContent = '⏳ Imprimiendo copia 2 de 2...';

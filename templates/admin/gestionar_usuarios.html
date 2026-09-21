@@ -4,7 +4,7 @@
 {% block content %}
 <section class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1rem;">
     <h2>👤 Conductores</h2>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
       <a href="{% url 'crear_conductor' %}" class="btn">➕ Nuevo conductor</a>
@@ -48,7 +48,7 @@
           <td><strong>{{ u.nombre|default:"—" }}</strong></td>
           <td>{{ u.apellido|default:"—" }}</td>
           <td>{{ u.correo }}</td>
-          <td style="text-align:right; font-weight:600;">${{ u.saldo }}</td>
+          <td style="text-align:right; font-weight:600;">${{ u.saldo_billetera|default:'0' }}</td>
           <td style="text-align:center;">{{ u.vehiculos.count }}</td>
           <td>
             <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"

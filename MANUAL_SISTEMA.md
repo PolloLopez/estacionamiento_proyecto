@@ -195,9 +195,16 @@ Vendedor → "Cobrar infracción" → ingresa patente → ve la infracción pend
    → Si observa: el motivo se guarda en notas_tesorero (campo requerido)
 
 5. Tesorero deposita comisiones a vendedores:
-   → Desde el panel o desde el detalle de la rendición
-   → Registra el depósito con fecha y notas opcionales
-   → El vendedor lo certifica desde su panel y puede adjuntar factura
+   → Panel Tesorería → sección "Comisiones a depositar"
+   → Botón "Depositar" junto a la liquidación pendiente
+   → Puede adjuntar: número de comprobante bancario, archivo PDF/imagen del comprobante, notas adicionales
+   → Al confirmar, la comisión pasa a estado "depositada"
+
+6. Vendedor certifica que recibió la comisión:
+   → El vendedor ve una alerta azul prominente en su panel cuando hay comisiones depositadas
+   → Desde "Mis comisiones" ve el detalle del depósito (quién depositó, fecha, comprobante, notas)
+   → Botón "Certificar recibo" → confirma que recibió el monto
+   → Puede adjuntar factura en cualquier momento (estado "depositada" o "certificada")
 ```
 
 ### Flujo de horarios y días especiales
@@ -302,11 +309,23 @@ Panel Admin → "💲 Tarifas" → ingreso el nuevo precio → guardar.
 **¿Cómo configuro el porcentaje de ganancia de un inspector?**
 Panel Admin → "👮 Inspectores" → click en el inspector → sección "Configuración de rendición".
 
+**¿Cómo funciona el flujo de rendición?**
+La pantalla `/admin-rendiciones/` muestra un banner de 3 pasos al tope:
+- **① Certificar cierres de caja** → confirmás que recibiste el efectivo de cada inspector/vendedor. Cuando todos están certificados, aparece el botón "② Crear rendición →".
+- **② Rendir a tesorería** → agrupás los cierres certificados en una rendición formal. El sistema calcula totales automáticamente y genera las liquidaciones de comisión por cada vendedor.
+- **③ Tesorería valida** → el tesorero revisa y aprueba o devuelve con observaciones. Vos respondés desde la misma pantalla.
+
 **¿Cómo creo una rendición hacia tesorería?**
-Panel Admin → "Rendiciones" → "Crear rendición". Seleccioná los cierres de caja certificados del período. El sistema calcula los totales automáticamente (efectivo, digital, neto) y genera las liquidaciones de comisión por cada vendedor incluido en los cierres — sin intervención manual.
+Panel Admin → "Rendiciones" → tab "② Rendición a tesorería" → "Nueva rendición". Seleccioná los cierres de caja certificados del período. El sistema calcula los totales automáticamente (efectivo, digital, neto) y genera las liquidaciones de comisión por cada vendedor incluido en los cierres — sin intervención manual.
 
 **¿Cómo veo el detalle de una rendición?**
 En la tabla de rendiciones (tanto en el panel del admin como en el del tesorero) hay un botón "Ver detalle" en cada fila. Muestra los cierres de caja incluidos con totales por operador y las liquidaciones de comisión generadas automáticamente.
+
+**¿Cómo veo quién reseteó la contraseña de un conductor?**
+En "Conductores" → "Ver" (detalle del conductor) → sección "🔑 Cambiar contraseña". Al final de esa sección aparece una tabla con los últimos 10 resets: fecha, admin que lo hizo y tipo (reset al DNI o contraseña personalizada). Si nunca se cambió la contraseña desde el panel, la tabla no aparece.
+
+**¿Cómo habilito la gestión de subcuadras para el admin del municipio?**
+Por defecto solo el superadmin puede crear y editar subcuadras. Para que el admin del municipio también pueda hacerlo: Superadmin → Municipios → Editar municipio → activar "📍 Admin puede gestionar subcuadras". A partir de ahí el admin accede a `/admin-subcuadras/` para crear, editar y asignar coordenadas GPS. Si el flag está desactivado, el admin ve un mensaje pidiendo que el superadmin lo active.
 
 **¿Cómo configuro la pausa entre copias del ticket BLE?**
 Panel Admin → "⚙️ Municipio" (o desde Superadmin → Gestionar municipio) → sección de impresora. El campo "Segundos de pausa entre copias" acepta:
@@ -363,7 +382,7 @@ Es el total de ingresos acumulados que gestionaste (cobros + infracciones cobrad
 Iniciás sesión → "Estacionar" → elegís tu auto (o ingresás la patente) → elegís la duración → el sistema descuenta del saldo.
 
 **¿Cómo cargo saldo?**
-Desde tu panel de inicio → "Recargar saldo" → elegís el monto → te redirige a MercadoPago.
+Desde tu panel de inicio → "Recargar saldo" → elegís el monto → te redirige a MercadoPago. El saldo que cargás queda vinculado al municipio donde estás usando el sistema — si el municipio cambia de sistema, el saldo del anterior no se transfiere automáticamente.
 
 **¿Qué pasa si se me vence el tiempo?**
 Podés seguir estacionado, pero si un inspector pasa, te puede infraccionar. Tenés 15 minutos de tolerancia desde que vence el tiempo pagado.
@@ -411,6 +430,18 @@ Panel Vendedor → "Resumen de caja". Mostrá los movimientos del período.
 **¿Cómo hago la rendición al admin?**
 Cuando tenés movimientos abiertos aparece el botón "Confirmar cierre de caja". El admin lo verifica de su lado.
 
+**¿Cómo sé si tesorería me depositó la comisión?**
+Tu panel muestra una **alerta azul destacada** cuando hay comisiones en estado "depositada" esperando tu confirmación. También podés ver el historial completo en "Mis comisiones".
+
+**¿Cómo certifico que recibí la comisión?**
+En "Mis comisiones" → fila con estado 🏦 Depositada → ves el detalle del depósito (quién depositó, fecha, número de comprobante, notas del tesorero, y link al comprobante si adjuntaron uno). Botón "✅ Certificar recibo" → confirmás que recibiste el monto. **No se puede deshacer.**
+
+**¿Cómo adjunto mi factura?**
+En "Mis comisiones" → columna "Factura" → botón "🧾 Adjuntar" junto a cualquier liquidación que no sea "pendiente". Podés adjuntar o reemplazar el archivo en cualquier momento.
+
+**¿Cuándo se generan mis comisiones?**
+Se calculan automáticamente cuando el admin crea una rendición hacia tesorería (no cuando cerrás la caja). En "Mis comisiones" ves el monto acumulado histórico y el detalle por período.
+
 ---
 
 ### FAQ — Tesorero
@@ -425,7 +456,14 @@ En cualquier fila de la tabla de rendiciones (pendientes o historial) hay un bot
 Las comisiones se calculan automáticamente al crear la rendición. El sistema agrupa los cierres de vendedores por operador, suma el campo `ganancia_usuario` de cada cierre y crea una liquidación por vendedor. El tesorero no necesita calcular nada — solo verifica y registra el depósito.
 
 **¿Cómo registro el depósito de una comisión?**
-Panel Tesorería → sección "Liquidaciones de comisión" → botón "Depositar" junto a la liquidación → se abre un formulario para confirmar la fecha y agregar notas. El vendedor luego certifica el recibo desde su panel.
+Panel Tesorería → sección "Comisiones a depositar" → botón "💳 Depositar" junto a la liquidación pendiente. El formulario te permite adjuntar:
+- **Número de comprobante** (referencia de transferencia, CBU, número MP, etc.)
+- **Archivo del comprobante** (imagen o PDF del comprobante bancario)
+- **Notas adicionales** (medio de pago, aclaraciones)
+El vendedor ve toda esa información desde su panel en "Mis comisiones" antes de certificar el recibo.
+
+**¿Cómo sé si el vendedor ya confirmó el recibo?**
+En el panel tesorero, la sección "Comisiones" muestra el estado de cada liquidación: pendiente → depositada → certificada. Cuando el vendedor confirma, el estado pasa a "certificada" automáticamente.
 
 **¿Cómo certifico cierres de admin?**
 Los cierres de admin pendientes de certificación aparecen en una sección separada del panel. Revisalos y certificalos para que queden disponibles para futuras rendiciones.

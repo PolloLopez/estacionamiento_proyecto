@@ -8,18 +8,17 @@ Esta guía cubre cada rol con: flujos a testear paso a paso, qué verificar en c
 
 ---
 
-## Preparación previa
+## Credenciales del ambiente Railway (demo)
 
-Crear o verificar que existan los siguientes usuarios de prueba en Railway (crear desde `/sistema-interno/`):
+> ⚠️ Estas son las credenciales del ambiente de prueba en Railway. No son datos de producción real.
 
-| Rol | Email sugerido | Datos necesarios |
-|-----|---------------|-----------------|
-| Conductor | conductor@test.com | saldo > $0, al menos 1 vehículo vinculado |
-| Inspector | inspector@test.com | municipio asignado, es_inspector=True |
-| Vendedor | vendedor@test.com | municipio asignado, porcentaje_ganancia > 0 |
-| Admin | admin@test.com | municipio asignado, es_admin=True |
-| Tesorero | tesorero@test.com | municipio asignado, es_tesorero=True |
-| Superadmin | superadmin@test.com | es_superadmin=True |
+| Rol | Email | Contraseña |
+|-----|-------|-----------|
+| Admin municipal | admin@ejemplo.com | Admin.2026 |
+| Tesorero | tesoreria@ejemplo.com | Teso.2026 |
+| Vendedor / Kiosco | kiosco@ejemplo.com | 12345 |
+| Inspector | inspector@ejemplo.com | 12345 |
+| Conductor | conductor@ejemplo.com | Cond.12 |
 
 Tener una patente de prueba lista (ej: `AA123BB`) que NO tenga infracciones pendientes.
 

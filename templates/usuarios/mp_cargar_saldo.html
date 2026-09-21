@@ -2,9 +2,9 @@
 {% block title %}Cargar saldo{% endblock %}
 
 {% block content %}
-<section class="container" style="max-width:480px; margin:auto;">
+<section class="container form-narrow">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.2rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1.2rem;">
     <h2>💳 Cargar saldo</h2>
     <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
   </div>
@@ -13,7 +13,7 @@
   <div class="card" style="text-align:center; margin-bottom:1.2rem;">
     <div class="text-muted" style="font-size:0.88rem;">Saldo actual</div>
     <div style="font-size:2.2rem; font-weight:800; color:var(--color-primary);">
-      ${{ request.user.saldo }}
+      ${{ saldo_conductor }}
     </div>
   </div>
 
@@ -46,8 +46,9 @@
           <input type="number" id="monto" name="monto"
                  min="{{ monto_minimo }}" max="{{ monto_maximo }}" step="1"
                  placeholder="{{ monto_minimo }}" required
+                 inputmode="numeric"
                  style="font-size:1.4rem; font-weight:800; letter-spacing:1px; flex:1;"
-                 oninput="limpiarSeleccion()">
+                 oninput="sanitizarMonto()">
         </div>
         <p style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.3rem;">
           Mínimo: ${{ monto_minimo }} &nbsp;·&nbsp; Máximo: ${{ monto_maximo }}
@@ -65,8 +66,8 @@
     </form>
 
     <p class="text-muted" style="font-size:0.82rem; margin-top:0.9rem; text-align:center;">
-      Serás redirigido a MercadoPago para completar el pago de forma segura.
-      El saldo se acredita automáticamente al confirmarse.
+      Serás redirigido a MercadoPago para completar el pago.
+      El saldo se acredita automáticamente al finalizar.
     </p>
   </div>
 
@@ -80,7 +81,12 @@ function setMonto(valor) {
     b.classList.toggle("btn-outline", b.dataset.monto != valor);
   });
 }
-function limpiarSeleccion() {
+function sanitizarMonto() {
+  const input = document.getElementById("monto");
+  // Eliminar todo lo que no sea dígito (sin punto, sin coma, sin signo)
+  const soloDigitos = input.value.replace(/[^0-9]/g, "");
+  input.value = soloDigitos;
+  // Deseleccionar los botones de monto rápido
   document.querySelectorAll(".monto-rapido").forEach(b => {
     b.classList.remove("btn");
     b.classList.add("btn-outline");

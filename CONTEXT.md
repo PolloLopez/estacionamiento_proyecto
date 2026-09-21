@@ -1,7 +1,7 @@
 # CONTEXT.md — Sistema de Estacionamiento Medido
 > Referencia fija del proyecto. No incluye tareas pendientes ni cambios en curso → ver PENDIENTES.md.
 
-Última actualización estructural: 2026-09-20
+Última actualización estructural: 2026-09-21 (sesión 14 — continuación)
 
 ---
 
@@ -62,7 +62,7 @@ Admin URL: `/sistema-interno/` (no obvia, reduce bruteforce).
 | Email | django-anymail + Brevo | API transaccional |
 | Frontend | HTML + CSS propio (`global.css`) | Sin frameworks JS. Colores del municipio inyectados como variables CSS en `base.html`. |
 | Deploy | Railway + Gunicorn + WhiteNoise | PaaS simple |
-| Tests | Django TestCase | ~130 tests (suite estable) |
+| Tests | Django TestCase | ~198 tests (suite estable) |
 | Impresora BLE | Web Bluetooth API (`impresora_bluetooth.js`) | Chrome Android (HTTPS). ESC/POS 58mm. Doble copia con pausa configurable (`Municipio.segundos_pausa_doble_copia`): 0=el inspector confirma, >0=pausa automática en segundos. Alias por dispositivo en localStorage. QR nativo `GS(k)`. |
 
 ---
@@ -119,8 +119,9 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 
 | Modelo | Descripción |
 |--------|-------------|
-| `Usuario` | AbstractUser con `correo` como USERNAME_FIELD. Flags: `es_admin`, `es_inspector`, `es_vendedor`, `es_conductor`, `es_tesorero`, `es_superadmin`. Campos: `saldo` (wallet digital conductor), `saldo_operativo` (caja del vendedor/inspector), `es_verificado`, `municipio`, `porcentaje_ganancia`, `cambio_password_requerido`. Preferencias de notificaciones: `notif_verificacion`, `notif_exencion`, `notif_sugerencia` (BooleanFields). |
-| `Municipio` | Configuración del municipio. Campos de tarifa/horario. Branding: `logo (ImageField, upload_to="municipios/logos/")`, `color_primario`, `color_secundario`, `color_acento`. Textos: `leyenda_horarios`, `texto_ordenanza`. Opciones: `tolerancia_multa_minutos`, `minutos_entre_infracciones`, `monto_minimo_carga`, `monto_maximo_carga`. Features: `estadisticas_inspectores_activo`, `token_tv`, `inspector_ve_sus_infracciones (Bool)`, `admin_puede_editar_plantillas (Bool)`. Impresora BLE: `segundos_pausa_doble_copia (0=el inspector confirma, >0=pausa automática en segundos)`. Descuentos: `descuento_verificados_pct (Decimal, null=módulo inactivo)`, `descuento_solo_vecinos (Bool)`. Facturación: `porcentaje_plataforma`, `cuota_mantenimiento_mensual`, `concepto_recaudacion`. |
+| `Usuario` | AbstractUser con `correo` como USERNAME_FIELD. Flags: `es_admin`, `es_inspector`, `es_vendedor`, `es_conductor`, `es_tesorero`, `es_superadmin`. Campos: `saldo` (legacy, no usar — reemplazado por `BilleteraConductor`), `saldo_operativo` (caja del vendedor/inspector), `es_verificado`, `municipio`, `porcentaje_ganancia`, `cambio_password_requerido`. Preferencias de notificaciones: `notif_verificacion`, `notif_exencion`, `notif_sugerencia` (BooleanFields). |
+| `BilleteraConductor` | Saldo digital del conductor por municipio. `UniqueConstraint(conductor, municipio)`. Un conductor puede tener saldo en N municipios. `services/saldo.py` → `debitar_saldo_conductor()` y `cargar_saldo_conductor()` usan este modelo como fuente de verdad. **No usar `Usuario.saldo` directo en código nuevo.** Migración `0085`. |
+| `Municipio` | Configuración del municipio. Campos de tarifa/horario. Branding: `logo (ImageField, upload_to="municipios/logos/")`, `color_primario`, `color_secundario`, `color_acento`. Textos: `leyenda_horarios`, `texto_ordenanza`. Opciones: `tolerancia_multa_minutos`, `minutos_entre_infracciones`, `monto_minimo_carga`, `monto_maximo_carga`. Features: `estadisticas_inspectores_activo`, `token_tv`, `inspector_ve_sus_infracciones (Bool)`, `admin_puede_editar_plantillas (Bool)`, `modulo_informes_activo (Bool, default=False)` — activa tab "Informes" en `/admin-rendiciones/`, habilitado desde superadmin. `puede_gestionar_subcuadras (Bool, default=False)` — habilita `/admin-subcuadras/` para el admin municipal (por defecto solo superadmin); el superadmin lo activa desde `editar_municipio.html`. Migración `0087`. Impresora BLE: `segundos_pausa_doble_copia (0=el inspector confirma, >0=pausa automática en segundos)`. Descuentos: `descuento_verificados_pct (Decimal, null=módulo inactivo)`, `descuento_solo_vecinos (Bool)`. Facturación: `porcentaje_plataforma`, `cuota_mantenimiento_mensual`, `concepto_recaudacion`. |
 | `ModuloMunicipio` | Feature flags premium por municipio (activo/inactivo). Gestionado por superadmin. |
 | `Vehiculo` | Patente única. Tipos: `auto`, `moto`. Exenciones: `exento_global`, `tipo_exencion`, `vigencia_exencion (DateField, null=indefinida)`, `exencion_verificada`, `notas_exencion`. Exención parcial: `subcuadras_exentas (M2M)`. Campos SIA: `sia_titular_nombre`, `sia_titular_apellido`, `sia_titular_dni`, `sia_nci`. |
 | `Infraccion` | Estado: `pendiente`/`pagada`/`anulada`. `monto`, `motivo`, `foto (ImageField → Cloudinary)`, `descuento_porcentaje`. GPS del inspector: `gps_lat`, `gps_lon`, `gps_acc` (guardados al labrar; panel admin muestra "📍 Ver en mapa" vía OpenStreetMap). Campos SIA: `sia_presentado`, `sia_verificado`, `sia_estado`, `sia_url`, `sia_patente_sia`, `sia_nci`, `sia_titular`, `sia_vencimiento`, etc. |
@@ -138,6 +139,7 @@ views_*.py  →  use_cases/  →  services/  →  domain/
 | `Rendicion` | El admin cierra un período seleccionando `CierreCaja` certificados. Totales **calculados automáticamente**: `total_efectivo`, `total_digital` (transferencia+débito+crédito+QR), `total_neto`. Estado: `pendiente`/`validada`/`observada`. Al crear la rendición, el sistema genera automáticamente `LiquidacionComision` por cada vendedor con `ganancia_usuario > 0` en los cierres incluidos. |
 | `LiquidacionComision` | Comisiones de un vendedor por período. Flujo: `pendiente` → `depositada` (tesorero) → `certificada` (vendedor). `factura_presentada`, `factura_archivo`. **Se crean automáticamente** al crear la `Rendicion` desde `views_admin.crear_rendicion()`. |
 | `SugerenciaMejora` | Cualquier usuario puede enviar sugerencias de mejora. `area` filtrada por rol del usuario (conductor ve áreas de conductor+general, inspector ve inspector+general, etc.). `criticidad`, `estado`, `rango_edad` (opcional, choices: menor18/18-25/26-35/36-50/51-65/mayor65). Gestionada por superadmin. |
+| `AuditoriaPassword` | Registro de cada reset de contraseña de un conductor por parte de un admin. Campos: `admin (FK→Usuario, SET_NULL)`, `conductor (FK→Usuario, CASCADE)`, `municipio (FK, SET_NULL)`, `tipo (choices: "dni"/"personalizada")`, `ip (GenericIPAddressField, null=ok)`, `fecha (auto_now_add)`. Se crea automáticamente en `views_admin.detalle_usuario_admin` al ejecutar `cambiar_password` o `resetear_password_dni`. El historial (últimos 10) se muestra dentro de la sección "🔑 Cambiar contraseña" en `admin/detalle_usuario.html`. Migración `0088`. |
 | `SolicitudEliminacionCuenta` | El conductor puede solicitar darse de baja (soft-delete). Revisada por admin. |
 | `Impugnacion` | El conductor impugna una infracción. Revisada por admin. |
 | `TransferenciaSaldo` | Transferencia de saldo entre conductores. |
@@ -238,3 +240,15 @@ get_object_or_404(Modelo, id=pk, municipio=request.user.municipio)
 /health/                                       → healthcheck (UptimeRobot)
 /tv/<token>/                                   → dashboard TV público
 ```
+
+---
+
+## Historial de cambios por sesión
+
+| Sesión | Fecha | Cambios principales |
+|--------|-------|---------------------|
+| 12 | 2026-09-20 | Input monto entero en carga MP · Mis vehículos en `/inicio/` · Multi-vehículo simultáneo · Agregar vehículo inline en abono · Cards responsive en mis-infracciones y mis-estacionamientos · Layout expandible detalle conductor · Reset contraseña al DNI |
+| 13 | 2026-09-20 | `BilleteraConductor` (saldo por municipio, migración 0085) · Mail al resetear contraseña · Panel tesorero UX · Flujo confirmación depósito tesorero→vendedor · Flag `modulo_informes_activo` (migración 0086) · Rediseño `/admin-rendiciones/` con flujo de 3 pasos numerados |
+| 14 | 2026-09-20 | Fix 10 errores en tests (nombre_completo property, UnboundLocalError, HorarioEstacionamiento en setUp) · Refactor 84 estilos inline → 6 clases CSS en global.css |
+| 14-cont | 2026-09-20 | BLE impresora: fix duplicado no imprime (reconexión siempre fresca con `reconectarSilencioso()`) · BLE UX: muestra alias de impresora al pedir reconexión · Flag `puede_gestionar_subcuadras` en Municipio (migración 0087) · `/admin-subcuadras/` habilitado para admin con gate interno |
+| 14-cont | 2026-09-21 | `AuditoriaPassword` model + migración 0088 · Integración en `detalle_usuario_admin` (crea registro en cada reset) · Historial de cambios en template `detalle_usuario.html` · Limpieza y reorganización completa de PENDIENTES.md |

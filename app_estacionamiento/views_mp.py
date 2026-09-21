@@ -33,6 +33,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from .decorators import require_login
 from .models import Usuario
+from .services.saldo import obtener_saldo_conductor
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ def _contexto_cargar_saldo(usuario):
         "montos_rapidos": [500, 1000, 2000, 5000],
         "monto_minimo": municipio.monto_minimo_carga,
         "monto_maximo": municipio.monto_maximo_carga,
+        "saldo_conductor": obtener_saldo_conductor(usuario, municipio),
     }
 
 
@@ -110,10 +112,12 @@ def mp_iniciar_carga(request):
         # auto_return eliminado: requería back_urls HTTPS estricto y daba
         # error 400 "auto_return invalid". El webhook + back_urls alcanzan.
         "notification_url": request.build_absolute_uri(reverse("mp_webhook")),
-        # Metadatos para identificar al usuario en el webhook
+        # Metadatos para identificar al usuario y el municipio en el webhook.
+        # municipio_id es necesario para acreditar en la billetera correcta.
         "metadata": {
-            "usuario_id": str(request.user.id),
-            "monto": str(monto),
+            "usuario_id":   str(request.user.id),
+            "municipio_id": str(request.user.municipio_id) if request.user.municipio_id else "",
+            "monto":        str(monto),
         },
         "external_reference": f"usuario_{request.user.id}_monto_{monto}",
     }
@@ -216,14 +220,16 @@ def mp_exitoso(request):
         return render(request, "usuarios/mp_resultado.html", {"estado": "pendiente"})
 
     try:
-        acreditar(request.user, monto, payment_id)
+        acreditar(request.user, monto, payment_id, municipio=request.user.municipio)
     except Exception:
         pass  # Si ya fue acreditado por el webhook, está bien
 
-    request.user.refresh_from_db()
+    # Leer saldo actualizado desde la billetera
+    from app_estacionamiento.services.saldo import obtener_saldo_conductor
+    saldo_nuevo = obtener_saldo_conductor(request.user, request.user.municipio)
     messages.success(
         request,
-        f"✅ Se acreditaron ${monto} a tu saldo. Nuevo saldo: ${request.user.saldo}",
+        f"✅ Se acreditaron ${monto} a tu saldo. Nuevo saldo: ${saldo_nuevo}",
     )
     return redirect("inicio_usuarios")
 
@@ -397,13 +403,26 @@ def mp_webhook(request):
 
     # ── Pago de conductor con cuenta (carga de saldo) ──────────────────────
     try:
-        usuario_id = metadata.get("usuario_id")
-        usuario    = Usuario.objects.get(pk=usuario_id)
+        usuario_id   = metadata.get("usuario_id")
+        municipio_id = metadata.get("municipio_id")
+        usuario      = Usuario.objects.get(pk=usuario_id)
     except Exception:
         return HttpResponse(status=200)
 
+    # Resolver el municipio: primero desde metadata (más confiable),
+    # luego desde usuario.municipio como fallback.
+    municipio = None
+    if municipio_id:
+        from app_estacionamiento.models import Municipio
+        try:
+            municipio = Municipio.objects.get(pk=municipio_id)
+        except Municipio.DoesNotExist:
+            pass
+    if municipio is None:
+        municipio = usuario.municipio
+
     try:
-        acreditar(usuario, monto, payment_id)
+        acreditar(usuario, monto, payment_id, municipio=municipio)
     except Exception:
         pass  # Idempotencia: si ya fue acreditado, no hay problema
 

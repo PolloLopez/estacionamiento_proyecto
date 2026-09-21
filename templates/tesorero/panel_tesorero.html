@@ -4,48 +4,57 @@
 {% block content %}
 <div class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1.5rem;">
     <h1>🏦 Tesorería</h1>
   </div>
 
-  <!-- ── Tutorial tesorero (colapsable) ─────────────────────────── -->
-  <details style="margin-bottom:1.4rem;">
-    <summary style="cursor:pointer; font-size:0.88rem; font-weight:700;
-                    color:var(--color-text-muted); list-style:none; user-select:none;
-                    display:flex; align-items:center; gap:0.4rem;">
-      📖 ¿Cómo usar el panel?
-    </summary>
-    <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
-      <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
-                 font-size:0.88rem; line-height:1.4;">
-        <li>📋 <strong>Revisá las rendiciones pendientes</strong>: son los cierres de caja de inspectores y vendedores que el admin ya certificó. Aparecen en la tabla superior.</li>
-        <li>✅ <strong>Validá o marcá como observada</strong>: revisá el monto de efectivo y digital. Si observás, el campo de motivo es obligatorio — no se puede enviar vacío. Podés tocar "Ver detalle" para ver los cierres y comisiones incluidos.</li>
-        <li>💼 <strong>Depositá las comisiones</strong>: las comisiones de vendedores se calculan automáticamente al crear la rendición. Una vez validada, registrá el depósito. El vendedor lo certifica desde su panel.</li>
-        <li>📊 <strong>Historial y detalle</strong>: usá el botón "Ver detalle" en cualquier rendición del historial para ver el desglose completo: cierres de cada operador, montos y liquidaciones de comisión.</li>
-      </ol>
-    </div>
-  </details>
-
   {# Los mensajes los muestra base.html — no duplicar aquí #}
 
-  {# Resumen rápido #}
-  <div class="grid grid-2" style="margin-bottom:1.5rem;">
-    <div class="card" style="text-align:center;">
-      <div class="text-muted" style="font-size:0.85rem;">Rendiciones pendientes</div>
-      <div style="font-size:2rem; font-weight:800; color:var(--color-warning);">{{ pendientes_rendicion }}</div>
-    </div>
-    <a href="{% url 'admin_rendiciones' %}?seccion=comisiones"
-       class="card" style="text-align:center; text-decoration:none; display:block;">
-      <div class="text-muted" style="font-size:0.85rem;">💵 Comisiones a depositar</div>
-      <div style="font-size:2rem; font-weight:800; color:var(--color-primary);">{{ pendientes_liquidacion }}</div>
-      {% if pendientes_liquidacion > 0 %}
-        <div style="font-size:0.78rem; color:var(--color-warning); margin-top:0.2rem;">Ver comisiones →</div>
+  {# ── RESUMEN RÁPIDO (3 indicadores de acción pendiente) ─────────────── #}
+  <div class="grid grid-3" style="margin-bottom:1.5rem;">
+
+    <a href="#rendiciones-pendientes" class="card"
+       style="text-align:center; text-decoration:none; display:block;">
+      <div class="text-muted" style="font-size:0.83rem;">📋 Rendiciones pendientes</div>
+      <div style="font-size:2rem; font-weight:800;
+                  color:{% if pendientes_rendicion > 0 %}var(--color-warning){% else %}var(--color-text-muted){% endif %};">
+        {{ pendientes_rendicion }}
+      </div>
+      {% if pendientes_rendicion > 0 %}
+        <div style="font-size:0.75rem; color:var(--color-warning); margin-top:0.15rem;">Validar →</div>
       {% endif %}
     </a>
+
+    <a href="#comisiones" class="card"
+       style="text-align:center; text-decoration:none; display:block;">
+      <div class="text-muted" style="font-size:0.83rem;">💵 Comisiones a depositar</div>
+      <div style="font-size:2rem; font-weight:800;
+                  color:{% if pendientes_liquidacion > 0 %}var(--color-primary){% else %}var(--color-text-muted){% endif %};">
+        {{ pendientes_liquidacion }}
+      </div>
+      {% if pendientes_liquidacion > 0 %}
+        <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.15rem;">Depositar →</div>
+      {% endif %}
+    </a>
+
+    <a href="#cierres-admin" class="card"
+       style="text-align:center; text-decoration:none; display:block;">
+      <div class="text-muted" style="font-size:0.83rem;">🔐 Cierres sin certificar</div>
+      <div style="font-size:2rem; font-weight:800;
+                  color:{% if pendientes_cierres_admin > 0 %}var(--color-danger){% else %}var(--color-text-muted){% endif %};">
+        {{ pendientes_cierres_admin }}
+      </div>
+      {% if pendientes_cierres_admin > 0 %}
+        <div style="font-size:0.75rem; color:var(--color-danger); margin-top:0.15rem;">Certificar →</div>
+      {% endif %}
+    </a>
+
   </div>
 
-  {# RENDICIONES PENDIENTES (requieren acción) #}
-  <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+  {# ── RENDICIONES PENDIENTES ─────────────────────────────────────────── #}
+  <div id="rendiciones-pendientes"
+       style="display:flex; justify-content:space-between; align-items:baseline;
+              margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
     <h2 style="margin:0;">📋 Rendiciones pendientes</h2>
     {% if total_neto_pendiente %}
       <span style="font-size:1rem; font-weight:700; color:var(--color-warning);">
@@ -53,6 +62,17 @@
       </span>
     {% endif %}
   </div>
+
+  {% if pendientes_cierres_admin > 0 %}
+  <div style="background:#fff3cd; border-left:4px solid var(--color-warning);
+              border-radius:6px; padding:0.65rem 1rem; margin-bottom:0.75rem;
+              font-size:0.85rem; color:#664d03;">
+    ⚠️ Hay <strong>{{ pendientes_cierres_admin }} cierre/s de admin sin certificar</strong>.
+    <a href="#cierres-admin" style="color:#664d03; font-weight:700;">Ver más abajo ↓</a>
+    — Los cierres sin certificar no aparecen en las rendiciones hasta que los certifiques.
+  </div>
+  {% endif %}
+
   <div class="card" style="overflow-x:auto; margin-bottom:2rem;">
     {% if rendiciones_pendientes %}
       <table>
@@ -121,7 +141,59 @@
     {% endif %}
   </div>
 
-  {# RENDICIONES HISTORIAL (ya validadas u observadas) #}
+  {# ── CIERRES DE ADMIN SIN CERTIFICAR ───────────────────────────────── #}
+  {% if cierres_admin_sin_certificar %}
+  <div id="cierres-admin">
+    <h2 style="margin-bottom:0.5rem;">🔐 Cierres de admin sin certificar</h2>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      Estos cierres de administrador no tienen otro admin disponible para certificarlos.
+      Como tesorero podés certificarlos directamente.<br>
+      <strong>Nota:</strong> las comisiones de vendedores se crean cuando el admin genera la rendición,
+      no al certificar el cierre.
+    </p>
+    <div class="card" style="overflow-x:auto; margin-bottom:2rem; border-left:4px solid var(--color-danger);">
+      <table style="min-width:500px;">
+        <thead>
+          <tr>
+            <th>Admin</th>
+            <th>Fecha cierre</th>
+            <th style="text-align:right;">Total cobrado</th>
+            <th style="text-align:right;">Efectivo</th>
+            <th style="text-align:right;">Digital</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cierre in cierres_admin_sin_certificar %}
+          <tr>
+            <td style="font-weight:600; font-size:0.88rem;">
+              {{ cierre.usuario.nombre_completo|default:cierre.usuario.correo }}
+            </td>
+            <td style="font-size:0.85rem; white-space:nowrap;">
+              {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
+            </td>
+            <td style="text-align:right; font-weight:700;">${{ cierre.total_cobrado }}</td>
+            <td style="text-align:right;">${{ cierre.total_efectivo }}</td>
+            <td style="text-align:right;">${{ cierre.total_digital }}</td>
+            <td>
+              <form method="post" action="{% url 'certificar_cierre' cierre.id %}"
+                    onsubmit="return confirm('¿Certificar el cierre de {{ cierre.usuario.correo }} del {{ cierre.fecha_cierre|date:'d/m/Y' }}?')">
+                {% csrf_token %}
+                <button type="submit" class="btn"
+                        style="font-size:0.8rem; padding:0.3rem 0.7rem;">
+                  ✅ Certificar cierre
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── RENDICIONES HISTORIAL ──────────────────────────────────────────── #}
   {% if rendiciones_historial %}
   <h2 style="margin-bottom:0.75rem;">📁 Historial de rendiciones</h2>
   <div class="card" style="overflow-x:auto; margin-bottom:2rem;">
@@ -188,54 +260,7 @@
   </div>
   {% endif %}
 
-  {# CIERRES DE ADMIN SIN CERTIFICAR — válvula de escape para el tesorero #}
-  {% if cierres_admin_sin_certificar %}
-  <h2 style="margin-bottom:0.75rem;">🔐 Cierres de admin sin certificar</h2>
-  <div class="card" style="overflow-x:auto; margin-bottom:2rem; border-left:4px solid var(--color-warning);">
-    <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
-      Estos cierres no tienen otro admin disponible para certificarlos. Como tesorero podés certificarlos vos.
-    </p>
-    <table style="min-width:500px;">
-      <thead>
-        <tr>
-          <th>Admin</th>
-          <th>Fecha cierre</th>
-          <th style="text-align:right;">Total cobrado</th>
-          <th style="text-align:right;">Efectivo</th>
-          <th style="text-align:right;">Digital</th>
-          <th>Acción</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for cierre in cierres_admin_sin_certificar %}
-        <tr>
-          <td style="font-weight:600; font-size:0.88rem;">
-            {{ cierre.usuario.nombre_completo|default:cierre.usuario.correo }}
-          </td>
-          <td style="font-size:0.85rem; white-space:nowrap;">
-            {{ cierre.fecha_cierre|date:"d/m/Y H:i" }}
-          </td>
-          <td style="text-align:right; font-weight:700;">${{ cierre.total_cobrado }}</td>
-          <td style="text-align:right;">${{ cierre.total_efectivo }}</td>
-          <td style="text-align:right;">${{ cierre.total_digital }}</td>
-          <td>
-            <form method="post" action="{% url 'certificar_cierre' cierre.id %}"
-                  onsubmit="return confirm('¿Certificar el cierre de {{ cierre.usuario.correo }} del {{ cierre.fecha_cierre|date:'d/m/Y' }}?')">
-              {% csrf_token %}
-              <button type="submit" class="btn"
-                      style="font-size:0.8rem; padding:0.3rem 0.7rem;">
-                ✅ Certificar
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endif %}
-
-  {# LIQUIDACIONES DE PLATAFORMA #}
+  {# ── LIQUIDACIONES DE PLATAFORMA ────────────────────────────────────── #}
   {% if liq_plataforma_pendientes or liq_plataforma_recientes %}
   <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
     <h2 style="margin:0;">💳 Liquidaciones de plataforma</h2>
@@ -243,7 +268,7 @@
   </div>
   {% if liq_plataforma_pendientes %}
   <div class="card" style="margin-bottom:0.75rem; border-left:4px solid var(--color-warning);">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+    <div class="page-header">
       <div>
         <p style="font-weight:700; margin:0 0 0.25rem;">⏳ {{ liq_plataforma_pendientes|length }} liquidación/es pendiente/s de pago</p>
         <p style="font-size:0.83rem; color:var(--color-text-muted); margin:0;">
@@ -296,75 +321,102 @@
   {% endif %}
   {% endif %}
 
-  {# LIQUIDACIONES DE COMISIÓN #}
-  <h2 style="margin-bottom:0.75rem;">💵 Comisiones de vendedores</h2>
-  <div class="card" style="overflow-x:auto;">
-    {% if liquidaciones %}
-      <table>
-        <thead>
-          <tr>
-            <th>Vendedor</th>
-            <th>Desde</th>
-            <th>Hasta</th>
-            <th style="text-align:right;">Monto</th>
-            <th style="text-align:center;">Estado</th>
-            <th style="text-align:center;">Factura</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for liq in liquidaciones %}
-          <tr>
-            <td>
-              <strong>{{ liq.vendedor.nombre_completo|default:liq.vendedor.correo }}</strong>
-            </td>
-            <td style="font-size:0.85rem;">{{ liq.fecha_desde|date:"d/m/Y" }}</td>
-            <td style="font-size:0.85rem;">{{ liq.fecha_hasta|date:"d/m/Y" }}</td>
-            <td style="text-align:right; font-weight:700; color:var(--color-primary);">${{ liq.monto_total }}</td>
-            <td style="text-align:center;">
-              {% if liq.estado == "pendiente" %}
-                <span style="color:var(--color-warning); font-weight:600;">⏳ Pendiente</span>
-              {% elif liq.estado == "depositada" %}
-                <span style="color:#2563eb; font-weight:600;">🏦 Depositada</span>
-              {% else %}
-                <span style="color:var(--color-primary); font-weight:600;">✅ Certificada</span>
-              {% endif %}
-            </td>
-            <td style="text-align:center; font-size:0.85rem;">
-              {% if liq.factura_presentada %}
-                <span style="color:var(--color-primary); font-weight:600;">✅ Presentada</span>
-                {% if liq.factura_archivo %}
-                  &nbsp;<a href="{{ liq.factura_archivo.url }}" target="_blank"
-                           title="Ver factura" style="color:var(--color-text-muted);">📄</a>
+  {# ── LIQUIDACIONES DE COMISIÓN ──────────────────────────────────────── #}
+  <div id="comisiones">
+    <h2 style="margin-bottom:0.4rem;">💵 Comisiones de vendedores</h2>
+    <p style="font-size:0.83rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+      Las comisiones se generan automáticamente cuando el admin crea una rendición.
+      Hacé click en <strong>💸 Marcar depositada</strong> para registrar que ya transferiste al vendedor.
+      El vendedor lo confirma desde su panel — no necesita que lo avises.
+    </p>
+    <div class="card" style="overflow-x:auto; margin-bottom:2rem;">
+      {% if liquidaciones %}
+        <table>
+          <thead>
+            <tr>
+              <th>Vendedor</th>
+              <th>Desde</th>
+              <th>Hasta</th>
+              <th style="text-align:right;">Monto</th>
+              <th style="text-align:center;">Estado</th>
+              <th style="text-align:center;">Factura</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for liq in liquidaciones %}
+            <tr>
+              <td>
+                <strong>{{ liq.vendedor.nombre_completo|default:liq.vendedor.correo }}</strong>
+              </td>
+              <td style="font-size:0.85rem;">{{ liq.fecha_desde|date:"d/m/Y" }}</td>
+              <td style="font-size:0.85rem;">{{ liq.fecha_hasta|date:"d/m/Y" }}</td>
+              <td style="text-align:right; font-weight:700; color:var(--color-primary);">${{ liq.monto_total }}</td>
+              <td style="text-align:center;">
+                {% if liq.estado == "pendiente" %}
+                  <span style="color:var(--color-warning); font-weight:600;">⏳ Pendiente</span>
+                {% elif liq.estado == "depositada" %}
+                  <span style="color:#2563eb; font-weight:600;">🏦 Depositada</span>
+                {% else %}
+                  <span style="color:var(--color-primary); font-weight:600;">✅ Certificada</span>
                 {% endif %}
-              {% elif liq.estado == "pendiente" %}
-                <span class="text-muted">—</span>
-              {% else %}
-                <span style="color:var(--color-warning);">⏳ Sin factura</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if liq.estado == "pendiente" %}
-                <a href="{% url 'depositar_comision' liq.id %}" class="btn btn-outline"
-                   style="font-size:0.82rem; padding:0.3rem 0.7rem;">
-                  💸 Marcar depositada
-                </a>
-              {% elif liq.estado == "depositada" %}
-                <span class="text-muted" style="font-size:0.82rem;">Esperando cert. del vendedor</span>
-              {% else %}
-                <span class="text-muted" style="font-size:0.82rem;">
-                  Cert. {{ liq.certificada_en|date:"d/m/Y H:i" }}
-                </span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p class="text-muted" style="padding:1rem; text-align:center;">No hay liquidaciones registradas.</p>
-    {% endif %}
+              </td>
+              <td style="text-align:center; font-size:0.85rem;">
+                {% if liq.factura_presentada %}
+                  <span style="color:var(--color-primary); font-weight:600;">✅ Presentada</span>
+                  {% if liq.factura_archivo %}
+                    &nbsp;<a href="{{ liq.factura_archivo.url }}" target="_blank"
+                             title="Ver factura" style="color:var(--color-text-muted);">📄</a>
+                  {% endif %}
+                {% elif liq.estado == "pendiente" %}
+                  <span class="text-muted">—</span>
+                {% else %}
+                  <span style="color:var(--color-warning);">⏳ Sin factura</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if liq.estado == "pendiente" %}
+                  <a href="{% url 'depositar_comision' liq.id %}" class="btn btn-outline"
+                     style="font-size:0.82rem; padding:0.3rem 0.7rem;">
+                    💸 Marcar depositada
+                  </a>
+                {% elif liq.estado == "depositada" %}
+                  <span class="text-muted" style="font-size:0.82rem;">
+                    🕐 Esperando confirmación del vendedor
+                  </span>
+                {% else %}
+                  <span class="text-muted" style="font-size:0.82rem;">
+                    Cert. {{ liq.certificada_en|date:"d/m/Y H:i" }}
+                  </span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-muted" style="padding:1rem; text-align:center;">No hay liquidaciones registradas.</p>
+      {% endif %}
+    </div>
   </div>
+
+  {# ── TUTORIAL (pie del panel) ───────────────────────────────────────── #}
+  <details style="margin-top:1rem; margin-bottom:0.5rem;">
+    <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
+                    color:var(--color-text-muted); list-style:none; user-select:none;
+                    display:flex; align-items:center; gap:0.4rem;">
+      📖 ¿Cómo usar este panel?
+    </summary>
+    <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+      <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+                 font-size:0.88rem; line-height:1.4;">
+        <li>📋 <strong>Revisá las rendiciones pendientes</strong>: son los cierres de caja de inspectores y vendedores que el admin ya agrupó en una rendición. Aparecen arriba. Hacé click en "✅ Recibida" para validarla o "⚠️ Observar" para devolverla.</li>
+        <li>🔐 <strong>Certificá cierres de admin</strong>: si un admin cerró su caja y no hay otro admin para certificarla, podés hacerlo vos. Aparecen resaltados en rojo.</li>
+        <li>💵 <strong>Depositá las comisiones</strong>: una vez que el admin genera la rendición, las comisiones de vendedores aparecen en "Comisiones de vendedores". Hacé click en "💸 Marcar depositada" cuando hayas transferido. El vendedor lo confirma desde su propio panel.</li>
+        <li>📊 <strong>Ver detalle</strong>: usá "Ver detalle" en el historial para ver el desglose completo de cierres y comisiones de cada rendición.</li>
+      </ol>
+    </div>
+  </details>
 
 </div>
 
