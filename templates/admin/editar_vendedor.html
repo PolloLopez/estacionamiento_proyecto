@@ -4,7 +4,7 @@
 {% block content %}
 <section class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1rem;">
     <h2>💰 Editar: {{ vendedor.nombre|default:vendedor.correo }}</h2>
     <a href="{% url 'gestionar_vendedores' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
   </div>

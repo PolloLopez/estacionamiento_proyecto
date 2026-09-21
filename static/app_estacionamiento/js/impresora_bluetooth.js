@@ -233,6 +233,30 @@ async function diagnosticarImpresora() {
   return resultado;
 }
 
+/**
+ * Reconexión silenciosa: solo intenta getDevices(), sin abrir diálogos.
+ * Usar cuando NO hay gesto de usuario disponible (ej: entre copias en modo automático).
+ * Si getDevices() falla (bug de Chrome al navegar), retorna null inmediatamente
+ * en vez de intentar requestDevice() sin gesto → el caller puede mostrar un botón
+ * de reintento que SÍ tiene gesto.
+ *
+ * Retorna { device, caracteristica, perfil } o null.
+ */
+async function reconectarSilencioso() {
+  if (!navigator.bluetooth) return null;
+  if (typeof navigator.bluetooth.getDevices !== 'function') return null;
+  try {
+    var devs = await navigator.bluetooth.getDevices();
+    if (!devs.length) return null;
+    var conexion = await _abrirConexion(devs[0]);
+    guardarInfoImpresora(devs[0]);
+    return conexion;
+  } catch (e) {
+    console.warn('[BLE] reconexión silenciosa falló:', e.message);
+    return null;
+  }
+}
+
 // ── Envío de datos ──────────────────────────────────────────────────────────
 
 /** Envía datos en chunks de CHUNK_SIZE bytes con pausa entre cada uno. */

@@ -1,6 +1,6 @@
 # Guía de testing completo por rol
 > Sistema de Estacionamiento Medido — Railway: https://estacionamiento.up.railway.app
-> Última actualización: 2026-09-18
+> Última actualización: 2026-09-20
 
 Esta guía cubre cada rol con: flujos a testear paso a paso, qué verificar en cada pantalla, y un cuestionario de experiencia de usuario (UX) para registrar observaciones durante la prueba.
 
@@ -8,18 +8,17 @@ Esta guía cubre cada rol con: flujos a testear paso a paso, qué verificar en c
 
 ---
 
-## Preparación previa
+## Credenciales del ambiente Railway (demo)
 
-Crear o verificar que existan los siguientes usuarios de prueba en Railway (crear desde `/sistema-interno/`):
+> ⚠️ Estas son las credenciales del ambiente de prueba en Railway. No son datos de producción real.
 
-| Rol | Email sugerido | Datos necesarios |
-|-----|---------------|-----------------|
-| Conductor | conductor@test.com | saldo > $0, al menos 1 vehículo vinculado |
-| Inspector | inspector@test.com | municipio asignado, es_inspector=True |
-| Vendedor | vendedor@test.com | municipio asignado, porcentaje_ganancia > 0 |
-| Admin | admin@test.com | municipio asignado, es_admin=True |
-| Tesorero | tesorero@test.com | municipio asignado, es_tesorero=True |
-| Superadmin | superadmin@test.com | es_superadmin=True |
+| Rol | Email | Contraseña |
+|-----|-------|-----------|
+| Admin municipal | admin@ejemplo.com | Admin.2026 |
+| Tesorero | tesoreria@ejemplo.com | Teso.2026 |
+| Vendedor / Kiosco | kiosco@ejemplo.com | 12345 |
+| Inspector | inspector@ejemplo.com | 12345 |
+| Conductor | conductor@ejemplo.com | Cond.12 |
 
 Tener una patente de prueba lista (ej: `AA123BB`) que NO tenga infracciones pendientes.
 
@@ -34,7 +33,7 @@ Tener una patente de prueba lista (ej: `AA123BB`) que NO tenga infracciones pend
 #### F1.1 — Registrar estacionamiento con saldo
 1. Ir a `/usuarios/` → ver panel con saldo actual y vehículos vinculados.
 2. Clic en "Estacionar".
-3. Activar GPS (botón de ubicación) → esperar que detecte la subcuadra automáticamente.
+3. Hacer clic en el botón "Detectar mi cuadra" → esperar el spinner de detección.
 4. Verificar que muestre el nombre de la subcuadra detectada.
 5. Si la subcuadra es libre → verificar que aparece el **banner verde** "Zona de estacionamiento libre" y que el formulario de pago queda oculto.
 6. Si la subcuadra es pagada → seleccionar duración → ver precio calculado.
@@ -107,7 +106,109 @@ Tener una patente de prueba lista (ej: `AA123BB`) que NO tenga infracciones pend
 #### F1.7 — Enviar sugerencia de mejora
 1. Ir a `/usuarios/sugerencias/nueva/`.
 2. Verificar que solo aparecen las áreas del conductor (conductor + general).
-3. Completar y enviar.
+3. En el campo **Edad (opcional)**, seleccionar un rango (ej: 26–35).
+4. Completar y enviar → verificar que aparece en la lista de "Mis sugerencias".
+5. Enviar una segunda sugerencia **sin** seleccionar rango de edad (dejar "Prefiero no decir").
+
+**Qué verificar:**
+- [ ] Solo aparecen áreas "conductor" y "general" en el select de área
+- [ ] El select de rango de edad está visible y tiene las opciones correctas (menor18, 18-25, 26-35, 36-50, 51-65, mayor65)
+- [ ] Enviar con rango seleccionado → funciona correctamente
+- [ ] Enviar sin seleccionar rango → también funciona (campo opcional)
+- [ ] Las sugerencias enviadas aparecen en `/usuarios/sugerencias/`
+
+#### F1.8 — Estacionar en la última franja horaria 🆕 *sesión 11*
+> **Contexto:** antes del fix, si quedaban menos de 60 minutos para el cierre del horario, el sistema no mostraba opciones y el conductor no podía estacionar — pero el inspector sí podía multar. Ahora siempre aparece al menos una opción.
+
+Para testear este flujo necesitás estar cerca del cierre del horario (ej. faltan 45 min, 20 min). Podés simularlo editando el horario del municipio desde el panel admin para que el cierre sea en unos minutos.
+
+**Caso A — quedan entre 30 y 60 minutos:**
+1. Configurar cierre del horario para dentro de 45 min.
+2. Ir a `/usuarios/estacionar/`.
+3. Verificar que aparece **solo la opción "1 hora"** (aunque exceda el cierre).
+4. Completar el estacionamiento → el sistema lo cerrará automáticamente al vencer el horario.
+
+**Caso B — quedan menos de 30 minutos:**
+1. Configurar cierre del horario para dentro de 15 min.
+2. Ir a `/usuarios/estacionar/`.
+3. Verificar que aparece **solo la opción "30 min"**.
+4. Completar el estacionamiento.
+
+**Qué verificar:**
+- [ ] Con 45 min restantes → botón "1 hora" disponible (no pantalla en blanco)
+- [ ] Con 15 min restantes → botón "30 min" disponible
+- [ ] Con horario ya cerrado → pantalla de "fuera de horario" (no opciones)
+- [ ] En ningún caso el mensaje dice "finaliza en breve, no registres" cuando el horario sigue activo
+
+#### F1.9 — GPS on demand: "Detectar mi cuadra" 🆕 *sesión 11*
+> **Contexto:** antes el GPS se activaba automáticamente al cargar la página, lo que mostraba un popup de permiso sin contexto. Ahora el conductor debe hacer clic en "Detectar mi cuadra" para activarlo. El flag `gpsYaCorrio` evita que un segundo clic dispare un segundo pedido.
+
+**Caso A — GPS disponible:**
+1. Ir a `/usuarios/estacionar/`.
+2. Verificar que **no aparece ningún popup de permiso de GPS** al cargar la página.
+3. Hacer clic en el botón "Detectar mi cuadra".
+4. Aceptar el permiso cuando el navegador lo pida → ver el spinner "Detectando...".
+5. Verificar que aparece el nombre de la subcuadra detectada y su tipo (pagada/libre).
+6. Hacer clic en "Detectar mi cuadra" una segunda vez (sin recargar) → verificar que **no** hace un segundo pedido de GPS (el botón no actúa si `gpsYaCorrio=true`).
+
+**Caso B — GPS denegado o sin cobertura:**
+1. Ir a `/usuarios/estacionar/`.
+2. Hacer clic en "Detectar mi cuadra" → denegar el permiso (o estar en zona sin señal).
+3. Verificar que aparece el selector manual calle→altura en cascada (no pantalla de error).
+4. Seleccionar calle → el selector de altura se repopula solo.
+5. Seleccionar altura → verificar que detecta tipo_zona y muestra la respuesta correcta (banner libre o formulario pagado).
+
+**Qué verificar:**
+- [ ] Al cargar la página: no aparece popup de GPS automático
+- [ ] Botón "Detectar mi cuadra" visible y clicable
+- [ ] Spinner aparece mientras se detecta
+- [ ] Subcuadra detectada: muestra nombre + tipo (pagada/libre)
+- [ ] Segundo clic en el botón: no dispara un nuevo fetch (flag gpsYaCorrio)
+- [ ] GPS fallido/denegado → selector manual aparece correctamente, la página no se rompe
+- [ ] Link "Ingresar manualmente" también activa el selector sin esperar al GPS
+
+#### F1.10 — Sugerencias de vehículos: últimos usados + otros vinculados 🆕 *sesión 11*
+> **Contexto:** antes todos los vehículos aparecían en una lista plana. Ahora se muestran en dos secciones: "Últimos usados" (últimos 3 vehículos con estacionamiento, sin repetidos) y "Otros vinculados" (los restantes). Los emojis indican el tipo.
+
+**Con estacionamientos previos:**
+1. Asegurarse de tener al menos 2 vehículos vinculados con estacionamientos registrados.
+2. Ir a `/usuarios/estacionar/`.
+3. Verificar que aparece la sección "Últimos usados" con hasta 3 vehículos.
+4. Verificar que son los últimos 3 usados (más reciente arriba), sin repetidos.
+5. Verificar que los vehículos restantes aparecen en "Otros vinculados".
+6. Verificar que ningún vehículo aparece en ambas secciones al mismo tiempo.
+7. Verificar los emojis: 🛵 para motos, 🚗 para autos.
+
+**Con cuenta sin estacionamientos previos:**
+1. Loguearse con un conductor nuevo (sin estacionamientos registrados).
+2. Ir a `/usuarios/estacionar/`.
+3. Verificar que la sección "Últimos usados" no aparece (o está vacía, sin error).
+4. Los vehículos vinculados aparecen directamente en "Otros vinculados".
+
+**Qué verificar:**
+- [ ] "Últimos usados" muestra máximo 3 vehículos, sin repetidos
+- [ ] El orden es por uso más reciente (más reciente primero)
+- [ ] "Otros vinculados" muestra los restantes (no incluye los de "últimos usados")
+- [ ] 🛵 para moto, 🚗 para auto en ambas secciones
+- [ ] Sin estacionamientos previos: no rompe la página, "Últimos usados" no aparece o está vacía
+
+#### F1.11 — Agregar vehículo inline (sin salir de la página) 🆕 *sesión 11*
+> **Contexto:** antes, hacer clic en "Agregar vehículo" navegaba a otra página y el conductor perdía el contexto del estacionamiento que estaba por registrar. Ahora el formulario se expande inline, en la misma página.
+
+1. Ir a `/usuarios/estacionar/`.
+2. Hacer clic en "➕ Agregar vehículo".
+3. Verificar que el panel de formulario se expande **en la misma página** (no navega a otra URL).
+4. Completar patente y tipo de vehículo.
+5. Hacer clic en "Guardar" → el panel se cierra y el nuevo vehículo aparece en la lista.
+6. Hacer clic de nuevo en "➕ Agregar vehículo" → hacer clic en "Cancelar" → el panel se cierra sin guardar nada.
+7. Abrir y cerrar el panel varias veces → verificar que no hay errores.
+
+**Qué verificar:**
+- [ ] Clic en "➕ Agregar vehículo" → panel se expande inline (sin cambiar de URL)
+- [ ] El formulario tiene campos de patente + tipo de vehículo
+- [ ] Guardar correctamente → vehículo aparece en la lista de vehículos
+- [ ] "Cancelar" colapsa el panel sin hacer submit
+- [ ] Abrir/cerrar múltiples veces → no hay errores JavaScript en consola
 
 ---
 
@@ -199,6 +300,43 @@ _______________
 1. Ir a `/usuarios/inspectores/resumen/`.
 2. Ver las infracciones propias del día.
 3. Verificar que si `inspector_ve_sus_infracciones` está desactivado → no aparece el menú.
+
+#### F2.7 — Verificar una moto (formato patente diferente) 🆕 *sesión 11*
+> **Contexto:** las motos usan el formato `123ABC` (tres dígitos + tres letras), distinto al auto `AA123BB`. El auto-submit se dispara al completar el patrón; la moto tiene dígitos al inicio, por lo que el auto-submit puede no disparar mientras se tipea. El botón manual "🔍 Verificar" aparece con ≥ 3 caracteres.
+
+1. Ir a `/usuarios/inspectores/verificar/`.
+2. Seleccionar tipo **Moto** (radio button).
+3. Tipear solo los tres dígitos iniciales, por ejemplo `123`.
+4. Verificar que aparece el botón "🔍 Verificar" debajo del input.
+5. Tipear las letras `ABC` → el auto-submit debería disparar al completar el patrón.
+6. Si el auto-submit no dispara (foco perdido, teclado virtual), tocar el botón "🔍 Verificar" manualmente.
+7. Verificar que la búsqueda se ejecuta y aparece el resultado.
+8. Cambiar de vuelta a tipo **Auto** → verificar que el campo se limpia y el botón desaparece.
+9. Cambiar de nuevo a **Moto** → verificar que el campo está vacío (no quedó la patente de auto anterior).
+
+**Qué verificar:**
+- [ ] Tipear solo 3 caracteres → botón "🔍 Verificar" aparece
+- [ ] Auto-submit funciona al completar `123ABC` (6 caracteres)
+- [ ] Botón manual funciona como fallback si auto-submit no dispara
+- [ ] Cambiar tipo Auto → Moto: el campo queda vacío
+- [ ] Cambiar tipo Moto → Auto: el campo queda vacío
+- [ ] El resultado se muestra igual que para un auto (colores, sonido, datos)
+
+#### F2.8 — Inspector en zona de estacionamiento libre 🆕 *sesión 11*
+> **Contexto:** en zonas marcadas como `tipo_zona="libre"` no corresponde multar ni verificar. El inspector no debe ver el campo de patente en esa subcuadra.
+
+1. Ir a `/usuarios/inspectores/verificar/`.
+2. En el selector de calle/altura, elegir una subcuadra marcada como **libre** (coordinarlo con el admin).
+3. Verificar que aparece el **banner verde** "Zona de estacionamiento libre" y que el campo de patente queda oculto.
+4. Cambiar a una subcuadra **pagada** en el mismo selector.
+5. Verificar que el banner desaparece y el campo de patente vuelve a mostrarse.
+6. Si el inspector tiene GPS activo y se detecta una subcuadra libre por GPS: verificar el mismo comportamiento de bloqueo.
+
+**Qué verificar:**
+- [ ] Subcuadra libre seleccionada manualmente → campo de patente oculto, banner visible
+- [ ] Cambiar a subcuadra pagada → campo de patente visible, banner oculto
+- [ ] El inspector **no puede** enviar el formulario mientras la subcuadra activa es libre (no hay campo visible)
+- [ ] La subcuadra libre detectada al cargar la página (si hay una activa) también bloquea el formulario desde el inicio
 
 ---
 
@@ -637,6 +775,201 @@ _______________
 
 ---
 
+---
+
+## TEST COMPLETO: Flujo de comisiones de vendedores (punta a punta)
+
+Este test cubre el ciclo completo desde que un vendedor cobra hasta que recibe su comisión. Hay que hacerlo una sola vez, en orden, con los roles en sesiones separadas (abrir el browser como incógnito para cada rol, o tener usuarios de prueba distintos).
+
+**Prerrequisitos antes de arrancar:**
+- Un vendedor con `porcentaje_ganancia > 0` (ej: 10%)
+- Un admin con `es_admin=True` en el mismo municipio
+- Un tesorero con `es_tesorero=True` en el mismo municipio
+- El municipio tiene una tarifa y horario activo para hoy
+- Tener a mano una calculadora — vas a verificar montos en cada paso
+
+---
+
+### PASO 1 — Vendedor cobra estacionamientos (genera movimientos de caja)
+
+**Quién:** vendedor@test.com | **URL:** `/usuarios/vendedores/`
+
+1. Ir al panel vendedor → "Registrar estacionamiento".
+2. Ingresar una patente cualquiera (ej: `AA123BB`).
+3. Seleccionar duración: 1 hora.
+4. Medio de pago: efectivo.
+5. Confirmar el cobro.
+6. **Anotar el monto cobrado** (ej: $500).
+7. Repetir una o dos veces con patentes distintas para tener varios movimientos.
+8. Ir a `/usuarios/vendedores/caja/` → verificar el resumen de caja.
+9. **Anotar el total recaudado** (suma de todos los cobros del turno).
+
+**Qué verificar:**
+- [ ] Cada cobro generó un `MovimientoCaja` (visible en el resumen de caja)
+- [ ] El resumen muestra el desglose por medio de pago
+- [ ] La suma de los montos en el resumen coincide con lo que cobraste manualmente
+
+**💡 ¿Cómo se calcula la comisión?**
+`comision_monto = monto_cobrado × porcentaje_ganancia / 100`
+Ej: $500 cobrados × 10% = $50 de comisión por ese movimiento.
+
+---
+
+### PASO 2 — Vendedor cierra su caja (genera el CierreCaja)
+
+**Quién:** vendedor@test.com | **URL:** `/usuarios/vendedores/caja/`
+
+1. En el resumen de caja → clic en "Cerrar caja".
+2. Seleccionar el período (ej: "Mañana").
+3. Confirmar el cierre.
+4. **Anotar el `ganancia_usuario` del cierre** — es la suma de las comisiones de todos los movimientos del turno.
+
+**Qué verificar:**
+- [ ] El cierre se creó correctamente y aparece en el historial de cierres
+- [ ] El `saldo_operativo` del vendedor volvió a 0
+- [ ] El estado del cierre es "pendiente de certificación" (no certificado todavía)
+- [ ] La `ganancia_usuario` del cierre = suma de `comision_monto` de cada movimiento (calcularlo a mano y verificar)
+
+**Referencia de cálculo esperada:**
+Si cobraste $500 + $300 + $200 = $1000, y el porcentaje es 10%:
+- Movimiento 1: $50 de comisión
+- Movimiento 2: $30 de comisión
+- Movimiento 3: $20 de comisión
+- `ganancia_usuario` del cierre = $100
+
+---
+
+### PASO 3 — Admin certifica el cierre del vendedor
+
+**Quién:** admin@test.com | **URL:** `/usuarios/admin-rendiciones/`
+
+1. Ir a `/usuarios/admin-rendiciones/`.
+2. En la sección "Cierres pendientes de certificación", buscar el cierre que recién hizo el vendedor.
+3. Abrir el detalle del cierre → revisar el desglose (efectivo, digital, total recaudado, comisión).
+4. **Verificar que los montos coinciden** con lo que anotaste en el paso 1.
+5. Certificar el cierre.
+
+**Qué verificar:**
+- [ ] El cierre del vendedor aparece en "Cierres pendientes"
+- [ ] El desglose muestra efectivo/digital/total con los valores correctos
+- [ ] La `ganancia_usuario` (comisión del vendedor) coincide con lo calculado en el paso 2
+- [ ] Después de certificar: el cierre pasa a estado "certificado"
+- [ ] El propio cierre del admin (si hubiera uno) NO muestra el botón "Certificar" → muestra el mensaje de que el tesorero debe certificarlo desde su panel
+
+**⚠️ Diferencia entre cierre de vendedor y cierre de admin:**
+El admin puede certificar los cierres de los vendedores. Para el cierre propio del admin, es el tesorero quien lo certifica (desde el panel del tesorero en `cierres_admin_sin_certificar`).
+
+---
+
+### PASO 4 — Admin crea la rendición (genera LiquidacionComision)
+
+**Quién:** admin@test.com | **URL:** `/usuarios/admin-rendiciones/crear/`
+
+1. Ir a `/usuarios/admin-rendiciones/` → clic en "Crear rendición".
+2. En el formulario, ver la lista de cierres certificados disponibles para incluir.
+3. Seleccionar el cierre del vendedor que se acaba de certificar.
+4. Si hay más cierres certificados de otros vendedores, seleccionarlos también.
+5. Confirmar la creación de la rendición.
+
+**Qué verificar:**
+- [ ] Solo aparecen en la lista los cierres **certificados** (los pendientes no deben aparecer)
+- [ ] Al crear la rendición, el sistema genera automáticamente una `LiquidacionComision` por cada vendedor incluido
+- [ ] La rendición queda en estado "pendiente" (esperando que el tesorero la valide)
+- [ ] Las liquidaciones de comisión quedan en estado "pendiente"
+- [ ] El monto de la `LiquidacionComision` del vendedor = la `ganancia_usuario` de su cierre incluido
+
+**Cómo verificar las liquidaciones creadas:**
+En la misma pantalla de rendiciones, después de crear, debería aparecer la rendición con el desglose de liquidaciones. Verificar que la comisión del vendedor de prueba sea exactamente la que calculaste en el paso 2.
+
+---
+
+### PASO 5 — Tesorero valida la rendición
+
+**Quién:** tesorero@test.com | **URL:** `/usuarios/tesorero/`
+
+1. Entrar al panel tesorero.
+2. Ver las rendiciones pendientes de validación.
+3. Abrir el detalle de la rendición que recién creó el admin.
+4. **Revisar el detalle**: cierres incluidos, totales, liquidaciones de comisión por vendedor.
+5. Si todo está correcto → validar la rendición.
+6. Si hay algo incorrecto → observar (escribir las notas de observación — campo obligatorio).
+
+**Qué verificar:**
+- [ ] La rendición pendiente aparece en el panel del tesorero
+- [ ] El detalle muestra los cierres incluidos con sus montos
+- [ ] Las liquidaciones de comisión están listadas por vendedor con los montos correctos
+- [ ] Intentar observar sin escribir notas → el formulario no debe enviarse (validación)
+- [ ] Al validar: la rendición pasa a estado "validada"
+
+---
+
+### PASO 6 — Tesorero deposita la comisión al vendedor
+
+**Quién:** tesorero@test.com | **URL:** `/usuarios/tesorero/depositar/<liquidacion_id>/`
+
+1. Desde el panel tesorero → ir a la sección de comisiones a depositar.
+2. Ver la `LiquidacionComision` del vendedor en estado "pendiente".
+3. Clic en "Depositar comisión".
+4. Completar el formulario:
+   - Número de comprobante (ej: `TRF-2026-0001`)
+   - Subir el archivo de comprobante (PDF o imagen)
+5. Confirmar el depósito.
+
+**Qué verificar:**
+- [ ] El monto a depositar coincide con el calculado en el paso 2
+- [ ] El número de comprobante se guarda correctamente
+- [ ] El archivo de comprobante se sube sin error
+- [ ] La liquidación pasa a estado "depositada" (no "certificada" todavía — eso lo hace el vendedor)
+- [ ] El vendedor ahora puede ver la comisión como "depositada" en su panel
+
+---
+
+### PASO 7 — Vendedor certifica que recibió la comisión
+
+**Quién:** vendedor@test.com | **URL:** `/usuarios/vendedores/comisiones/`
+
+1. Ir a `/usuarios/vendedores/comisiones/`.
+2. Ver la liquidación en estado "depositada" (con el comprobante que subió el tesorero).
+3. Revisar el comprobante (nombre del banco, número, monto).
+4. Confirmar que recibió el depósito → clic en "Certificar recibo".
+5. Si el municipio requiere factura → subir el archivo de factura en `/usuarios/vendedores/comisiones/<id>/factura/`.
+
+**Qué verificar:**
+- [ ] La liquidación aparece con estado "depositada" y el comprobante del tesorero es visible
+- [ ] El vendedor NO puede certificar antes de que el tesorero deposite (estado "pendiente" no tiene botón de certificar)
+- [ ] Al certificar: la liquidación pasa a estado "certificada"
+- [ ] La factura (si aplica) se sube correctamente
+
+---
+
+### Verificación final de montos — Tabla de reconciliación
+
+Al terminar el test, completar esta tabla y verificar que los números cierran:
+
+| Concepto | Valor esperado | Valor real del sistema | ¿Coincide? |
+|----------|---------------|----------------------|-----------|
+| Total recaudado por el vendedor | (suma de cobros) | (ver resumen de caja) | [ ] |
+| `ganancia_usuario` del CierreCaja | (total × % comisión) | (ver detalle del cierre) | [ ] |
+| Monto de la LiquidacionComision | (igual a ganancia_usuario) | (ver detalle de rendición) | [ ] |
+| Monto depositado por el tesorero | (igual a ganancia_usuario) | (ver comprobante) | [ ] |
+
+Si alguna celda no coincide, hay un bug de cálculo. Reportarlo con los valores exactos y el `id` de los objetos involucrados (CierreCaja, LiquidacionComision).
+
+---
+
+### Checklist rápido — Flujo de comisiones completo
+
+- [ ] **Paso 1** — Vendedor cobró estacionamientos y el resumen de caja es correcto
+- [ ] **Paso 2** — Vendedor cerró caja y `ganancia_usuario` = suma de comisiones de sus movimientos
+- [ ] **Paso 3** — Admin certificó el cierre del vendedor; el propio cierre del admin NO muestra botón "Certificar"
+- [ ] **Paso 4** — Admin creó la rendición; se generaron `LiquidacionComision` automáticamente
+- [ ] **Paso 5** — Tesorero validó la rendición; observar sin notas falla correctamente
+- [ ] **Paso 6** — Tesorero depositó la comisión con comprobante; la liquidación pasó a "depositada"
+- [ ] **Paso 7** — Vendedor certificó el recibo; la liquidación pasó a "certificada"
+- [ ] **Montos** — Tabla de reconciliación completa, todos los valores coinciden
+
+---
+
 ## Casos borde — testear en cualquier rol
 
 | Caso | Qué probar | Resultado esperado |
@@ -657,7 +990,7 @@ _______________
 
 Después de testear todos los roles:
 
-- [ ] **Flujo financiero completo:** conductor pagó → vendedor cobró → vendedor cerró caja → admin certificó cierre → admin creó rendición → tesorero validó → tesorero depositó comisión → vendedor certificó.
+- [ ] **Flujo de comisiones completo:** ver sección "TEST COMPLETO: Flujo de comisiones de vendedores (punta a punta)" y completar su checklist de 7 pasos con verificación de montos.
 - [ ] **Zona libre de punta a punta:** inspector confirma que una subcuadra es libre en el mapa → conductor la detecta por GPS y no paga → conductor la detecta en cascada manual y no paga → pago público tampoco genera pago.
 - [ ] **Infracción de punta a punta:** inspector labró → conductor impugnó → admin respondió la impugnación → conductor pagó → estado = pagada.
 - [ ] **Dark mode:** todos los paneles se ven correctamente en modo oscuro (sin textos ilegibles ni fondos raros).

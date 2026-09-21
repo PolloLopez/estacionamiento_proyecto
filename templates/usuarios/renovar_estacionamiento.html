@@ -2,17 +2,16 @@
 {% block title %}Renovar estacionamiento{% endblock %}
 
 {% block content %}
-<section class="container" style="max-width:480px; margin:0 auto;">
+<section class="container form-narrow">
 
-  <div style="display:flex; justify-content:space-between; align-items:center;
-              margin-bottom:1.2rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1.2rem;">
     <h2 style="margin:0;">🔄 Extender estacionamiento</h2>
     <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
   </div>
 
   {# Resumen del estacionamiento actual #}
   <div class="card" style="margin-bottom:1.2rem;">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+    <div class="page-header">
       <div>
         <div style="font-size:1.2rem; font-weight:700;">{{ estacionamiento.vehiculo.patente }}</div>
         <div class="text-muted" style="font-size:0.88rem;">{{ estacionamiento.subcuadra }}</div>
@@ -73,7 +72,7 @@
       {% else %}
         <div class="alert" style="background:#fff3cd; color:#856404; border:1px solid #ffc107;
              border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem;">
-          ⏰ No hay tiempo disponible para extender — el horario de estacionamiento cierra pronto.
+          ⏰ Tu estacionamiento actual ya cubre hasta el cierre del horario. No hace falta que lo renueves.
         </div>
       {% endif %}
 

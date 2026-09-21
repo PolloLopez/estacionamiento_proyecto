@@ -17,7 +17,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 
-from app_estacionamiento.models import TransferenciaSaldo, Usuario
+from app_estacionamiento.models import BilleteraConductor, TransferenciaSaldo, Usuario
 
 
 MONTO_MINIMO     = Decimal("100")
@@ -55,19 +55,27 @@ def iniciar_transferencia(emisor, correo_receptor, monto_str):
             "transferencia": None,
         }
 
+    municipio = emisor.municipio
+
     with transaction.atomic():
         emisor_db = Usuario.objects.select_for_update().get(pk=emisor.pk)
 
-        if emisor_db.saldo < monto:
+        # Verificar y debitar de la billetera del municipio
+        billetera_emisor, _ = BilleteraConductor.objects.select_for_update().get_or_create(
+            conductor=emisor_db,
+            municipio=municipio,
+            defaults={"saldo": Decimal("0")},
+        )
+        if billetera_emisor.saldo < monto:
             return {
                 "ok":    False,
-                "error": f"Saldo insuficiente. Tenés ${emisor_db.saldo}.",
+                "error": f"Saldo insuficiente. Tenés ${billetera_emisor.saldo}.",
                 "transferencia": None,
             }
 
         # Debitar al emisor de inmediato (saldo queda "reservado")
-        emisor_db.saldo -= monto
-        emisor_db.save(update_fields=["saldo"])
+        billetera_emisor.saldo -= monto
+        billetera_emisor.save(update_fields=["saldo"])
 
         ahora = timezone.now()
         transferencia = TransferenciaSaldo.objects.create(
@@ -119,10 +127,15 @@ def responder_transferencia(usuario, transferencia_id, accion):
             return {"ok": False, "error": "La transferencia ya expiró. El saldo fue devuelto."}
 
         if accion == "aceptar":
-            # Acreditar al receptor
+            # Acreditar al receptor en la billetera del municipio de la transferencia
             receptor_db = Usuario.objects.select_for_update().get(pk=transf.receptor_id)
-            receptor_db.saldo += transf.monto
-            receptor_db.save(update_fields=["saldo"])
+            billetera_receptor, _ = BilleteraConductor.objects.select_for_update().get_or_create(
+                conductor=receptor_db,
+                municipio=transf.municipio,
+                defaults={"saldo": Decimal("0")},
+            )
+            billetera_receptor.saldo += transf.monto
+            billetera_receptor.save(update_fields=["saldo"])
             transf.estado        = "aceptada"
             transf.respondido_en = ahora
             transf.save(update_fields=["estado", "respondido_en"])
@@ -139,5 +152,10 @@ def responder_transferencia(usuario, transferencia_id, accion):
 def _devolver_al_emisor(transf):
     """Devuelve el monto al emisor. Debe llamarse dentro de un atomic() con el emisor lockeado."""
     emisor_db = Usuario.objects.select_for_update().get(pk=transf.emisor_id)
-    emisor_db.saldo += transf.monto
-    emisor_db.save(update_fields=["saldo"])
+    billetera, _ = BilleteraConductor.objects.select_for_update().get_or_create(
+        conductor=emisor_db,
+        municipio=transf.municipio,
+        defaults={"saldo": Decimal("0")},
+    )
+    billetera.saldo += transf.monto
+    billetera.save(update_fields=["saldo"])

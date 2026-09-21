@@ -85,6 +85,7 @@ def ejecutar(usuario, infraccion):
             conductor=usuario_locked,
             monto=monto_a_cobrar,
             descripcion=f"Pago infraccion #{infraccion_locked.id} — {infraccion_locked.vehiculo.patente}",
+            municipio=infraccion_locked.municipio,
         )
 
         infraccion_locked.estado                = "pagada"

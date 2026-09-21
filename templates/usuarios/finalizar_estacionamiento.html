@@ -13,7 +13,7 @@
       <!-- Si hay mensaje de éxito, se muestra -->
       {% if mensaje %}
       <p style="color: green">{{ mensaje }}</p>
-      <p>Saldo restante: ${{ usuario.saldo }}</p>
+      <p>Saldo restante: ${{ saldo_conductor }}</p>
       {% endif %}
 
       <!-- Tarjeta con detalles del estacionamiento -->
@@ -32,7 +32,7 @@
       >
         {% csrf_token %}
         <div class="form-row actions">
-          <button class="btn">✅ Pagar y finalizar</button>
+          <button class="btn">✅ Confirmar finalización</button>
           <!-- Botón de cancelar vuelve al inicio de usuarios -->
           <a class="btn link" href="{% url 'inicio' %}">Cancelar</a>
         </div>

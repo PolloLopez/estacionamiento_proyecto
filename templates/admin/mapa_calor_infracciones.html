@@ -3,13 +3,13 @@
 
 {% block content %}
 <div class="container">
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1rem;">
     <h2 style="margin:0;">🗺️ Mapa de calor de infracciones</h2>
     <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.85rem;">← Volver al panel</a>
   </div>
 
   {% if total_subcuadras == 0 %}
-  <div class="card" style="text-align:center; padding:2rem;">
+  <div class="card card-empty">
     <p style="color:var(--color-text-muted);">
       No hay subcuadras con coordenadas cargadas.<br>
       Cargá lat/lon en <a href="{% url 'gestionar_subcuadras' %}">Gestionar subcuadras</a> para ver el mapa.

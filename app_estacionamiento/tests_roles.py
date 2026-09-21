@@ -6,8 +6,10 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 from app_estacionamiento.models import (
-    Usuario, Municipio, Subcuadra, Estacionamiento, Tarifa
+    Usuario, Municipio, Subcuadra, Estacionamiento, Tarifa,
+    BilleteraConductor, HorarioEstacionamiento,
 )
+from app_estacionamiento.services.saldo import obtener_saldo_conductor
 
 
 class BaseRolesTest(TestCase):
@@ -39,9 +41,26 @@ class BaseRolesTest(TestCase):
         )
         self.conductor = Usuario.objects.create_user(
             correo="conductor@test.com", password="123456",
-            municipio=self.municipio, es_conductor=True, saldo=1000,
+            municipio=self.municipio, es_conductor=True,
             first_name="Test",  # evita redirección del middleware (conductor sin nombre)
         )
+        # BilleteraConductor es la fuente de verdad del saldo.
+        BilleteraConductor.objects.create(
+            conductor=self.conductor, municipio=self.municipio, saldo=Decimal("1000"),
+        )
+
+        # Sin HorarioEstacionamiento, es_dia_libre_conductor() devuelve True y el costo
+        # siempre sería $0, rompiendo los tests de saldo. Creamos horario para todos los
+        # días (00:00–23:59) para que los tests siempre corran con costo > 0.
+        from datetime import time
+        for dia in range(7):
+            HorarioEstacionamiento.objects.create(
+                municipio=self.municipio,
+                dia_semana=dia,
+                hora_inicio=time(0, 0),
+                hora_fin=time(23, 59),
+                activo=True,
+            )
 
 
 # =====================================================
@@ -151,15 +170,15 @@ class FlujoConductorCompletoTest(BaseRolesTest):
 
     def test_saldo_se_descuenta_al_estacionar(self):
         self.client.force_login(self.conductor)
-        saldo_inicial = self.conductor.saldo
+        saldo_inicial = obtener_saldo_conductor(self.conductor, self.municipio)
 
         self.client.post(
             reverse("usuarios_estacionar_vehiculo"),
             {"patente": "AAA999", "duracion": "2"}
         )
 
-        self.conductor.refresh_from_db()
-        self.assertLess(self.conductor.saldo, saldo_inicial)
+        saldo_final = obtener_saldo_conductor(self.conductor, self.municipio)
+        self.assertLess(saldo_final, saldo_inicial)
 
     def test_no_puede_tener_dos_estacionamientos_activos(self):
         self.client.force_login(self.conductor)
@@ -180,8 +199,10 @@ class FlujoConductorCompletoTest(BaseRolesTest):
 
     def test_conductor_sin_saldo_redirige_a_carga_mp(self):
         """Sin saldo el sistema redirige a cargar saldo via MercadoPago, no a deuda."""
-        self.conductor.saldo = 0
-        self.conductor.save()
+        BilleteraConductor.objects.update_or_create(
+            conductor=self.conductor, municipio=self.municipio,
+            defaults={"saldo": Decimal("0")},
+        )
 
         self.client.force_login(self.conductor)
         response = self.client.post(

@@ -42,12 +42,12 @@
       {# Resultado de búsqueda #}
       {% if patente %}
         {% if not vehiculo %}
-          <div class="card" style="text-align:center; padding:1.5rem;">
+          <div class="card card-empty" style="padding:1.5rem;">
             🚗 No se encontró ningún vehículo con patente <strong>{{ patente }}</strong>.
           </div>
 
         {% elif not infracciones %}
-          <div class="card" style="text-align:center; padding:1.5rem;">
+          <div class="card card-empty" style="padding:1.5rem;">
             ✅ El vehículo <strong>{{ vehiculo.patente }}</strong> no tiene infracciones pendientes.
           </div>
 

@@ -4,7 +4,7 @@
 {% block content %}
 <section class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1rem;">
     <div style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
       <h2 style="margin:0;">📋 Infracciones</h2>
       {% if total_impagas %}
@@ -120,8 +120,7 @@
           </tbody>
         </table>
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:center;
-                  flex-wrap:wrap; gap:0.5rem; margin-top:0.75rem;">
+      <div class="page-header" style="margin-top:0.75rem;">
         <p class="text-muted" style="font-size:0.83rem; margin:0;">
           {{ infracciones|length }} resultado{{ infracciones|length|pluralize }} en esta página.
           {% if paginator.count %}({{ paginator.count }} en total){% endif %}

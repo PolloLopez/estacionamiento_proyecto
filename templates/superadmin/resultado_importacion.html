@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1.5rem;">
     <h1 style="font-size:1.4rem;">📊 Resultado de importación — {{ municipio.nombre }}</h1>
     <a href="{% url 'editar_municipio' municipio.id %}" class="btn btn-outline">← Volver al municipio</a>
   </div>
@@ -29,7 +29,7 @@
 
   {# Tabla de errores #}
   <div class="card" style="overflow-x:auto;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+    <div class="page-header" style="margin-bottom:0.75rem;">
       <h2 style="font-size:1rem; margin:0;">⚠️ Filas con error ({{ errores|length }})</h2>
       <button onclick="copiarErrores()" class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.7rem;">
         📋 Copiar como texto

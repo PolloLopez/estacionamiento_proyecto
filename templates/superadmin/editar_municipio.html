@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1.5rem;">
     <h1 style="font-size:1.5rem;">🏙️ {{ municipio.nombre }}</h1>
     <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
       <a href="{% url 'importar_estacionamientos' municipio.id %}" class="btn btn-outline"
@@ -107,6 +107,30 @@
             <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
               Si está activado, el admin ve la sección "📄 Plantillas" en su panel y puede personalizar
               los textos de actas e infracciones. Por defecto solo el superadmin puede hacerlo.
+            </small>
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <input type="checkbox" name="modulo_informes_activo"
+                     {% if municipio.modulo_informes_activo %}checked{% endif %}>
+              <span style="font-size:0.85rem; font-weight:600;">📨 Módulo de informes por mail</span>
+            </label>
+            <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+              Activa el tab "Informes" en /admin-rendiciones/ para que el admin configure
+              destinatarios y envíe resúmenes periódicos. Por defecto desactivado.
+            </small>
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <input type="checkbox" name="puede_gestionar_subcuadras"
+                     {% if municipio.puede_gestionar_subcuadras %}checked{% endif %}>
+              <span style="font-size:0.85rem; font-weight:600;">📍 Admin puede gestionar subcuadras</span>
+            </label>
+            <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+              Habilita /admin-subcuadras/ para el admin municipal: crear cuadras,
+              asignar coordenadas GPS y definir zonas pagadas/libres. Por defecto solo el superadmin.
             </small>
           </div>
 
@@ -399,7 +423,7 @@
 
       {# Admins del municipio #}
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <div class="page-header" style="margin-bottom:1rem;">
           <h2 style="font-size:1.05rem; margin:0;">👤 Administradores y tesoreros</h2>
           <a href="{% url 'crear_admin' municipio.id %}" class="btn btn-outline"
              style="font-size:0.82rem; padding:0.3rem 0.7rem;">➕ Nuevo usuario</a>

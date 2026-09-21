@@ -9,7 +9,7 @@ from app_estacionamiento.models import Infraccion, Usuario, VehiculoUsuario, Tar
 from app_estacionamiento.domain.vehiculo_policy import VehiculoPolicy
 from app_estacionamiento.domain.saldo_policy import SaldoPolicy
 
-from app_estacionamiento.services.horarios import obtener_tarifa_hora
+from app_estacionamiento.services.horarios import obtener_tarifa_hora, es_dia_libre_conductor
 from app_estacionamiento.services.saldo import debitar_saldo_conductor
 from app_estacionamiento.services.infracciones import calcular_estado_tolerancia
 from app_estacionamiento.services.reintegro import aplicar_reintegro
@@ -53,19 +53,34 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             "info_reintegro":  None,
         }
 
-    tarifa_obj  = Tarifa.objects.filter(municipio=usuario.municipio).first()
-    tarifa_hora = obtener_tarifa_hora(tarifa_obj, vehiculo)
-    costo_base  = duracion * tarifa_hora
+    # Zona libre o día sin horario: el estacionamiento se registra igualmente
+    # (para que el inspector vea "PAGADO") pero el costo es $0.
+    # Esto es la red de seguridad del backend: el frontend ya oculta el formulario
+    # de pago, pero si alguien enviara el POST igual, no se le cobra.
+    zona_libre = subcuadra and getattr(subcuadra, "tipo_zona", None) == "libre"
+    # es_dia_libre_conductor cubre tanto días sin horario como DiaEspecial sin cobro
+    dia_libre  = usuario.municipio and es_dia_libre_conductor(usuario.municipio)
 
-    # Descuento para conductores verificados (configurado por el superadmin).
-    # Se calcula antes del lock — es solo aritmética, sin race condition posible.
-    resultado_descuento = aplicar_descuento_conductor(costo_base, usuario, usuario.municipio)
-    costo = resultado_descuento["costo_final"]
+    if zona_libre or dia_libre:
+        tarifa_hora = Decimal("0")
+        costo_base  = Decimal("0")
+        resultado_descuento = {"costo_final": Decimal("0"), "descuento_pct": Decimal("0"), "motivo": ""}
+        costo = Decimal("0")
+    else:
+        tarifa_obj  = Tarifa.objects.filter(municipio=usuario.municipio).first()
+        tarifa_hora = obtener_tarifa_hora(tarifa_obj, vehiculo)
+        costo_base  = duracion * tarifa_hora
+
+        # Descuento para conductores verificados (configurado por el superadmin).
+        # Se calcula antes del lock — es solo aritmética, sin race condition posible.
+        resultado_descuento = aplicar_descuento_conductor(costo_base, usuario, usuario.municipio)
+        costo = resultado_descuento["costo_final"]
 
     relaciones = VehiculoUsuario.objects.filter(vehiculo=vehiculo)
     warnings   = VehiculoPolicy.generar_warnings(usuario, vehiculo, relaciones)
 
-    if not SaldoPolicy.tiene_saldo(usuario, costo):
+    municipio = usuario.municipio
+    if not SaldoPolicy.tiene_saldo(usuario, costo, municipio=municipio):
         return {
             "ok": False,
             "redirect": REDIRECT_SIN_SALDO,
@@ -78,7 +93,7 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
 
         usuario_db = Usuario.objects.select_for_update().get(id=usuario.id)
 
-        if not SaldoPolicy.tiene_saldo(usuario_db, costo):
+        if not SaldoPolicy.tiene_saldo(usuario_db, costo, municipio=municipio):
             return {
                 "ok": False,
                 "redirect": REDIRECT_SIN_SALDO,
@@ -144,6 +159,7 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             conductor=usuario_db,
             monto=costo,
             descripcion="Estacionamiento",
+            municipio=municipio,
         )
 
         # ── Reintegro de vecinos (si el municipio tiene el módulo activo) ───────

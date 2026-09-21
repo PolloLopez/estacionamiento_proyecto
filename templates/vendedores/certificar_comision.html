@@ -2,7 +2,7 @@
 {% block title %}Certificar recibo{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width:480px;">
+<div class="container form-narrow">
   <h1 style="margin-bottom:1.5rem;">✅ Certificar recibo de comisión</h1>
 
   <div class="card" style="margin-bottom:1.5rem;">
@@ -15,8 +15,20 @@
     {% if liquidacion.depositada_en %}
       <p><strong>Fecha depósito:</strong> {{ liquidacion.depositada_en|date:"d/m/Y H:i" }}hs</p>
     {% endif %}
+    {% if liquidacion.numero_comprobante %}
+      <p><strong>Nro. comprobante:</strong> {{ liquidacion.numero_comprobante }}</p>
+    {% endif %}
+    {% if liquidacion.comprobante_archivo %}
+      <p><strong>Comprobante:</strong>
+        <a href="{{ liquidacion.comprobante_archivo.url }}" target="_blank"
+           style="color:var(--color-primary);">📄 Ver comprobante</a>
+      </p>
+    {% endif %}
     {% if liquidacion.notas_tesorero %}
       <p><strong>Notas del tesorero:</strong> {{ liquidacion.notas_tesorero }}</p>
+    {% endif %}
+    {% if not liquidacion.numero_comprobante and not liquidacion.comprobante_archivo and not liquidacion.notas_tesorero %}
+      <p class="text-muted" style="font-size:0.85rem;">El tesorero no adjuntó comprobante ni notas.</p>
     {% endif %}
     <p style="font-size:1.8rem; font-weight:900; color:var(--color-primary); margin-top:0.75rem; text-align:center;">
       ${{ liquidacion.monto_total }}

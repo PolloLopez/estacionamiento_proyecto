@@ -4,8 +4,7 @@
 {% block content %}
 <section class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center;
-              flex-wrap:wrap; gap:0.5rem; margin-bottom:1.5rem;">
+  <div class="page-header" style="margin-bottom:1.5rem;">
     <h2 style="margin:0;">📅 Pagar abono mensual</h2>
     <a href="{% url 'inicio_usuarios' %}" class="btn btn-outline">← Volver</a>
   </div>
@@ -70,14 +69,14 @@
 
     {# ── Formulario de selección ── #}
     <div class="card" style="max-width:460px;">
-      <form method="post">
+      <form method="post" id="form-abono">
         {% csrf_token %}
-        <input type="hidden" name="accion" value="confirmar">
+        <input type="hidden" name="accion" id="campo-accion" value="confirmar">
 
         <div style="margin-bottom:1rem;">
           <label style="display:block; margin-bottom:0.4rem; font-weight:600;">Vehículo</label>
           {% if vehiculos %}
-            <select name="vehiculo_id" required style="width:100%;">
+            <select name="vehiculo_id" id="select-vehiculo" style="width:100%;">
               <option value="">— Seleccioná —</option>
               {% for v in vehiculos %}
                 <option value="{{ v.id }}"
@@ -87,8 +86,42 @@
               {% endfor %}
             </select>
           {% else %}
-            <p class="text-muted" style="margin:0;">No tenés vehículos registrados.</p>
+            <p class="text-muted" style="margin:0 0 0.5rem;">No tenés vehículos registrados.</p>
           {% endif %}
+
+          {# Formulario inline para agregar un vehículo nuevo sin salir de la página #}
+          <details id="detalle-nuevo-vehiculo" style="margin-top:0.75rem;">
+            <summary style="cursor:pointer; font-size:0.85rem; color:var(--color-primary);
+                            font-weight:600; list-style:none; user-select:none;">
+              + Agregar otro vehículo
+            </summary>
+            <div style="margin-top:0.6rem; padding:0.75rem; background:var(--color-surface);
+                        border-radius:8px; display:flex; flex-direction:column; gap:0.6rem;">
+              <div>
+                <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.25rem;">
+                  Patente
+                </label>
+                <input type="text" name="patente_nueva" id="patente-nueva"
+                       maxlength="10" placeholder="Ej: AA123BB"
+                       style="width:100%; text-transform:uppercase; letter-spacing:1px;"
+                       oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+              </div>
+              <div>
+                <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.25rem;">
+                  Tipo
+                </label>
+                <select name="tipo_nuevo" style="width:100%;">
+                  <option value="auto">Auto</option>
+                  <option value="moto">Moto</option>
+                  <option value="camion">Camión</option>
+                </select>
+              </div>
+              <button type="button" class="btn btn-outline" style="align-self:flex-start;"
+                      onclick="agregarVehiculo()">
+                Agregar y seleccionar
+              </button>
+            </div>
+          </details>
         </div>
 
         <div style="margin-bottom:1.25rem;">
@@ -116,4 +149,26 @@
   {% endif %}
 
 </section>
+
+<script>
+function agregarVehiculo() {
+  const patente = document.getElementById("patente-nueva").value.trim();
+  if (!patente) {
+    alert("Ingresá una patente.");
+    return;
+  }
+  // Cambiar la acción y enviar el formulario principal
+  document.getElementById("campo-accion").value = "agregar_vehiculo";
+  document.getElementById("form-abono").submit();
+}
+
+// Si el formulario volvió con un vehículo nuevo seleccionado,
+// abrir el detalle para que el usuario vea el resultado
+{% if vehiculo %}
+const detalleNuevo = document.getElementById("detalle-nuevo-vehiculo");
+// Si el vehículo seleccionado existe en el select, el detalle permanece cerrado.
+// Solo abrirlo si el vehículo no estaba en la lista original
+// (la lista tiene más de 0 opciones con value != "")
+{% endif %}
+</script>
 {% endblock %}

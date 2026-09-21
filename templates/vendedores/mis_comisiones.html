@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1.5rem;">
     <h1>💵 Mis comisiones</h1>
     <a href="{% url 'panel_vendedor' %}" class="btn btn-outline">← Panel</a>
   </div>
@@ -92,12 +92,30 @@
               {% endif %}
             </td>
           </tr>
+          {# Sub-fila con comprobante del tesorero: solo cuando está depositada y hay datos #}
+          {% if liq.estado == "depositada" and liq.depositada_por %}
+          <tr>
+            <td colspan="5"
+                style="font-size:0.82rem; padding:0.4rem 0.75rem;
+                       background:#eff6ff; border-left:3px solid #2563eb;
+                       color:var(--color-text-muted);">
+              🏦 <strong>Depositado por {{ liq.depositada_por.nombre_completo|default:liq.depositada_por.correo }}</strong>
+              el {{ liq.depositada_en|date:"d/m/Y" }}
+              {% if liq.numero_comprobante %}· Comp. #{{ liq.numero_comprobante }}{% endif %}
+              {% if liq.notas_tesorero %}· {{ liq.notas_tesorero }}{% endif %}
+              {% if liq.comprobante_archivo %}
+                · <a href="{{ liq.comprobante_archivo.url }}" target="_blank"
+                     style="color:#2563eb;">📄 Ver comprobante</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endif %}
           {% endfor %}
         </tbody>
       </table>
     </div>
   {% else %}
-    <div class="card" style="text-align:center; padding:1.5rem;">
+    <div class="card card-empty" style="padding:1.5rem;">
       <p class="text-muted">Todavía no hay liquidaciones registradas.</p>
     </div>
   {% endif %}

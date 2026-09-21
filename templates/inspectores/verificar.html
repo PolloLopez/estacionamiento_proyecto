@@ -76,15 +76,34 @@
           <label for="tipo-moto" class="tipo-btn">🏍️ Moto</label>
         </div>
 
-        <input
-            id="patente"
-            name="patente"
-            oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
-            class="input-patente"
-            placeholder="AAA111"
-            autocomplete="off"
-            {% if not resultado %}autofocus{% endif %}
-        />
+        <!-- Banner zona libre: se muestra cuando la subcuadra activa es tipo_zona=libre.
+             Oculta el input de patente porque no corresponde verificar ni multar. -->
+        <div id="banner-zona-libre-inspector" style="display:none; background:#d4edda; color:#155724;
+             border:1px solid #c3e6cb; border-radius:10px; padding:0.9rem 1.1rem;
+             margin-bottom:0.75rem; text-align:center;">
+          🟢 <strong>Zona de estacionamiento libre</strong><br>
+          <span style="font-size:0.9rem;">No corresponde verificar ni multar en esta subcuadra.</span>
+        </div>
+
+        <div id="contenedor-patente">
+          <input
+              id="patente"
+              name="patente"
+              oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
+              class="input-patente"
+              placeholder="AAA111"
+              autocomplete="off"
+              {% if not resultado %}autofocus{% endif %}
+          />
+          {# Botón de submit visible: garantiza que el inspector pueda enviar
+             aunque el auto-submit no se dispare (útil especialmente para motos 123ABC). #}
+          <button type="submit" id="btn-verificar"
+                  style="width:100%; margin-top:0.5rem; padding:0.7rem; font-size:1rem;
+                         background:var(--color-primary); color:white; border:none;
+                         border-radius:8px; cursor:pointer; font-weight:600; display:none;">
+            🔍 Verificar
+          </button>
+        </div>
     </form>
     {% endif %}{# fin {% if not horario_activo %} / {% else %} #}
 
@@ -242,16 +261,52 @@
 const input = document.getElementById("patente");
 const form  = document.getElementById("form");
 
+// ── Zona libre inspector ──────────────────────────────────────────────────────
+// Bloquea el input de patente y muestra un aviso cuando la subcuadra es libre.
+// También chequea la subcuadra_activa que llega desde el servidor al cargar la página.
+function aplicarZonaLibreInspector(esLibre) {
+  const banner     = document.getElementById("banner-zona-libre-inspector");
+  const contenedor = document.getElementById("contenedor-patente");
+  if (esLibre) {
+    if (banner)     banner.style.display     = "block";
+    if (contenedor) contenedor.style.display = "none";
+  } else {
+    if (banner)     banner.style.display     = "none";
+    if (contenedor) contenedor.style.display = "block";
+  }
+}
+
+// Verificar la subcuadra activa al cargar: si ya viene de sesión y es libre, bloquear.
+(function() {
+  var idActivo = "{{ subcuadra_activa.id|default:'' }}";
+  if (idActivo) {
+    var sub = SUBCUADRAS_INS.find(function(s) { return s.id == idActivo; });
+    if (sub && sub.tipo_zona === "libre") {
+      aplicarZonaLibreInspector(true);
+    }
+  }
+})();
+
 // El formulario solo existe dentro del horario de cobro.
 // Todos los listeners que dependen de él se registran condicionalmente.
 if (form && input) {
-    // Cambiar placeholder según tipo de vehículo
+    // Cambiar placeholder según tipo de vehículo y limpiar el input.
+    // Al cambiar de auto a moto (o viceversa) el formato de patente cambia,
+    // así que limpiamos el valor para que el inspector ingrese la nueva patente.
     function actualizarPlaceholder() {
         const esMoto = document.getElementById("tipo-moto").checked;
         input.placeholder = esMoto ? "123ABC" : "AAA111";
     }
-    document.getElementById("tipo-auto").addEventListener("change", actualizarPlaceholder);
-    document.getElementById("tipo-moto").addEventListener("change", actualizarPlaceholder);
+    function cambiarTipo() {
+        actualizarPlaceholder();
+        input.value = "";
+        // Ocultar el botón de submit al limpiar
+        const btnVerificar = document.getElementById("btn-verificar");
+        if (btnVerificar) btnVerificar.style.display = "none";
+        input.focus();
+    }
+    document.getElementById("tipo-auto").addEventListener("change", cambiarTipo);
+    document.getElementById("tipo-moto").addEventListener("change", cambiarTipo);
     actualizarPlaceholder();
 
     input.addEventListener("input", () => {
@@ -267,6 +322,13 @@ if (form && input) {
             (esMoto && /^[0-9]{3}[A-Z]{3}$/.test(val)); // 123ABC — motos
 
         if (esValida) form.submit();
+
+        // Botón de submit manual: visible cuando el inspector tiene algo escrito
+        // pero el formato no matchea todavía (especialmente útil para motos 123ABC).
+        const btnVerificar = document.getElementById("btn-verificar");
+        if (btnVerificar) {
+            btnVerificar.style.display = val.length >= 3 ? "block" : "none";
+        }
     });
 
     input.addEventListener("keydown", (e) => {
@@ -303,7 +365,7 @@ window.onload = () => {
 
 // ── Cascade Calle → Altura ────────────────────────────────────────
 var SUBCUADRAS_INS = [
-  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}"},
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}", tipo_zona: "{{ s.tipo_zona }}"},
   {% endfor %}
 ];
 
@@ -346,6 +408,9 @@ var SUBCUADRAS_INS = [
 
   selAltura.addEventListener("change", function() {
     hidden.value = selAltura.value;
+    // Verificar si la subcuadra seleccionada es zona libre para bloquear el input.
+    var sub = SUBCUADRAS_INS.find(function(s) { return s.id == selAltura.value; });
+    aplicarZonaLibreInspector(sub && sub.tipo_zona === "libre");
   });
 
   // Preseleccionar la subcuadra_activa (guardada en sesión)

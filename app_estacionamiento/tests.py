@@ -11,10 +11,11 @@ from django.urls import reverse
 
 from app_estacionamiento.models import (
     Usuario, Municipio, Subcuadra, Vehiculo, VehiculoUsuario,
-    Estacionamiento, MovimientoCaja, Tarifa, Infraccion,
+    Estacionamiento, MovimientoCaja, Tarifa, Infraccion, BilleteraConductor,
 )
 from app_estacionamiento.services_caja import generar_cierre_caja
 from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
+from app_estacionamiento.services.saldo import obtener_saldo_conductor
 
 
 # ─────────────────────────────────────────────
@@ -43,8 +44,12 @@ def crear_conductor(municipio, correo="conductor@test.com", saldo=500):
         municipio=municipio, es_conductor=True,
         first_name="Test",  # evita redirección del middleware (conductor sin nombre)
     )
-    u.saldo = Decimal(str(saldo))
-    u.save()
+    # BilleteraConductor es la fuente de verdad del saldo; Usuario.saldo es legacy.
+    BilleteraConductor.objects.create(
+        conductor=u,
+        municipio=municipio,
+        saldo=Decimal(str(saldo)),
+    )
     return u
 
 def crear_subcuadra(municipio, calle="San Martín", altura=100):
@@ -188,19 +193,22 @@ class TestRenovarEstacionamiento(TestCase):
 
     def test_renovar_descuenta_saldo(self):
         self.client.post(self.url, {"horas_extra": "1"})
-        self.conductor.refresh_from_db()
-        # $100/h × 1h = $100 descontado de $500
-        self.assertEqual(self.conductor.saldo, Decimal("400"))
+        # $100/h × 1h = $100 descontado de $500 → billetera = $400
+        saldo = obtener_saldo_conductor(self.conductor, self.municipio)
+        self.assertEqual(saldo, Decimal("400"))
 
     def test_renovar_sin_saldo_no_modifica(self):
         """Con saldo insuficiente no cambia ni duración ni saldo."""
-        self.conductor.saldo = Decimal("50")
-        self.conductor.save()
+        # Poner billetera en $50 (insuficiente para 2h × $100 = $200)
+        BilleteraConductor.objects.update_or_create(
+            conductor=self.conductor, municipio=self.municipio,
+            defaults={"saldo": Decimal("50")},
+        )
         self.client.post(self.url, {"horas_extra": "2"})  # costaría $200
         self.est.refresh_from_db()
-        self.conductor.refresh_from_db()
         self.assertEqual(self.est.duracion_horas, 2)
-        self.assertEqual(self.conductor.saldo, Decimal("50"))
+        saldo = obtener_saldo_conductor(self.conductor, self.municipio)
+        self.assertEqual(saldo, Decimal("50"))
 
     def test_renovar_estacionamiento_ajeno_retorna_404(self):
         """No puede renovar un estacionamiento de otro conductor."""

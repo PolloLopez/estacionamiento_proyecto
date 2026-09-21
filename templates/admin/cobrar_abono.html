@@ -131,6 +131,31 @@
                 🏍️ Moto
               </label>
             </div>
+            <!-- Precio de referencia: se actualiza con JS al seleccionar el tipo -->
+            {% if tarifa_obj %}
+            <div id="precio-referencia"
+                 style="margin-top:0.55rem; font-size:0.93rem; font-weight:600;
+                        color:var(--color-primary);">
+            </div>
+            <script>
+              (function() {
+                var PRECIO_AUTO = {{ tarifa_obj.precio_abono_auto|default:0 }};
+                var PRECIO_MOTO = {{ tarifa_obj.precio_abono_moto|default:0 }};
+                function actualizar() {
+                  var tipo  = document.querySelector('[name="tipo_vehiculo"]:checked');
+                  var el    = document.getElementById("precio-referencia");
+                  if (!tipo || !el) return;
+                  var precio = (tipo.value === "moto") ? PRECIO_MOTO : PRECIO_AUTO;
+                  el.textContent = precio > 0
+                    ? "Precio del abono: $" + precio
+                    : "Sin tarifa configurada para este tipo.";
+                }
+                document.querySelectorAll('[name="tipo_vehiculo"]')
+                  .forEach(function(r) { r.addEventListener("change", actualizar); });
+                actualizar(); // mostrar al cargar la página
+              })();
+            </script>
+            {% endif %}
           </div>
 
           {% if error %}

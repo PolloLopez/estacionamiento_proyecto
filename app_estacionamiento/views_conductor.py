@@ -51,12 +51,15 @@ from .models import (
 from .use_cases.estacionar_vehiculo import ejecutar_estacionamiento
 from .services.infracciones import calcular_descuento_infraccion
 from .services.descuentos_verificados import calcular_descuento_conductor
+from .services.saldo import obtener_saldo_conductor, debitar_saldo_conductor
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
 from .use_cases.pagar_infraccion import ejecutar as pagar_infraccion_uc
 from .services.horarios import (
     calcular_opciones_duracion,
     cerrar_estacionamientos_vencidos_por_horario,
     puede_estacionar_ahora,
+    es_dia_sin_horario,
+    es_dia_libre_conductor,
 )
 from .utils import get_subcuadra_default, sanitizar_patente
 from .views_auth import redirect_por_rol
@@ -75,23 +78,31 @@ def inicio_usuarios(request):
     """
     usuario = request.user
 
-    estacionamiento_activo = Estacionamiento.objects.filter(
-        usuario=usuario,
-        estado="ACTIVO"
-    ).order_by("-hora_inicio").first()
+    # Un conductor puede tener activos varios vehículos simultáneamente
+    # (la constraint es por vehículo, no por conductor).
+    estacionamientos_activos = list(
+        Estacionamiento.objects
+        .filter(usuario=usuario, estado="ACTIVO")
+        .select_related("vehiculo", "subcuadra")
+        .order_by("-hora_inicio")
+    )
 
-    # Auto-cierre: si el tiempo pago ya venció, finalizar automáticamente
-    if estacionamiento_activo:
-        expiracion = estacionamiento_activo.hora_inicio + timedelta(
-            hours=float(estacionamiento_activo.duracion_horas)
-        )
-        if timezone.now() >= expiracion:
-            finalizar_estacionamiento_uc(estacionamiento_activo)
-            estacionamiento_activo = None
+    # Auto-cierre: finalizar los que ya vencieron su tiempo pago
+    ahora_autoclose = timezone.now()
+    vigentes = []
+    for _est in estacionamientos_activos:
+        expiracion = _est.hora_inicio + timedelta(hours=float(_est.duracion_horas))
+        if ahora_autoclose >= expiracion:
+            finalizar_estacionamiento_uc(_est)
             messages.info(
                 request,
-                "⏰ Tu estacionamiento finalizó automáticamente porque venció el tiempo pago."
+                f"⏰ Estacionamiento de {_est.vehiculo.patente} finalizó automáticamente."
             )
+        else:
+            vigentes.append(_est)
+    estacionamientos_activos = vigentes
+    # Backward compat: el más reciente para el timer del card principal
+    estacionamiento_activo = estacionamientos_activos[0] if estacionamientos_activos else None
 
     # Auto-cierre por horario: si el municipio ya cerró, finalizar estacionamientos activos
     if usuario.municipio:
@@ -125,18 +136,49 @@ def inicio_usuarios(request):
     # Lo calculamos solo si el municipio existe para evitar error con usuario sin municipio.
     if usuario.municipio:
         puede_estacionar, msg_horario_inicio = puede_estacionar_ahora(usuario.municipio)
+        # Días libres para el conductor (sin horario configurado o DiaEspecial sin cobro):
+        # puede_estacionar_ahora puede devolver False por el DiaEspecial, pero el conductor
+        # sí puede estacionar — simplemente sin costo ($0). Sobreescribimos el bloqueo.
+        if not puede_estacionar and es_dia_libre_conductor(usuario.municipio):
+            puede_estacionar   = True
+            msg_horario_inicio = None
     else:
         puede_estacionar, msg_horario_inicio = True, None
 
+    # Vehículos del conductor con conteo de infracciones pendientes para la sección "Mis vehículos".
+    # El annotate evita N+1: una sola query con LEFT JOIN + COUNT.
+    from django.db.models import Count, Q as DbQ
+    vehiculos_conductor_qs = (
+        Vehiculo.objects
+        .filter(vehiculousuario__usuario=usuario)
+        .annotate(
+            infracciones_pendientes=Count(
+                "infraccion",
+                filter=DbQ(infraccion__estado="pendiente"),
+            )
+        )
+        .distinct()
+        .order_by("patente")
+    )
+    # Anotar en Python qué vehículos tienen estacionamiento activo ahora mismo.
+    # Evita una subquery por vehículo; los activos ya están en memoria.
+    vehiculo_ids_activos = {e.vehiculo_id for e in estacionamientos_activos}
+    vehiculos_conductor = list(vehiculos_conductor_qs)
+    for v in vehiculos_conductor:
+        v.tiene_estacionamiento_activo = v.id in vehiculo_ids_activos
+
     return render(request, "usuarios/inicio_usuarios.html", {
-        "usuario":               usuario,
-        "estacionamiento_activo": estacionamiento_activo,
-        "solicitud_verificacion": solicitud_verificacion,
-        "notificaciones_nuevas": notificaciones_nuevas,
-        "abonos_activos":        abonos_activos,
-        "notif_infraccion":      notif_infraccion,
-        "puede_estacionar":      puede_estacionar,
-        "mensaje_horario":       msg_horario_inicio,
+        "usuario":                 usuario,
+        "estacionamiento_activo":  estacionamiento_activo,
+        "estacionamientos_activos": estacionamientos_activos,
+        "solicitud_verificacion":  solicitud_verificacion,
+        "notificaciones_nuevas":   notificaciones_nuevas,
+        "abonos_activos":          abonos_activos,
+        "notif_infraccion":        notif_infraccion,
+        "puede_estacionar":        puede_estacionar,
+        "mensaje_horario":         msg_horario_inicio,
+        "saldo_conductor":         obtener_saldo_conductor(usuario, usuario.municipio),
+        "vehiculos_conductor":     vehiculos_conductor,
     })
 
 
@@ -364,6 +406,11 @@ def mis_infracciones(request):
         .order_by("-creado_en")
     )
 
+    # Filtro opcional por patente (viene de "Mis vehículos" en el inicio)
+    patente_filtro = sanitizar_patente(request.GET.get("patente", ""))
+    if patente_filtro:
+        infracciones = infracciones.filter(vehiculo__patente=patente_filtro)
+
     # Calcular tolerancia de gracia para mostrar aviso en el modal de pago
     tolerancia_min = getattr(usuario.municipio, "tolerancia_multa_minutos", 0) or 0
     ahora = timezone.now()
@@ -404,10 +451,11 @@ def mis_infracciones(request):
 
     return render(request, "usuarios/historial_infracciones.html", {
         "infracciones":           infracciones_lista,
-        "saldo_usuario":          usuario.saldo,
+        "saldo_usuario":          obtener_saldo_conductor(usuario, usuario.municipio),
         "tiene_pendientes":       tiene_pendientes,
         "tolerancia_min":         tolerancia_min,
         "ids_dentro_tolerancia":  ids_dentro_tolerancia,
+        "patente_filtro":         patente_filtro,
     })
 
 
@@ -530,7 +578,13 @@ def subcuadra_cercana_conductor(request):
         return math.sqrt(dlat ** 2 + dlon ** 2)
 
     mas_cercana = min(subcuadras, key=distancia)
-    return JsonResponse({"id": mas_cercana.id, "nombre": str(mas_cercana)})
+    return JsonResponse({
+        "id":        mas_cercana.id,
+        "nombre":    str(mas_cercana),
+        # tipo_zona es "pagado" o "libre" — el template lo usa para mostrar
+        # el banner de zona libre y ocultar el formulario de pago.
+        "tipo_zona": mas_cercana.tipo_zona,
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -609,25 +663,29 @@ def estacionar_vehiculo(request):
                 "usuario":  usuario,
             })
 
-        permitido, msg_horario = puede_estacionar_ahora(usuario.municipio)
-        if not permitido:
-            return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error":    msg_horario,
-                "warning":  warning,
-                "vehiculos": vehiculos,
-                "usuario":  usuario,
-            })
+        # Días libres para el conductor (sin horario o DiaEspecial sin cobro):
+        # omitir el chequeo de horario — el use case ya lo maneja con costo=$0.
+        if not es_dia_libre_conductor(usuario.municipio):
+            permitido, msg_horario = puede_estacionar_ahora(usuario.municipio)
+            if not permitido:
+                return render(request, "usuarios/estacionar_vehiculo.html", {
+                    "error":    msg_horario,
+                    "warning":  warning,
+                    "vehiculos": vehiculos,
+                    "usuario":  usuario,
+                })
 
         # ── Duración ─────────────────────────────────────────────────────────
         try:
             duracion = Decimal(duracion)
-            # Mínimo 1 hora — las opciones del selector ya lo reflejan,
-            # pero validamos también en el servidor por si viene manipulado.
-            if duracion < 1:
+            # Mínimo 30 min: el selector siempre ofrece al menos esa opción
+            # (en la franja final del horario). Validamos en servidor por si
+            # el POST viene manipulado.
+            if duracion < Decimal("0.5"):
                 raise ValueError()
         except Exception:
             return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error":    "La duración mínima es 1 hora.",
+                "error":    "La duración mínima es 30 minutos.",
                 "warning":  warning,
                 "vehiculos": vehiculos,
                 "usuario":  usuario,
@@ -695,21 +753,49 @@ def estacionar_vehiculo(request):
 
     patente_preseleccionada = sanitizar_patente(request.GET.get("patente", ""))
 
+    # Últimos 3 vehículos distintos usados por este conductor (para sugerencia rápida).
+    # Recorremos los últimos 30 estacionamientos y nos quedamos con los primeros 3 únicos.
+    vehiculos_recientes = []
+    visto_ids = set()
+    for est in (Estacionamiento.objects
+                .filter(usuario=usuario)
+                .order_by("-hora_inicio")
+                .select_related("vehiculo")[:30]):
+        if est.vehiculo_id not in visto_ids:
+            visto_ids.add(est.vehiculo_id)
+            vehiculos_recientes.append(est.vehiculo)
+        if len(vehiculos_recientes) >= 3:
+            break
+    ids_recientes = {v.id for v in vehiculos_recientes}
+
     # Chequeo de horario en GET: si está fuera de horario se muestra el banner
     # y el formulario queda bloqueado. Mismo chequeo que en POST, pero acá
     # informamos al conductor antes de que intente enviar el formulario.
     permitido_get, msg_horario_get = puede_estacionar_ahora(usuario.municipio)
 
+    # Si hoy es un día libre para conductores (sin horario o DiaEspecial sin cobro):
+    # puede registrar estacionamiento pero costo=$0.
+    dia_libre_hoy = bool(usuario.municipio and es_dia_libre_conductor(usuario.municipio))
+    # Sobreescribir el bloqueo de permitido_get: los días libres siempre permiten estacionar.
+    if dia_libre_hoy:
+        permitido_get    = True
+        msg_horario_get  = None
+
     # Descuento para verificados: ajustar la tarifa mostrada si aplica.
-    # Así las opciones de duración ya muestran el precio real que se va a debitar.
-    descuento_pct = calcular_descuento_conductor(usuario, usuario.municipio)
-    if descuento_pct > 0:
-        factor = 1 - descuento_pct / 100
-        tarifa_hora_auto_efectiva = (tarifa_hora_auto * factor).quantize(Decimal("0.01"))
-        tarifa_hora_moto_efectiva = (tarifa_hora_moto * factor).quantize(Decimal("0.01"))
+    # En días libres siempre es $0 independientemente del descuento.
+    if dia_libre_hoy:
+        tarifa_hora_auto_efectiva = Decimal("0")
+        tarifa_hora_moto_efectiva = Decimal("0")
+        descuento_pct = Decimal("0")
     else:
-        tarifa_hora_auto_efectiva = Decimal(str(tarifa_hora_auto))
-        tarifa_hora_moto_efectiva = Decimal(str(tarifa_hora_moto))
+        descuento_pct = calcular_descuento_conductor(usuario, usuario.municipio)
+        if descuento_pct > 0:
+            factor = 1 - descuento_pct / 100
+            tarifa_hora_auto_efectiva = (tarifa_hora_auto * factor).quantize(Decimal("0.01"))
+            tarifa_hora_moto_efectiva = (tarifa_hora_moto * factor).quantize(Decimal("0.01"))
+        else:
+            tarifa_hora_auto_efectiva = Decimal(str(tarifa_hora_auto))
+            tarifa_hora_moto_efectiva = Decimal(str(tarifa_hora_moto))
 
     opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto_efectiva)
 
@@ -721,6 +807,8 @@ def estacionar_vehiculo(request):
 
     return render(request, "usuarios/estacionar_vehiculo.html", {
         "vehiculos":              vehiculos,
+        "vehiculos_recientes":    vehiculos_recientes,
+        "ids_recientes":          ids_recientes,
         "usuario":                usuario,
         "tarifa_hora":            tarifa_hora_auto_efectiva,
         "tarifa_hora_auto":       tarifa_hora_auto_efectiva,
@@ -731,6 +819,8 @@ def estacionar_vehiculo(request):
         "subcuadras":             subcuadras,
         "fuera_de_horario":       not permitido_get,
         "mensaje_horario":        msg_horario_get,
+        "dia_libre_hoy":          dia_libre_hoy,
+        "saldo_conductor":        obtener_saldo_conductor(usuario, usuario.municipio),
     })
 
 
@@ -749,6 +839,12 @@ def historial_estacionamientos(request):
         .select_related("vehiculo", "subcuadra")
         .order_by("-hora_inicio")
     )
+
+    # Filtro opcional por patente (viene de "Mis vehículos" en el inicio)
+    patente_filtro = sanitizar_patente(request.GET.get("patente", ""))
+    if patente_filtro:
+        qs = qs.filter(vehiculo__patente=patente_filtro)
+
     paginator   = Paginator(qs, 20)
     numero_pag  = request.GET.get("pagina", 1)
     estacionamientos = paginator.get_page(numero_pag)
@@ -756,6 +852,7 @@ def historial_estacionamientos(request):
     return render(request, "usuarios/historial_estacionamientos.html", {
         "estacionamientos": estacionamientos,
         "paginator":        paginator,
+        "patente_filtro":   patente_filtro,
     })
 
 
@@ -787,28 +884,27 @@ def renovar_estacionamiento(request, est_id):
             error = "Ingresá una cantidad de horas válida."
         else:
             costo_extra = horas_extra * tarifa_hora
+            saldo_actual = obtener_saldo_conductor(usuario, usuario.municipio)
 
-            if usuario.saldo < costo_extra:
-                error = f"Saldo insuficiente. Necesitás ${costo_extra:.2f} y tenés ${usuario.saldo:.2f}."
+            if saldo_actual < costo_extra:
+                error = f"Saldo insuficiente. Necesitás ${costo_extra:.2f} y tenés ${saldo_actual:.2f}."
             else:
                 with transaction.atomic():
                     usuario_db = Usuario.objects.select_for_update().get(id=usuario.id)
-                    if usuario_db.saldo < costo_extra:
+                    # Verificar y debitar usando billetera del municipio
+                    try:
+                        debitar_saldo_conductor(
+                            conductor=usuario_db,
+                            monto=costo_extra,
+                            descripcion=f"Renovación {float(horas_extra):g}h — {estacionamiento.vehiculo.patente}",
+                            municipio=usuario.municipio,
+                        )
+                    except ValueError:
                         error = "Saldo insuficiente."
                     else:
                         # horas_extra ya es Decimal — sin int() para no perder medias horas
                         estacionamiento.duracion_horas = estacionamiento.duracion_horas + horas_extra
                         estacionamiento.save(update_fields=["duracion_horas"])
-
-                        usuario_db.saldo -= costo_extra
-                        usuario_db.save(update_fields=["saldo"])
-
-                        MovimientoCaja.objects.create(
-                            usuario=usuario_db,
-                            monto=costo_extra,
-                            tipo="egreso",
-                            descripcion=f"Renovación {float(horas_extra):g}h — {estacionamiento.vehiculo.patente}",
-                        )
 
                         messages.success(
                             request,
@@ -827,7 +923,7 @@ def renovar_estacionamiento(request, est_id):
     return render(request, "usuarios/renovar_estacionamiento.html", {
         "estacionamiento":  estacionamiento,
         "tarifa_hora":      tarifa_hora,
-        "saldo":            usuario.saldo,
+        "saldo":            obtener_saldo_conductor(usuario, usuario.municipio),
         "error":            error,
         "opciones_duracion": opciones_duracion,
     })
@@ -849,26 +945,24 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     if estacionamiento.estado != Estado.ACTIVO:
         return redirect("usuarios_historial_estacionamientos")
 
+    usuario = request.user
     if request.method != "POST":
         return render(request, "usuarios/finalizar_estacionamiento.html", {
             "estacionamiento": estacionamiento,
             "duracion_horas":  estacionamiento.duracion_horas,
             "costo_estimado":  estacionamiento.costo_base,
-            "usuario":         request.user,
+            "usuario":         usuario,
+            "saldo_conductor": obtener_saldo_conductor(usuario, usuario.municipio),
         })
 
     resultado = finalizar_estacionamiento_uc(estacionamiento)
 
     if resultado["ok"]:
-        if resultado.get("reintegro"):
-            # Finalizó antes de los 30 minutos → saldo devuelto
-            messages.success(
-                request,
-                f"✅ Estacionamiento finalizado en {resultado['minutos_transcurridos']} min. "
-                f"¡Saldo reintegrado al 100%!"
-            )
-        else:
-            messages.success(request, f"Estacionamiento finalizado. Costo: ${resultado['costo']}")
+        messages.success(
+            request,
+            f"✅ Estacionamiento finalizado ({resultado['minutos_transcurridos']} min). "
+            f"Costo descontado al inicio: ${resultado['costo']}"
+        )
     else:
         messages.error(request, resultado.get("error", "Error al finalizar"))
 
@@ -943,9 +1037,33 @@ def pagar_abono_conductor(request):
         accion      = request.POST.get("accion", "confirmar")
         vehiculo_id = request.POST.get("vehiculo_id", "").strip()
 
+        # ── Agregar vehículo desde el formulario inline ───────────────────────
+        if accion == "agregar_vehiculo":
+            patente_nueva = sanitizar_patente(request.POST.get("patente_nueva", ""))
+            tipo_nuevo    = request.POST.get("tipo_nuevo", "auto").strip()
+            if not patente_nueva:
+                error = "Ingresá una patente válida."
+            elif tipo_nuevo not in ("auto", "moto", "camion"):
+                error = "Tipo de vehículo inválido."
+            else:
+                vehiculo_nuevo, _ = Vehiculo.objects.get_or_create(
+                    patente=patente_nueva,
+                    defaults={"tipo": tipo_nuevo},
+                )
+                VehiculoUsuario.objects.get_or_create(
+                    usuario=usuario, vehiculo=vehiculo_nuevo
+                )
+                # Recargar lista de vehículos con el nuevo incluido
+                vehiculos = Vehiculo.objects.filter(
+                    vehiculousuario__usuario=usuario
+                ).distinct()
+                # Preseleccionar el vehículo recién agregado en el formulario
+                vehiculo_id = str(vehiculo_nuevo.id)
+                # Continuar al flujo normal (caemos al bloque de confirmar abajo)
+
         if not vehiculo_id:
             error = "Selecciona un vehiculo."
-        else:
+        elif not error:
             vehiculo = Vehiculo.objects.filter(
                 id=vehiculo_id, vehiculousuario__usuario=usuario
             ).first()
@@ -973,19 +1091,22 @@ def pagar_abono_conductor(request):
                     elif accion == "confirmar":
                         confirmar = True
                     elif accion == "cobrar":
-                        if usuario.saldo < precio:
-                            error = f"Saldo insuficiente. Disponible: ${usuario.saldo}, requerido: ${precio}."
+                        saldo_actual = obtener_saldo_conductor(usuario, municipio)
+                        if saldo_actual < precio:
+                            error = f"Saldo insuficiente. Disponible: ${saldo_actual}, requerido: ${precio}."
                         else:
                             with transaction.atomic():
                                 conductor_locked = Usuario.objects.select_for_update().get(id=usuario.id)
-                                if conductor_locked.saldo < precio:
-                                    error = "Saldo insuficiente."
-                                else:
+                                try:
                                     debitar_saldo_conductor(
                                         conductor=conductor_locked,
                                         monto=precio,
                                         descripcion=f"Abono mensual {mes_seleccionado.strftime('%m/%Y')} - {vehiculo.patente}",
+                                        municipio=municipio,
                                     )
+                                except ValueError:
+                                    error = "Saldo insuficiente."
+                                else:
                                     AbonoMensual.objects.create(
                                         vehiculo=vehiculo,
                                         municipio=municipio,
@@ -1010,7 +1131,7 @@ def pagar_abono_conductor(request):
         "precio":           precio,
         "confirmar":        confirmar,
         "error":            error,
-        "saldo_usuario":    usuario.saldo,
+        "saldo_usuario":    obtener_saldo_conductor(usuario, usuario.municipio),
     })
 
 
@@ -1103,7 +1224,7 @@ def transferir_saldo(request):
 
     return render(request, "usuarios/transferir_saldo.html", {
         "error":         error,
-        "saldo_usuario": conductor.saldo,
+        "saldo_usuario": obtener_saldo_conductor(conductor, conductor.municipio),
     })
 
 
@@ -1163,11 +1284,15 @@ def solicitar_eliminacion_cuenta(request):
     """
     usuario = request.user
 
-    # Verificar saldo
-    if usuario.saldo > 0:
+    # Verificar saldo (verificar en todas las billeteras del usuario)
+    from .models import BilleteraConductor
+    saldo_total = sum(
+        b.saldo for b in BilleteraConductor.objects.filter(conductor=usuario)
+    )
+    if saldo_total > 0:
         messages.error(
             request,
-            f"Tenés un saldo de ${usuario.saldo:.2f}. "
+            f"Tenés saldo activo (${saldo_total:.2f}). "
             "Transferilo a otro conductor antes de eliminar tu cuenta."
         )
         return redirect("inicio_usuarios")
@@ -1212,6 +1337,7 @@ def solicitar_eliminacion_cuenta(request):
 
     return render(request, "usuarios/eliminar_cuenta.html", {
         "usuario": usuario,
+        "saldo_conductor": obtener_saldo_conductor(usuario, usuario.municipio),
     })
 
 
@@ -1257,6 +1383,12 @@ def enviar_sugerencia(request):
         descripcion = request.POST.get("descripcion", "").strip()
         area        = request.POST.get("area", "general")
         criticidad  = request.POST.get("criticidad", "funcional")
+        rango_edad  = request.POST.get("rango_edad", "")
+
+        # Validar que rango_edad sea un valor permitido (o vacío)
+        valores_validos = [v for v, _ in SugerenciaMejora.RANGOS_EDAD]
+        if rango_edad not in valores_validos:
+            rango_edad = ""
 
         if not titulo or not descripcion:
             messages.error(request, "El título y la descripción son obligatorios.")
@@ -1269,6 +1401,7 @@ def enviar_sugerencia(request):
                 criticidad  = criticidad,
                 titulo      = titulo,
                 descripcion = descripcion,
+                rango_edad  = rango_edad,
                 estado      = "recibida",
                 notificado  = True,   # empieza notificado (no hay cambio que avisar aún)
             )

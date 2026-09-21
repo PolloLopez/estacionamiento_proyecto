@@ -66,12 +66,18 @@ def panel_vendedor(request):
         usuario=user, tipo="ingreso", cerrado=False
     ).aggregate(total=Sum("monto"))["total"] or 0
 
-    # Comisiones pendientes = liquidaciones creadas pero no certificadas aún
-    # (estado "pendiente" = tesorero no depositó; "depositada" = falta certificar)
+    # Comisiones pendientes = monto total de liquidaciones aún no certificadas.
+    # (estado "pendiente" = tesorero no depositó; "depositada" = falta confirmar recibo)
     # No incluye las ya certificadas para no confundir con el total histórico.
     comisiones_pendientes = LiquidacionComision.objects.filter(
         vendedor=user, estado__in=["pendiente", "depositada"]
     ).aggregate(total=Sum("monto_total"))["total"] or 0
+
+    # Comisiones depositadas que el vendedor todavía no certificó como recibidas.
+    # Son las que requieren acción: el tesorero ya transfirió, falta la confirmación.
+    comisiones_a_certificar = LiquidacionComision.objects.filter(
+        vendedor=user, estado="depositada"
+    )
 
     # Cierres de caja que el admin todavía no certificó
     cierres_sin_certificar = CierreCaja.objects.filter(
@@ -79,11 +85,12 @@ def panel_vendedor(request):
     ).order_by("-fecha_cierre")[:10]
 
     return render(request, "vendedores/panel.html", {
-        "total_hoy":             total_hoy,
-        "cantidad_operaciones":  cantidad_operaciones,
-        "a_rendir":              a_rendir,
-        "comisiones_pendientes": comisiones_pendientes,
-        "cierres_sin_certificar": cierres_sin_certificar,
+        "total_hoy":               total_hoy,
+        "cantidad_operaciones":    cantidad_operaciones,
+        "a_rendir":                a_rendir,
+        "comisiones_pendientes":   comisiones_pendientes,
+        "comisiones_a_certificar": comisiones_a_certificar,
+        "cierres_sin_certificar":  cierres_sin_certificar,
     })
 
 

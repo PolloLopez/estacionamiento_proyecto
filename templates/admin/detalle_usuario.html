@@ -4,61 +4,93 @@
 {% block content %}
 <section class="container">
 
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
-    <h2>👤 {% if conductor.nombre %}{{ conductor.nombre }}{% if conductor.apellido %} {{ conductor.apellido }}{% endif %}{% else %}{{ conductor.correo }}{% endif %}</h2>
+  {# Header: nombre + badges + saldo #}
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;
+              margin-bottom:1.25rem; flex-wrap:wrap; gap:0.75rem;">
+    <div>
+      <h2 style="margin:0 0 0.25rem;">
+        👤 {% if conductor.nombre %}{{ conductor.nombre }}{% if conductor.apellido %} {{ conductor.apellido }}{% endif %}{% else %}{{ conductor.correo }}{% endif %}
+      </h2>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+        <span style="font-size:0.88rem; color:var(--color-text-muted);">{{ conductor.correo }}</span>
+        {% if conductor.es_verificado %}
+          <span style="background:var(--color-primary); color:#fff; font-size:0.75rem;
+                       font-weight:700; padding:0.15rem 0.55rem; border-radius:99px;">✅ Verificado</span>
+        {% else %}
+          <span style="background:var(--color-warning, #e5a000); color:#fff; font-size:0.75rem;
+                       font-weight:700; padding:0.15rem 0.55rem; border-radius:99px;">⏳ Sin verificar</span>
+        {% endif %}
+        {% if conductor.cambio_password_requerido %}
+          <span style="background:var(--color-danger, #c0392b); color:#fff; font-size:0.75rem;
+                       font-weight:700; padding:0.15rem 0.55rem; border-radius:99px;">🔑 Debe cambiar contraseña</span>
+        {% endif %}
+      </div>
+    </div>
     <a href="{% url 'gestionar_usuarios' %}" class="btn btn-outline" style="font-size:0.9rem;">← Volver</a>
   </div>
 
-  {# Los mensajes los muestra base.html — no duplicar aquí #}
+  {# ── ACCIONES RÁPIDAS (siempre visibles, las más frecuentes) ── #}
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem;">
 
-  <div class="grid grid-3" style="margin-bottom:1rem;">
-
-    <!-- DATOS + EDICIÓN -->
-    <div class="card">
-      <h3 style="margin-bottom:0.8rem;">Datos del conductor</h3>
-
-      {# Info rápida #}
-      <p><strong>Correo:</strong> {{ conductor.correo }}</p>
-      {% if conductor.telefono %}
-        <p style="margin-top:0.3rem;"><strong>Teléfono:</strong> {{ conductor.telefono }}</p>
-      {% endif %}
-      {% if conductor.numero_dni %}
-        <p style="margin-top:0.3rem;"><strong>DNI:</strong> {{ conductor.numero_dni }}</p>
-      {% endif %}
-
-      <div style="margin-top:0.5rem; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-        <p style="font-size:1.3rem; font-weight:800; color:var(--color-primary); margin:0;">
-          💰 Saldo: ${{ conductor.saldo }}
-        </p>
-        {% if conductor.es_verificado %}
-          <span style="background:var(--color-primary); color:#fff; font-size:0.78rem;
-                       font-weight:700; padding:0.2rem 0.6rem; border-radius:99px;">
-            ✅ Verificado
-          </span>
-        {% else %}
-          <span style="background:var(--color-warning); color:#fff; font-size:0.78rem;
-                       font-weight:700; padding:0.2rem 0.6rem; border-radius:99px;">
-            ⏳ Sin verificar
-          </span>
-        {% endif %}
+    {# 1. Cargar saldo #}
+    <div class="card" style="display:flex; align-items:center; justify-content:space-between;
+                              gap:0.5rem; padding:0.9rem 1rem;">
+      <div>
+        <div style="font-size:0.8rem; color:var(--color-text-muted);">Saldo actual</div>
+        <div style="font-size:1.4rem; font-weight:800; color:var(--color-primary);">
+          ${{ saldo_conductor }}
+        </div>
       </div>
+      <a href="{% url 'cargar_saldo' conductor.id %}" class="btn"
+         style="font-size:0.9rem; white-space:nowrap;">
+        💰 Cargar saldo
+      </a>
+    </div>
 
-      <div style="margin-top:0.8rem;">
-        <a href="{% url 'cargar_saldo' conductor.id %}" class="btn btn-outline" style="font-size:0.9rem;">
-          + Cargar saldo
-        </a>
-      </div>
+    {# 2. Agregar vehículo — form inline siempre visible #}
+    <div class="card" style="padding:0.9rem 1rem;">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="agregar_vehiculo">
+        <div style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
+          <div style="flex:2; min-width:90px;">
+            <label style="font-size:0.8rem; color:var(--color-text-muted); display:block; margin-bottom:0.2rem;">Patente</label>
+            <input name="patente" placeholder="ABC123" required
+                   oninput="this.value=this.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase()"
+                   style="text-transform:uppercase; letter-spacing:2px; font-weight:700; width:100%;" />
+          </div>
+          <div style="flex:1; min-width:80px;">
+            <label style="font-size:0.8rem; color:var(--color-text-muted); display:block; margin-bottom:0.2rem;">Tipo</label>
+            <select name="tipo" style="width:100%;">
+              <option value="auto">Auto</option>
+              <option value="moto">Moto</option>
+            </select>
+          </div>
+          <button class="btn" type="submit" style="height:fit-content; white-space:nowrap;">
+            🚗 Agregar
+          </button>
+        </div>
+      </form>
+    </div>
 
-      {# Editar datos #}
-      <form method="post" style="margin-top:1rem;">
+  </div>
+
+  {# ── SECCIONES EXPANDIBLES ── #}
+
+  {# Editar datos personales #}
+  <details class="card" style="margin-bottom:0.75rem; padding:0;">
+    <summary style="cursor:pointer; padding:0.9rem 1rem; user-select:none;
+                    display:flex; align-items:center; justify-content:space-between; list-style:none;">
+      <span style="font-weight:600;">✏️ Editar datos personales</span>
+      <span style="font-size:0.78rem; color:var(--color-text-muted);">
+        {% if conductor.nombre %}{{ conductor.nombre }} {{ conductor.apellido }}{% else %}Sin nombre{% endif %}
+        {% if conductor.numero_dni %} · DNI {{ conductor.numero_dni }}{% endif %}
+      </span>
+    </summary>
+    <div style="padding:0 1rem 1rem;">
+      <form method="post">
         {% csrf_token %}
         <input type="hidden" name="accion" value="editar_datos">
-
-        <div style="margin-bottom:0.5rem;">
-          <label style="font-size:0.88rem; color:var(--color-text-muted);">Correo electrónico</label>
-          <input name="correo" type="email" value="{{ conductor.correo }}"
-                 style="width:100%; margin-top:0.2rem;" />
-        </div>
 
         <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap;">
           <div style="flex:1; min-width:110px;">
@@ -71,6 +103,12 @@
             <input name="apellido" value="{{ conductor.last_name }}" placeholder="Apellido"
                    style="width:100%; margin-top:0.2rem;" />
           </div>
+        </div>
+
+        <div style="margin-bottom:0.5rem;">
+          <label style="font-size:0.88rem; color:var(--color-text-muted);">Correo electrónico</label>
+          <input name="correo" type="email" value="{{ conductor.correo }}"
+                 style="width:100%; margin-top:0.2rem;" />
         </div>
 
         <div style="display:flex; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap;">
@@ -89,7 +127,7 @@
         <div style="margin-bottom:0.75rem;">
           <label style="font-size:0.88rem; color:var(--color-text-muted);">Domicilio</label>
           <input name="domicilio" value="{{ conductor.domicilio }}"
-                 placeholder="Ej: San Martín 1234, Mercedes"
+                 placeholder="Ej: San Martín 1234"
                  style="width:100%; margin-top:0.2rem;" />
         </div>
 
@@ -100,87 +138,183 @@
                    style="width:1.1rem; height:1.1rem;" />
             Identidad verificada
           </label>
-          <button class="btn btn-outline" type="submit" style="font-size:0.9rem;">Guardar</button>
+          <button class="btn btn-outline" type="submit" style="font-size:0.9rem;">Guardar cambios</button>
         </div>
       </form>
     </div>
+  </details>
 
-    <!-- CAMBIAR CONTRASEÑA -->
-    <div class="card">
-      <h3 style="margin-bottom:0.8rem;">🔑 Contraseña temporal</h3>
-      <p class="text-muted" style="font-size:0.9rem; margin-bottom:0.75rem;">
-        Establecé una contraseña temporal y comunicásela al usuario.
-        Al próximo login se le pedirá que elija una propia.
-      </p>
-      {% if conductor.cambio_password_requerido %}
-      <div style="background:var(--color-warning-bg,#fff8e1); border:1px solid var(--color-warning);
-                  border-radius:6px; padding:0.5rem 0.75rem; margin-bottom:0.75rem;
-                  font-size:0.85rem; color:var(--color-text);">
-        ⏳ Este usuario tiene pendiente cambiar su contraseña al próximo login.
+  {# Cambiar contraseña — colapsada, con advertencia visual #}
+  <details class="card" style="margin-bottom:0.75rem; padding:0;
+             border-left:3px solid var(--color-warning, #e5a000);"
+           id="seccion-password">
+    <summary style="cursor:pointer; padding:0.9rem 1rem; user-select:none;
+                    display:flex; align-items:center; justify-content:space-between; list-style:none;">
+      <span style="font-weight:600;">🔑 Cambiar contraseña</span>
+      <span style="font-size:0.78rem; color:var(--color-warning, #e5a000); font-weight:600;">
+        ⚠️ acción sensible
+      </span>
+    </summary>
+    <div style="padding:0 1rem 1rem;">
+
+      {# Atajo: reset al DNI #}
+      <div style="background:var(--color-surface); border-radius:8px; padding:0.75rem;
+                  margin-bottom:0.75rem;">
+        <p style="font-size:0.88rem; margin:0 0 0.5rem;">
+          <strong>Opción 1 — Resetear al DNI</strong>
+          {% if conductor.numero_dni %}
+            (DNI: <strong>{{ conductor.numero_dni }}</strong>)
+          {% else %}
+            <span style="color:var(--color-danger, #c0392b);">— sin DNI cargado</span>
+          {% endif %}
+        </p>
+        <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0 0 0.6rem;">
+          La contraseña quedará igual al DNI. El usuario deberá cambiarla al próximo login.
+          {% if not conductor.numero_dni %}
+            Editá los datos del conductor para cargar el DNI primero.
+          {% endif %}
+        </p>
+        <form method="post" style="margin:0;"
+              onsubmit="return confirm('¿Resetear la contraseña de {{ conductor.correo }} al DNI?')">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="resetear_password_dni">
+          <button type="submit" class="btn btn-outline"
+                  style="font-size:0.88rem;"
+                  {% if not conductor.numero_dni %}disabled title="Cargá el DNI primero"{% endif %}>
+            Resetear al DNI
+          </button>
+        </form>
       </div>
-      {% endif %}
+
+      {# Contraseña personalizada #}
+      <p style="font-size:0.88rem; font-weight:600; margin:0 0 0.5rem;">Opción 2 — Contraseña personalizada</p>
+      <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0 0 0.6rem;">
+        El usuario deberá cambiarla al próximo login. Comunicásela por fuera del sistema.
+      </p>
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="accion" value="cambiar_password">
         <div style="margin-bottom:0.5rem;">
           <label style="font-size:0.88rem; color:var(--color-text-muted);">Nueva contraseña</label>
-          <input name="nueva_password" type="password" placeholder="Mínimo 6 caracteres"
+          <input id="pwd-nueva" name="nueva_password" type="password"
+                 placeholder="Mínimo 6 caracteres"
                  style="width:100%; margin-top:0.2rem;" required />
         </div>
         <div style="margin-bottom:0.75rem;">
           <label style="font-size:0.88rem; color:var(--color-text-muted);">Confirmar contraseña</label>
-          <input name="confirmar_password" type="password" placeholder="Repetí la contraseña"
+          <input id="pwd-confirmar" name="confirmar_password" type="password"
+                 placeholder="Repetí la contraseña"
                  style="width:100%; margin-top:0.2rem;" required />
         </div>
-        <button class="btn btn-outline" type="submit" style="font-size:0.9rem; width:100%;">
-          Establecer contraseña
-        </button>
-      </form>
-    </div>
-
-    <!-- AGREGAR VEHÍCULO -->
-    <div class="card">
-      <h3 style="margin-bottom:0.8rem;">🚗 Agregar vehículo</h3>
-      <p class="text-muted" style="font-size:0.9rem; margin-bottom:0.75rem;">
-        Agregá una patente a este conductor y elegí el tipo.
-      </p>
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="agregar_vehiculo">
-        <div style="display:flex; gap:0.5rem; align-items:flex-end; flex-wrap:wrap;">
-          <div style="flex:2; min-width:100px;">
-            <label>Patente</label>
-            <input name="patente" placeholder="ABC123" required
-                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
-                   style="text-transform:uppercase; letter-spacing:3px; font-weight:700;" />
-          </div>
-          <div style="flex:1; min-width:90px;">
-            <label>Tipo</label>
-            <select name="tipo" style="width:100%;">
-              <option value="auto">🚗 Auto</option>
-              <option value="moto">🏍️ Moto</option>
-            </select>
-          </div>
-          <button class="btn" type="submit" style="height:fit-content;">Agregar</button>
+        <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+          {% if conductor.numero_dni %}
+          <button type="button" class="btn btn-outline" onclick="precargarDNI()"
+                  style="font-size:0.85rem;">
+            Usar DNI como base
+          </button>
+          {% endif %}
+          <button class="btn btn-outline" type="submit"
+                  style="font-size:0.9rem; color:var(--color-warning, #c0392b);
+                         border-color:var(--color-warning, #e5a000);">
+            Establecer contraseña
+          </button>
         </div>
       </form>
+
+      {# Historial de resets de contraseña #}
+      {% if historial_passwords %}
+      <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--color-border);">
+        <p style="font-size:0.82rem; font-weight:600; color:var(--color-text-muted); margin:0 0 0.5rem;">
+          📋 Historial de cambios recientes
+        </p>
+        <table style="width:100%; font-size:0.82rem; border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:0.3rem 0.4rem; color:var(--color-text-muted); font-weight:600; border-bottom:1px solid var(--color-border);">Fecha</th>
+              <th style="text-align:left; padding:0.3rem 0.4rem; color:var(--color-text-muted); font-weight:600; border-bottom:1px solid var(--color-border);">Admin</th>
+              <th style="text-align:left; padding:0.3rem 0.4rem; color:var(--color-text-muted); font-weight:600; border-bottom:1px solid var(--color-border);">Tipo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for auditoria in historial_passwords %}
+            <tr>
+              <td style="padding:0.3rem 0.4rem; color:var(--color-text-muted);">{{ auditoria.fecha|date:"d/m/Y H:i" }}</td>
+              <td style="padding:0.3rem 0.4rem;">{{ auditoria.admin.correo|default:"—" }}</td>
+              <td style="padding:0.3rem 0.4rem;">{{ auditoria.get_tipo_display }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
-  </div>
+  </details>
 
-  <!-- VEHÍCULOS + EXENCIONES -->
-  <div class="card" style="margin-bottom:1rem;">
+  {# Módulo reintegro: verificación de residencia #}
+  {% if modulo_reintegro %}
+  <details class="card" style="margin-bottom:0.75rem; padding:0;">
+    <summary style="cursor:pointer; padding:0.9rem 1rem; user-select:none;
+                    display:flex; align-items:center; justify-content:space-between; list-style:none;">
+      <span style="font-weight:600;">🏠 Residencia verificada</span>
+      <span style="font-size:0.78rem; color:var(--color-text-muted);">
+        {% if conductor.es_residente_verificado %}✅ Verificado{% else %}○ Sin verificar{% endif %}
+      </span>
+    </summary>
+    <div style="padding:0 1rem 1rem;">
+      <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+        {% if reintegro_alcance == "residentes" %}
+          Solo los conductores marcados como vecinos verificados reciben reintegro de saldo.
+        {% else %}
+          El reintegro aplica a todos; podés marcar vecinos para registro interno.
+        {% endif %}
+      </p>
+
+      {% if conductor.es_residente_verificado %}
+        <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+          <span style="background:var(--color-primary); color:#fff; font-size:0.82rem;
+                       font-weight:700; padding:0.25rem 0.75rem; border-radius:99px;">
+            ✅ Residente verificado
+          </span>
+          {% if conductor.fecha_verificacion_residencia %}
+            <span style="font-size:0.8rem; color:var(--color-text-muted);">
+              desde {{ conductor.fecha_verificacion_residencia|date:"d/m/Y" }}
+            </span>
+          {% endif %}
+        </div>
+        <form method="post" style="margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="quitar_verificacion_residencia">
+          <button type="submit" class="btn btn-outline"
+                  style="font-size:0.82rem; color:var(--color-warning); border-color:var(--color-warning);"
+                  onclick="return confirm('¿Revocar la verificación de residencia?')">
+            Revocar verificación
+          </button>
+        </form>
+      {% else %}
+        <form method="post" style="margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="verificar_residencia">
+          <button type="submit" class="btn" style="font-size:0.85rem;">
+            Marcar como residente verificado
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {# Vehículos registrados #}
+  <div class="card" style="margin-bottom:0.75rem;">
     <h3 style="margin-bottom:0.8rem;">Vehículos registrados</h3>
-
     {% if vehiculos %}
       <div style="overflow-x:auto;">
-        <table style="min-width:500px;">
+        <table style="min-width:420px;">
           <thead>
             <tr>
               <th>Patente</th>
               <th>Tipo</th>
-              <th>Exento global</th>
-              <th>Subcuadras exentas</th>
-              <th>Acciones</th>
+              <th>Exento</th>
+              <th style="text-align:center;">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -190,15 +324,14 @@
               <td style="font-size:0.88rem;">{{ v.get_tipo_display }}</td>
               <td style="text-align:center;">
                 {% if v.exento_global %}
-                  <span style="color:var(--color-primary); font-weight:700;">✅ Sí</span>
+                  <span style="color:var(--color-primary); font-weight:700;">✅</span>
+                {% elif v.exento_parcial %}
+                  <span style="color:var(--color-warning, #e5a000);">parcial</span>
                 {% else %}
-                  <span class="text-muted">No</span>
+                  <span class="text-muted">—</span>
                 {% endif %}
               </td>
-              <td style="text-align:center;">
-                {{ v.subcuadras_exentas.count }}
-              </td>
-              <td style="white-space:nowrap;">
+              <td style="text-align:center; white-space:nowrap;">
                 <a class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.65rem;"
                    href="{% url 'exenciones' %}?patente={{ v.patente }}">
                   🚫 Exenciones
@@ -210,63 +343,13 @@
         </table>
       </div>
     {% else %}
-      <p class="text-muted">Este conductor no tiene vehículos registrados.</p>
+      <p class="text-muted">Sin vehículos registrados.</p>
     {% endif %}
   </div>
 
-  <!-- MÓDULO REINTEGRO: VERIFICACIÓN DE RESIDENCIA -->
-  {% if modulo_reintegro %}
+  {# Infracciones recientes #}
   <div class="card">
-    <h3 style="margin:0 0 0.6rem;">🏠 Residencia verificada</h3>
-    <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
-      El módulo de reintegro está activo en este municipio.
-      {% if reintegro_alcance == "residentes" %}
-      Solo los conductores marcados como vecinos verificados reciben el reintegro de saldo.
-      {% else %}
-      El reintegro aplica a todos los conductores, pero podés marcar vecinos para registro interno.
-      {% endif %}
-    </p>
-
-    {% if conductor.es_residente_verificado %}
-      <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.75rem;">
-        <span style="background:var(--color-primary); color:#fff; font-size:0.82rem;
-                     font-weight:700; padding:0.25rem 0.75rem; border-radius:99px;">
-          ✅ Residente verificado
-        </span>
-        {% if conductor.fecha_verificacion_residencia %}
-          <span style="font-size:0.8rem; color:var(--color-text-muted);">
-            desde {{ conductor.fecha_verificacion_residencia|date:"d/m/Y" }}
-          </span>
-        {% endif %}
-      </div>
-      <form method="post" style="margin:0;">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="quitar_verificacion_residencia">
-        <button type="submit" class="btn btn-outline"
-                style="font-size:0.82rem; padding:0.3rem 0.75rem;
-                       color:var(--color-warning); border-color:var(--color-warning);"
-                onclick="return confirm('¿Revocar la verificación de residencia de {{ conductor.get_full_name }}?')">
-          Revocar verificación
-        </button>
-      </form>
-    {% else %}
-      <p style="font-size:0.85rem; margin-bottom:0.75rem;">
-        <span style="color:var(--color-text-muted);">○ Sin verificación de residencia.</span>
-      </p>
-      <form method="post" style="margin:0;">
-        {% csrf_token %}
-        <input type="hidden" name="accion" value="verificar_residencia">
-        <button type="submit" class="btn btn-primary" style="font-size:0.85rem;">
-          Marcar como residente verificado
-        </button>
-      </form>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <!-- HISTORIAL DE INFRACCIONES -->
-  <div class="card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem; flex-wrap:wrap; gap:0.5rem;">
+    <div class="page-header" style="margin-bottom:0.8rem;">
       <h3 style="margin:0;">⚠️ Infracciones recientes</h3>
       {% if infracciones %}
         <a href="{% url 'admin_infracciones' %}?patente={{ vehiculos.0.patente|default:'' }}"
@@ -298,7 +381,7 @@
               <td style="font-size:0.83rem;">{{ inf.creado_en|date:"d/m/Y" }}</td>
               <td style="text-align:center;">
                 {% if inf.estado == "pendiente" %}
-                  <span style="color:var(--color-warning); font-weight:700;">Pendiente</span>
+                  <span style="color:var(--color-warning, #e5a000); font-weight:700;">Pendiente</span>
                 {% elif inf.estado == "pagada" %}
                   <span style="color:var(--color-primary); font-weight:700;">✅ Pagada</span>
                 {% else %}
@@ -316,4 +399,20 @@
   </div>
 
 </section>
+
+<script>
+function precargarDNI() {
+  const dni = "{{ conductor.numero_dni|escapejs }}";
+  document.getElementById("pwd-nueva").value = dni;
+  document.getElementById("pwd-confirmar").value = dni;
+}
+
+// Si el conductor tiene cambio de contraseña pendiente, abrir la sección automáticamente
+{% if conductor.cambio_password_requerido %}
+document.addEventListener("DOMContentLoaded", function() {
+  const sec = document.getElementById("seccion-password");
+  if (sec) sec.open = true;
+});
+{% endif %}
+</script>
 {% endblock %}

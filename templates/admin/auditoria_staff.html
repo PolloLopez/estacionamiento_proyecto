@@ -5,8 +5,7 @@
 <section class="container">
 
   <!-- Encabezado + navegación -->
-  <div style="display:flex; justify-content:space-between; align-items:center;
-              margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+  <div class="page-header" style="margin-bottom:1rem;">
     <h2>🔍 Auditoría de staff</h2>
     <a href="{% url 'panel_admin' %}" class="btn btn-outline" style="font-size:0.9rem;">← Panel</a>
   </div>
@@ -114,7 +113,7 @@
 
   <!-- ── INSPECTORES ─────────────────────────────────────────────────────── -->
   <div class="card" style="overflow-x:auto;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+    <div class="page-header" style="margin-bottom:0.75rem;">
       <h3 style="margin:0;">👮 Inspectores</h3>
       <a href="{% url 'estadisticas_inspectores' %}?desde={{ desde|date:'Y-m-d' }}&hasta={{ hasta|date:'Y-m-d' }}"
          class="btn btn-outline" style="font-size:0.82rem; padding:0.3rem 0.75rem;">

@@ -758,6 +758,63 @@ table tr:hover { background: var(--color-surface-2); }
 .mb-2 { margin-bottom: 1rem; }
 .gap-1 { gap: 0.5rem; }
 
+/* ─── UTILIDADES DE LAYOUT ───────────────────────────────────── */
+
+/* Cabecera de sección: título a la izquierda + botón al costado.
+   Soporta flex-wrap para no romperse en mobile.
+   Uso: <div class="page-header" style="margin-bottom:1.5rem;">
+   El margin-bottom se deja inline porque varía por sección. */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Contenedor angosto para páginas de formulario (login, crear, editar).
+   Uso: <div class="container form-narrow"> o <section class="container form-narrow">
+   El !important garantiza que gane a las reglas responsive del .container. */
+.form-narrow {
+  max-width: 480px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Variante levemente más ancha (formularios con más campos). */
+.form-narrow-md {
+  max-width: 540px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Card de estado vacío: "sin datos", lista vacía, placeholders.
+   Uso: <div class="card card-empty">…</div> */
+.card-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--color-text-muted);
+}
+
+/* Celda de tabla sin datos (fila "No hay resultados").
+   Uso: <td class="td-sin-datos" colspan="N">Sin resultados</td> */
+.td-sin-datos {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 1.5rem;
+  font-size: var(--font-size-sm);
+}
+
+/* Label pequeño para filtros y campos secundarios.
+   Uso: <label class="label-sm">Desde</label> */
+.label-sm {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--color-text);
+}
+
 /* ─── ESTACIONAR — botones duración ─────────────────────────── */
 .duraciones {
   display: flex;
