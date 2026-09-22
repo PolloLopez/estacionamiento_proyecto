@@ -36,20 +36,18 @@
             <th style="padding:0.4rem 0.75rem; text-align:left;">B — Nombre y Apellido</th>
             <th style="padding:0.4rem 0.75rem; text-align:left;">C — Dirección</th>
             <th style="padding:0.4rem 0.75rem; text-align:left;">D — Teléfono</th>
-            <th style="padding:0.4rem 0.75rem; text-align:left;">E — Fecha</th>
-            <th style="padding:0.4rem 0.75rem; text-align:left;">F — Condición</th>
-            <th style="padding:0.4rem 0.75rem; text-align:left;">G — Vencimiento</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left;">E — Fecha renovación</th>
+            <th style="padding:0.4rem 0.75rem; text-align:left;">F — Vencimiento</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td style="padding:0.4rem 0.75rem; font-family:monospace;">ABC123</td>
             <td style="padding:0.4rem 0.75rem;">Juan Pérez</td>
-            <td style="padding:0.4rem 0.75rem;">San Martín</td>
+            <td style="padding:0.4rem 0.75rem;">San Martín 430</td>
             <td style="padding:0.4rem 0.75rem;">2994123456</td>
             <td style="padding:0.4rem 0.75rem;">01/01/2025</td>
-            <td style="padding:0.4rem 0.75rem;">Propietario</td>
-            <td style="padding:0.4rem 0.75rem; color:var(--color-text-muted);">(vacío)</td>
+            <td style="padding:0.4rem 0.75rem; color:var(--color-text-muted);">31/12/2025</td>
           </tr>
         </tbody>
       </table>
@@ -67,6 +65,25 @@
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <input type="hidden" name="accion" value="preview">
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:0.4rem;">
+          Tipo de exención para todos los registros
+        </label>
+        <div style="display:flex; gap:1.25rem;">
+          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+            <input type="radio" name="tipo_exencion" value="parcial" checked>
+            <span style="font-size:0.9rem;">📍 Parcial (solo en su subcuadra)</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+            <input type="radio" name="tipo_exencion" value="global">
+            <span style="font-size:0.9rem;">🌐 Global (cualquier subcuadra del municipio)</span>
+          </label>
+        </div>
+        <small style="color:var(--color-text-muted);">
+          La subcuadra se detecta automáticamente a partir de la dirección.
+          Si el vecino es global, la subcuadra detectada igualmente se guarda como referencia.
+        </small>
+      </div>
       <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
         <div style="flex:1; min-width:220px;">
           <label for="archivo" style="display:block; margin-bottom:0.3rem;">

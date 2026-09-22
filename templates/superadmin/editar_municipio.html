@@ -135,6 +135,18 @@
           </div>
 
           <div style="margin-bottom:0.75rem;">
+            <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+              <input type="checkbox" name="mapa_infracciones_activo"
+                     {% if municipio.mapa_infracciones_activo %}checked{% endif %}>
+              <span style="font-size:0.85rem; font-weight:600;">🗺️ Mapa de calor de infracciones activo</span>
+            </label>
+            <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+              Habilita /admin/mapa-infracciones/ para el admin municipal.
+              Por defecto está desactivado.
+            </small>
+          </div>
+
+          <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Monto mínimo de carga MP ($)</label>
             <input type="number" name="monto_minimo_carga" min="1" step="1"
                    value="{{ municipio.monto_minimo_carga }}"

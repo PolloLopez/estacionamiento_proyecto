@@ -60,14 +60,14 @@
     {% endif %}
   </div>
 
-  <!-- ── COBROS POR USUARIO ─────────────────────────────────────────────── -->
+  <!-- ── COBROS POR VENDEDORES ─────────────────────────────────────────── -->
   <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
-    <h3 style="margin-bottom:0.75rem;">💰 Cobros por usuario</h3>
+    <h3 style="margin-bottom:0.75rem;">💰 Cobros por vendedores</h3>
     {% if cobros %}
       <table style="min-width:300px;">
         <thead>
           <tr>
-            <th>Usuario</th>
+            <th>Vendedor</th>
             <th style="text-align:right;">Total cobrado</th>
           </tr>
         </thead>
@@ -82,6 +82,31 @@
       </table>
     {% else %}
       <p class="text-muted">Sin cobros registrados en el período.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── INFRACCIONES POR DÍA ──────────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.5rem; overflow-x:auto;">
+    <h3 style="margin-bottom:0.75rem;">📋 Infracciones por día</h3>
+    {% if infracciones_por_dia %}
+      <table style="min-width:250px;">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th style="text-align:right;">Infracciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for fila in infracciones_por_dia %}
+          <tr>
+            <td>{{ fila.fecha|date:"d/m/Y" }}</td>
+            <td style="text-align:right; font-weight:600;">{{ fila.total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted">Sin infracciones en el período.</p>
     {% endif %}
   </div>
 

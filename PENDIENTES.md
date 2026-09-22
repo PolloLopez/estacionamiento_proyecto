@@ -115,6 +115,7 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 
 ## 🟢 Baja prioridad / Futuras versiones
 
+- **Usuarios de staff con doble rol(admin, tesorero, inspectores deben poder gestionar su saldo y estacionamientos)** 
 - **OCR de patentes con cámara (mejora)** — actualmente hay un botón básico de escaneo. Mejora real con Google ML Kit o Tesseract.js, especialmente útil para el inspector en campo. Evaluar para después del go-live municipal cuando haya volumen real de uso.
 - **Tutorial GIFs en landing pública** — el tutorial por rol ya existe dentro del sistema como `<details>` colapsable. Pendiente: versión con GIFs animados para la landing pública.
 - **Pago diario (módulo premium)** — superadmin habilita por municipio, municipio asigna valor. Requiere diseño de modelo antes de implementar.

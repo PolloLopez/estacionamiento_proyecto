@@ -280,6 +280,7 @@ def editar_municipio(request, municipio_id):
             municipio.admin_puede_editar_plantillas   = request.POST.get("admin_puede_editar_plantillas") == "on"
             municipio.modulo_informes_activo          = request.POST.get("modulo_informes_activo") == "on"
             municipio.puede_gestionar_subcuadras      = request.POST.get("puede_gestionar_subcuadras") == "on"
+            municipio.mapa_infracciones_activo        = request.POST.get("mapa_infracciones_activo") == "on"
 
             # Coordenadas de la sede municipal (para el mapa de zonas)
             def _decimal(nombre, fallback):
