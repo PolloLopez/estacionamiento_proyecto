@@ -1,6 +1,6 @@
 # Guía de testing completo por rol
 > Sistema de Estacionamiento Medido — Railway: https://estacionamiento.up.railway.app
-> Última actualización: 2026-09-20
+> Última actualización: 2026-09-21
 
 Esta guía cubre cada rol con: flujos a testear paso a paso, qué verificar en cada pantalla, y un cuestionario de experiencia de usuario (UX) para registrar observaciones durante la prueba.
 
@@ -278,6 +278,7 @@ _______________
 - [ ] El acta tiene watermark con GPS, fecha y nombre del inspector
 - [ ] El sistema hace doble copia (según configuración de `segundos_pausa_doble_copia`)
 - [ ] Si pausa=0: el inspector debe confirmar manualmente antes de imprimir la copia 2
+- [ ] Copia 2: se reconecta automáticamente a la impresora sin diálogo (`reconectarSilencioso()` vía `getDevices()`). Si falla, aparece el botón "Reintentar copia 2" — ese botón tiene gesto fresco y puede abrir el diálogo de vinculación
 - [ ] La infracción aparece en "Mis infracciones del día" del inspector
 
 #### F2.3 — Intentar infraccionar dentro del período de gracia
@@ -542,7 +543,15 @@ _______________
 - [ ] Las liquidaciones de comisión aparecen creadas automáticamente en estado "pendiente"
 - [ ] La rendición queda en estado "pendiente" esperando al tesorero
 
-#### F4.8 — Gestionar subcuadras
+#### F4.8 — Gestionar subcuadras (requiere flag activo) 🆕 *sesión 14*
+> **Contexto:** por defecto solo el superadmin puede acceder a `/admin-subcuadras/`. El superadmin puede habilitarlo por municipio activando "📍 Admin puede gestionar subcuadras" en `editar_municipio`. Si el flag está desactivado, el admin ve un mensaje de error explicativo en lugar de la página.
+
+**Con flag DESACTIVADO:**
+1. Loguearse como admin municipal.
+2. Intentar acceder a `/usuarios/admin-subcuadras/` directamente.
+3. Verificar que aparece un mensaje: "No tenés autorización para gestionar subcuadras. Pedí al superadmin que active este módulo para tu municipio."
+
+**Con flag ACTIVADO (habilitarlo desde superadmin primero):**
 1. Ir a `/usuarios/admin-subcuadras/`.
 2. Ver el mapa con los pins (azul = pagado, verde = libre).
 3. Agregar una subcuadra nueva haciendo clic en el mapa (poner latitud/longitud).
@@ -550,8 +559,9 @@ _______________
 5. Verificar que el pin del mapa se actualiza al agregar coordenadas.
 
 **Qué verificar:**
-- [ ] El mapa carga correctamente (OpenStreetMap)
-- [ ] Los pins tienen el color correcto según tipo_zona
+- [ ] Con flag desactivado: admin ve mensaje de error claro (no 403 genérico)
+- [ ] Con flag activado: el mapa carga correctamente (OpenStreetMap)
+- [ ] Los pins tienen el color correcto según tipo_zona (azul = pagado, verde = libre)
 - [ ] Al hacer clic en un pin: muestra popup con nombre y tipo
 - [ ] La edición guarda correctamente calle y altura
 - [ ] No se puede duplicar una subcuadra con la misma calle+altura
@@ -565,6 +575,27 @@ _______________
 1. Ir a auditoría de staff.
 2. Filtrar por vendedor/inspector en un rango de fechas.
 3. Verificar que se muestran los movimientos de caja y las infracciones.
+
+#### F4.11 — Auditoría de resets de contraseña 🆕 *sesión 14*
+> **Contexto:** cada vez que el admin usa "Resetear al DNI" o "Establecer contraseña" en el detalle de un conductor, el sistema registra el evento en `AuditoriaPassword` (quién, a quién, cuándo, tipo). El historial aparece dentro de la sección "🔑 Cambiar contraseña" en la vista de detalle del conductor.
+
+1. Ir a `/usuarios/admin-usuarios/` → abrir el detalle de cualquier conductor.
+2. Expandir la sección "🔑 Cambiar contraseña".
+3. Ejecutar "Resetear al DNI" → confirmar → volver al detalle del conductor.
+4. Expandir la sección "🔑 Cambiar contraseña" de nuevo.
+5. Verificar que la tabla de historial aparece con el reset recién hecho.
+6. Verificar que muestra: fecha/hora, correo del admin logueado, tipo "Reset al DNI".
+7. Ejecutar "Establecer contraseña" con una contraseña temporal → volver al detalle.
+8. Verificar que la tabla muestra ahora dos entradas (orden: más reciente primero).
+
+**Qué verificar:**
+- [ ] Antes del primer reset: la tabla de historial no aparece (vacía → sección oculta)
+- [ ] Después del primer reset: la tabla aparece con 1 fila
+- [ ] Fecha/hora de la fila: coincide con el momento del reset (margen de ±1 min)
+- [ ] Admin: muestra el correo del admin logueado (el que hizo la acción)
+- [ ] Tipo "Reset al DNI" o "Contraseña personalizada" según la acción
+- [ ] Segunda acción → segunda fila, la más reciente aparece primero
+- [ ] Se muestran máximo 10 entradas (si hay más, las más viejas desaparecen de la vista)
 
 ---
 
@@ -710,12 +741,26 @@ _______________
 2. Ver sugerencias enviadas por conductores/inspectores.
 3. Cambiar el estado de una sugerencia (en revisión, implementada, descartada).
 
-#### F6.6 — Toggle inspector ve sus infracciones
+#### F6.6 — Habilitar gestión de subcuadras para admin municipal 🆕 *sesión 14*
+1. En editar municipio → buscar el checkbox "📍 Admin puede gestionar subcuadras".
+2. Activarlo → guardar.
+3. Loguearse como admin del municipio → acceder a `/usuarios/admin-subcuadras/`.
+4. Verificar que el admin puede ver el mapa y crear/editar subcuadras.
+5. Volver a superadmin → desactivar el flag → guardar.
+6. Loguearse como admin e intentar acceder a `/usuarios/admin-subcuadras/`.
+7. Verificar que aparece el mensaje de "sin autorización".
+
+**Qué verificar:**
+- [ ] Con flag activado: admin accede sin problemas al mapa de subcuadras
+- [ ] Con flag desactivado: admin ve mensaje explicativo (no una pantalla de error genérica)
+- [ ] El superadmin siempre puede acceder a `/admin-subcuadras/` independientemente del flag
+
+#### F6.7 — Toggle inspector ve sus infracciones
 1. En editar municipio → sección de configuración.
 2. Activar/desactivar `inspector_ve_sus_infracciones`.
 3. Loguearse como inspector y verificar que el menú de resumen aparece/desaparece.
 
-#### F6.7 — Limpiar datos de prueba
+#### F6.8 — Limpiar datos de prueba
 1. En editar municipio → "Zona de peligro".
 2. Escribir `CONFIRMAR+<NOMBRE>` en el campo.
 3. Verificar que limpia solo los datos de ese municipio.
@@ -995,4 +1040,6 @@ Después de testear todos los roles:
 - [ ] **Infracción de punta a punta:** inspector labró → conductor impugnó → admin respondió la impugnación → conductor pagó → estado = pagada.
 - [ ] **Dark mode:** todos los paneles se ven correctamente en modo oscuro (sin textos ilegibles ni fondos raros).
 - [ ] **Mobile:** las pantallas que usan los inspectores y conductores se ven bien en Chrome Android (pantalla chica, touch).
+- [ ] **Auditoría de contraseñas:** admin resetea la contraseña de un conductor → historial aparece en el detalle del conductor → muestra fecha, admin y tipo correctamente.
+- [ ] **Subcuadras con flag:** superadmin activa `puede_gestionar_subcuadras` → admin accede a `/admin-subcuadras/` → superadmin desactiva → admin ve mensaje de error.
 - [ ] **Sin errores 500 en ningún flujo** (revisar Sentry o los logs de Railway al final del testing).

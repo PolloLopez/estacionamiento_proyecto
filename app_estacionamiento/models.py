@@ -390,6 +390,15 @@ class Municipio(models.Model):
         ),
     )
 
+    mapa_infracciones_activo = models.BooleanField(
+        default=False,
+        verbose_name="Mapa de infracciones activo",
+        help_text=(
+            "Si está activo, el admin municipal puede ver el mapa de calor de infracciones "
+            "desde /admin/mapa-infracciones/. Por defecto está desactivado."
+        ),
+    )
+
     # ── Descuento para conductores verificados ───────────────────────────────────
     # El superadmin configura un porcentaje de descuento sobre el costo de
     # estacionamiento para conductores que ya verificaron su identidad (es_verificado=True).

@@ -200,14 +200,24 @@ def panel_admin(request):
                 {"label": "⚖️ Impugnaciones",    "url": _reverse("admin_impugnaciones"),      "badge": impugnaciones_pendientes or None},
                 # Exenciones unifica admin + SIA en una sola vista
                 {"label": "🚫 Exenciones",       "url": _reverse("exenciones"),               "badge": None},
-                {"label": "🗺️ Mapa de calor",    "url": _reverse("mapa_calor_infracciones"),  "badge": None},
+                # Mapa de calor: solo si el superadmin habilitó el módulo para este municipio
+                *(
+                    [{"label": "🗺️ Mapa de calor", "url": _reverse("mapa_calor_infracciones"), "badge": None}]
+                    if municipio.mapa_infracciones_activo else []
+                ),
             ],
         },
         {
             "titulo": "Configuración",
             "items": [
-                {"label": "📍 Subcuadras",       "url": _reverse("gestionar_subcuadras"),     "badge": None},
-                {"label": "📊 Cobertura",        "url": _reverse("reportes_subcuadras"),      "badge": None},
+                # Subcuadras y Cobertura: solo si el superadmin habilitó el módulo de subcuadras
+                *(
+                    [
+                        {"label": "📍 Subcuadras", "url": _reverse("gestionar_subcuadras"), "badge": None},
+                        {"label": "📊 Cobertura",  "url": _reverse("reportes_subcuadras"),  "badge": None},
+                    ]
+                    if municipio.puede_gestionar_subcuadras else []
+                ),
                 {"label": "💲 Tarifas",          "url": _reverse("gestionar_tarifas"),        "badge": None},
                 {"label": "🕐 Horarios",         "url": _reverse("gestionar_horarios"),       "badge": None},
                 {"label": "📅 Días especiales",  "url": _reverse("gestionar_dias_especiales"),"badge": None},
@@ -287,8 +297,22 @@ def dashboard_admin(request):
         creado_en__date__lte=hasta,
     ).values("usuario__correo").annotate(total=Sum("monto")).order_by("-total")
 
+    # Infracciones agrupadas por día (para ver tendencia diaria)
+    infracciones_por_dia = (
+        Infraccion.objects.filter(
+            municipio=municipio,
+            creado_en__date__gte=desde,
+            creado_en__date__lte=hasta,
+        )
+        .annotate(fecha=TruncDate("creado_en"))
+        .values("fecha")
+        .annotate(total=Count("id"))
+        .order_by("fecha")
+    )
+
     return render(request, "admin/dashboard_admin.html", {
         "infracciones_por_inspector": infracciones_por_inspector,
+        "infracciones_por_dia":       infracciones_por_dia,
         "patentes_por_dia":           patentes_por_dia,
         "cobros":                     cobros,
         "desde":                      desde,
@@ -2872,11 +2896,18 @@ def gestionar_subcuadras(request, municipio_id=None):
     # habilitó el flag puede_gestionar_subcuadras para su municipio.
     # El superadmin siempre puede.
     if not es_superadmin and not getattr(municipio, "puede_gestionar_subcuadras", False):
+        # Renderizar una página de acceso denegado con el estilo del panel,
+        # en lugar del 403 crudo del browser (sin CSS ni layout).
         from django.http import HttpResponseForbidden
-        return HttpResponseForbidden(
-            "No tenés autorización para gestionar subcuadras. "
-            "Pedí al superadmin que active este módulo para tu municipio."
-        )
+        from django.template.loader import render_to_string
+        contenido = render_to_string("admin/acceso_denegado_modulo.html", {
+            "titulo_modulo": "📍 Subcuadras",
+            "mensaje": (
+                "El módulo de gestión de subcuadras no está habilitado para tu municipio. "
+                "Solicitá al superadmin que lo active desde la configuración del municipio."
+            ),
+        }, request=request)
+        return HttpResponseForbidden(contenido)
 
     if request.method == "POST":
         accion = request.POST.get("accion")
@@ -3009,9 +3040,16 @@ def gestionar_subcuadras(request, municipio_id=None):
 # Importación de exenciones desde Excel
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _procesar_fila_exencion(fila_num, fila_vals, municipio):
+def _procesar_fila_exencion(fila_num, fila_vals, municipio, es_global=False):
     """
     Procesa una fila del Excel y devuelve un dict con el resultado del análisis.
+
+    Columnas esperadas (formato real del municipio):
+        Patente | Nombre y Apellido | Dirección | Teléfono |
+        Fecha renovación de trámite | Vencimiento
+
+    El parámetro es_global viene del formulario de importación (no del Excel),
+    ya que el Excel no tiene columna de tipo de exención.
 
     Devuelve:
         {
@@ -3019,9 +3057,10 @@ def _procesar_fila_exencion(fila_num, fila_vals, municipio):
             "patente":   str,
             "nombre":    str,
             "telefono":  str,
-            "direccion": str,          # texto original de la columna Direccion
+            "direccion": str,          # texto original de la columna Dirección
             "subcuadra": Subcuadra | None,
             "notas":     str,          # texto a guardar en notas_exencion
+            "es_global": bool,         # global (cualquier subcuadra) o parcial
             "estado":    "nuevo" | "actualizar" | "error",
             "mensaje":   str,
         }
@@ -3036,14 +3075,14 @@ def _procesar_fila_exencion(fila_num, fila_vals, municipio):
             return ""
         return str(val).strip()
 
-    patente   = re.sub(r"[^A-Z0-9]", "", celda(0).upper())
-    nombre    = celda(1)
-    direccion = celda(2)
-    telefono  = celda(3)
-    # columnas Fecha(4), Condicion(5), Vencimiento(6) — las guardamos en notas
-    fecha      = celda(4)
-    condicion  = celda(5)
-    vencimiento = celda(6)
+    # Columnas del Excel real: Patente|Nombre y Apellido|Dirección|Teléfono|Fecha|Vencimiento
+    patente     = re.sub(r"[^A-Z0-9]", "", celda(0).upper())
+    nombre      = celda(1)
+    direccion   = celda(2)
+    telefono    = celda(3)
+    fecha       = celda(4)   # "Fecha renovación de trámite"
+    vencimiento = celda(5)   # "Vencimiento"
+    # es_global se recibe como parámetro del formulario, no del Excel
 
     # ── Validación básica ─────────────────────────────────────────────────────
     if not patente:
@@ -3054,10 +3093,7 @@ def _procesar_fila_exencion(fila_num, fila_vals, municipio):
             "estado": "error", "mensaje": "Patente vacía — fila ignorada.",
         }
 
-    # ── Detectar tipo de exención ─────────────────────────────────────────────
-    # Si Condicion contiene "global" → exento_global (cubre cualquier subcuadra).
-    # Cualquier otro valor (vacío, "Propietario", etc.) → exento_parcial.
-    es_global = "global" in condicion.lower()
+    # es_global se recibió como parámetro del formulario (no viene del Excel)
 
     # ── Buscar subcuadra a partir de la dirección ────────────────────────────
     # La dirección viene como "CALLE NUMERO" (ej: "29 685", "San Martín 430").
@@ -3115,17 +3151,17 @@ def _procesar_fila_exencion(fila_num, fila_vals, municipio):
                 aviso_subcuadra = f" (sin subcuadra para '{direccion}')"
 
     # ── Construir notas_exencion ──────────────────────────────────────────────
+    # Se guardan todos los datos del Excel como texto libre para que el admin
+    # pueda consultarlos cuando vaya a verificar el trámite manualmente.
     partes = []
     if nombre:
         partes.append(f"Nombre: {nombre}")
     if telefono:
         partes.append(f"Tel: {telefono}")
-    if fecha:
-        partes.append(f"Fecha: {fecha}")
     if direccion:
         partes.append(f"Dirección: {direccion}")
-    if condicion:
-        partes.append(f"Condición: {condicion}")
+    if fecha:
+        partes.append(f"Fecha trámite: {fecha}")
     if vencimiento:
         partes.append(f"Vencimiento: {vencimiento}")
     notas = " | ".join(partes)
@@ -3236,6 +3272,11 @@ def importar_exenciones(request):
             messages.error(request, "Seleccioná un archivo Excel.")
             return render(request, "admin/importar_exenciones.html", {})
 
+        # El admin elige si los vecinos importados son exentos globales (cualquier
+        # subcuadra) o parciales (solo en la subcuadra detectada por su dirección).
+        # Esta elección aplica a TODOS los registros del archivo.
+        es_global_lote = request.POST.get("tipo_exencion") == "global"
+
         try:
             wb  = openpyxl.load_workbook(io.BytesIO(archivo.read()), data_only=True)
             ws  = wb.active
@@ -3249,7 +3290,7 @@ def importar_exenciones(request):
             # Ignorar filas completamente vacías
             if all(v is None or str(v).strip() == "" for v in fila):
                 continue
-            datos = _procesar_fila_exencion(idx, fila, municipio)
+            datos = _procesar_fila_exencion(idx, fila, municipio, es_global=es_global_lote)
             resultados.append(datos)
 
         # Serializar para el formulario de confirmación:
@@ -3595,11 +3636,26 @@ def mapa_calor_infracciones(request):
     Usa las coordenadas (lat/lon) de cada subcuadra y muestra círculos
     proporcionales a la cantidad de infracciones.
     Solo incluye subcuadras con coordenadas cargadas.
+
+    Requiere que el superadmin haya activado mapa_infracciones_activo para el municipio.
     """
     from django.db.models import Count
     import json
 
     municipio = request.user.municipio
+
+    # Gate: solo visible si el superadmin habilitó el módulo para este municipio
+    if not getattr(municipio, "mapa_infracciones_activo", False):
+        from django.http import HttpResponseForbidden
+        from django.template.loader import render_to_string
+        contenido = render_to_string("admin/acceso_denegado_modulo.html", {
+            "titulo_modulo": "🗺️ Mapa de calor",
+            "mensaje": (
+                "El módulo de mapa de infracciones no está habilitado para tu municipio. "
+                "Solicitá al superadmin que lo active desde la configuración del municipio."
+            ),
+        }, request=request)
+        return HttpResponseForbidden(contenido)
 
     datos = list(
         Infraccion.objects.filter(municipio=municipio, subcuadra__isnull=False)
@@ -3871,6 +3927,12 @@ def editar_staff(request, usuario_id):
         return redirect("gestionar_staff")
     if staff.pk == request.user.pk:
         messages.error(request, "No podés editarte a vos mismo desde acá.")
+        return redirect("gestionar_staff")
+    # Un admin no puede gestionar las cuentas de otros admins: podría resetear
+    # la contraseña y luego acceder con esas credenciales. Solo el superadmin
+    # tiene ese nivel de acceso.
+    if staff.es_admin and not getattr(request.user, "es_superadmin", False):
+        messages.error(request, "Solo el superadmin puede modificar la cuenta de otros administradores.")
         return redirect("gestionar_staff")
 
     if request.method == "POST":
