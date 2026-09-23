@@ -132,28 +132,6 @@
 
     <h1 style="font-size:1.6rem; margin-bottom:1.25rem;">🛠️ Panel Admin</h1>
 
-    <!-- ── Tutorial admin (colapsable) ──────────────────────────────── -->
-    <details style="margin-bottom:1.4rem;">
-      <summary style="cursor:pointer; font-size:0.88rem; font-weight:700;
-                      color:var(--color-text-muted); list-style:none; user-select:none;
-                      display:flex; align-items:center; gap:0.4rem;">
-        📖 ¿Cómo usar el panel?
-      </summary>
-      <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
-        <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
-                   font-size:0.88rem; line-height:1.4;">
-          <li>💲 <strong>Configurá las tarifas</strong>: precio por hora, monto de infracción y abonos desde "Tarifas" en el menú lateral. Los cambios aplican a las infracciones nuevas, no a las ya creadas.</li>
-          <li>🕐 <strong>Definí los horarios</strong> de estacionamiento medido y los días especiales sin cobro (feriados, eventos) desde "Horarios" y "Días especiales".</li>
-          <li>👥 <strong>Gestioná usuarios</strong>: cargá saldo a conductores, activá inspectores y vendedores desde "Usuarios" → "Gestionar usuarios".</li>
-          <li>📋 <strong>Certificá rendiciones</strong>: cuando un inspector, vendedor u otro admin cierra su caja, aparece acá. Al crear una rendición hacia tesorería, las comisiones de vendedores se calculan automáticamente. Podés ver el desglose completo con "Ver detalle".</li>
-          <li>🔍 <strong>Auditoría de staff</strong>: ve de un vistazo cuánto cobró cada vendedor y cuántas infracciones labró cada inspector en el período. Desde "Auditoría staff" en el menú.</li>
-          <li>🧾 <strong>Tu propia caja</strong>: si vos también cobraste en el turno, cerrá tu caja desde "Mi caja" para que otro admin o el tesorero la certifique.</li>
-          <li>📍 <strong>Subcuadras GPS</strong>: asigná coordenadas a las cuadras desde el mapa interactivo para que los inspectores puedan usarlas como referencia.</li>
-          <li>🗺️ <strong>Mapa de zonas</strong>: visualizá las zonas pagadas y libres, los puntos de carga de vendedores y la sede municipal desde <a href="{% url 'mapa_zonas' %}">Mapa de zonas</a>.</li>
-        </ol>
-      </div>
-    </details>
-
     <!-- ALERTA: vendedores con caja atrasada -->
     {% if vendedores_caja_atrasada %}
     <div class="alert alert-warning"
@@ -251,6 +229,33 @@
         {% endif %}
       </div>
 
+    </div>
+
+    <!-- ── PIE DEL PANEL: tutorial + sugerencias ─────────────────────── -->
+    <div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--color-border);">
+      <details style="margin-bottom:0.5rem;">
+        <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
+                        color:var(--color-text-muted); list-style:none; user-select:none;
+                        display:flex; align-items:center; gap:0.4rem;">
+          📖 ¿Cómo usar el panel?
+        </summary>
+        <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+          <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+                     font-size:0.88rem; line-height:1.4;">
+            <li>💲 <strong>Configurá las tarifas</strong>: precio por hora, monto de infracción y abonos desde "Tarifas" en el menú lateral. Los cambios aplican a las infracciones nuevas, no a las ya creadas.</li>
+            <li>🕐 <strong>Definí los horarios</strong> de estacionamiento medido y los días especiales sin cobro (feriados, eventos) desde "Horarios" y "Días especiales".</li>
+            <li>👥 <strong>Gestioná usuarios</strong>: cargá saldo a conductores, activá inspectores y vendedores desde "Usuarios" → "Gestionar usuarios".</li>
+            <li>📋 <strong>Certificá rendiciones</strong>: cuando un inspector, vendedor u otro admin cierra su caja, aparece acá. Al crear una rendición hacia tesorería, las comisiones de vendedores se calculan automáticamente. Podés ver el desglose completo con "Ver detalle".</li>
+            <li>🔍 <strong>Auditoría de staff</strong>: ve de un vistazo cuánto cobró cada vendedor y cuántas infracciones labró cada inspector en el período. Desde "Auditoría staff" en el menú.</li>
+            <li>🧾 <strong>Tu propia caja</strong>: si vos también cobraste en el turno, cerrá tu caja desde "Mi caja" para que otro admin o el tesorero la certifique.</li>
+            <li>📍 <strong>Subcuadras GPS</strong>: asigná coordenadas a las cuadras desde el mapa interactivo para que los inspectores puedan usarlas como referencia.</li>
+            <li>🗺️ <strong>Mapa de zonas</strong>: visualizá las zonas pagadas y libres, los puntos de carga de vendedores y la sede municipal desde <a href="{% url 'mapa_zonas' %}">Mapa de zonas</a>.</li>
+          </ol>
+        </div>
+      </details>
+      <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0; text-align:center;">
+        💡 ¿Tenés alguna sugerencia? <a href="{% url 'enviar_sugerencia' %}" style="color:var(--color-primary);">Enviala acá →</a>
+      </p>
     </div>
 
   </div>

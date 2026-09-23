@@ -124,6 +124,32 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 
 ---
 
+## ✅ Resuelto (sesión 15 — 2026-09-22)
+
+- **Comentarios Django visibles en templates**: `rendiciones.html` y `verificar.html` tenían comentarios `{# ... #}` multi-línea con `{#` y `#}` en líneas separadas. El lexer de Django no los reconocía como comentario — el texto aparecía en pantalla. Convertidos a `<!-- ... -->`.
+
+- **Flag `mapa_infracciones_activo` por municipio**: campo `BooleanField(default=False)` en `Municipio`. Migración `0089` creada manualmente. El superadmin activa el flag desde `editar_municipio.html` (mismo patrón que `puede_gestionar_subcuadras`). `views_superadmin.py` guarda el valor del POST. Sidebar de admin muestra "🗺️ Mapa de calor" solo si el flag está activo.
+
+- **Sidebar admin — items condicionales por flags**: "📍 Subcuadras" y "📊 Cobertura" visibles solo si `puede_gestionar_subcuadras=True`; "🗺️ Mapa de calor" solo si `mapa_infracciones_activo=True`. Patrón `*([] if not flag else [...])` en el diccionario de sidebar en `views_admin.py`.
+
+- **`/admin-subcuadras/` y `/admin/mapa-infracciones/` sin permiso → página con estilo**: antes devolvían un 403 de texto plano sin CSS. Ahora renderizan `admin/acceso_denegado_modulo.html` con `HttpResponseForbidden(render_to_string(...))`. Template nuevo: 🔒, título del módulo, mensaje explicativo y botón "← Volver al panel".
+
+- **Seguridad: admin no puede administrar a otro admin/tesorero**: `views_admin.py::editar_staff` verifica si `staff.es_admin`; si el usuario actual no es superadmin, rechaza con redirect + mensaje de error. El tesorero queda protegido por el mismo gate implícito (el queryset de staff solo incluye vendedores e inspectores para admins no-superadmin).
+
+- **`/admin-staff/` — tabs Vendedores / Inspectores con sticky headers**: reescritura de `auditoria_staff.html`. Tabs con JS `cambiarTab()`. Headers de tabla con `position:sticky; top:0; background:var(--color-surface); z-index:1`. Tab activo persiste en URL (`?tab=vendedores|inspectores`) vía `history.replaceState()` sin recargar.
+
+- **Dashboard admin**: "Cobros por usuario" renombrado a "Cobros por vendedores" (columna `<th>Vendedor</th>`). Nueva sección "📋 Infracciones por día" con query `TruncDate("creado_en")` + `Count("id")` sobre el período seleccionado.
+
+- **Importar exenciones — formato Excel real**: código esperaba 7 columnas con "Condición" en índice 5; el Excel real tiene 6 columnas (Patente, Nombre y Apellido, Dirección, Teléfono, Fecha renovación, Vencimiento). Eliminada columna "Condición", `es_global` ahora viene de un radio selector `tipo_exencion` en el formulario (Parcial / Global), no del Excel. `_procesar_fila_exencion()` acepta `es_global=False` como parámetro.
+
+- **`/pagar/` — confirmación de patente**: segundo campo `id_patente_confirm` en `buscar.html`. JS `validarPatentes()` bloquea el botón "Buscar →" y muestra aviso "⚠️ Las patentes no coinciden" si los campos difieren. Handler en `submit` como doble seguro.
+
+- **Footer "📖 ¿Cómo usar el panel?" + sugerencias en todos los roles**: tutorial movido al pie del panel en admin, inspector y vendedor (tesorero ya lo tenía). Bloque unificado con `border-top`, `<details>` colapsable y link "💡 ¿Tenés alguna sugerencia? Enviala acá →" (`enviar_sugerencia`). Patrón idéntico en los 4 paneles.
+
+- **Inspector — botón y autosubmit moto (investigado)**: comportamiento correcto. El bloque `if (form && input)` no corre cuando `horario_activo=False` (formulario no existe en el DOM). Síntomas: botón invisible, placeholder estático, sin autosubmit. Causa: testeo fuera del horario activo. Para motos, seleccionar radio "🏍 Moto" antes de tipear; el regex `^[0-9]{3}[A-Z]{3}$` dispara el autosubmit al completar el patrón.
+
+---
+
 ## ✅ Resuelto (sesión 14 — continuación — 2026-09-21)
 
 - **Auditoría de reseteos de contraseña**: modelo `AuditoriaPassword` con ForeignKey a admin, conductor y municipio; campo `tipo` (choices: "dni" / "personalizada"), campo `ip` opcional, `fecha` con `auto_now_add=True`. Migración `0088` creada manualmente. `views_admin.py::detalle_usuario_admin` crea un registro en `cambiar_password` y en `resetear_password_dni`. Historial de los últimos 10 cambios se pasa al template en `historial_passwords` y se muestra dentro de la sección colapsable `🔑 Cambiar contraseña`.

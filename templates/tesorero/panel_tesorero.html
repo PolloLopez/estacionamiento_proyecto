@@ -400,23 +400,28 @@
     </div>
   </div>
 
-  {# ── TUTORIAL (pie del panel) ───────────────────────────────────────── #}
-  <details style="margin-top:1rem; margin-bottom:0.5rem;">
-    <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
-                    color:var(--color-text-muted); list-style:none; user-select:none;
-                    display:flex; align-items:center; gap:0.4rem;">
-      📖 ¿Cómo usar este panel?
-    </summary>
-    <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
-      <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
-                 font-size:0.88rem; line-height:1.4;">
-        <li>📋 <strong>Revisá las rendiciones pendientes</strong>: son los cierres de caja de inspectores y vendedores que el admin ya agrupó en una rendición. Aparecen arriba. Hacé click en "✅ Recibida" para validarla o "⚠️ Observar" para devolverla.</li>
-        <li>🔐 <strong>Certificá cierres de admin</strong>: si un admin cerró su caja y no hay otro admin para certificarla, podés hacerlo vos. Aparecen resaltados en rojo.</li>
-        <li>💵 <strong>Depositá las comisiones</strong>: una vez que el admin genera la rendición, las comisiones de vendedores aparecen en "Comisiones de vendedores". Hacé click en "💸 Marcar depositada" cuando hayas transferido. El vendedor lo confirma desde su propio panel.</li>
-        <li>📊 <strong>Ver detalle</strong>: usá "Ver detalle" en el historial para ver el desglose completo de cierres y comisiones de cada rendición.</li>
-      </ol>
-    </div>
-  </details>
+  <!-- ── PIE DEL PANEL: tutorial + sugerencias ─────────────────────── -->
+  <div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--color-border);">
+    <details style="margin-bottom:0.5rem;">
+      <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
+                      color:var(--color-text-muted); list-style:none; user-select:none;
+                      display:flex; align-items:center; gap:0.4rem;">
+        📖 ¿Cómo usar el panel?
+      </summary>
+      <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+        <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+                   font-size:0.88rem; line-height:1.4;">
+          <li>📋 <strong>Revisá las rendiciones pendientes</strong>: son los cierres de caja de inspectores y vendedores que el admin ya agrupó en una rendición. Aparecen arriba. Hacé click en "✅ Recibida" para validarla o "⚠️ Observar" para devolverla.</li>
+          <li>🔐 <strong>Certificá cierres de admin</strong>: si un admin cerró su caja y no hay otro admin para certificarla, podés hacerlo vos. Aparecen resaltados en rojo.</li>
+          <li>💵 <strong>Depositá las comisiones</strong>: una vez que el admin genera la rendición, las comisiones de vendedores aparecen en "Comisiones de vendedores". Hacé click en "💸 Marcar depositada" cuando hayas transferido. El vendedor lo confirma desde su propio panel.</li>
+          <li>📊 <strong>Ver detalle</strong>: usá "Ver detalle" en el historial para ver el desglose completo de cierres y comisiones de cada rendición.</li>
+        </ol>
+      </div>
+    </details>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0; text-align:center;">
+      💡 ¿Tenés alguna sugerencia? <a href="{% url 'enviar_sugerencia' %}" style="color:var(--color-primary);">Enviala acá →</a>
+    </p>
+  </div>
 
 </div>
 
