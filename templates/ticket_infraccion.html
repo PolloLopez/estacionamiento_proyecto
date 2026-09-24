@@ -165,6 +165,12 @@
 
   </div>
 
+  <!-- Confirmación siempre visible: el acta está guardada aunque falle la impresión -->
+  <div class="no-print" style="margin-top:1.2rem; background:#d4edda; border:1px solid #c3e6cb;
+       border-radius:8px; padding:0.7rem 1rem; text-align:center; color:#155724; font-weight:600;">
+    ✅ Acta N° {{ infraccion.numero_acta|default:infraccion.id }} registrada en el sistema
+  </div>
+
   <!-- Acciones (solo pantalla) -->
   <div class="no-print" style="margin-top:1.5rem; display:flex; flex-direction:column; gap:0.8rem; align-items:center;">
 

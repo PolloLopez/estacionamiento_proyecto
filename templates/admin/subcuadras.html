@@ -278,8 +278,11 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
 }).addTo(mapa);
 
-// Fuerza recalculo del tamaño por si el container tuvo cambios al renderizar
+// Fuerza recalculo del tamaño por si el container tuvo cambios al renderizar.
+// Se llama dos veces: inmediato (por si ya está listo) y con delay (por si el
+// grid/flex necesita un tick extra para calcular las dimensiones del container).
 mapa.invalidateSize();
+setTimeout(function() { mapa.invalidateSize(); }, 300);
 
 // ── Iconos ────────────────────────────────────────────────────────────────
 // Azul = zona pagada, Verde = zona libre, Naranja = marcador temporal al clickear
