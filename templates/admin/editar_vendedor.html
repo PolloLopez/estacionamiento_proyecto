@@ -18,8 +18,12 @@
       <div class="card">
         <h3 style="margin-bottom:1rem;">Datos del comercio</h3>
 
-        <label>Nombre de fantasía del negocio</label>
-        <input name="nombre" value="{{ vendedor.nombre }}" placeholder="Nombre del comercio" />
+        <label>Nombre del negocio / punto de venta</label>
+        <input name="nombre_negocio" value="{{ vendedor.nombre_negocio }}"
+               placeholder="Ej: Kiosco Don Juan, Farmacia Central" />
+
+        <label>Nombre de fantasía (interno)</label>
+        <input name="nombre" value="{{ vendedor.nombre }}" placeholder="Nombre de usuario del comercio" />
 
         <label>Nombre del propietario</label>
         <input name="nombre_propietario" value="{{ vendedor.nombre_propietario }}" placeholder="Ej: María García" />

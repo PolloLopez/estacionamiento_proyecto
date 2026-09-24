@@ -77,15 +77,22 @@ function nombreMostrar(device) {
 
 /**
  * Guarda info del dispositivo activo para reconexión posterior.
+ * Si se pasa `perfil`, también lo guarda para usarlo primero en la próxima conexión
+ * y así saltear la iteración de perfiles conocidos (ahorra ~300-600ms por conexión).
  * Se llama siempre que se conecta exitosamente.
  */
-function guardarInfoImpresora(device) {
+function guardarInfoImpresora(device, perfil) {
   try {
-    localStorage.setItem(_INFO_KEY, JSON.stringify({
+    var data = {
       id:    device.id,
       name:  device.name || '',
       alias: obtenerAlias(device.id) || device.name || 'Impresora BLE',
-    }));
+    };
+    if (perfil) {
+      data.perfil_servicio = perfil.servicio;
+      data.perfil_caract   = perfil.caract;
+    }
+    localStorage.setItem(_INFO_KEY, JSON.stringify(data));
   } catch (_) {}
 }
 
@@ -112,7 +119,7 @@ async function conectarImpresora() {
     optionalServices: UUID_SERVICIOS_OPT,
   });
   var conexion = await _abrirConexion(device);
-  guardarInfoImpresora(device);   // persiste para reconexiones futuras
+  guardarInfoImpresora(device, conexion.perfil);   // persiste device + perfil para reconexiones futuras
   return conexion;
 }
 
@@ -138,12 +145,12 @@ async function reconectarImpresora() {
       var devs = await navigator.bluetooth.getDevices();
       if (devs.length) {
         var device = devs[0];
-        guardarInfoImpresora(device);
 
-        // Esperamos el anuncio BLE (5s) antes de conectar: mucho más confiable
+        // Esperamos el anuncio BLE (3s) antes de conectar: mucho más confiable
         // que llamar gatt.connect() en frío, especialmente después de navegar entre páginas.
         try {
-          var cx = await _conectarViaAnuncio(device, 5000);
+          var cx = await _conectarViaAnuncio(device, 3000);
+          guardarInfoImpresora(device, cx.perfil);   // persiste perfil exitoso
           return cx;
         } catch (eAnuncio) {
           console.warn('[BLE] watchAdvertisements falló o timeout:', eAnuncio.message);
@@ -151,7 +158,9 @@ async function reconectarImpresora() {
 
         // Fallback dentro del mismo dispositivo: connect directo con reintentos
         try {
-          return await _abrirConexionConReintentos(device, 3);
+          var cxDirecto = await _abrirConexionConReintentos(device, 3);
+          guardarInfoImpresora(device, cxDirecto.perfil);
+          return cxDirecto;
         } catch (eDirecto) {
           console.warn('[BLE] connect directo falló tras reintentos:', eDirecto.message);
         }
@@ -171,7 +180,7 @@ async function reconectarImpresora() {
         optionalServices: UUID_SERVICIOS_OPT,
       });
       var conexion = await _abrirConexionConReintentos(device, 2);
-      guardarInfoImpresora(device);
+      guardarInfoImpresora(device, conexion.perfil);
       return conexion;
     } catch (e) {
       console.warn('[BLE] reconexión por nombre falló:', e.message);
@@ -242,11 +251,29 @@ async function _abrirConexionConReintentos(device, intentos) {
 
 /**
  * Conecta al GATT server y encuentra la primera característica de escritura.
+ *
+ * Optimización: si hay un perfil guardado en localStorage de una conexión anterior
+ * exitosa, lo intenta primero antes de iterar todos los perfiles conocidos.
+ * Esto ahorra 300-600ms por reconexión (cada perfil fallido es un round-trip BLE).
  */
 async function _abrirConexion(device) {
   var server = await device.gatt.connect();
 
-  // Probar perfiles conocidos primero
+  // Intentar el perfil guardado de la última conexión exitosa (más rápido)
+  var infoGuardada = obtenerInfoImpresora();
+  if (infoGuardada && infoGuardada.perfil_servicio) {
+    try {
+      var svc    = await server.getPrimaryService(infoGuardada.perfil_servicio);
+      var caract = await svc.getCharacteristic(infoGuardada.perfil_caract);
+      console.log('[BLE] Perfil guardado (rápido):', infoGuardada.perfil_servicio);
+      return { device: device, caracteristica: caract,
+               perfil: { servicio: infoGuardada.perfil_servicio, caract: infoGuardada.perfil_caract } };
+    } catch (_) {
+      console.warn('[BLE] Perfil guardado falló, probando todos...');
+    }
+  }
+
+  // Probar perfiles conocidos en orden
   for (var i = 0; i < PERFILES_BLE.length; i++) {
     var perfil = PERFILES_BLE[i];
     try {
@@ -337,13 +364,17 @@ async function reconectarSilencioso() {
 
     // Intentar vía anuncio BLE (más confiable, especialmente post-disconnect de copia 1)
     try {
-      return await _conectarViaAnuncio(device, 4000);
+      var cx = await _conectarViaAnuncio(device, 3000);
+      guardarInfoImpresora(device, cx.perfil);
+      return cx;
     } catch (eAnuncio) {
       console.warn('[BLE] watchAdvertisements silencioso falló:', eAnuncio.message);
     }
 
     // Fallback: connect directo con reintentos
-    return await _abrirConexionConReintentos(device, 3);
+    var cxDirecto2 = await _abrirConexionConReintentos(device, 3);
+    guardarInfoImpresora(device, cxDirecto2.perfil);
+    return cxDirecto2;
   } catch (e) {
     console.warn('[BLE] reconexión silenciosa falló:', e.message);
     return null;
