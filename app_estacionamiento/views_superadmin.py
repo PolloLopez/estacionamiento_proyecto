@@ -311,6 +311,25 @@ def editar_municipio(request, municipio_id):
             messages.success(request, "Configuración general guardada.")
             return redirect("editar_municipio", municipio_id=municipio.id)
 
+        # ── Sección: configuración del módulo reintegro ─────────────────
+        # Acción separada para no pisar checkboxes ni otros campos de guardar_general.
+        if accion == "guardar_reintegro":
+            def _entero_r(nombre, fallback):
+                val = request.POST.get(nombre, "").strip()
+                try:
+                    return int(val)
+                except (ValueError, TypeError):
+                    return fallback
+
+            municipio.reintegro_minutos     = _entero_r("reintegro_minutos",     municipio.reintegro_minutos)
+            municipio.reintegro_max_por_dia = _entero_r("reintegro_max_por_dia", municipio.reintegro_max_por_dia)
+            alcance_r = request.POST.get("reintegro_alcance", "").strip()
+            if alcance_r in ("todos", "residentes"):
+                municipio.reintegro_alcance = alcance_r
+            municipio.save()
+            messages.success(request, "Configuración de reintegro guardada.")
+            return redirect("editar_municipio", municipio_id=municipio.id)
+
         # ── Sección: facturación de la plataforma ────────────────────────
         if accion == "guardar_facturacion":
             municipio.cuota_mantenimiento_mensual = _decimal(
