@@ -5,7 +5,12 @@ Lógica de negocio para verificar el estado de un vehículo en la vía pública.
 Responsabilidades:
 - Determinar si un vehículo está pagado, en deuda, exento o con abono activo
 - Registrar la verificación del inspector (trazabilidad)
-- Calcular tolerancia entre verificaciones consecutivas
+
+Nota sobre tolerancia:
+La tolerancia del negocio es post-infracción (conductor tiene N minutos para
+acreditar estacionamiento y anular el acta — ver calcular_estado_tolerancia en
+services/infracciones.py). NO existe restricción de tiempo entre verificaciones
+del inspector: puede verificar un vehículo las veces que considere necesario.
 """
 
 from datetime import date, timedelta
@@ -25,10 +30,6 @@ from app_estacionamiento.models import (
     Vehiculo,
 )
 
-# Minutos de tolerancia entre verificaciones sucesivas del inspector.
-# Distinto de municipio.tolerancia_multa_minutos (que es la ventana de pago de multas).
-_TOLERANCIA_INSPECTOR_MINUTOS = 15
-
 
 def _url_infraccion(patente):
     """URL de alta de infracción pre-cargada con la patente."""
@@ -45,9 +46,8 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
     3. Estacionamiento activo       → PAGADO
     4. Abono mensual vigente        → ABONO_ACTIVO
     5. Exento parcial en subcuadra  → EXENTO_PARCIAL
-    6. Dentro de tolerancia         → PENDIENTE_PAGO
-    7. Infracción reciente (<15min) → INFRACCION_RECIENTE
-    8. Sin pago                     → IMPAGO
+    6. Infracción reciente (<N min) → INFRACCION_RECIENTE
+    7. Sin pago                     → IMPAGO
 
     Registra siempre la verificación para trazabilidad.
     """
@@ -63,11 +63,6 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
             subcuadras_exentas=[],
             registrar_infraccion_url=_url_infraccion(patente),
         )
-
-    # Guardar la verificación anterior ANTES de crear la nueva (para tolerancia)
-    verificacion_anterior = VerificacionInspector.objects.filter(
-        vehiculo=vehiculo
-    ).order_by("-fecha").first()
 
     VerificacionInspector.objects.create(
         vehiculo=vehiculo,
@@ -141,18 +136,7 @@ def verificar_estado_vehiculo(patente, usuario, subcuadra):
                 registrar_infraccion_url=_url_infraccion(patente),
             )
 
-    # 5. TOLERANCIA del inspector (entre verificaciones sucesivas)
-    if verificacion_anterior:
-        tiempo_desde_ultima = timezone.now() - verificacion_anterior.fecha
-        if tiempo_desde_ultima <= timedelta(minutes=_TOLERANCIA_INSPECTOR_MINUTOS):
-            return ResultadoVerificacion(
-                patente=patente,
-                estado=EstadoVehiculo.PENDIENTE_PAGO,
-                subcuadras_exentas=[],
-                estacionamiento_activo=False,
-            )
-
-    # 6. INFRACCIÓN RECIENTE — ya existe un acta en los últimos N minutos.
+    # 5. INFRACCIÓN RECIENTE — ya existe un acta en los últimos N minutos.
     # Sin este chequeo el inspector vería el botón INFRACCIONAR y recién
     # descubriría el duplicado al enviar el formulario (mala UX).
     # El plazo lo configura el superadmin en editar_municipio; fallback al default.

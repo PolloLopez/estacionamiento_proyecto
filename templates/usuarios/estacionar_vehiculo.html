@@ -339,7 +339,7 @@ const URL_SUBCUADRA_CERCANA = "{% url 'conductor_subcuadra_cercana' %}";
 
 // Array de subcuadras para el selector manual en cascada
 var SUBCUADRAS = [
-  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: {{ s.altura }}, tipo_zona: "{{ s.tipo_zona }}"},
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: {{ s.altura }}, tipo_zona: "{{ s.tipo_zona|escapejs }}"},
   {% endfor %}
 ];
 

@@ -63,19 +63,6 @@
           {% endif %}
         </div>
 
-        <!-- Selector tipo: Auto / Moto -->
-<div style="display:flex; justify-content:center; gap:0.6rem; margin-bottom:0.75rem;">
-          <input type="radio" id="tipo-auto" name="tipo" value="auto"
-                 class="tipo-radio" style="display:none;"
-                 {% if tipo_seleccionado != 'moto' %}checked{% endif %}>
-          <label for="tipo-auto" class="tipo-btn">🚗 Auto</label>
-
-          <input type="radio" id="tipo-moto" name="tipo" value="moto"
-                 class="tipo-radio" style="display:none;"
-                 {% if tipo_seleccionado == 'moto' %}checked{% endif %}>
-          <label for="tipo-moto" class="tipo-btn">🏍️ Moto</label>
-        </div>
-
         <!-- Banner zona libre: se muestra cuando la subcuadra activa es tipo_zona=libre.
              Oculta el input de patente porque no corresponde verificar ni multar. -->
         <div id="banner-zona-libre-inspector" style="display:none; background:#d4edda; color:#155724;
@@ -291,36 +278,22 @@ function aplicarZonaLibreInspector(esLibre) {
 // El formulario solo existe dentro del horario de cobro.
 // Todos los listeners que dependen de él se registran condicionalmente.
 if (form && input) {
-    // Cambiar placeholder según tipo de vehículo y limpiar el input.
-    // Al cambiar de auto a moto (o viceversa) el formato de patente cambia,
-    // así que limpiamos el valor para que el inspector ingrese la nueva patente.
-    function actualizarPlaceholder() {
-        const esMoto = document.getElementById("tipo-moto").checked;
-        input.placeholder = esMoto ? "123ABC" : "AAA111";
-    }
-    function cambiarTipo() {
-        actualizarPlaceholder();
-        input.value = "";
-        // Ocultar el botón de submit al limpiar
-        const btnVerificar = document.getElementById("btn-verificar");
-        if (btnVerificar) btnVerificar.style.display = "none";
-        input.focus();
-    }
-    document.getElementById("tipo-auto").addEventListener("change", cambiarTipo);
-    document.getElementById("tipo-moto").addEventListener("change", cambiarTipo);
-    actualizarPlaceholder();
+    // Placeholder genérico — el sistema acepta todos los formatos (auto y moto).
+    input.placeholder = "AAA111 / AA111BB / 123ABC";
 
     input.addEventListener("input", () => {
         // Normalizar: solo letras y números, todo mayúscula.
         // Para motos: el guion "123-ABC" no se guarda, solo "123ABC".
         input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
-        const val    = input.value;
-        const esMoto = document.getElementById("tipo-moto").checked;
+        const val = input.value;
 
+        // Acepta todos los formatos válidos de patente argentina:
+        // AAA111 (autos viejos), AA111BB (Mercosur), 123ABC (motos).
+        // Ya no se distingue por tipo de vehículo seleccionado — la patente define el formato.
         const esValida =
-            /^[A-Z]{3}[0-9]{3}$/.test(val)        ||  // AAA111   — autos viejos
-            /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val)||  // AA111BB  — autos nuevos (Mercosur)
-            (esMoto && /^[0-9]{3}[A-Z]{3}$/.test(val)); // 123ABC — motos
+            /^[A-Z]{3}[0-9]{3}$/.test(val)         ||  // AAA111  — autos viejos
+            /^[A-Z]{2}[0-9]{3}[A-Z]{2}$/.test(val) ||  // AA111BB — autos nuevos (Mercosur)
+            /^[0-9]{3}[A-Z]{3}$/.test(val);             // 123ABC  — motos
 
         if (esValida) form.submit();
 
@@ -366,7 +339,7 @@ window.onload = () => {
 
 // ── Cascade Calle → Altura ────────────────────────────────────────
 var SUBCUADRAS_INS = [
-  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}", tipo_zona: "{{ s.tipo_zona }}"},
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: "{{ s.altura|escapejs }}", tipo_zona: "{{ s.tipo_zona|escapejs }}"},
   {% endfor %}
 ];
 
