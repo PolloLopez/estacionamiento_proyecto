@@ -187,48 +187,6 @@
             <small style="color:var(--color-text-muted);">El conductor no puede cargar más de este monto en una sola operación.</small>
           </div>
 
-          {# ── Módulo: Reintegro de estacionamiento ── #}
-          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
-            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
-              Módulo reintegro de estacionamiento
-            </p>
-            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
-              Configuración del crédito de saldo que el municipio otorga por los primeros N minutos de cada estacionamiento.
-              Solo aplica si el módulo <strong>Reintegro de estacionamiento para vecinos</strong> está activo.
-            </p>
-
-            <div style="margin-bottom:0.75rem;">
-              <label style="font-size:0.85rem; font-weight:600;">Minutos a reintegrar por estacionamiento</label>
-              <input type="number" name="reintegro_minutos" min="1" max="120" step="1"
-                     value="{{ municipio.reintegro_minutos }}"
-                     style="width:100%; margin-top:0.25rem;">
-              <small style="color:var(--color-text-muted);">Cuántos minutos se acreditan como saldo al conductor. Defecto: 30 min.</small>
-            </div>
-
-            <div style="margin-bottom:0.75rem;">
-              <label style="font-size:0.85rem; font-weight:600;">Máx. reintegros por día (por conductor)</label>
-              <input type="number" name="reintegro_max_por_dia" min="1" max="10" step="1"
-                     value="{{ municipio.reintegro_max_por_dia }}"
-                     style="width:100%; margin-top:0.25rem;">
-              <small style="color:var(--color-text-muted);">Límite diario de reintegros que un mismo conductor puede recibir. Defecto: 1.</small>
-            </div>
-
-            <div style="margin-bottom:0.75rem;">
-              <label style="font-size:0.85rem; font-weight:600;">Alcance del reintegro</label>
-              <select name="reintegro_alcance" style="width:100%; margin-top:0.25rem;">
-                <option value="residentes" {% if municipio.reintegro_alcance == "residentes" %}selected{% endif %}>
-                  Solo residentes verificados
-                </option>
-                <option value="todos" {% if municipio.reintegro_alcance == "todos" %}selected{% endif %}>
-                  Todos los conductores
-                </option>
-              </select>
-              <small style="color:var(--color-text-muted);">
-                "Solo residentes" requiere que el admin verifique manualmente cada conductor como vecino del municipio.
-              </small>
-            </div>
-          </div>
-
           {# ── Descuento para conductores verificados ── #}
           <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
             <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.5px;">
@@ -636,6 +594,57 @@
           <button type="submit" class="btn btn-outline"
                   style="font-size:0.78rem; padding:0.3rem 0.6rem; white-space:nowrap;">
             💾 Guardar precios
+          </button>
+        </form>
+        {% endif %}
+
+        {# Configuración específica del módulo reintegro — solo cuando está activo #}
+        {% if m.clave == "reintegro_residentes" and m.activo %}
+        <form method="post" action="{% url 'editar_municipio' municipio.id %}"
+              style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid var(--color-border);">
+          {% csrf_token %}
+          <input type="hidden" name="accion" value="guardar_reintegro">
+          <p style="font-size:0.78rem; font-weight:700; color:var(--color-text-muted);
+                    text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.5rem;">
+            Configuración del reintegro
+          </p>
+          <div style="margin-bottom:0.6rem;">
+            <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">
+              Minutos a reintegrar por estacionamiento
+            </label>
+            <input type="number" name="reintegro_minutos" min="1" max="120" step="1"
+                   value="{{ municipio.reintegro_minutos }}"
+                   style="width:100%; font-size:0.85rem;">
+            <small style="color:var(--color-text-muted);">Minutos que se acreditan como saldo al conductor. Defecto: 30.</small>
+          </div>
+          <div style="margin-bottom:0.6rem;">
+            <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">
+              Máx. reintegros por día (por conductor)
+            </label>
+            <input type="number" name="reintegro_max_por_dia" min="1" max="10" step="1"
+                   value="{{ municipio.reintegro_max_por_dia }}"
+                   style="width:100%; font-size:0.85rem;">
+            <small style="color:var(--color-text-muted);">Límite diario por conductor. Defecto: 1.</small>
+          </div>
+          <div style="margin-bottom:0.6rem;">
+            <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">
+              Alcance del reintegro
+            </label>
+            <select name="reintegro_alcance" style="width:100%; font-size:0.85rem;">
+              <option value="residentes" {% if municipio.reintegro_alcance == "residentes" %}selected{% endif %}>
+                Solo residentes verificados
+              </option>
+              <option value="todos" {% if municipio.reintegro_alcance == "todos" %}selected{% endif %}>
+                Todos los conductores
+              </option>
+            </select>
+            <small style="color:var(--color-text-muted);">
+              "Solo residentes" requiere que el admin verifique manualmente a cada vecino.
+            </small>
+          </div>
+          <button type="submit" class="btn btn-outline"
+                  style="font-size:0.78rem; padding:0.3rem 0.6rem; white-space:nowrap;">
+            💾 Guardar configuración
           </button>
         </form>
         {% endif %}
