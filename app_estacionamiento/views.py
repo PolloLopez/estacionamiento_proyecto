@@ -61,6 +61,7 @@ from .views_vendedor import (
     mis_comisiones,
     certificar_comision,
     presentar_factura,
+    cargar_saldo_vendedor,
 )
 from .views_conductor import (
     inicio_usuarios,

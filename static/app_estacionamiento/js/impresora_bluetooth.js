@@ -453,6 +453,7 @@ function generarTicketInfraccion(d) {
 
   // Init
   push(ESC, 0x40);
+  push(GS, 0x21, 0x10);           // doble alto por defecto → texto ~2x más grande
 
   // Encabezado
   push(ESC, 0x61, 0x01);      // centro
@@ -470,8 +471,8 @@ function generarTicketInfraccion(d) {
   // Patente grande — en modo doble-ancho entran ANCHO/2 columnas
   push(GS, 0x21, 0x11);       // doble alto+ancho
   linea(centrar(d.patente, Math.floor(ANCHO / 2)));
-  push(GS, 0x21, 0x00);
-  linea(centrar(_norm(d.tipo_vehiculo)));    // modo normal: ANCHO completo
+  push(GS, 0x21, 0x10);      // vuelve a doble alto (modo base)
+  linea(centrar(_norm(d.tipo_vehiculo)));    // doble alto, ANCHO completo
   linea(SEP);
 
   // Datos
@@ -488,7 +489,7 @@ function generarTicketInfraccion(d) {
   push(ESC, 0x45, 0x01);
   linea(centrar('$' + d.monto, Math.floor(ANCHO / 2)));
   push(ESC, 0x45, 0x00);
-  push(GS, 0x21, 0x00);
+  push(GS, 0x21, 0x10);      // vuelve a doble alto (modo base)
   linea(SEP);
 
   // Inspector

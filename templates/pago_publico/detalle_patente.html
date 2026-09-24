@@ -57,8 +57,8 @@
   {% endif %}
 
   <!-- ══ 1b. INFRACCIONES RECIENTES YA RESUELTAS ════════════════════════ -->
-  {# Se muestran cuando el conductor escanea un QR de infracción ya pagada/anulada,
-     para evitar confusión: ve el estado real antes de intentar estacionar. #}
+  <!-- Se muestran cuando el conductor escanea un QR de infracción ya pagada/anulada,
+     para evitar confusión: ve el estado real antes de intentar estacionar. -->
   {% if infracciones_recientes %}
   <div class="card" style="margin-bottom:1.25rem; border-left:4px solid var(--color-text-muted);">
     <h2 style="font-size:1rem; margin-bottom:0.75rem; color:var(--color-text-muted);">
@@ -77,13 +77,13 @@
       <div>
         {% if inf.estado == "pagada" %}
           <span style="background:#d4edda; color:#155724; padding:0.2rem 0.7rem;
-                       border-radius:20px; font-size:0.8rem; font-weight:700;">✅ Pagada</span>
+                       border-radius:20px; font-size:1rem; font-weight:700;">✅ Pagada</span>
         {% elif inf.estado == "anulada" %}
           <span style="background:#e2e3e5; color:#383d41; padding:0.2rem 0.7rem;
-                       border-radius:20px; font-size:0.8rem; font-weight:700;">🚫 Anulada</span>
+                       border-radius:20px; font-size:1rem; font-weight:700;">🚫 Anulada</span>
         {% elif inf.estado == "cancelada" %}
           <span style="background:#fff3cd; color:#856404; padding:0.2rem 0.7rem;
-                       border-radius:20px; font-size:0.8rem; font-weight:700;">↩️ Cancelada</span>
+                       border-radius:20px; font-size:1rem; font-weight:700;">↩️ Cancelada</span>
         {% endif %}
       </div>
     </div>

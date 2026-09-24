@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Proyecto
 
-Última actualización: 2026-09-21 (sesión 14 — continuación)
+Última actualización: 2026-09-24 (sesión 18)
 
 ---
 
@@ -123,6 +123,30 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 - **`/admin/mapa-infracciones/` — errores de consola**: Los `ChunkLoadError` son de la extensión de Chrome **Excalidraw** (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código de la app. La traza viene de `content.js:2` (content script de la extensión). La página funciona correctamente con Leaflet/OSM. Verificar desactivando la extensión. El banner "beforeinstallprompt" es del PWA y es intencional.
 - **Inspector cancela infraccion** — Asmin autoriza por municipio: Inspector cancela infraccion, otorgando un periodo de tiempo desde el momento de la infraccion. 
 - **Conductor** Al seleccionar sub cuadra, debe ver entre y entre. ver como implementar
+
+---
+
+## ✅ Resuelto (sesión 18 — 2026-09-24)
+
+- **Datalist cascade en `registrar_infraccion.html`**: reemplazado patrón viejo `<select>` + evento `change` por `<datalist>` con `<input list="...">`. Dos inputs: calle (con datalist de calles únicas) y altura (datalist filtrado por calle seleccionada). Evento `input` en lugar de `change` — reacciona mientras el inspector escribe, no solo al perder foco. `inputmode="numeric"` en el campo altura para teclado numérico en móvil. Al haber una sola altura para la calle elegida, se autoselecciona y se llena el `hidden-subcuadra` automáticamente.
+
+- **Menú hamburguesa — X en rojo cuando está abierto**: `.menu-toggle.abierto span { background: #e74c3c; }` en `global.css`. Garantiza contraste visible del ícono X sobre cualquier color de fondo de la navbar.
+
+- **Dark mode en `historial_infracciones.html`**: dos colores hardcodeados reemplazados por variables CSS existentes — `#f0fdf4` → `var(--color-success-bg)` (descuento disponible), `var(--color-danger-light)` (variable inexistente) → `var(--color-warning-bg)` + `border: 1px solid var(--color-warning)` (pago fuera del período de gracia).
+
+- **Flag `inspector_ve_sus_infracciones` en `panel_inspectores`**: la vista no lo pasaba al contexto. Agregado `"inspector_ve_sus_infracciones": getattr(municipio, "inspector_ve_sus_infracciones", False)` al `render()`. El template ya tenía el `{% if %}` correcto — solo faltaba el dato.
+
+- **`accionRenombrar()` — falla silenciosa en path de localStorage**: cuando `getDevices()` devuelve vacío (bug conocido de Chrome al navegar), el código tomaba el path de localStorage pero nunca llamaba a `mostrarRenombrado(device)`, por lo que `cont.dataset.deviceId` quedaba vacío y la función salía sin hacer nada. Fix: en el path de localStorage se puebla explícitamente `cont-renombrar` con `info.id`, `info.alias` y `info.name` antes de mostrar el panel de renombrado.
+
+- **SIA `PATENTE_NO_COINCIDE` — confirmación de patente antes de infraccionar**: en lugar de solo mostrar el error, se presenta un mini-diálogo "¿Ingresaste bien la patente XX?" con dos botones: "↩ No, corregir patente" (resetea el modal SIA) y "🚨 Sí, infraccionar igual" (redirige a `/inspectores/infraccion/?patente=XX`). Diferencia error humano vs. patente de vehículo diferente al QR.
+
+- **`ticket_infraccion.html` — solo opciones de impresión**: eliminado botón "🔍 Verificar otro vehículo" y link "Omitir impresión →". Después de generar un acta, la pantalla solo muestra el ticket y las opciones de impresión BLE. Se eliminó también la clase CSS `.btn-verificar` y todas las referencias a `btnVer` en JS (evitando TypeError por elemento inexistente).
+
+- **BLE impresora — reconexión via `watchAdvertisements()`**: reconexión más robusta para el problema de desvinculación en cada impresión. Estrategia en `reconectarSilencioso()`: (1) `watchAdvertisements()` 4s — espera que la impresora emita un anuncio BLE antes de conectar, (2) reintentos directos gatt.connect() x3 con 600ms entre intentos. `reconectarImpresora()` agrega un tercer nivel: `requestDevice` con filtro por nombre si los dos anteriores fallan. Agregado delay de 800ms antes de la reconexión para copia 2 para que el ciclo de desconexión anterior complete. Razón del problema original: `gatt.connect()` en frío fallaba porque la impresora aún no estaba en modo advertising tras la desconexión previa.
+
+- **Reintegro unificado en Módulos de pago**: eliminado el bloque "Módulo reintegro de estacionamiento" de ⚙️ Configuración general. Los campos `reintegro_minutos`, `reintegro_max_por_dia` y `reintegro_alcance` ahora aparecen directamente dentro del card del módulo `reintegro_residentes` en 🧩 Módulos de pago, pero solo cuando el módulo está activo. Nueva acción `guardar_reintegro` en `views_superadmin.py` para guardar únicamente esos 3 campos sin riesgo de pisar checkboxes ni otros campos de `guardar_general`.
+
+- **`btn-confirmar-est` — botón siempre deshabilitado tras error POST**: dos causas combinadas. Causa 1: los re-renders de error en `estacionar_vehiculo` devolvían un contexto mínimo sin `saldo_conductor` ni `opciones_duracion` → el JS recibía `SALDO_CONDUCTOR = 0` → cualquier costo > 0 bloqueaba el botón permanentemente. Fix: función `_contexto_base(extra=None)` dentro de la vista, usada en los 4 puntos de retorno de error para garantizar contexto completo. Causa 2 (UX): el botón solo se habilitaba al hacer clic en un botón de duración — el conductor no lo sabía. Fix: auto-click del primer `.duracion-btn` al final de `seleccionarVehiculo()` en el template, cuando no es día libre ni zona libre.
 
 ---
 

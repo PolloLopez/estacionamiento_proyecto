@@ -65,6 +65,37 @@
         </div>
       </div>
 
+      <!-- Duración mínima configurable -->
+      <div class="campo-fila" id="fila-duracion_minima">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Duración mínima por ticket</span>
+            <span class="campo-ayuda">Mínimo que puede comprar un conductor. El máximo lo da el horario de cierre.</span>
+          </div>
+          <span class="campo-valor">{{ tarifa_actual.duracion_minima_minutos|default:30 }} min</span>
+          <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.75rem;white-space:nowrap;" onclick="editarCampo('duracion_minima')">✏️ Editar</button>
+        </div>
+        <div class="campo-edit-zona">
+          <div class="campo-label-grupo" style="min-width:160px;">
+            <span class="campo-label">Duración mínima por ticket</span>
+            <span class="campo-ayuda">Múltiplo de 30 min. El máximo lo define el horario.</span>
+          </div>
+          <form id="form-duracion_minima" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            {% csrf_token %}
+            <input type="hidden" name="seccion" value="duracion_minima">
+            <select class="campo-input" name="duracion_minima_minutos" style="width:160px;" data-label="Duración mínima" data-actual="{{ tarifa_actual.duracion_minima_minutos|default:30 }}" data-prefijo="" data-sufijo=" min">
+              {% for opcion in duracion_minima_opciones %}
+              <option value="{{ opcion.valor }}" {% if opcion.valor == tarifa_actual.duracion_minima_minutos|default:30 %}selected{% endif %}>
+                {{ opcion.label }}
+              </option>
+              {% endfor %}
+            </select>
+            <button type="button" class="btn" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="guardarCampo('duracion_minima','form-duracion_minima')">Guardar</button>
+            <button type="button" class="btn btn-outline" style="font-size:0.85rem;padding:0.3rem 0.85rem;" onclick="cancelarEdicion('duracion_minima')">Cancelar</button>
+          </form>
+        </div>
+      </div>
+
     </div>
   </div>
 
