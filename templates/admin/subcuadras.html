@@ -392,7 +392,8 @@ mapa.on("click", function(e) {
   document.getElementById("inp-lon").value = lon;
   document.querySelectorAll(".inp-lat-nueva").forEach(el => el.value = lat);
   document.querySelectorAll(".inp-lon-nueva").forEach(el => el.value = lon);
-  document.getElementById("coord-texto").textContent = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  // lat y lon ya son strings (vienen de .toFixed(6) arriba), no se puede llamar .toFixed() de nuevo
+  document.getElementById("coord-texto").textContent = `${lat}, ${lon}`;
 
   // Mostrar panel
   const panel = document.getElementById("panel-asignar");
