@@ -197,15 +197,15 @@
               Infracción <strong>#{{ i.id }}</strong> · <strong>{{ i.vehiculo.patente }}</strong>
             </p>
             {% if i.descuento_preview %}
-              <div style="background:#f0fdf4; border:1px solid var(--color-primary);
+              <div style="background:var(--color-success-bg); border:1px solid var(--color-primary);
                           border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
                 <strong style="color:var(--color-primary);">🏷️ {{ i.descuento_preview.motivo }}</strong><br>
                 Original: <span style="text-decoration:line-through;">${{ i.monto }}</span><br>
                 <strong>Pagás: ${{ i.descuento_preview.monto_final|floatformat:2 }}</strong>
               </div>
             {% else %}
-              <div style="background:var(--color-danger-light, #fff3cd);
-                          border:1px solid var(--color-danger, #e5a000);
+              <div style="background:var(--color-warning-bg);
+                          border:1px solid var(--color-warning);
                           border-radius:6px; padding:0.75rem; margin-bottom:1rem;">
                 Fuera del período de gracia{% if tolerancia_min %} ({{ tolerancia_min }} min){% endif %}.<br>
                 Se descontarán <strong>${{ i.monto }}</strong> de tu saldo.

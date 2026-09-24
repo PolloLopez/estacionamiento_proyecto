@@ -40,20 +40,21 @@
             📍 Subcuadra actual
             <span id="gps-estado" style="font-weight:400; text-transform:none; margin-left:0.4rem;"></span>
           </label>
-          <!-- Cascade Calle → Altura. subcuadra_activa se preselecciona vía JS -->
+          <!-- Cascade Calle → Altura con autocomplete (datalist).
+               sel-calle: texto libre con sugerencias. sel-altura: teclado numérico con sugerencias. -->
           <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-            <select id="sel-calle"
-                    style="flex:1; min-width:110px; padding:0.5rem 0.65rem; border-radius:8px;
-                           border:2px solid var(--color-border); background:var(--color-surface);
-                           color:var(--color-text); font-size:0.9rem; font-weight:600;">
-              <option value="">— Calle —</option>
-            </select>
-            <select id="sel-altura"
-                    style="flex:1; min-width:80px; padding:0.5rem 0.65rem; border-radius:8px;
-                           border:2px solid var(--color-border); background:var(--color-surface);
-                           color:var(--color-text); font-size:0.9rem; font-weight:600;" disabled>
-              <option value="">— Altura —</option>
-            </select>
+            <input id="sel-calle" list="list-calles" autocomplete="off"
+                   placeholder="Escribí la calle..."
+                   style="flex:1; min-width:110px; padding:0.5rem 0.65rem; border-radius:8px;
+                          border:2px solid var(--color-border); background:var(--color-surface);
+                          color:var(--color-text); font-size:0.9rem; font-weight:600;">
+            <datalist id="list-calles"></datalist>
+            <input id="sel-altura" list="list-alturas" inputmode="numeric" autocomplete="off"
+                   placeholder="Altura" disabled
+                   style="flex:1; min-width:80px; padding:0.5rem 0.65rem; border-radius:8px;
+                          border:2px solid var(--color-border); background:var(--color-surface);
+                          color:var(--color-text); font-size:0.9rem; font-weight:600;">
+            <datalist id="list-alturas"></datalist>
           </div>
           <input type="hidden" name="subcuadra_id" id="subcuadra_sel"
                  value="{{ subcuadra_activa.id|default:'' }}">
@@ -246,12 +247,18 @@
 <audio id="error" src="{% static 'sounds/error.mp3' %}"></audio>
 
 <script>
+// ── SUBCUADRAS_INS — definido al principio para que esté disponible en todos los IIFE ──
+// (antes estaba al final del bloque y causaba TypeError al ser accedido antes de definirse)
+var SUBCUADRAS_INS = [
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: "{{ s.altura|escapejs }}", tipo_zona: "{{ s.tipo_zona|escapejs }}"},
+  {% endfor %}
+];
+
 const input = document.getElementById("patente");
 const form  = document.getElementById("form");
 
 // ── Zona libre inspector ──────────────────────────────────────────────────────
 // Bloquea el input de patente y muestra un aviso cuando la subcuadra es libre.
-// También chequea la subcuadra_activa que llega desde el servidor al cargar la página.
 function aplicarZonaLibreInspector(esLibre) {
   const banner     = document.getElementById("banner-zona-libre-inspector");
   const contenedor = document.getElementById("contenedor-patente");
@@ -263,17 +270,6 @@ function aplicarZonaLibreInspector(esLibre) {
     if (contenedor) contenedor.style.display = "block";
   }
 }
-
-// Verificar la subcuadra activa al cargar: si ya viene de sesión y es libre, bloquear.
-(function() {
-  var idActivo = "{{ subcuadra_activa.id|default:'' }}";
-  if (idActivo) {
-    var sub = SUBCUADRAS_INS.find(function(s) { return s.id == idActivo; });
-    if (sub && sub.tipo_zona === "libre") {
-      aplicarZonaLibreInspector(true);
-    }
-  }
-})();
 
 // El formulario solo existe dentro del horario de cobro.
 // Todos los listeners que dependen de él se registran condicionalmente.
@@ -337,72 +333,92 @@ window.onload = () => {
     }
 };
 
-// ── Cascade Calle → Altura ────────────────────────────────────────
-var SUBCUADRAS_INS = [
-  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: "{{ s.altura|escapejs }}", tipo_zona: "{{ s.tipo_zona|escapejs }}"},
-  {% endfor %}
-];
-
+// ── Cascade Calle → Altura con autocomplete (datalist) ───────────────────────
+// sel-calle: campo de texto con sugerencias de calles (escritura libre).
+// sel-altura: campo numérico con sugerencias de alturas disponibles para la calle elegida.
+// El campo oculto subcuadra_sel recibe el id de la subcuadra cuando calle+altura coinciden.
 (function initCascadeInspector() {
-  var selCalle  = document.getElementById("sel-calle");
-  var selAltura = document.getElementById("sel-altura");
-  var hidden    = document.getElementById("subcuadra_sel");
+  var selCalle    = document.getElementById("sel-calle");
+  var selAltura   = document.getElementById("sel-altura");
+  var listCalles  = document.getElementById("list-calles");
+  var listAlturas = document.getElementById("list-alturas");
+  var hidden      = document.getElementById("subcuadra_sel");
   if (!selCalle) return; // municipio con zona única — usa campo oculto directo
 
-  // Poblar calles únicas
+  // Poblar datalist de calles con valores únicos
   var callesVistas = {};
   SUBCUADRAS_INS.forEach(function(s) {
     if (!callesVistas[s.calle]) {
       callesVistas[s.calle] = true;
       var opt = document.createElement("option");
       opt.value = s.calle;
-      opt.textContent = s.calle === "Zona Única" ? "— Sin zona específica —" : s.calle;
-      selCalle.appendChild(opt);
+      listCalles.appendChild(opt);
     }
   });
 
-  selCalle.addEventListener("change", function() {
-    var calle = selCalle.value;
-    selAltura.innerHTML = '<option value="">— Altura —</option>';
+  // Puebla el datalist de alturas para la calle dada.
+  function poblarAlturas(calle) {
+    listAlturas.innerHTML = "";
+    selAltura.value = "";
     hidden.value = "";
-    if (!calle) { selAltura.disabled = true; return; }
     var filtradas = SUBCUADRAS_INS.filter(function(s) { return s.calle === calle; });
     filtradas.forEach(function(s) {
       var opt = document.createElement("option");
-      opt.value = s.id;
-      opt.textContent = s.altura;
-      selAltura.appendChild(opt);
+      opt.value = s.altura;
+      listAlturas.appendChild(opt);
     });
-    selAltura.disabled = false;
+    selAltura.disabled = filtradas.length === 0;
+    return filtradas;
+  }
+
+  // Al escribir / seleccionar una calle del datalist
+  selCalle.addEventListener("input", function() {
+    var calle = selCalle.value.trim();
+    var filtradas = poblarAlturas(calle);
+    aplicarZonaLibreInspector(false); // reset banner hasta que se elija altura
+    // Autocompletado: si solo hay una altura para esa calle, seleccionarla
     if (filtradas.length === 1) {
-      selAltura.value = filtradas[0].id;
+      selAltura.value = filtradas[0].altura;
       hidden.value = filtradas[0].id;
+      aplicarZonaLibreInspector(filtradas[0].tipo_zona === "libre");
     }
   });
 
-  selAltura.addEventListener("change", function() {
-    hidden.value = selAltura.value;
-    // Verificar si la subcuadra seleccionada es zona libre para bloquear el input.
-    var sub = SUBCUADRAS_INS.find(function(s) { return s.id == selAltura.value; });
-    aplicarZonaLibreInspector(sub && sub.tipo_zona === "libre");
+  // Al escribir / seleccionar una altura del datalist
+  selAltura.addEventListener("input", function() {
+    var calle  = selCalle.value.trim();
+    var altura = selAltura.value.trim();
+    var sub = SUBCUADRAS_INS.find(function(s) {
+      return s.calle === calle && s.altura === altura;
+    });
+    hidden.value = sub ? sub.id : "";
+    if (sub) aplicarZonaLibreInspector(sub.tipo_zona === "libre");
   });
 
-  // Preseleccionar la subcuadra_activa (guardada en sesión)
+  // Preseleccionar la subcuadra activa (guardada en sesión del servidor)
   var idActivo = "{{ subcuadra_activa.id|default:'' }}";
   if (idActivo) seleccionarSubcuadraInspector(idActivo);
 })();
 
+// Preselecciona calle+altura dados un subcuadra id.
+// También la llama el GPS cuando detecta la más cercana.
 function seleccionarSubcuadraInspector(id) {
   var sub = SUBCUADRAS_INS.find(function(s) { return s.id == id; });
   if (!sub) return;
-  var selCalle  = document.getElementById("sel-calle");
-  var selAltura = document.getElementById("sel-altura");
-  var hidden    = document.getElementById("subcuadra_sel");
+  var selCalle    = document.getElementById("sel-calle");
+  var selAltura   = document.getElementById("sel-altura");
+  var listAlturas = document.getElementById("list-alturas");
+  var hidden      = document.getElementById("subcuadra_sel");
   if (!selCalle) return;
+
+  // Setear calle y disparar "input" para que poblarAlturas() corra
   selCalle.value = sub.calle;
-  selCalle.dispatchEvent(new Event("change"));
-  selAltura.value = id;
-  hidden.value = id;
+  selCalle.dispatchEvent(new Event("input"));
+
+  // Setear la altura y el campo oculto directamente
+  selAltura.value = sub.altura;
+  hidden.value    = sub.id;
+  aplicarZonaLibreInspector(sub.tipo_zona === "libre");
 }
 
 // ── GPS: preseleccionar subcuadra más cercana ────────────────────
@@ -733,6 +749,24 @@ function enviarVerificacionSia(qrUrl) {
             detalles += "<br>Patente SIA: <strong>" + data.patente_sia + "</strong>";
         if (data.url_andis)
             detalles += "<br><a href='" + data.url_andis + "' target='_blank' rel='noopener' style='color:inherit;'>Ver en ANDIS ↗</a>";
+
+        // Caso especial: la patente del SIA no coincide con la controlada.
+        // Puede ser un error de tipeo del inspector. Pedimos confirmación antes de infraccionar.
+        if (data.estado === "PATENTE_NO_COINCIDE") {
+            var urlInfraccion = "{% url 'inspectores_registrar_infraccion' %}?patente=" + patente;
+            var confirmacion = "<div style='margin-top:0.75rem; display:flex; flex-direction:column; gap:0.5rem;'>"
+                + "<p style='font-size:0.88rem; margin:0 0 0.4rem;'>¿Ingresaste <strong>" + patente + "</strong>?</p>"
+                + "<button onclick='resetearModalSia()' class='btn btn-outline' style='font-size:0.85rem; padding:0.4rem 0.8rem;'>"
+                + "↩ No, corregir patente</button>"
+                + "<a href='" + urlInfraccion + "' class='btn btn-danger' style='font-size:0.85rem; padding:0.4rem 0.8rem; text-align:center;'>"
+                + "🚨 Sí, infraccionar igual</a>"
+                + "</div>";
+            mostrarResultadoSia("warn", data.mensaje + detalles + confirmacion);
+            document.getElementById("sia-estado").textContent = "";
+            _siaVerificando = false;
+            return;
+        }
+
         // Botón de re-verificar con countdown de 5 segundos
         var btnReverificar = "<div style='margin-top:0.75rem;'>"
             + "<button onclick='resetearModalSia()' class='btn btn-outline' "

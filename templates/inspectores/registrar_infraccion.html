@@ -31,19 +31,18 @@
     <div class="inf-field">
       <label>📍 Ubicación</label>
       <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-        <select id="sel-calle" class="inf-field select"
-                style="flex:1; min-width:110px; padding:0.6rem 0.75rem;
-                       border:1.5px solid var(--color-border); border-radius:8px;
-                       font-size:0.97rem; background:var(--color-surface); color:var(--color-text);">
-          <option value="">— Calle —</option>
-        </select>
-        <select id="sel-altura" class="inf-field select"
-                style="flex:1; min-width:80px; padding:0.6rem 0.75rem;
-                       border:1.5px solid var(--color-border); border-radius:8px;
-                       font-size:0.97rem; background:var(--color-surface); color:var(--color-text);"
-                disabled>
-          <option value="">— Altura —</option>
-        </select>
+        <input id="sel-calle" list="list-calles-inf" autocomplete="off"
+               placeholder="Escribí la calle..."
+               style="flex:1; min-width:110px; padding:0.6rem 0.75rem;
+                      border:1.5px solid var(--color-border); border-radius:8px;
+                      font-size:0.97rem; background:var(--color-surface); color:var(--color-text);">
+        <datalist id="list-calles-inf"></datalist>
+        <input id="sel-altura" list="list-alturas-inf" inputmode="numeric" autocomplete="off"
+               placeholder="Altura" disabled
+               style="flex:1; min-width:80px; padding:0.6rem 0.75rem;
+                      border:1.5px solid var(--color-border); border-radius:8px;
+                      font-size:0.97rem; background:var(--color-surface); color:var(--color-text);">
+        <datalist id="list-alturas-inf"></datalist>
       </div>
       <input type="hidden" name="subcuadra_id" id="hidden-subcuadra" required>
     </div>
@@ -145,46 +144,63 @@
   );
 }());
 
-// ── Cascade Calle → Altura ────────────────────────────────────────
+// ── Cascade Calle → Altura con autocomplete (datalist) ───────────────────────
 var SUBCUADRAS_INF = [
   {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: "{{ s.altura|escapejs }}"},
   {% endfor %}
 ];
 
 (function() {
-  var selCalle  = document.getElementById("sel-calle");
-  var selAltura = document.getElementById("sel-altura");
-  var hidden    = document.getElementById("hidden-subcuadra");
+  var selCalle    = document.getElementById("sel-calle");
+  var selAltura   = document.getElementById("sel-altura");
+  var listCalles  = document.getElementById("list-calles-inf");
+  var listAlturas = document.getElementById("list-alturas-inf");
+  var hidden      = document.getElementById("hidden-subcuadra");
 
-  // Poblar calles únicas
+  // Poblar datalist de calles únicas
   var callesVistas = {};
   SUBCUADRAS_INF.forEach(function(s) {
     if (!callesVistas[s.calle]) {
       callesVistas[s.calle] = true;
       var opt = document.createElement("option");
       opt.value = s.calle;
-      opt.textContent = s.calle;
-      selCalle.appendChild(opt);
+      listCalles.appendChild(opt);
     }
   });
 
-  selCalle.addEventListener("change", function() {
-    var calle = selCalle.value;
-    selAltura.innerHTML = '<option value="">— Altura —</option>';
+  // Puebla el datalist de alturas para la calle dada.
+  function poblarAlturas(calle) {
+    listAlturas.innerHTML = "";
+    selAltura.value = "";
     hidden.value = "";
-    if (!calle) { selAltura.disabled = true; return; }
     var filtradas = SUBCUADRAS_INF.filter(function(s) { return s.calle === calle; });
     filtradas.forEach(function(s) {
       var opt = document.createElement("option");
-      opt.value = s.id;
-      opt.textContent = s.altura;
-      selAltura.appendChild(opt);
+      opt.value = s.altura;
+      listAlturas.appendChild(opt);
     });
-    selAltura.disabled = false;
-    if (filtradas.length === 1) { selAltura.value = filtradas[0].id; hidden.value = filtradas[0].id; }
+    selAltura.disabled = filtradas.length === 0;
+    return filtradas;
+  }
+
+  selCalle.addEventListener("input", function() {
+    var calle = selCalle.value.trim();
+    var filtradas = poblarAlturas(calle);
+    // Si solo hay una altura para esa calle, autocompletar
+    if (filtradas.length === 1) {
+      selAltura.value = filtradas[0].altura;
+      hidden.value = filtradas[0].id;
+    }
   });
 
-  selAltura.addEventListener("change", function() { hidden.value = selAltura.value; });
+  selAltura.addEventListener("input", function() {
+    var calle  = selCalle.value.trim();
+    var altura = selAltura.value.trim();
+    var sub = SUBCUADRAS_INF.find(function(s) {
+      return s.calle === calle && s.altura === altura;
+    });
+    hidden.value = sub ? sub.id : "";
+  });
 
   // Preseleccionar subcuadra_default (viene de sesión del inspector)
   var defId = "{{ subcuadra_default|default:'' }}";
@@ -192,9 +208,9 @@ var SUBCUADRAS_INF = [
     var sub = SUBCUADRAS_INF.find(function(s) { return s.id == defId; });
     if (sub) {
       selCalle.value = sub.calle;
-      selCalle.dispatchEvent(new Event("change"));
-      selAltura.value = defId;
-      hidden.value = defId;
+      selCalle.dispatchEvent(new Event("input")); // pobla alturas
+      selAltura.value = sub.altura;
+      hidden.value = sub.id;
     }
   }
 })();

@@ -81,10 +81,11 @@ def panel_inspectores(request):
     }
 
     return render(request, "inspectores/panel_inspectores.html", {
-        "resumen":                resumen,
-        "cierres_sin_certificar": cierres_sin_certificar,
-        "mostrar_estadisticas":   mostrar_estadisticas,
-        "modulo_cobrador":        modulo_cobrador,
+        "resumen":                        resumen,
+        "cierres_sin_certificar":         cierres_sin_certificar,
+        "mostrar_estadisticas":           mostrar_estadisticas,
+        "modulo_cobrador":                modulo_cobrador,
+        "inspector_ve_sus_infracciones":  getattr(municipio, "inspector_ve_sus_infracciones", False),
     })
 
 

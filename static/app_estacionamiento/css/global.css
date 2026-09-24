@@ -245,6 +245,9 @@ main.container {
 .menu-toggle.abierto span:nth-child(2) { opacity: 0; transform: scaleX(0); }
 .menu-toggle.abierto span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
 
+/* X en rojo cuando el menú está abierto (contraste en cualquier fondo de navbar) */
+.menu-toggle.abierto span { background: #e74c3c; }
+
 /* Backdrop oscuro detrás del menú móvil.
    DEBE estar por debajo del navbar (z-index < 1000) porque el navbar crea
    un stacking context propio: sus hijos no pueden superar su z-index.
