@@ -321,9 +321,14 @@
 
 {% block extra_scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+{# json_script escapa automáticamente <, >, & y cualquier carácter especial.         #}
+{# Es la forma recomendada por Django para incrustar datos en bloques <script>.       #}
+{# Genera: <script type="application/json" id="marcadores-json">...</script>          #}
+{{ marcadores_list|json_script:"marcadores-json" }}
 <script>
-// Marcadores con coordenadas ya guardadas (desde el servidor)
-const marcadoresExistentes = {{ marcadores|safe }};
+// Marcadores con coordenadas ya guardadas (desde el servidor).
+// Se lee del elemento JSON embebido de forma segura (json_script).
+const marcadoresExistentes = JSON.parse(document.getElementById("marcadores-json").textContent);
 
 // Centro inicial: promedio de marcadores existentes, o Argentina por defecto
 let centroLat = -38.4;

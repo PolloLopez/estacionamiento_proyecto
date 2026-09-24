@@ -3051,30 +3051,26 @@ def gestionar_subcuadras(request, municipio_id=None):
     # GET: listar subcuadras del municipio
     subcuadras = Subcuadra.objects.filter(municipio=municipio).order_by("calle", "altura")
 
-    # Datos para el mapa: las que tienen coordenadas, con tipo_zona para colorearlas
-    import json as _json
-    # Escapar <, > y & para que el JSON sea seguro dentro de un bloque <script>.
-    # json.dumps no escapa estos caracteres por defecto, y si algún nombre de calle
-    # los contiene, el HTML parser los interpreta como tags y rompe el JS.
-    marcadores = _json.dumps(
-        [
-            {
-                "id":       s.id,
-                "nombre":   str(s),
-                "lat":      float(s.lat),
-                "lon":      float(s.lon),
-                "tipo_zona": s.tipo_zona,
-            }
-            for s in subcuadras if s.lat is not None and s.lon is not None
-        ],
-        ensure_ascii=False,
-    ).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    # Datos para el mapa: las que tienen coordenadas, con tipo_zona para colorearlas.
+    # Se pasa como lista Python (no JSON string) para que el template use |json_script,
+    # que es el filtro recomendado por Django para incrustar datos en <script> de forma segura.
+    # Escapa automáticamente <, >, &, comillas y cualquier otro carácter especial.
+    marcadores_list = [
+        {
+            "id":       s.id,
+            "nombre":   str(s),
+            "lat":      float(s.lat),
+            "lon":      float(s.lon),
+            "tipo_zona": s.tipo_zona,
+        }
+        for s in subcuadras if s.lat is not None and s.lon is not None
+    ]
 
     return render(request, "admin/subcuadras.html", {
-        "subcuadras":  subcuadras,
-        "marcadores":  marcadores,
-        "municipio":   municipio,    # para el template (nombre, link de vuelta al superadmin)
-        "municipio_id": municipio_id,  # None si viene del admin municipal
+        "subcuadras":    subcuadras,
+        "marcadores_list": marcadores_list,
+        "municipio":     municipio,    # para el template (nombre, link de vuelta al superadmin)
+        "municipio_id":  municipio_id, # None si viene del admin municipal
     })
 
 
