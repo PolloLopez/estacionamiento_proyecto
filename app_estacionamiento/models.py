@@ -704,6 +704,16 @@ class Subcuadra(models.Model):
         help_text="Pagado = estacionamiento medido. Libre = sin cobro (zona céntrica liberada u otra).",
     )
 
+    # Referencia por intersecciones, útil para conductores que no conocen las alturas.
+    # Ej: "Entre Av. 14 y Av. 16". Opcional.
+    calles_entre = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        verbose_name="Entre calles",
+        help_text="Opcional. Ej: 'Entre Av. 14 y Av. 16'. Ayuda a los conductores que no conocen la altura.",
+    )
+
     class Meta:
         # municipio incluido: distintos municipios pueden tener la misma calle+altura
         unique_together = ("municipio", "calle", "altura")
