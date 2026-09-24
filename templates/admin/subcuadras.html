@@ -69,49 +69,6 @@
 
       <!-- Panel que aparece al clickear el mapa: asignar GPS a existente o crear nueva -->
       <div id="panel-asignar" class="card">
-<<<<<<< HEAD
-        <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0 0 0.75rem;">
-          📍 <span id="coord-texto">—</span>
-        </p>
-        <form method="post" id="form-asignar">
-          {% csrf_token %}
-          <input type="hidden" name="accion" value="guardar_coordenadas">
-          <input type="hidden" name="lat" id="inp-lat">
-          <input type="hidden" name="lon" id="inp-lon">
-          <!-- subcuadra_id se completa al elegir la altura -->
-          <input type="hidden" name="subcuadra_id" id="inp-subcuadra-id">
-
-          <!-- Paso 1: elegir calle -->
-          <select id="sel-calle"
-                  style="width:100%; padding:0.4rem 0.6rem; border-radius:6px;
-                         border:1px solid var(--color-border); font-size:0.88rem;
-                         background:var(--color-surface); color:var(--color-text);
-                         margin-bottom:0.4rem;">
-            <option value="">— 1. Elegí una calle —</option>
-          </select>
-
-          <!-- Paso 2: elegir altura (se habilita al seleccionar calle) -->
-          <select id="sel-altura" disabled
-                  style="width:100%; padding:0.4rem 0.6rem; border-radius:6px;
-                         border:1px solid var(--color-border); font-size:0.88rem;
-                         background:var(--color-surface); color:var(--color-text);
-                         margin-bottom:0.6rem;">
-            <option value="">— 2. Elegí la altura —</option>
-          </select>
-
-          <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
-            <button type="button" onclick="cerrarPanel()"
-                    style="background:none; border:none; cursor:pointer; font-size:0.85rem;
-                           color:var(--color-text-muted);">
-              Cancelar
-            </button>
-            <button type="submit" id="btn-guardar-gps" class="btn"
-                    style="font-size:0.85rem;" disabled>
-              💾 Guardar GPS
-            </button>
-          </div>
-        </form>
-=======
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
           <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0;">
             📍 <span id="coord-texto">—</span>
@@ -199,7 +156,6 @@
             </button>
           </form>
         </div>
->>>>>>> develop
       </div>
 
       <!-- Tabla de subcuadras -->
@@ -267,15 +223,15 @@
                   </button>
                 </form>
                 {% endif %}
-                <form method="post" style="display:inline;"
-                      onsubmit="return confirm('¿Eliminar {{ s }}?\nSi tiene registros asociados no se podrá borrar.')">
+                <form method="post" style="display:inline;">
                   {% csrf_token %}
                   <input type="hidden" name="accion" value="eliminar">
                   <input type="hidden" name="subcuadra_id" value="{{ s.id }}">
                   <button type="submit" class="btn btn-outline"
-                          style="font-size:0.75rem; padding:0.2rem 0.6rem;
-                                 color:var(--color-danger); border-color:var(--color-danger);">
-                    Eliminar
+                          style="font-size:0.75rem; padding:0.2rem 0.5rem;"
+                          onclick="return confirm('¿Eliminar {{ s }}?')"
+                          title="Eliminar subcuadra">
+                    ✕
                   </button>
                 </form>
               </td>
@@ -365,85 +321,36 @@
 
 {% block extra_scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+{# json_script escapa automáticamente <, >, & y cualquier carácter especial.         #}
+{# Es la forma recomendada por Django para incrustar datos en bloques <script>.       #}
+{# Genera: <script type="application/json" id="marcadores-json">...</script>          #}
+{{ marcadores_list|json_script:"marcadores-json" }}
 <script>
-// ── Datos de subcuadras para el cascade calle → altura ───────────────────
-const SUBCUADRAS = [
-  {% for s in subcuadras %}
-  { id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: {{ s.altura }}, gps: {{ s.lat|yesno:"true,false" }} },
-  {% endfor %}
-];
+// Marcadores con coordenadas ya guardadas (desde el servidor).
+// Se lee del elemento JSON embebido de forma segura (json_script).
+const marcadoresExistentes = JSON.parse(document.getElementById("marcadores-json").textContent);
 
-// Poblar selector de calles (únicas, ordenadas)
-(function() {
-  const selCalle  = document.getElementById("sel-calle");
-  const selAltura = document.getElementById("sel-altura");
-  const hiddenId  = document.getElementById("inp-subcuadra-id");
-  const btnGuardar = document.getElementById("btn-guardar-gps");
+// Centro inicial: promedio de marcadores existentes, o Argentina por defecto
+let centroLat = -38.4;
+let centroLon = -63.6;
+let zoomInicial = 5;
 
-  const calles = [...new Set(SUBCUADRAS.map(s => s.calle))].sort();
-  calles.forEach(c => {
-    const opt = document.createElement("option");
-    opt.value = c;
-    opt.textContent = c;
-    selCalle.appendChild(opt);
-  });
-
-  selCalle.addEventListener("change", function() {
-    const calle = selCalle.value;
-    selAltura.innerHTML = '<option value="">— 2. Elegí la altura —</option>';
-    hiddenId.value = "";
-    btnGuardar.disabled = true;
-
-    if (!calle) { selAltura.disabled = true; return; }
-
-    const filtradas = SUBCUADRAS.filter(s => s.calle === calle);
-    filtradas.forEach(s => {
-      const opt = document.createElement("option");
-      opt.value = s.id;
-      opt.textContent = s.altura + (s.gps ? " ✅" : "");
-      selAltura.appendChild(opt);
-    });
-    selAltura.disabled = false;
-
-    // Auto-seleccionar si hay una sola altura
-    if (filtradas.length === 1) {
-      selAltura.value = filtradas[0].id;
-      hiddenId.value  = filtradas[0].id;
-      btnGuardar.disabled = false;
-    }
-  });
-
-  selAltura.addEventListener("change", function() {
-    hiddenId.value      = selAltura.value;
-    btnGuardar.disabled = !selAltura.value;
-  });
-})();
-
-// ── Mapa Leaflet ──────────────────────────────────────────────────────────
-const marcadoresExistentes = {{ marcadores|safe }};
-
-let centroLat = -38.4, centroLon = -63.6, zoomInicial = 5;
 if (marcadoresExistentes.length > 0) {
-  centroLat    = marcadoresExistentes.reduce((a, m) => a + m.lat, 0) / marcadoresExistentes.length;
-  centroLon    = marcadoresExistentes.reduce((a, m) => a + m.lon, 0) / marcadoresExistentes.length;
-  zoomInicial  = 15;
+  centroLat = marcadoresExistentes.reduce((a, m) => a + m.lat, 0) / marcadoresExistentes.length;
+  centroLon = marcadoresExistentes.reduce((a, m) => a + m.lon, 0) / marcadoresExistentes.length;
+  zoomInicial = 15;
 }
 
 // ── Inicializar mapa ──────────────────────────────────────────────────────
 // Se inicializa en extra_scripts (después del DOM) para garantizar que
 // el div #mapa ya existe y su CSS (height: 520px) ya fue aplicado.
 const mapa = L.map("mapa").setView([centroLat, centroLon], zoomInicial);
-<<<<<<< HEAD
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-=======
 
 // CartoDB Voyager: tiles gratuitos sin API key, sin bloqueo de IP de servidor.
 // No usar OpenStreetMap directo en producción: bloquea IPs de servidores (Railway, etc.).
 L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
   subdomains: "abcd",
->>>>>>> develop
   maxZoom: 19,
 }).addTo(mapa);
 
@@ -474,19 +381,18 @@ marcadoresExistentes.forEach(m => {
    .bindPopup(`<b>${m.nombre}</b><br><small>${m.tipo_zona === "libre" ? "🟢 Zona libre" : "💳 Zona pagada"}</small><br><small>${m.lat}, ${m.lon}</small>`);
 });
 
+// ── Click en el mapa: mostrar panel de asignación ─────────────────────────
 let marcadorTemporal = null;
 
 mapa.on("click", function(e) {
   const lat = e.latlng.lat.toFixed(6);
   const lon = e.latlng.lng.toFixed(6);
 
+  // Reemplazar marcador temporal anterior
   if (marcadorTemporal) mapa.removeLayer(marcadorTemporal);
   marcadorTemporal = L.marker([lat, lon], { icon: iconoNaranja }).addTo(mapa);
 
-<<<<<<< HEAD
-=======
   // Rellenar los campos lat/lon en ambos tabs del panel
->>>>>>> develop
   document.getElementById("inp-lat").value = lat;
   document.getElementById("inp-lon").value = lon;
   document.querySelectorAll(".inp-lat-nueva").forEach(el => el.value = lat);
@@ -494,16 +400,10 @@ mapa.on("click", function(e) {
   // lat y lon ya son strings (vienen de .toFixed(6) arriba), no se puede llamar .toFixed() de nuevo
   document.getElementById("coord-texto").textContent = `${lat}, ${lon}`;
 
-  // Resetear cascade al abrir el panel
-  const selCalle = document.getElementById("sel-calle");
-  selCalle.value = "";
-  document.getElementById("sel-altura").innerHTML = '<option value="">— 2. Elegí la altura —</option>';
-  document.getElementById("sel-altura").disabled = true;
-  document.getElementById("inp-subcuadra-id").value = "";
-  document.getElementById("btn-guardar-gps").disabled = true;
-
-  document.getElementById("panel-asignar").style.display = "block";
-  selCalle.focus();
+  // Mostrar panel
+  const panel = document.getElementById("panel-asignar");
+  panel.style.display = "block";
+  document.getElementById("sel-subcuadra").focus();
 });
 
 // ── Tabs del panel asignar ────────────────────────────────────────────────
@@ -522,7 +422,10 @@ function cambiarTabPanel(tab) {
 
 function cerrarPanel() {
   document.getElementById("panel-asignar").style.display = "none";
-  if (marcadorTemporal) { mapa.removeLayer(marcadorTemporal); marcadorTemporal = null; }
+  if (marcadorTemporal) {
+    mapa.removeLayer(marcadorTemporal);
+    marcadorTemporal = null;
+  }
 }
 
 // ── Modal editar calle/altura ─────────────────────────────────────────────

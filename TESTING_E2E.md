@@ -1,6 +1,6 @@
 # Testing E2E — Flujo completo de punta a punta
 > Sistema de Estacionamiento Medido — Railway: https://estacionamiento.up.railway.app
-> Última actualización: 2026-09-24 (sesión 16)
+> Última actualización: 2026-09-22 (sesión 15)
 
 Seguí este archivo en orden. Cada fase depende de la anterior.
 Anotá tus observaciones en los espacios `___` — eso es el insumo para la siguiente sesión de mejoras.
@@ -40,24 +40,7 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 - Algo confuso en la pantalla de edición: `___`
 - Campos faltantes o mal ordenados: `___`
 
-### 1.2 — Tolerancia de multa y flag de admin 🆕 *sesión 16*
-
-1. En la pantalla de edición del municipio (Fase 1.1), buscar la sección **"Tolerancia de multa"**.
-2. Verificar que existe el campo de minutos de gracia:
-   - [ ] Aparece el input numérico "Minutos de gracia al pagar una multa" con el valor actual
-3. Cambiar el valor a `10` → guardar.
-   - [ ] No hay error 500 · el valor se persiste
-4. Verificar el checkbox **"Admin puede editar la tolerancia de multa"**:
-   - [ ] Si está **marcado**: en `/usuarios/admin-tarifas/` el admin puede editar la tolerancia (flujo normal)
-   - [ ] Si se **desmarca** aquí y se guarda: en `/usuarios/admin-tarifas/` aparece el campo en modo solo lectura con el candado "🔒 Solo superadmin"
-5. Desmarcar el checkbox → guardar → ir a **Ventana B** (`/usuarios/admin-tarifas/`) y verificar que el campo está bloqueado.
-6. Volver a marcar el checkbox → guardar → verificar que el admin vuelve a poder editar.
-
-**Qué anotar:**
-- El valor de minutos se persistió correctamente: `[ ] Sí / [ ] No — ___`
-- El bloqueo del campo en admin funcionó: `[ ] Sí / [ ] No — ___`
-
-### 1.3 — Verificar panel superadmin
+### 1.2 — Verificar panel superadmin
 
 - [ ] El municipio aparece en la lista con estado correcto
 - [ ] "Gestionar sugerencias" accesible y sin errores
@@ -150,26 +133,6 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 **Qué anotar:**
 - El mensaje de error al intentar editar a otro admin: `___`
 
-### 2.7 — Tolerancia de multa en admin-tarifas 🆕 *sesión 16*
-
-> Requiere que el flag esté **activado** (ver Fase 1.2). Si el superadmin lo desactivó en la Fase 1.2, primero reactivarlo.
-
-1. Ir a `/usuarios/admin-tarifas/`.
-2. Buscar la sección **"Tolerancia de multa"**.
-3. Con el flag **activo** (default):
-   - [ ] Aparece un input editable con los minutos actuales
-   - [ ] Cambiar el valor → guardar → se muestra el mensaje de confirmación
-   - [ ] El valor nuevo persiste al recargar
-4. Ahora en **Ventana A** (superadmin): desactivar el flag "Admin puede editar tolerancia".
-5. Volver a **Ventana B** → refrescar `/usuarios/admin-tarifas/`:
-   - [ ] El campo ya no es editable: muestra el valor actual + "🔒 Solo superadmin"
-   - [ ] No hay botón de guardar para esa sección
-6. Reactivar el flag desde superadmin para no romper el resto del test.
-
-**Qué anotar:**
-- El mensaje de confirmación al guardar la tolerancia: `___`
-- El texto del candado fue claro: `[ ] Sí / [ ] No — ___`
-
 ---
 
 ## FASE 3 — INSPECTOR: Verificar y multar `[~15 min]`
@@ -246,26 +209,6 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 2. Verificar saldo disponible → anotar: `$___`
 3. Verificar que aparecen los vehículos vinculados.
    - [ ] Ícono correcto por estado: 🟢 activo / ⚠️ con infracción / 🏷️ exento
-4. Verificar el **footer unificado** (sin bloque "Notificaciones"): 🆕 *sesión 16*
-   - [ ] "📖 ¿Cómo usar la aplicación?" colapsable al pie
-   - [ ] "💡 ¿Tenés alguna sugerencia? Enviala acá →" funciona
-   - [ ] **No hay** sección de preferencias de notificaciones (se eliminó)
-
-### 4.1b — Alerta de saldo insuficiente 🆕 *sesión 16*
-
-> Para probar esto necesitás un conductor con saldo menor al precio de 1 hora de la tarifa del municipio. Si el saldo es suficiente, saltear este punto.
-
-1. Con un conductor con saldo bajo (o retirar saldo desde el shell si es entorno de prueba):
-   - [ ] En la tarjeta "Sin estacionamiento activo": aparece alerta naranja/amarilla con el texto del saldo disponible y el costo de 1 hora
-   - [ ] Aparecen **dos botones**: "💳 Recargar saldo" y "Estacionar igual" (más discreto)
-   - [ ] El botón "💳 Recargar saldo" lleva a la carga por MercadoPago
-   - [ ] El botón "Estacionar igual" lleva a `/estacionar/` (permite igual, con riesgo)
-2. Con saldo suficiente:
-   - [ ] El botón único "🚗 Estacionar vehículo" aparece normalmente (sin alerta)
-
-**Qué anotar:**
-- El mensaje de saldo insuficiente fue claro: `[ ] Sí / [ ] No — ___`
-- Monto mostrado en la alerta: `$___` (costo hora) vs saldo real: `$___`
 
 ### 4.2 — Estacionar (con GPS o manual)
 
@@ -299,24 +242,7 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 **Qué anotar:**
 - El aviso de infracción pendiente fue claro: `[ ] Sí / [ ] No — ___`
 
-### 4.4 — QR de infracción ya resuelta 🆕 *sesión 16*
-
-> Simula el caso de un conductor que escanea el QR de una infracción que ya pagó o fue anulada.
-
-1. Ir a `/pagar/` (sin login, o como conductor).
-2. Buscar una patente que tenga infracciones **pagadas, anuladas o canceladas** en los últimos 90 días.
-   - Si no tenés una a mano, usá la infracción que pagó el vendedor en la Fase 5.3.
-3. Ingresar esa patente y buscar.
-4. Verificar la sección **"📋 Infracciones recientes (últimos 90 días)"**:
-   - [ ] Aparece antes del formulario de estacionar/abono
-   - [ ] Muestra la fecha, motivo y estado con ícono: ✅ Pagada / 🚫 Anulada / ↩️ Cancelada
-5. Verificar que la sección de estacionar/abono **sigue disponible** debajo (la infracción resuelta no bloquea).
-
-**Qué anotar:**
-- La sección de infracciones recientes se mostró correctamente: `[ ] Sí / [ ] No — ___`
-- El estado visualmente fue claro para entender que ya está resuelta: `[ ] Sí / [ ] No — ___`
-
-### 4.5 — Pago público `/pagar/` sin login 🆕 *sesión 15*
+### 4.4 — Pago público `/pagar/` sin login 🆕 *sesión 15*
 
 1. Sin cerrar sesión de conductor, abrir `/usuarios/pagar/` (o usar una pestaña sin login).
 2. Ingresar una patente en el **primer campo** (ej: `AA123BB`).
@@ -328,7 +254,6 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
    - [ ] El botón se habilita
 5. Enviar → verificar que busca correctamente.
    - [ ] Muestra deuda o estado del vehículo
-   - [ ] Si hay infracciones recientes resueltas: aparece la sección "📋 Infracciones recientes" (Fase 4.4)
 
 **Qué anotar:**
 - El flujo de confirmación de patente fue claro: `[ ] Sí / [ ] No — ___`
@@ -567,13 +492,8 @@ Cuando terminés las 10 fases, revisá esto antes de reportar:
 - [ ] **Footer tutorial**: verificado en los 4 roles (admin, inspector, vendedor, tesorero)
 - [ ] **Sidebar flags**: activar y desactivar funcionó correctamente (Fase 2.5)
 - [ ] **Tabs de auditoría de staff**: sticky headers y URL con tab funcionan (Fase 2.4)
-- [ ] **Confirmación de patente en /pagar/**: bloquea con patentes distintas (Fase 4.5)
+- [ ] **Confirmación de patente en /pagar/**: bloquea con patentes distintas (Fase 4.4)
 - [ ] **Importar exenciones**: 6 columnas reconocidas, selector global/parcial funciona (Fase 9)
-- [ ] **Tolerancia de multa (superadmin)**: campo editable y se persiste correctamente (Fase 1.2) 🆕 *sesión 16*
-- [ ] **Flag admin tolerancia**: bloquea correctamente el campo en admin-tarifas (Fases 1.2 + 2.7) 🆕 *sesión 16*
-- [ ] **Conductor saldo insuficiente**: alerta visible + botón recargar (Fase 4.1b) 🆕 *sesión 16*
-- [ ] **QR infracción resuelta**: sección "Infracciones recientes" visible en /pagar/ (Fase 4.4) 🆕 *sesión 16*
-- [ ] **Panel conductor**: sección "Notificaciones" eliminada, footer unificado presente (Fase 4.1) 🆕 *sesión 16*
 
 ---
 
