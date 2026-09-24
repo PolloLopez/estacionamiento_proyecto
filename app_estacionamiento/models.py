@@ -102,6 +102,13 @@ class Usuario(AbstractUser):
                            verbose_name="Número de legajo", help_text="Opcional")
 
     # ── Datos adicionales para vendedores / kioscos ─────────────────────────
+    # nombre_negocio: identifica el punto de venta (kiosco, farmacia, etc.).
+    # A futuro esto migrará a un modelo PuntoDeVenta separado, permitiendo que
+    # un mismo negocio tenga varios usuarios vendedor y varias cajas independientes.
+    # Por ahora vive en Usuario hasta que la estructura multi-usuario lo justifique.
+    nombre_negocio = models.CharField(max_length=200, blank=True, default="",
+                             verbose_name="Nombre del negocio / punto de venta",
+                             help_text="Ej: Kiosco Don Juan, Farmacia Central")
     nombre_propietario = models.CharField(max_length=200, blank=True, default="",
                              verbose_name="Nombre del propietario")
     documento_cuil     = models.CharField(max_length=20, blank=True, default="",

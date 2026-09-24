@@ -98,7 +98,21 @@
       </tr>
       <tr>
         <td style="color:var(--color-text-muted); padding:0.4rem 0;">Registrado por</td>
-        <td>{{ comprobante.vendedor.get_full_name|default:comprobante.vendedor.correo }}</td>
+        <td>
+          {% if comprobante.vendedor.es_vendedor %}
+            {% if comprobante.vendedor.nombre_negocio %}
+              {{ comprobante.vendedor.nombre_negocio }}
+              <span style="color:var(--color-text-muted); font-size:0.85em;">
+                ({{ comprobante.vendedor.correo }})
+              </span>
+            {% else %}
+              {{ comprobante.vendedor.correo }}
+            {% endif %}
+          {% else %}
+            {# Admin u otro rol: mostrar nombre completo o correo #}
+            {{ comprobante.vendedor.get_full_name|default:comprobante.vendedor.correo }}
+          {% endif %}
+        </td>
       </tr>
       <tr>
         <td style="color:var(--color-text-muted); padding:0.4rem 0;">Fecha / hora</td>

@@ -691,6 +691,7 @@ def gestionar_vendedores(request):
                 periodicidad_rendicion=request.POST.get("periodicidad_rendicion", "semanal"),
             )
             vendedor.first_name         = nombre
+            vendedor.nombre_negocio     = request.POST.get("nombre_negocio", "").strip()
             vendedor.nombre_propietario = request.POST.get("nombre_propietario", "").strip()
             vendedor.documento_cuil     = request.POST.get("documento_cuil", "").strip()
             vendedor.telefono           = request.POST.get("telefono", "").strip()
@@ -713,12 +714,13 @@ def editar_vendedor(request, vendedor_id):
     )
 
     if request.method == "POST":
-        vendedor.first_name         = request.POST.get("nombre", "").strip().title()
-        vendedor.is_active          = request.POST.get("activo") == "on"
-        vendedor.nombre_propietario = request.POST.get("nombre_propietario", "").strip().title()
-        vendedor.documento_cuil     = request.POST.get("documento_cuil", "").strip()
-        vendedor.telefono           = request.POST.get("telefono", "").strip()
-        vendedor.horario_atencion   = request.POST.get("horario_atencion", "").strip()
+        vendedor.first_name          = request.POST.get("nombre", "").strip().title()
+        vendedor.is_active           = request.POST.get("activo") == "on"
+        vendedor.nombre_negocio      = request.POST.get("nombre_negocio", "").strip()
+        vendedor.nombre_propietario  = request.POST.get("nombre_propietario", "").strip().title()
+        vendedor.documento_cuil      = request.POST.get("documento_cuil", "").strip()
+        vendedor.telefono            = request.POST.get("telefono", "").strip()
+        vendedor.horario_atencion    = request.POST.get("horario_atencion", "").strip()
         vendedor.domicilio_comercial = request.POST.get("domicilio_comercial", "").strip()
         try:
             lat_str = request.POST.get("ubicacion_lat", "").strip()

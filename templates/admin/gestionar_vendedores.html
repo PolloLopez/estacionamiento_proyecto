@@ -27,7 +27,12 @@
         <tbody>
           {% for v in vendedores %}
           <tr>
-            <td><strong>{{ v.nombre|default:"—" }}</strong></td>
+            <td>
+              <strong>{{ v.nombre_negocio|default:v.nombre|default:"—" }}</strong>
+              {% if v.nombre_negocio and v.nombre %}
+                <div style="font-size:0.8rem; color:var(--color-text-muted);">{{ v.nombre }}</div>
+              {% endif %}
+            </td>
             <td style="font-size:0.88rem;">{{ v.nombre_propietario|default:"—" }}</td>
             <td style="font-size:0.88rem;">{{ v.telefono|default:"—" }}</td>
             <td style="font-size:0.85rem;">{{ v.horario_atencion|default:"—" }}</td>
@@ -60,9 +65,15 @@
 
       <div class="grid grid-2" style="margin-bottom:0.75rem;">
         <div>
-          <label for="nombre">Nombre del negocio *</label>
+          <label for="nombre_negocio">Nombre del negocio / punto de venta *</label>
+          <input id="nombre_negocio" name="nombre_negocio" placeholder="Ej: Kiosco Central, Farmacia del Centro" />
+        </div>
+        <div>
+          <label for="nombre">Nombre de usuario (interno)</label>
           <input id="nombre" name="nombre" placeholder="Ej: Kiosco Central" />
         </div>
+      </div>
+      <div class="grid grid-2" style="margin-bottom:0.75rem;">
         <div>
           <label for="nombre_propietario">Nombre del/la propietario/a</label>
           <input id="nombre_propietario" name="nombre_propietario" placeholder="Ej: María García" />
