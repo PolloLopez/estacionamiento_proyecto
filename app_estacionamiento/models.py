@@ -753,6 +753,15 @@ class Tarifa(models.Model):
         help_text="Tarifa por hora para motos. Vacío = igual que autos.",
     )
 
+    # Duración mínima que puede comprar un conductor (en minutos, múltiplo de 30).
+    # El máximo lo determina el horario de cierre del día (HorarioEstacionamiento).
+    # Default 30 min = comportamiento original del sistema.
+    duracion_minima_minutos = models.IntegerField(
+        default=30,
+        verbose_name="Duración mínima (min)",
+        help_text="Mínimo de minutos que puede comprar un conductor. Múltiplo de 30. El máximo lo define el horario de cierre.",
+    )
+
     # ── Descuentos por pago voluntario (módulo premium descuentos_voluntarios) ──
     # Si el módulo está activo, el conductor tiene X horas para pagar con descuento Y%.
     # Un segundo nivel (en días) ofrece un descuento menor para un plazo más largo.

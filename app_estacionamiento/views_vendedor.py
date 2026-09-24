@@ -34,12 +34,14 @@ from .models import (
     LiquidacionComision,
     MovimientoCaja,
     Tarifa,
+    Usuario,
     Vehiculo,
 )
 from .services_caja import generar_cierre_caja
 from .use_cases.cobrar_estacionamiento import ejecutar as cobrar_estacionamiento
 from .services.horarios import calcular_opciones_duracion, puede_estacionar_ahora
 from .services.infracciones import calcular_estado_tolerancia, MEDIOS_VALIDOS_COBRO
+from .services.saldo import cargar_saldo_conductor, obtener_saldo_conductor
 from .utils import get_subcuadra_default, obtener_plantilla, sanitizar_patente
 
 
@@ -107,7 +109,10 @@ def registrar_estacionamiento_manual(request):
     vendedor   = request.user
     tarifa_obj = Tarifa.objects.filter(municipio=vendedor.municipio).first()
     tarifa_hora = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
-    opciones_duracion = calcular_opciones_duracion(vendedor.municipio, tarifa_hora)
+    opciones_duracion = calcular_opciones_duracion(
+        vendedor.municipio, tarifa_hora,
+        duracion_minima_min=tarifa_obj.duracion_minima_minutos if tarifa_obj else 30,
+    )
 
     def _render_form(error=None):
         return render(request, "inspectores/registrar_estacionamiento_manual.html", {
@@ -195,7 +200,10 @@ def registrar_estacionamiento_vendedor(request):
         else tarifa_hora_auto
     )
     tarifa_hora       = tarifa_hora_auto
-    opciones_duracion = calcular_opciones_duracion(vendedor.municipio, tarifa_hora)
+    opciones_duracion = calcular_opciones_duracion(
+        vendedor.municipio, tarifa_hora,
+        duracion_minima_min=tarifa_obj.duracion_minima_minutos if tarifa_obj else 30,
+    )
 
     def _render_form(error=None):
         return render(request, "vendedores/registrar_estacionamiento.html", {
@@ -299,10 +307,12 @@ def registrar_estacionamiento_vendedor(request):
         )
 
     if infraccion_anulada:
+        # Guardamos el id del acta en la sesión para que ticket_cobro lo muestre en la leyenda.
+        request.session["acta_cancelada_gracia"] = infraccion_pendiente.id
         messages.success(
             request,
-            f"✅ Infracción del vehículo {patente} anulada automáticamente "
-            f"(dentro del período de gracia)."
+            f"✅ Acta #{infraccion_pendiente.id} cancelada por pago en período permitido "
+            f"({patente}). Avisale al conductor."
         )
     elif infraccion_fuera:
         messages.warning(
@@ -851,12 +861,21 @@ def ticket_cobro(request, est_id):
             "monto":       str(est.costo_base),
         })
 
+    # Si el vendedor acaba de cancelar un acta dentro de la gracia, mostrarlo en el ticket.
+    # Se usa la sesión para pasar el dato desde el POST de cobro hasta este GET del ticket.
+    acta_cancelada_id = request.session.pop("acta_cancelada_gracia", None)
+    leyenda_acta = (
+        f"Acta #{acta_cancelada_id} cancelada por pago en período permitido"
+        if acta_cancelada_id else None
+    )
+
     return render(request, "ticket.html", {
         "patente":          est.vehiculo.patente,
         "duracion":         est.duracion_horas,
         "hora":             est.hora_inicio,
         "monto":            est.costo_base,
         "texto_plantilla":  texto_plantilla,
+        "leyenda_acta":     leyenda_acta,
     })
 
 
@@ -1024,4 +1043,101 @@ def presentar_factura(request, liquidacion_id):
 
     return render(request, "vendedores/presentar_factura.html", {
         "liquidacion": liquidacion,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Carga de saldo — el vendedor acredita saldo a un conductor en efectivo
+# ─────────────────────────────────────────────────────────────────────────────
+
+@require_role("vendedor", "admin")
+def cargar_saldo_vendedor(request):
+    """
+    El vendedor carga saldo a un conductor cobrando en efectivo.
+    El movimiento queda registrado en la caja del vendedor (igual que cobrar estacionamiento).
+
+    Flujo:
+    - GET: muestra formulario de búsqueda por correo o patente.
+    - POST paso=buscar: encuentra el conductor y muestra el formulario de monto.
+    - POST paso=cargar: acredita el saldo y muestra el comprobante.
+
+    Seguridad: solo se puede cargar saldo a conductores del mismo municipio.
+    """
+    vendedor  = request.user
+    municipio = vendedor.municipio
+
+    conductor  = None
+    comprobante = None
+    error      = None
+
+    paso = request.POST.get("paso", "")
+
+    if request.method == "POST":
+
+        if paso == "buscar":
+            # Buscar conductor por correo (exacto) o por patente de un vehículo vinculado.
+            termino = request.POST.get("termino", "").strip()
+            if not termino:
+                error = "Ingresá un correo o patente para buscar."
+            else:
+                from .models import VehiculoUsuario
+                # Primero intentar por correo
+                qs = Usuario.objects.filter(
+                    correo__iexact=termino,
+                    municipio=municipio,
+                    es_conductor=True,
+                )
+                if not qs.exists():
+                    # Intentar por patente → VehiculoUsuario → conductor
+                    patente = sanitizar_patente(termino)
+                    qs = Usuario.objects.filter(
+                        vehiculousuario__vehiculo__patente=patente,
+                        municipio=municipio,
+                        es_conductor=True,
+                    ).distinct()
+
+                if qs.count() == 0:
+                    error = f"No se encontró ningún conductor con correo o patente '{termino}' en este municipio."
+                elif qs.count() > 1:
+                    error = f"Más de un conductor encontrado. Buscá por correo para mayor precisión."
+                else:
+                    conductor = qs.first()
+
+        elif paso == "cargar":
+            conductor_id = request.POST.get("conductor_id", "")
+            monto_str    = request.POST.get("monto", "").replace(",", ".").strip()
+            conductor = get_object_or_404(
+                Usuario, id=conductor_id, municipio=municipio, es_conductor=True
+            )
+            try:
+                monto = Decimal(monto_str)
+                if monto <= 0:
+                    raise ValueError("Monto debe ser mayor a 0.")
+                # Reutiliza cargar_saldo_conductor con el vendedor como operador:
+                # registra el ingreso en la caja del vendedor y acredita la billetera.
+                cargar_saldo_conductor(
+                    admin=vendedor,     # el parámetro se llama "admin" pero acepta vendedor
+                    conductor=conductor,
+                    monto=monto,
+                    municipio=municipio,
+                )
+                comprobante = {
+                    "monto":       monto,
+                    "saldo_nuevo": obtener_saldo_conductor(conductor, municipio),
+                    "fecha":       timezone.localtime(),
+                    "vendedor":    vendedor,
+                }
+            except Exception as exc:
+                error = f"Error al cargar saldo: {exc}"
+
+    saldo_conductor = (
+        obtener_saldo_conductor(conductor, municipio) if conductor else None
+    )
+
+    return render(request, "vendedores/cargar_saldo.html", {
+        "conductor":       conductor,
+        "saldo_conductor": saldo_conductor,
+        "comprobante":     comprobante,
+        "error":           error,
+        "paso":            paso,
     })

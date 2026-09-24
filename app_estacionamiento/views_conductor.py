@@ -629,6 +629,57 @@ def estacionar_vehiculo(request):
         vehiculousuario__usuario=usuario
     ).distinct()
 
+    def _contexto_base(extra=None):
+        """
+        Contexto mínimo para re-renderizar el formulario desde el POST
+        con errores. Incluye saldo, tarifas y opciones de duración para que
+        el JS funcione correctamente (sin esto SALDO_CONDUCTOR = 0 y el
+        botón confirmar queda siempre bloqueado).
+        """
+        tarifa_obj_b = Tarifa.objects.filter(municipio=usuario.municipio).first()
+        t_auto       = tarifa_obj_b.precio_por_hora if tarifa_obj_b else Decimal("0")
+        t_moto       = (
+            tarifa_obj_b.precio_por_hora_moto
+            if tarifa_obj_b and tarifa_obj_b.precio_por_hora_moto
+            else t_auto
+        )
+        dia_libre_b = bool(usuario.municipio and es_dia_libre_conductor(usuario.municipio))
+        if dia_libre_b:
+            t_auto_ef = Decimal("0")
+            t_moto_ef = Decimal("0")
+        else:
+            desc_pct = calcular_descuento_conductor(usuario, usuario.municipio)
+            if desc_pct > 0:
+                factor   = 1 - desc_pct / 100
+                t_auto_ef = (t_auto * factor).quantize(Decimal("0.01"))
+                t_moto_ef = (t_moto * factor).quantize(Decimal("0.01"))
+            else:
+                t_auto_ef = Decimal(str(t_auto))
+                t_moto_ef = Decimal(str(t_moto))
+        subcuadras_b = Subcuadra.objects.filter(
+            municipio=usuario.municipio
+        ).exclude(calle="Zona Única").order_by("calle", "altura")
+        permitido_b, msg_b = puede_estacionar_ahora(usuario.municipio)
+        ctx = {
+            "vehiculos":              vehiculos,
+            "usuario":                usuario,
+            "tarifa_hora_auto":       t_auto_ef,
+            "tarifa_hora_moto":       t_moto_ef,
+            "opciones_duracion":      calcular_opciones_duracion(
+                usuario.municipio, t_auto_ef,
+                duracion_minima_min=tarifa_obj_b.duracion_minima_minutos if tarifa_obj_b else 30,
+            ),
+            "subcuadras":             subcuadras_b,
+            "saldo_conductor":        obtener_saldo_conductor(usuario, usuario.municipio),
+            "fuera_de_horario":       not permitido_b if not dia_libre_b else False,
+            "dia_libre_hoy":          dia_libre_b,
+            "vehiculos_recientes":    [],
+            "ids_recientes":          set(),
+        }
+        if extra:
+            ctx.update(extra)
+        return ctx
+
     if request.method == "POST":
         patente    = sanitizar_patente(request.POST.get("patente") or "")
         vehiculo_id = request.POST.get("vehiculo_id")
@@ -643,11 +694,8 @@ def estacionar_vehiculo(request):
             )
         else:
             if not patente:
-                return render(request, "usuarios/estacionar_vehiculo.html", {
-                    "error": "Debe ingresar una patente",
-                    "vehiculos": vehiculos,
-                    "usuario": usuario,
-                })
+                return render(request, "usuarios/estacionar_vehiculo.html",
+                              _contexto_base({"error": "Debe ingresar una patente"}))
             vehiculo, _ = Vehiculo.objects.get_or_create(patente=patente)
 
         if not vehiculo.municipio:
@@ -672,24 +720,17 @@ def estacionar_vehiculo(request):
             })
 
         if Estacionamiento.objects.filter(vehiculo=vehiculo, estado="ACTIVO").exists():
-            return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error":    "El vehículo ya tiene un estacionamiento activo.",
-                "warning":  warning,
-                "vehiculos": vehiculos,
-                "usuario":  usuario,
-            })
+            return render(request, "usuarios/estacionar_vehiculo.html",
+                          _contexto_base({"error": "El vehículo ya tiene un estacionamiento activo.",
+                                          "warning": warning}))
 
         # Días libres para el conductor (sin horario o DiaEspecial sin cobro):
         # omitir el chequeo de horario — el use case ya lo maneja con costo=$0.
         if not es_dia_libre_conductor(usuario.municipio):
             permitido, msg_horario = puede_estacionar_ahora(usuario.municipio)
             if not permitido:
-                return render(request, "usuarios/estacionar_vehiculo.html", {
-                    "error":    msg_horario,
-                    "warning":  warning,
-                    "vehiculos": vehiculos,
-                    "usuario":  usuario,
-                })
+                return render(request, "usuarios/estacionar_vehiculo.html",
+                              _contexto_base({"error": msg_horario, "warning": warning}))
 
         # ── Duración ─────────────────────────────────────────────────────────
         try:
@@ -700,12 +741,9 @@ def estacionar_vehiculo(request):
             if duracion < Decimal("0.5"):
                 raise ValueError()
         except Exception:
-            return render(request, "usuarios/estacionar_vehiculo.html", {
-                "error":    "La duración mínima es 30 minutos.",
-                "warning":  warning,
-                "vehiculos": vehiculos,
-                "usuario":  usuario,
-            })
+            return render(request, "usuarios/estacionar_vehiculo.html",
+                          _contexto_base({"error": "La duración mínima es 30 minutos.",
+                                          "warning": warning}))
 
         # Subcuadra: usa la informada por el conductor (GPS o selector manual),
         # o la default si no se envió ninguna o el id no pertenece al municipio.
@@ -813,7 +851,10 @@ def estacionar_vehiculo(request):
             tarifa_hora_auto_efectiva = Decimal(str(tarifa_hora_auto))
             tarifa_hora_moto_efectiva = Decimal(str(tarifa_hora_moto))
 
-    opciones_duracion = calcular_opciones_duracion(usuario.municipio, tarifa_hora_auto_efectiva)
+    opciones_duracion = calcular_opciones_duracion(
+        usuario.municipio, tarifa_hora_auto_efectiva,
+        duracion_minima_min=tarifa_obj.duracion_minima_minutos if tarifa_obj else 30,
+    )
 
     # Subcuadras disponibles para GPS / selección manual.
     # Excluimos "Zona Única" (el default silencioso) para no confundir al conductor.
@@ -934,6 +975,7 @@ def renovar_estacionamiento(request, est_id):
         tarifa_hora=tarifa_hora,
         hora_inicio_est=estacionamiento.hora_inicio,
         duracion_actual_h=float(estacionamiento.duracion_horas),
+        duracion_minima_min=tarifa_obj.duracion_minima_minutos if tarifa_obj else 30,
     )
 
     return render(request, "usuarios/renovar_estacionamiento.html", {

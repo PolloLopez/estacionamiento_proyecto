@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Cargar saldo — Vendedor{% endblock %}
+
+{% block content %}
+<div style="max-width:520px; margin:0 auto; padding:1.5rem 1rem;">
+  <h2 style="margin-bottom:0.25rem;">💳 Cargar saldo a conductor</h2>
+  <p class="text-muted" style="font-size:0.9rem; margin-bottom:1.5rem;">
+    El conductor paga en efectivo. El monto se acredita en su billetera y queda registrado en tu caja.
+  </p>
+
+  {% if error %}
+  <div class="alert alert-danger" style="margin-bottom:1rem;">⚠️ {{ error }}</div>
+  {% endif %}
+
+  <!-- ── PASO 1: buscar conductor ── -->
+  {% if not conductor and not comprobante %}
+  <div class="card" style="padding:1.5rem;">
+    <h3 style="margin-bottom:1rem; font-size:1rem;">🔍 Buscar conductor</h3>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="paso" value="buscar">
+      <label style="font-weight:700; font-size:0.9rem; display:block; margin-bottom:0.4rem;">
+        Correo o patente del conductor
+      </label>
+      <input type="text" name="termino" autofocus required
+             placeholder="conductor@ejemplo.com  o  ABC123"
+             style="width:100%; font-size:1rem; padding:0.65rem 0.75rem; margin-bottom:1rem;">
+      <button type="submit" class="btn" style="width:100%; font-size:1rem; padding:0.75rem;">
+        Buscar →
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- ── PASO 2: conductor encontrado — ingresar monto ── -->
+  {% if conductor and not comprobante %}
+  <div class="card" style="padding:1.5rem; margin-bottom:1rem;">
+    <h3 style="margin-bottom:0.75rem; font-size:1rem;">👤 Conductor encontrado</h3>
+    <table style="width:100%; font-size:0.9rem; border-collapse:collapse;">
+      <tr>
+        <td style="color:var(--color-text-muted); padding:0.3rem 0; width:40%;">Nombre</td>
+        <td style="font-weight:700;">{{ conductor.get_full_name|default:conductor.correo }}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--color-text-muted); padding:0.3rem 0;">Correo</td>
+        <td>{{ conductor.correo }}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--color-text-muted); padding:0.3rem 0;">Saldo actual</td>
+        <td style="font-weight:700; color:var(--color-success);">${{ saldo_conductor|floatformat:2 }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card" style="padding:1.5rem;">
+    <h3 style="margin-bottom:1rem; font-size:1rem;">💰 Monto a cargar</h3>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="paso" value="cargar">
+      <input type="hidden" name="conductor_id" value="{{ conductor.id }}">
+      <label style="font-weight:700; font-size:0.9rem; display:block; margin-bottom:0.4rem;">
+        Monto (en efectivo)
+      </label>
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem;">
+        <span style="font-size:1.2rem; color:var(--color-text-muted);">$</span>
+        <input type="number" name="monto" min="1" step="0.01" autofocus required
+               placeholder="500"
+               style="flex:1; font-size:1.5rem; font-weight:700; padding:0.6rem 0.75rem; text-align:right;">
+      </div>
+      <button type="submit" class="btn" style="width:100%; font-size:1rem; padding:0.75rem; margin-bottom:0.5rem;">
+        ✅ Cargar saldo
+      </button>
+      <a href="{% url 'vendedor_cargar_saldo' %}"
+         style="display:block; text-align:center; font-size:0.85rem; color:var(--color-text-muted); margin-top:0.4rem;">
+        ← Buscar otro conductor
+      </a>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- ── COMPROBANTE ── -->
+  {% if comprobante %}
+  <div class="card" style="padding:1.5rem; text-align:center;">
+    <div style="font-size:3rem; margin-bottom:0.5rem;">✅</div>
+    <h3 style="margin-bottom:1.5rem;">Saldo cargado</h3>
+    <table style="width:100%; font-size:0.95rem; border-collapse:collapse; text-align:left;">
+      <tr>
+        <td style="color:var(--color-text-muted); padding:0.4rem 0; width:50%;">Conductor</td>
+        <td style="font-weight:700;">{{ conductor.get_full_name|default:conductor.correo }}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--color-text-muted); padding:0.4rem 0;">Monto cargado</td>
+        <td style="font-weight:700; color:var(--color-success); font-size:1.2rem;">${{ comprobante.monto|floatformat:2 }}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--color-text-muted); padding:0.4rem 0;">Saldo nuevo</td>
+        <td style="font-weight:700;">${{ comprobante.saldo_nuevo|floatformat:2 }}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--color-text-muted); padding:0.4rem 0;">Registrado por</td>
+        <td>{{ comprobante.vendedor.get_full_name|default:comprobante.vendedor.correo }}</td>
+      </tr>
+      <tr>
+        <td style="color:var(--color-text-muted); padding:0.4rem 0;">Fecha / hora</td>
+        <td>{{ comprobante.fecha|date:"d/m/Y H:i" }}</td>
+      </tr>
+    </table>
+    <div style="margin-top:1.5rem; display:flex; gap:0.75rem; justify-content:center; flex-wrap:wrap;">
+      <a href="{% url 'vendedor_cargar_saldo' %}" class="btn" style="font-size:0.9rem; padding:0.6rem 1.2rem;">
+        💳 Cargar otro conductor
+      </a>
+      <a href="{% url 'panel_vendedor' %}" class="btn btn-outline" style="font-size:0.9rem; padding:0.6rem 1.2rem;">
+        ← Panel
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

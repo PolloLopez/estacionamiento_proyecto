@@ -1213,6 +1213,19 @@ def gestionar_tarifas(request):
                 tarifa_qs.update(precio_por_hora_moto=valor)
                 messages.success(request, f"✅ Precio/hora Moto actualizado a ${valor:,.2f}." if valor else "✅ Precio/hora Moto eliminado (usará el precio de auto).")
 
+            elif seccion == "duracion_minima":
+                # Validar que sea múltiplo de 30 y esté en el rango permitido (30–480 min).
+                valor = _entero("duracion_minima_minutos", minimo=30)
+                if valor % 30 != 0:
+                    raise ValueError("La duración mínima debe ser múltiplo de 30 minutos.")
+                if valor > 480:
+                    raise ValueError("La duración mínima no puede superar 8 horas (480 minutos).")
+                tarifa_qs.update(duracion_minima_minutos=valor)
+                horas = valor // 60
+                minutos = valor % 60
+                label = f"{horas}h {minutos}min" if minutos else f"{horas}h" if horas else f"{valor}min"
+                messages.success(request, f"✅ Duración mínima actualizada a {label}.")
+
             elif seccion == "monto_infraccion":
                 valor = _decimal("monto_infraccion", minimo=Decimal("0"))
                 tarifa_qs.update(monto_infraccion=valor)
@@ -1320,12 +1333,27 @@ def gestionar_tarifas(request):
         activo=True,
     ).exists()
 
+    # Opciones de duración mínima para el select del template (múltiplos de 30 hasta 8h).
+    duracion_minima_opciones = []
+    for n in range(1, 17):  # n=1→30min, n=16→8h
+        minutos = n * 30
+        if minutos < 60:
+            label = f"{minutos} min"
+        elif minutos == 60:
+            label = "1 hora"
+        elif minutos % 60 == 0:
+            label = f"{minutos // 60} horas"
+        else:
+            label = f"{minutos // 60}h 30min"
+        duracion_minima_opciones.append({"valor": minutos, "label": label})
+
     return render(request, "admin/gestionar_tarifas.html", {
-        "tarifa_actual":     tarifa_actual,
-        "municipio":         municipio,
-        "error":             error,
-        "modulo_descuentos": modulo_descuentos,
-        "modulo_comisiones": modulo_comisiones,
+        "tarifa_actual":            tarifa_actual,
+        "municipio":                municipio,
+        "error":                    error,
+        "modulo_descuentos":        modulo_descuentos,
+        "modulo_comisiones":        modulo_comisiones,
+        "duracion_minima_opciones": duracion_minima_opciones,
     })
 
 

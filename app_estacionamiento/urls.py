@@ -109,6 +109,7 @@ urlpatterns = [
     path("vendedores/caja/", views.caja_inspector, name="vendedores_caja"),
     path("vendedores/cerrar-caja/", views.cerrar_caja, name="vendedores_cerrar_caja"),
     path("vendedores/cobrar-infraccion/", views.cobrar_infraccion_vendedor, name="vendedores_cobrar_infraccion"),
+    path("vendedores/cargar-saldo/", views.cargar_saldo_vendedor, name="vendedor_cargar_saldo"),
 
     # =========================
     # 💳 SALDO

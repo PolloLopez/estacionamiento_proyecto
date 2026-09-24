@@ -169,13 +169,17 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
     return resultado
 
 
-def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, duracion_actual_h=0):
+def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, duracion_actual_h=0, duracion_minima_min=30):
     """
     Retorna lista de opciones de duración disponibles en múltiplos de 30 minutos,
     limitadas al cierre del horario del día.
 
+    Parámetro duracion_minima_min: mínimo configurable por el admin del municipio
+    (viene de Tarifa.duracion_minima_minutos, default 30). Debe ser múltiplo de 30.
+    El máximo lo determina el horario de cierre del día.
+
     Regla de mínimo de duración:
-    - Normal (>= 60 min disponibles): mínimo 1 hora, opciones en bloques de 30 min.
+    - Normal (>= duracion_minima_min disponibles): mínimo = duracion_minima_min, bloques de 30 min.
     - Franja penúltima (30–59 min disponibles): solo 1 hora, aunque exceda el cierre.
       El estacionamiento se cierra automáticamente al vencerse el horario, así que
       ofrecer 1 hora es correcto y evita la inconsistencia de que el inspector pueda
@@ -239,15 +243,21 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
         costo = round(1.0 * float(tarifa_hora), 2)
         return [{"horas": 1.0, "label": "1 hora", "costo": costo}]
 
-    # ── Normal: mínimo 1 hora, bloques de 30 min hasta el cierre ────────────
+    # ── Normal: mínimo configurable, bloques de 30 min hasta el cierre ─────
+    # duracion_minima_min viene de Tarifa.duracion_minima_minutos (default 30).
+    # Lo convertimos a "n" (posición en la tabla de medios bloques de 30 min):
+    # n=1 → 30 min, n=2 → 60 min, n=3 → 90 min, etc.
+    n_minimo = max(1, duracion_minima_min // 30)   # nunca menos de 30 min
     opciones = []
-    for n in range(2, 17):      # n=2 → 1.0h mínimo; hasta 8 horas (n=16 → 8h)
+    for n in range(n_minimo, 17):   # hasta 8 horas (n=16 → 8h)
         horas   = n * 0.5
         minutos = int(horas * 60)
         if minutos > minutos_disponibles:
             break
         if horas == 1.0:
             label = "1 hora"
+        elif horas == 0.5:
+            label = "30 min"
         elif horas % 1 == 0:
             label = f"{int(horas)} horas"
         else:

@@ -271,8 +271,8 @@
           {% for op in opciones_duracion %}
           <button type="button"
                   class="btn btn-outline duracion-btn"
-                  data-horas="{{ op.horas }}"
-                  data-costo="{{ op.costo }}"
+                  data-horas="{{ op.horas|stringformat:'g' }}"
+                  data-costo="{{ op.costo|stringformat:'g' }}"
                   data-label="{{ op.label }}"
                   style="flex:1; min-width:80px; font-size:1.1rem; padding:0.75rem 0; font-weight:700;">
             {{ op.label }}
@@ -331,9 +331,11 @@
 
 <script>
 // ── Constantes ──────────────────────────────────────────────────────────────
-const PRECIO_HORA_AUTO   = parseFloat("{{ tarifa_hora_auto|default:'100' }}");
-const PRECIO_HORA_MOTO   = parseFloat("{{ tarifa_hora_moto|default:'0' }}") || PRECIO_HORA_AUTO;
-const SALDO_CONDUCTOR    = parseFloat("{{ saldo_conductor|default:'0' }}");
+// |stringformat:"g" fuerza notación inglesa (punto decimal) sin importar el locale es-ar.
+// Sin esto, 1.5 se renderiza como "1,5" y parseFloat lo trunca a 1.
+const PRECIO_HORA_AUTO   = parseFloat("{{ tarifa_hora_auto|default:'100'|stringformat:'g' }}");
+const PRECIO_HORA_MOTO   = parseFloat("{{ tarifa_hora_moto|default:'0'|stringformat:'g' }}") || PRECIO_HORA_AUTO;
+const SALDO_CONDUCTOR    = parseFloat("{{ saldo_conductor|default:'0'|stringformat:'g' }}");
 const DIA_LIBRE          = {{ dia_libre_hoy|yesno:"true,false" }};
 const URL_SUBCUADRA_CERCANA = "{% url 'conductor_subcuadra_cercana' %}";
 
@@ -534,6 +536,14 @@ function seleccionarVehiculo(id, patente, tipo) {
 
   const scrollTarget = seccionSubcuadra || document.getElementById("seccion-duracion");
   if (scrollTarget) scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+  // Auto-seleccionar la primera duración disponible para que el conductor
+  // no tenga que hacer ese clic extra. Si el saldo es insuficiente para esa
+  // opción, el botón "Confirmar" se mantiene deshabilitado y aparece el aviso.
+  if (!DIA_LIBRE && !esZonaLibre) {
+    const primerBtn = document.querySelector(".duracion-btn");
+    if (primerBtn) primerBtn.click();
+  }
 }
 
 // ── Botones de duración ──────────────────────────────────────────────────────
