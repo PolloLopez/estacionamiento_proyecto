@@ -147,7 +147,7 @@
 
 // ── Cascade Calle → Altura ────────────────────────────────────────
 var SUBCUADRAS_INF = [
-  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle }}", altura: "{{ s.altura }}"},
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: "{{ s.altura|escapejs }}"},
   {% endfor %}
 ];
 

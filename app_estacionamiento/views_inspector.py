@@ -11,6 +11,7 @@ Responsabilidades:
 No incluye cobros ni liquidaciones (eso es responsabilidad del vendedor).
 """
 
+import re
 from datetime import date, timedelta
 
 import math
@@ -18,6 +19,7 @@ import math
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from .decorators import require_role
@@ -151,7 +153,10 @@ def verificar_vehiculo(request):
 
     if request.method == "POST":
         patente = sanitizar_patente(request.POST.get("patente") or "")
-        tipo_seleccionado = request.POST.get("tipo", "auto")
+        # Auto-detectar el tipo desde el formato de la patente (123ABC = moto, resto = auto).
+        # El selector manual fue eliminado porque el tipo no afecta la infracción,
+        # y el formato de patente define unívocamente si es moto o auto.
+        tipo_seleccionado = "moto" if re.match(r"^[0-9]{3}[A-Z]{3}$", patente or "") else "auto"
 
         if patente:
             # Auto-cierre de estacionamientos vencidos ANTES de verificar
@@ -279,9 +284,16 @@ def registrar_infraccion(request):
                     messages.error(request, f"La foto pesa {foto.size / 1024 / 1024:.1f} MB; el máximo es 15 MB.")
                     return redirect("inspectores_verificar_vehiculo")
 
+            # Validar que llegó un subcuadra_id válido antes de llamar al servicio.
+            # Sin esto, un string vacío ('') causa ValueError en el ORM de Django.
+            subcuadra_id_raw = request.POST.get("subcuadra_id", "").strip()
+            if not subcuadra_id_raw:
+                messages.error(request, "No se detectó la cuadra. Seleccioná la calle y la altura antes de enviar.")
+                return redirect(f"{reverse('inspectores_registrar_infraccion')}?patente={patente}")
+
             infraccion = crear_infraccion(
                 patente=patente,
-                subcuadra_id=request.POST.get("subcuadra_id"),
+                subcuadra_id=subcuadra_id_raw,
                 inspector=usuario,
                 foto=foto,
                 gps_lat=gps_lat,
