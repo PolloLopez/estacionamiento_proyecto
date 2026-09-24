@@ -309,13 +309,13 @@ async function imprimirActa() {
     }
 
     // Reconexión antes de copia 2 — siempre con conexión fresca.
-    // Usamos reconectarSilencioso(): solo getDevices(), sin diálogos.
-    // Por qué sin diálogo: después de múltiples awaits, el gesto del usuario
-    // (click en "Imprimir copia 2") ya expiró — requestDevice() sin gesto falla.
-    // Si getDevices() también falla (bug de Chrome al navegar entre páginas),
-    // lanzamos error → el catch con copia1Enviada=true muestra "Reintentar copia 2",
-    // ese click SÍ es un gesto fresco y reconectarImpresora() puede abrir el diálogo.
+    // Esperamos 800ms para que el dispositivo termine el ciclo de desconexión
+    // de copia 1 antes de intentar reconectar. Sin esta pausa, gatt.connect()
+    // puede fallar con "device is in the process of disconnecting".
+    // Usamos reconectarSilencioso() (usa watchAdvertisements + reintentos, sin diálogos).
+    // Si falla → el catch muestra "Reintentar copia 2" cuyo click SÍ es gesto fresco.
     estado.textContent = '⏳ Reconectando para copia 2...';
+    await new Promise(function(r) { setTimeout(r, 800); });
     var reconCopia2 = await reconectarSilencioso();
     if (!reconCopia2) {
       throw new Error('Impresora no encontrada para la copia 2. Usá el botón de reintento.');
@@ -398,24 +398,30 @@ async function intentarAutoImprimir() {
   }
 
   // Solo getDevices(): silencioso, no requiere gesto.
-  var hayDispositivoPermitido = false;
+  var dispositivoGuardado = null;
   if (typeof navigator.bluetooth.getDevices === 'function') {
     try {
       var devs = await navigator.bluetooth.getDevices();
-      hayDispositivoPermitido = devs.length > 0;
+      if (devs.length) dispositivoGuardado = devs[0];
     } catch (e) {
       console.warn('[BLE] getDevices falló en auto-load:', e.message);
     }
   }
 
-  if (hayDispositivoPermitido) {
-    // Chrome tiene la impresora en su lista de permisos → imprimir automáticamente
+  if (dispositivoGuardado) {
+    // Chrome tiene la impresora en su lista de permisos.
+    // Mostramos el nombre mientras intentamos la reconexión automática.
+    var nombreConocido = nombreMostrar(dispositivoGuardado);
+    estado.textContent = '⏳ Buscando ' + nombreConocido + '...';
     imprimirActa();
   } else {
-    // Sin permiso previo → esperar que el inspector toque el botón (gesto válido)
+    // Sin permiso previo, o getDevices() vacío (bug de Chrome).
+    // Revisamos si hay info en localStorage para mostrar un botón más informativo.
+    var infoGuardada = obtenerInfoImpresora();
+    var nombreLabel = infoGuardada ? (infoGuardada.alias || infoGuardada.name || '') : '';
     estado.textContent = '🖨 Tocá para imprimir el acta';
     if (btn) {
-      btn.textContent = '🖨 Imprimir acta';
+      btn.textContent = nombreLabel ? ('🖨 Conectar ' + nombreLabel) : '🖨 Imprimir acta';
       btn.disabled = false;
       btn.style.display = 'block';
       btn.onclick = imprimirActa;
