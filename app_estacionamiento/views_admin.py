@@ -3053,16 +3053,22 @@ def gestionar_subcuadras(request, municipio_id=None):
 
     # Datos para el mapa: las que tienen coordenadas, con tipo_zona para colorearlas
     import json as _json
-    marcadores = _json.dumps([
-        {
-            "id":       s.id,
-            "nombre":   str(s),
-            "lat":      float(s.lat),
-            "lon":      float(s.lon),
-            "tipo_zona": s.tipo_zona,  # "pagado" o "libre" (para el color del pin)
-        }
-        for s in subcuadras if s.lat is not None and s.lon is not None
-    ])
+    # Escapar <, > y & para que el JSON sea seguro dentro de un bloque <script>.
+    # json.dumps no escapa estos caracteres por defecto, y si algún nombre de calle
+    # los contiene, el HTML parser los interpreta como tags y rompe el JS.
+    marcadores = _json.dumps(
+        [
+            {
+                "id":       s.id,
+                "nombre":   str(s),
+                "lat":      float(s.lat),
+                "lon":      float(s.lon),
+                "tipo_zona": s.tipo_zona,
+            }
+            for s in subcuadras if s.lat is not None and s.lon is not None
+        ],
+        ensure_ascii=False,
+    ).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
 
     return render(request, "admin/subcuadras.html", {
         "subcuadras":  subcuadras,
