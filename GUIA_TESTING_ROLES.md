@@ -1,6 +1,6 @@
 # Guía de testing completo por rol
 > Sistema de Estacionamiento Medido — Railway: https://estacionamiento.up.railway.app
-> Última actualización: 2026-09-21
+> Última actualización: 2026-09-22
 
 Esta guía cubre cada rol con: flujos a testear paso a paso, qué verificar en cada pantalla, y un cuestionario de experiencia de usuario (UX) para registrar observaciones durante la prueba.
 
@@ -304,6 +304,8 @@ _______________
 
 #### F2.7 — Verificar una moto (formato patente diferente) 🆕 *sesión 11*
 > **Contexto:** las motos usan el formato `123ABC` (tres dígitos + tres letras), distinto al auto `AA123BB`. El auto-submit se dispara al completar el patrón; la moto tiene dígitos al inicio, por lo que el auto-submit puede no disparar mientras se tipea. El botón manual "🔍 Verificar" aparece con ≥ 3 caracteres.
+>
+> ⚠️ **Importante:** este flujo solo funciona durante el horario activo del municipio. Si `horario_activo=False`, el formulario no renderiza en el DOM y ningún JS de verificación se ejecuta (botón no visible, placeholder fijo, sin autosubmit). Esto es comportamiento esperado. Testear siempre dentro del horario configurado.
 
 1. Ir a `/usuarios/inspectores/verificar/`.
 2. Seleccionar tipo **Moto** (radio button).
@@ -597,6 +599,53 @@ _______________
 - [ ] Segunda acción → segunda fila, la más reciente aparece primero
 - [ ] Se muestran máximo 10 entradas (si hay más, las más viejas desaparecen de la vista)
 
+#### F4.12 — Sidebar condicional por flags de superadmin 🆕 *sesión 15*
+> **Contexto:** los links "📍 Subcuadras", "📊 Cobertura" y "🗺️ Mapa de calor" solo aparecen en el sidebar si el superadmin los activó para ese municipio. Si no están habilitados, tampoco deben aparecer en el menú.
+
+1. Con un admin de un municipio sin `puede_gestionar_subcuadras=True`: verificar que "📍 Subcuadras" y "📊 Cobertura" **no aparecen** en el sidebar.
+2. Intentar acceder directamente a `/usuarios/admin-subcuadras/` → debe mostrar pantalla de "Módulo no habilitado" con estilo (no un 403 sin CSS).
+3. El superadmin activa el flag en "Editar municipio" → el admin ahora ve los links en el sidebar.
+4. Mismo test para `mapa_infracciones_activo` y "🗺️ Mapa de calor".
+
+**Qué verificar:**
+- [ ] Sin flag: links ausentes del sidebar
+- [ ] Sin flag: acceso directo a la URL muestra página de acceso denegado con estilo (🔒, botón "Volver al panel")
+- [ ] Con flag activado por superadmin: links aparecen en el sidebar
+- [ ] Solo el superadmin puede activar/desactivar estos flags
+
+#### F4.13 — Tabs en /admin-staff/ con sticky headers 🆕 *sesión 15*
+1. Ir a `/usuarios/admin-staff/`.
+2. Verificar que se ven dos tabs: "💰 Vendedores" y "👮 Inspectores".
+3. El tab activo se resalta visualmente. El tab por defecto es "Vendedores".
+4. Cambiar al tab "Inspectores" → verificar que la URL cambia a `?tab=inspectores` sin recargar la página.
+5. Recargar la página → verificar que sigue en el tab "Inspectores" (estado persiste en URL).
+6. Con listas largas: hacer scroll dentro de la tabla → los encabezados de columna deben permanecer visibles (sticky).
+
+**Qué verificar:**
+- [ ] Dos tabs separados: Vendedores e Inspectores
+- [ ] Cambiar de tab no recarga la página (history.replaceState)
+- [ ] URL refleja el tab activo (`?tab=vendedores` o `?tab=inspectores`)
+- [ ] Recargar con `?tab=inspectores` carga el tab correcto
+- [ ] Headers sticky: al hacer scroll en listas largas los encabezados siguen visibles
+
+#### F4.14 — Footer "¿Cómo usar el panel?" en todos los roles 🆕 *sesión 15*
+> **Contexto:** todos los paneles (admin, inspector, vendedor, tesorero) ahora tienen el tutorial en el **pie de página** del panel. Antes lo tenían en la parte superior o en lugares inconsistentes.
+
+Para cada rol:
+1. Ir al panel principal del rol.
+2. Hacer scroll hasta el final de la página.
+3. Verificar que aparece un separador horizontal y luego el bloque "📖 ¿Cómo usar el panel?" (colapsable) + "💡 ¿Tenés alguna sugerencia? Enviala acá →".
+4. Hacer clic en el `<summary>` para expandir el tutorial → verificar que el contenido es correcto para ese rol.
+5. Hacer clic en "Enviala acá →" → verificar que redirige a la página de sugerencias.
+
+**Qué verificar:**
+- [ ] Admin: tutorial + sugerencias al pie del contenido principal (antes del cierre del div)
+- [ ] Inspector: tutorial + sugerencias al pie de la sección principal (antes de `</section>`)
+- [ ] Vendedor: tutorial + sugerencias al pie del panel (antes del cierre del div)
+- [ ] Tesorero: tutorial + sugerencias al pie del panel (antes de `</div>`)
+- [ ] Tutorial colapsable: cerrado por defecto, se expande al hacer clic
+- [ ] Link de sugerencias: redirige a la URL de envío de sugerencias
+
 ---
 
 ### Cuestionario de experiencia — Admin Municipal
@@ -795,9 +844,25 @@ _______________
 
 ### Flujos a testear
 
+#### FP.0 — Confirmación de patente antes de buscar 🆕 *sesión 15*
+> **Contexto:** para evitar errores de tipeo, el formulario de búsqueda requiere ingresar la patente dos veces. El botón "Buscar →" se deshabilita si los dos campos no coinciden.
+
+1. Ir a `/usuarios/pagar/`.
+2. Ingresar una patente en el primer campo (ej: `AA123BB`).
+3. Ingresar una patente DISTINTA en el segundo campo (ej: `AA123BC`).
+4. Verificar que aparece el aviso "⚠️ Las patentes no coinciden" y el botón queda deshabilitado.
+5. Corregir el segundo campo para que coincida con el primero.
+6. Verificar que el aviso desaparece y el botón se habilita.
+7. Enviar el formulario.
+
+**Qué verificar:**
+- [ ] Con patentes distintas: aviso visible, botón deshabilitado
+- [ ] Con patentes iguales: aviso oculto, botón habilitado
+- [ ] El submit con JS desactivado también está protegido (handler en `submit`)
+
 #### FP.1 — Consultar deuda por patente
 1. Ir a `/usuarios/pagar/`.
-2. Ingresar una patente con infracciones pendientes.
+2. Ingresar la misma patente en ambos campos (con infracciones pendientes).
 3. Verificar que muestra la deuda correctamente.
 4. Pagar la infracción con MercadoPago.
 

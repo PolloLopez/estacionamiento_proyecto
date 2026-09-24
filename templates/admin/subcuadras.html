@@ -1,10 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Subcuadras GPS{% endblock %}
 
-{% block content %}
+{% block extra_head %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-
 <style>
 .layout {
   display: grid;
@@ -39,6 +37,9 @@
   margin-bottom: 1rem;
 }
 </style>
+{% endblock %}
+
+{% block content %}
 
 <div class="container">
 
@@ -262,6 +263,10 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 // ── Datos de subcuadras para el cascade calle → altura ───────────────────
 const SUBCUADRAS = [
@@ -326,11 +331,17 @@ if (marcadoresExistentes.length > 0) {
   zoomInicial  = 15;
 }
 
+// ── Inicializar mapa ──────────────────────────────────────────────────────
+// Se inicializa en extra_scripts (después del DOM) para garantizar que
+// el div #mapa ya existe y su CSS (height: 520px) ya fue aplicado.
 const mapa = L.map("mapa").setView([centroLat, centroLon], zoomInicial);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   maxZoom: 19,
 }).addTo(mapa);
+
+// Fuerza recalculo del tamaño por si el container tuvo cambios al renderizar
+mapa.invalidateSize();
 
 // ── Iconos ────────────────────────────────────────────────────────────────
 // Azul = zona pagada, Verde = zona libre, Naranja = marcador temporal al clickear

@@ -121,6 +121,50 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 - **Pago diario (módulo premium)** — superadmin habilita por municipio, municipio asigna valor. Requiere diseño de modelo antes de implementar.
 - **Verificación de dos pasos (2FA)** — para el go-live municipal, especialmente para roles admin y tesorero. Django tiene soporte nativo con `django-otp` o `django-two-factor-auth`. Evaluar después de la migración a DO.
 - **`/admin/mapa-infracciones/` — errores de consola**: Los `ChunkLoadError` son de la extensión de Chrome **Excalidraw** (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código de la app. La traza viene de `content.js:2` (content script de la extensión). La página funciona correctamente con Leaflet/OSM. Verificar desactivando la extensión. El banner "beforeinstallprompt" es del PWA y es intencional.
+- **Inspector cancela infraccion** — Asmin autoriza por municipio: Inspector cancela infraccion, otorgando un periodo de tiempo desde el momento de la infraccion. 
+- **Conductor** Al seleccionar sub cuadra, debe ver entre y entre. ver como implementar
+
+---
+
+## ✅ Resuelto (sesión 16 — 2026-09-24)
+
+- **Mapa subcuadras roto en `/superadmin/municipio/<id>/subcuadras/`**: Leaflet CSS/JS estaban dentro de `{% block content %}`. Movidos: CSS + `<style>` → `{% block extra_head %}`; JS de Leaflet + script de init → `{% block extra_scripts %}`. Agregado `mapa.invalidateSize()` para forzar recalculo del tamaño del contenedor. Razón: el script corría antes de que el CSS de `#mapa { height: 520px }` fuera procesado por el browser.
+
+- **QR scan — infracción ya pagada/cancelada**: `detalle_patente` en `views_pago_publico.py` solo consultaba infracciones `estado=pendiente`. Se agrega query de infracciones resueltas (`pagada`, `anulada`, `cancelada`) de los últimos 90 días como `infracciones_recientes`. El template `pago_publico/detalle_patente.html` las muestra antes del formulario de estacionar con badges de estado, evitando que el conductor crea que puede ignorar la situación.
+
+- **"Notificaciones" → "Sugerencias" en panel conductor**: eliminado el bloque `<details>` de preferencias de notificaciones (`notif_verificacion`, `notif_exencion`, `notif_sugerencia`) del pie de `inicio_usuarios.html`. Reemplazado por el patrón unificado de todos los roles: tutorial colapsable + link "💡 ¿Tenés alguna sugerencia? Enviala acá →".
+
+- **Conductor: alerta de saldo insuficiente antes de estacionar**: en `inicio_usuarios` view se calcula `saldo_insuficiente = saldo < tarifa.precio_por_hora` (excluyendo días libres). El template muestra warning "⚠️ Tu saldo no alcanza para 1 hora" + botón "💳 Recargar saldo" + link secundario "Estacionar igual" cuando aplica.
+
+- **Superadmin: gestión de tolerancia de multa + flag para admin**: nuevo campo `admin_puede_configurar_tolerancia` (BooleanField, default=True) en `Municipio`. Migración `0090` creada manualmente. El superadmin puede editar `tolerancia_multa_minutos` desde `editar_municipio.html` y controlar si el admin puede también hacerlo. El template `gestionar_tarifas.html` del admin muestra la fila editable si el flag está activo, o solo lectura con "🔒 Solo superadmin" si está inactivo. El endpoint `admin_guardar_tarifa` rechaza con error si el flag está desactivado.
+
+- **Tests nuevos**: `TestFlagToleranciaAdmin` en `tests_servicios.py` — cubre que el admin puede editar tolerancia con `flag=True` y no puede con `flag=False`.
+
+---
+
+## ✅ Resuelto (sesión 15 — 2026-09-22)
+
+- **Comentarios Django visibles en templates**: `rendiciones.html` y `verificar.html` tenían comentarios `{# ... #}` multi-línea con `{#` y `#}` en líneas separadas. El lexer de Django no los reconocía como comentario — el texto aparecía en pantalla. Convertidos a `<!-- ... -->`.
+
+- **Flag `mapa_infracciones_activo` por municipio**: campo `BooleanField(default=False)` en `Municipio`. Migración `0089` creada manualmente. El superadmin activa el flag desde `editar_municipio.html` (mismo patrón que `puede_gestionar_subcuadras`). `views_superadmin.py` guarda el valor del POST. Sidebar de admin muestra "🗺️ Mapa de calor" solo si el flag está activo.
+
+- **Sidebar admin — items condicionales por flags**: "📍 Subcuadras" y "📊 Cobertura" visibles solo si `puede_gestionar_subcuadras=True`; "🗺️ Mapa de calor" solo si `mapa_infracciones_activo=True`. Patrón `*([] if not flag else [...])` en el diccionario de sidebar en `views_admin.py`.
+
+- **`/admin-subcuadras/` y `/admin/mapa-infracciones/` sin permiso → página con estilo**: antes devolvían un 403 de texto plano sin CSS. Ahora renderizan `admin/acceso_denegado_modulo.html` con `HttpResponseForbidden(render_to_string(...))`. Template nuevo: 🔒, título del módulo, mensaje explicativo y botón "← Volver al panel".
+
+- **Seguridad: admin no puede administrar a otro admin/tesorero**: `views_admin.py::editar_staff` verifica si `staff.es_admin`; si el usuario actual no es superadmin, rechaza con redirect + mensaje de error. El tesorero queda protegido por el mismo gate implícito (el queryset de staff solo incluye vendedores e inspectores para admins no-superadmin).
+
+- **`/admin-staff/` — tabs Vendedores / Inspectores con sticky headers**: reescritura de `auditoria_staff.html`. Tabs con JS `cambiarTab()`. Headers de tabla con `position:sticky; top:0; background:var(--color-surface); z-index:1`. Tab activo persiste en URL (`?tab=vendedores|inspectores`) vía `history.replaceState()` sin recargar.
+
+- **Dashboard admin**: "Cobros por usuario" renombrado a "Cobros por vendedores" (columna `<th>Vendedor</th>`). Nueva sección "📋 Infracciones por día" con query `TruncDate("creado_en")` + `Count("id")` sobre el período seleccionado.
+
+- **Importar exenciones — formato Excel real**: código esperaba 7 columnas con "Condición" en índice 5; el Excel real tiene 6 columnas (Patente, Nombre y Apellido, Dirección, Teléfono, Fecha renovación, Vencimiento). Eliminada columna "Condición", `es_global` ahora viene de un radio selector `tipo_exencion` en el formulario (Parcial / Global), no del Excel. `_procesar_fila_exencion()` acepta `es_global=False` como parámetro.
+
+- **`/pagar/` — confirmación de patente**: segundo campo `id_patente_confirm` en `buscar.html`. JS `validarPatentes()` bloquea el botón "Buscar →" y muestra aviso "⚠️ Las patentes no coinciden" si los campos difieren. Handler en `submit` como doble seguro.
+
+- **Footer "📖 ¿Cómo usar el panel?" + sugerencias en todos los roles**: tutorial movido al pie del panel en admin, inspector y vendedor (tesorero ya lo tenía). Bloque unificado con `border-top`, `<details>` colapsable y link "💡 ¿Tenés alguna sugerencia? Enviala acá →" (`enviar_sugerencia`). Patrón idéntico en los 4 paneles.
+
+- **Inspector — botón y autosubmit moto (investigado)**: comportamiento correcto. El bloque `if (form && input)` no corre cuando `horario_activo=False` (formulario no existe en el DOM). Síntomas: botón invisible, placeholder estático, sin autosubmit. Causa: testeo fuera del horario activo. Para motos, seleccionar radio "🏍 Moto" antes de tipear; el regex `^[0-9]{3}[A-Z]{3}$` dispara el autosubmit al completar el patrón.
 
 ---
 

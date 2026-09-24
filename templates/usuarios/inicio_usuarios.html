@@ -100,15 +100,28 @@
   <div class="card">
     <h3>🚗 Estado del vehículo</h3>
     <div class="status-warn">🟡 Sin estacionamiento activo</div>
-    <p class="info">No hay ningún vehículo estacionado en este momento.</p>
+
+    {% if saldo_insuficiente %}
+    <!-- Alerta: saldo menor al costo de 1 hora → invitar a recargar antes de intentar estacionar -->
+    <div class="alert alert-warning" style="margin:0.75rem 0 0.5rem; font-size:0.9rem;">
+      ⚠️ Tu saldo (${{ saldo_conductor }}) no alcanza para 1 hora
+      {% if costo_hora_min %}(${{ costo_hora_min }}){% endif %}.
+      Recargá antes de estacionar.
+    </div>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.4rem;">
+      <a class="btn btn-primary" href="{% url 'mp_iniciar_carga' %}">💳 Recargar saldo</a>
+      <a class="btn btn-outline" href="{% url 'usuarios_estacionar_vehiculo' %}" style="font-size:0.85rem;">Estacionar igual</a>
+    </div>
+    {% else %}
     <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">🚗 Estacionar vehículo</a>
+    {% endif %}
   </div>
 
   {% endif %}
 
 </div>
 
-<!-- 📅 ABONOS MENSUALES ACTIVOS -->
+<!-- 📅 ABONOS MENSUALES ACTIVOS -->-->
 <div class="card" style="margin-top:1rem;">
   <div class="page-header" style="margin-bottom:0.5rem;">
     <h3 style="margin:0;">📅 Abono mensual</h3>
@@ -370,68 +383,29 @@
 })();
 </script>
 
-<!-- ── Preferencias de notificaciones (colapsable, al pie) ─────────── -->
-{% if request.user.es_conductor %}
-<details style="margin-top:1.5rem; border-top:1px solid var(--color-border); padding-top:1rem;">
-  <summary style="cursor:pointer; font-size:0.82rem; font-weight:600;
-                  color:var(--color-text-muted); list-style:none; user-select:none;
-                  display:flex; align-items:center; gap:0.4rem;">
-    🔔 Notificaciones
-  </summary>
-  <form method="post" action="{% url 'guardar_preferencias_notificaciones' %}"
-        style="margin-top:0.6rem; padding:0.9rem 1rem;
-               background:var(--color-surface); border-radius:8px;
-               width:100%; box-sizing:border-box;">
-    {% csrf_token %}
-    <p style="margin:0 0 0.75rem; font-size:0.82rem; color:var(--color-text-muted);">
-      Elegí qué tipo de notificaciones querés recibir en este panel:
-    </p>
-    <div style="display:flex; gap:0.5rem; font-size:0.88rem;">
-      <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; flex-wrap:wrap;">
-        <input type="checkbox" name="notif_verificacion" style="margin-top:0.15rem; flex-shrink:0;"
-               {% if request.user.notif_verificacion %}checked{% endif %}>
-        <span>Verificación de identidad </span>
-      </label>
-      <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; flex-wrap:wrap;">
-        <input type="checkbox" name="notif_exencion" style="margin-top:0.15rem; flex-shrink:0;"
-               {% if request.user.notif_exencion %}checked{% endif %}>
-        <span>Exención</span>
-      </label>
-      <label style="display:flex; align-items:flex-start; gap:0.5rem; cursor:pointer; flex-wrap:wrap;">
-        <input type="checkbox" name="notif_sugerencia" style="margin-top:0.15rem; flex-shrink:0;"
-               {% if request.user.notif_sugerencia %}checked{% endif %}>
-        <span>Estado de sugerencias enviadas</span>
-      </label>
+<!-- ── PIE DEL PANEL: tutorial + sugerencias ─────────────────────── -->
+<div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--color-border);">
+  <details style="margin-bottom:0.5rem;">
+    <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
+                    color:var(--color-text-muted); list-style:none; user-select:none;
+                    display:flex; align-items:center; gap:0.4rem;">
+      📖 ¿Cómo usar la aplicación?
+    </summary>
+    <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+      <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+                 font-size:0.88rem; line-height:1.4;">
+        <li>💰 <strong>Cargá saldo</strong> con MercadoPago desde "Cargar saldo", o acercate a un punto de venta autorizado.</li>
+        <li>🅿️ <strong>Estacioná</strong> tocando "Estacionar" → ingresá la patente y la duración → confirmá. El sistema debita el costo de tu saldo.</li>
+        <li>⏱ <strong>Seguí el tiempo</strong> desde esta pantalla: ves cuánto falta y podés renovar antes de que venza.</li>
+        <li>⚠️ <strong>Si tenés una infracción</strong>, pagala desde "Mis infracciones". Si creés que fue incorrecta, podés impugnarla desde el detalle de la infracción.</li>
+        <li>📅 <strong>Abono mensual</strong>: te olvidas de gestionarlo y es más económico.</li>
+      </ol>
     </div>
-    <button type="submit"
-            style="margin-top:0.9rem; padding:0.4rem 1.1rem; font-size:0.83rem;
-                   background:var(--color-primary); color:#fff;
-                   border:none; border-radius:6px; cursor:pointer;">
-      Guardar preferencias
-    </button>
-  </form>
-</details>
-{% endif %}
-
-<!-- ── Tutorial conductor (colapsable, al pie) ───────────────────── -->
-<details style="margin-top:2rem; border-top:1px solid var(--color-border); padding-top:1rem;">
-  <summary style="cursor:pointer; font-size:0.82rem; font-weight:600;
-                  color:var(--color-text-muted); list-style:none; user-select:none;
-                  display:flex; align-items:center; gap:0.4rem;">
-    📖 ¿Cómo usar la aplicación?
-  </summary>
-  <div style="margin-top:0.6rem; padding:0.9rem 1rem; background:var(--color-surface); border-radius:8px;">
-    <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.5rem;
-               font-size:0.85rem; line-height:1.4; color:var(--color-text-muted);">
-      <li>💰 <strong>Cargá saldo</strong> con MercadoPago desde "Cargar saldo", o acercate a un punto de venta autorizado.</li>
-      <li>🅿️ <strong>Estacioná</strong> tocando "Estacionar" → ingresá la patente y la duración → confirmá. El sistema debita el costo de tu saldo.</li>
-      <li>⏱ <strong>Seguí el tiempo</strong> desde esta pantalla: ves cuánto falta y podés renovar antes de que venza.</li>
-      <li>⚠️ <strong>Si tenés una infracción</strong>, pagala desde "Mis infracciones". Si creés que fue incorrecta, podés impugnarla desde el detalle de la infracción.</li>
-      <li>📅 <strong>Abono mensual</strong>: te olvidas de gestionarlo y es más económico.</li>
-      <li>💡 <strong>¿Tenés alguna sugerencia?</strong> Usá "Enviar sugerencia" desde el menú.</li>
-    </ol>
-  </div>
-</details>
+  </details>
+  <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0; text-align:center;">
+    💡 ¿Tenés alguna sugerencia? <a href="{% url 'enviar_sugerencia' %}" style="color:var(--color-primary);">Enviala acá →</a>
+  </p>
+</div>
 
 </div>
 {% endblock %}

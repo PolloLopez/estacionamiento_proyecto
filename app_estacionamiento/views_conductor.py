@@ -167,6 +167,20 @@ def inicio_usuarios(request):
     for v in vehiculos_conductor:
         v.tiene_estacionamiento_activo = v.id in vehiculo_ids_activos
 
+    # Verificar si el saldo alcanza para al menos 1 hora de estacionamiento.
+    # Se usa la tarifa de auto como referencia mínima; si no hay tarifa configurada
+    # se asume que no hay restricción (saldo_insuficiente=False).
+    # En días libres (es_dia_libre_conductor) el costo es $0 → no aplica la alerta.
+    saldo_actual = obtener_saldo_conductor(usuario, usuario.municipio)
+    tarifa_inicio = Tarifa.objects.filter(municipio=usuario.municipio).first() if usuario.municipio else None
+    costo_hora_min = tarifa_inicio.precio_por_hora if tarifa_inicio else None
+    dia_libre_hoy  = bool(usuario.municipio and es_dia_libre_conductor(usuario.municipio))
+    saldo_insuficiente = (
+        not dia_libre_hoy
+        and costo_hora_min is not None
+        and saldo_actual < costo_hora_min
+    )
+
     return render(request, "usuarios/inicio_usuarios.html", {
         "usuario":                 usuario,
         "estacionamiento_activo":  estacionamiento_activo,
@@ -177,8 +191,10 @@ def inicio_usuarios(request):
         "notif_infraccion":        notif_infraccion,
         "puede_estacionar":        puede_estacionar,
         "mensaje_horario":         msg_horario_inicio,
-        "saldo_conductor":         obtener_saldo_conductor(usuario, usuario.municipio),
+        "saldo_conductor":         saldo_actual,
         "vehiculos_conductor":     vehiculos_conductor,
+        "saldo_insuficiente":      saldo_insuficiente,
+        "costo_hora_min":          costo_hora_min,
     })
 
 

@@ -362,6 +362,15 @@ class Municipio(models.Model):
             "infracciones, el admin las gestiona."
         ),
     )
+    admin_puede_configurar_tolerancia = models.BooleanField(
+        default=True,
+        verbose_name="Admin puede configurar tolerancia de multa",
+        help_text=(
+            "Si está activo, el admin municipal puede editar los minutos de gracia "
+            "de la tolerancia de multa desde /admin-tarifas/. "
+            "Si está inactivo, solo el superadmin puede modificarlo."
+        ),
+    )
     admin_puede_editar_plantillas = models.BooleanField(
         default=False,
         verbose_name="Admin puede editar plantillas de comprobantes",

@@ -146,6 +146,31 @@
             </small>
           </div>
 
+          {# ── Tolerancia de multa ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.75rem; text-transform:uppercase; letter-spacing:0.5px;">
+              Tolerancia de multa
+            </p>
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.85rem; font-weight:600;">Minutos de gracia al pagar una multa</label>
+              <input type="number" name="tolerancia_multa_minutos" min="0" step="1"
+                     value="{{ municipio.tolerancia_multa_minutos }}"
+                     style="width:100%; margin-top:0.25rem;">
+              <small style="color:var(--color-text-muted);">Si el conductor paga la multa dentro de este plazo, se cancela automáticamente. 0 = sin gracia.</small>
+            </div>
+            <div style="margin-bottom:0.75rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" name="admin_puede_configurar_tolerancia"
+                       {% if municipio.admin_puede_configurar_tolerancia %}checked{% endif %}>
+                <span style="font-size:0.85rem; font-weight:600;">⏱ Admin puede editar la tolerancia de multa</span>
+              </label>
+              <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+                Si está activo, el admin municipal puede cambiar los minutos de gracia desde /admin-tarifas/.
+                Si está inactivo, solo el superadmin puede modificarlo (la fila aparece bloqueada).
+              </small>
+            </div>
+          </div>
+
           <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Monto mínimo de carga MP ($)</label>
             <input type="number" name="monto_minimo_carga" min="1" step="1"

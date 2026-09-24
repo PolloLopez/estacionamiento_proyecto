@@ -27,7 +27,7 @@ Flujo por tipo:
 
 import json
 import logging
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -173,6 +173,17 @@ def detalle_patente(request, patente):
         estado="pendiente",
     ).order_by("-creado_en")
 
+    # Infracciones recientes ya resueltas (pagadas, anuladas o canceladas en los últimos 90 días).
+    # Se muestran en la página para que el conductor sepa que el QR que escaneó ya fue procesado,
+    # y no confunda "no hay pendientes" con "puedo ignorarlo".
+    hace_90_dias = timezone.now() - timedelta(days=90)
+    infracciones_recientes = Infraccion.objects.filter(
+        vehiculo__patente=patente,
+        municipio=municipio,
+        estado__in=["pagada", "anulada", "cancelada"],
+        creado_en__gte=hace_90_dias,
+    ).order_by("-creado_en")[:5]  # máximo 5 para no sobrecargar la vista
+
     # Estacionamiento activo (para mostrar advertencia)
     estacionamiento_activo = Estacionamiento.objects.filter(
         vehiculo__patente=patente,
@@ -204,6 +215,7 @@ def detalle_patente(request, patente):
         "patente":                 patente,
         "municipio":               municipio,
         "infracciones_pendientes": infracciones_pendientes,
+        "infracciones_recientes":  infracciones_recientes,
         "estacionamiento_activo":  estacionamiento_activo,
         "abono_activo":            abono_activo,
         "mes_actual":              mes_actual,

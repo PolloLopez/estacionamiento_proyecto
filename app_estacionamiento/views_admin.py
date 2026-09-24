@@ -1219,10 +1219,14 @@ def gestionar_tarifas(request):
                 messages.success(request, f"✅ Monto de infracción actualizado a ${valor:,.2f}.")
 
             elif seccion == "tolerancia":
-                valor = _entero("tolerancia_multa_minutos", minimo=0)
-                municipio.tolerancia_multa_minutos = valor
-                municipio.save(update_fields=["tolerancia_multa_minutos"])
-                messages.success(request, f"✅ Tolerancia de multa actualizada a {valor} minuto{'s' if valor != 1 else ''}.")
+                # Solo se permite editar si el superadmin habilitó este flag para el municipio.
+                if not getattr(municipio, "admin_puede_configurar_tolerancia", True):
+                    messages.error(request, "⛔ El superadmin deshabilitó la edición de la tolerancia de multa para este municipio.")
+                else:
+                    valor = _entero("tolerancia_multa_minutos", minimo=0)
+                    municipio.tolerancia_multa_minutos = valor
+                    municipio.save(update_fields=["tolerancia_multa_minutos"])
+                    messages.success(request, f"✅ Tolerancia de multa actualizada a {valor} minuto{'s' if valor != 1 else ''}.")
 
             elif seccion == "abono_auto":
                 valor = _decimal("precio_abono_auto", minimo=Decimal("0"))

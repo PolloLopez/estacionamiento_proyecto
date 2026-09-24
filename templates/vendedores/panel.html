@@ -9,26 +9,6 @@
 
       <h1>💼 Panel vendedor</h1>
 
-      <!-- ── Tutorial vendedor (colapsable) ───────────────────────── -->
-      <details style="margin-bottom:1.2rem;">
-        <summary style="cursor:pointer; font-size:0.88rem; font-weight:700;
-                        color:var(--color-text-muted); list-style:none; user-select:none;
-                        display:flex; align-items:center; gap:0.4rem;">
-          📖 ¿Cómo usar el panel?
-        </summary>
-        <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
-          <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
-                     font-size:0.88rem; line-height:1.4;">
-            <li>🚗 <strong>Registrá estacionamientos</strong> en efectivo desde "Registrar estacionamiento" → ingresá patente, zona y duración.</li>
-            <li>📅 <strong>Vendé abonos mensuales</strong>: "Cobrar abono" → patente → confirmá. El abono queda activo automáticamente.</li>
-            <li>⚠️ <strong>Cobrá infracciones</strong>: "Cobrar infracción" → patente → el sistema muestra el monto pendiente → confirmá el cobro.</li>
-            <li>🧾 <strong>Cerrá la caja</strong> al terminar el día desde "Cerrar caja". Eso genera tu rendición para que el admin la certifique.</li>
-            <li>💼 <strong>Comisiones</strong>: tu comisión se calcula automáticamente cuando el admin crea la rendición. Una vez que tesorería deposite, lo ves en "Mis comisiones" para certificar el recibo.</li>
-            <li>💡 <strong>¿Tenés alguna sugerencia?</strong> Usá "Enviar sugerencia" desde el menú para hacérsela llegar al equipo de desarrollo.</li>
-          </ol>
-        </div>
-      </details>
-
       <div class="grid grid-2">
 
         <div class="card" style="text-align:center;">
@@ -119,6 +99,31 @@
       </div>
 
     </div>
+
+    <!-- ── PIE DEL PANEL: tutorial + sugerencias ─────────────────────── -->
+    <div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--color-border);">
+      <details style="margin-bottom:0.5rem;">
+        <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
+                        color:var(--color-text-muted); list-style:none; user-select:none;
+                        display:flex; align-items:center; gap:0.4rem;">
+          📖 ¿Cómo usar el panel?
+        </summary>
+        <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+          <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+                     font-size:0.88rem; line-height:1.4;">
+            <li>🚗 <strong>Registrá estacionamientos</strong> en efectivo desde "Registrar estacionamiento" → ingresá patente, zona y duración.</li>
+            <li>📅 <strong>Vendé abonos mensuales</strong>: "Cobrar abono" → patente → confirmá. El abono queda activo automáticamente.</li>
+            <li>⚠️ <strong>Cobrá infracciones</strong>: "Cobrar infracción" → patente → el sistema muestra el monto pendiente → confirmá el cobro.</li>
+            <li>🧾 <strong>Cerrá la caja</strong> al terminar el día desde "Cerrar caja". Eso genera tu rendición para que el admin la certifique.</li>
+            <li>💼 <strong>Comisiones</strong>: tu comisión se calcula automáticamente cuando el admin crea la rendición. Una vez que tesorería deposite, lo ves en "Mis comisiones" para certificar el recibo.</li>
+          </ol>
+        </div>
+      </details>
+      <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0; text-align:center;">
+        💡 ¿Tenés alguna sugerencia? <a href="{% url 'enviar_sugerencia' %}" style="color:var(--color-primary);">Enviala acá →</a>
+      </p>
+    </div>
+
   </div>
 
 </div>
