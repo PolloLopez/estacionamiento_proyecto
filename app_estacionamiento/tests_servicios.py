@@ -1095,7 +1095,8 @@ class TestFlagToleranciaAdmin(TestCase):
             monto_infraccion=Decimal("500"),
         )
         self.client = Client()
-        self.client.login(correo="admin_tol@test.com", password="pass1234")
+        # force_login evita el backend axes que requiere request en authenticate()
+        self.client.force_login(self.admin)
 
     def _post_tolerancia(self, valor):
         """Envía un POST al endpoint admin_guardar_tarifa sección tolerancia."""
