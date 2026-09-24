@@ -95,6 +95,7 @@
         </div>
       </div>
 
+      {% if municipio.admin_puede_configurar_tolerancia %}
       <div class="campo-fila" id="fila-tolerancia">
         <div class="campo-display-zona">
           <div class="campo-label-grupo">
@@ -116,6 +117,19 @@
           </form>
         </div>
       </div>
+      {% else %}
+      {# El superadmin deshabilitó la edición de tolerancia para este municipio #}
+      <div class="campo-fila">
+        <div class="campo-display-zona">
+          <div class="campo-label-grupo">
+            <span class="campo-label">Tolerancia de multa</span>
+            <span class="campo-ayuda">Configurado por el superadmin</span>
+          </div>
+          <span class="campo-valor">{{ municipio.tolerancia_multa_minutos|default:"5" }} min</span>
+          <span style="font-size:0.8rem; color:var(--color-text-muted); padding:0.3rem 0.75rem;">🔒 Solo superadmin</span>
+        </div>
+      </div>
+      {% endif %}
 
     </div>
   </div>

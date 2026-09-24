@@ -1066,3 +1066,62 @@ class TestAcreditarSaldoMp(TestCase):
         from app_estacionamiento.use_cases.acreditar_saldo_mp import ejecutar
         with self.assertRaises(ValueError):
             ejecutar(usuario=self.conductor, monto=Decimal("0"), payment_id="PAY_CERO")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tests: flag admin_puede_configurar_tolerancia
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestFlagToleranciaAdmin(TestCase):
+    """
+    El superadmin puede habilitar/deshabilitar que el admin municipal
+    edite la tolerancia de multa desde /admin-tarifas/.
+
+    Cuando admin_puede_configurar_tolerancia=False, el endpoint POST
+    debe rechazar la actualización con un mensaje de error.
+    """
+
+    def setUp(self):
+        self.municipio = Municipio.objects.create(
+            nombre="TestMuniToleranciaflag",
+            tolerancia_multa_minutos=5,
+            admin_puede_configurar_tolerancia=True,
+        )
+        self.admin = crear_admin(self.municipio, correo="admin_tol@test.com")
+        # Tarifa necesaria para que la view no falle
+        Tarifa.objects.create(
+            municipio=self.municipio,
+            precio_por_hora=Decimal("100"),
+            monto_infraccion=Decimal("500"),
+        )
+        self.client = Client()
+        self.client.login(correo="admin_tol@test.com", password="pass1234")
+
+    def _post_tolerancia(self, valor):
+        """Envía un POST al endpoint admin_guardar_tarifa sección tolerancia."""
+        return self.client.post(
+            reverse("admin_guardar_tarifa"),
+            {"seccion": "tolerancia", "tolerancia_multa_minutos": str(valor)},
+        )
+
+    def test_admin_puede_editar_cuando_flag_activo(self):
+        """Con flag=True el admin actualiza tolerancia_multa_minutos."""
+        self._post_tolerancia(10)
+        self.municipio.refresh_from_db()
+        self.assertEqual(self.municipio.tolerancia_multa_minutos, 10)
+
+    def test_admin_no_puede_editar_cuando_flag_inactivo(self):
+        """Con flag=False el POST no modifica el valor y devuelve error."""
+        self.municipio.admin_puede_configurar_tolerancia = False
+        self.municipio.save()
+
+        valor_original = self.municipio.tolerancia_multa_minutos
+        self._post_tolerancia(99)
+        self.municipio.refresh_from_db()
+        # El valor no debe cambiar
+        self.assertEqual(self.municipio.tolerancia_multa_minutos, valor_original)
+
+    def test_default_flag_es_true(self):
+        """Por defecto admin_puede_configurar_tolerancia es True (back-compat)."""
+        nuevo = Municipio.objects.create(nombre="MuniNuevo")
+        self.assertTrue(nuevo.admin_puede_configurar_tolerancia)

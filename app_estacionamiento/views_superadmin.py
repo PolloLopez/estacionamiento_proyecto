@@ -276,11 +276,13 @@ def editar_municipio(request, municipio_id):
             municipio.minutos_entre_infracciones  = _entero("minutos_entre_infracciones",  municipio.minutos_entre_infracciones)
             municipio.segundos_pausa_doble_copia  = _entero("segundos_pausa_doble_copia",  municipio.segundos_pausa_doble_copia)
             municipio.activo                          = request.POST.get("activo") == "on"
-            municipio.inspector_ve_sus_infracciones   = request.POST.get("inspector_ve_sus_infracciones") == "on"
-            municipio.admin_puede_editar_plantillas   = request.POST.get("admin_puede_editar_plantillas") == "on"
-            municipio.modulo_informes_activo          = request.POST.get("modulo_informes_activo") == "on"
-            municipio.puede_gestionar_subcuadras      = request.POST.get("puede_gestionar_subcuadras") == "on"
-            municipio.mapa_infracciones_activo        = request.POST.get("mapa_infracciones_activo") == "on"
+            municipio.inspector_ve_sus_infracciones      = request.POST.get("inspector_ve_sus_infracciones") == "on"
+            municipio.admin_puede_editar_plantillas      = request.POST.get("admin_puede_editar_plantillas") == "on"
+            municipio.admin_puede_configurar_tolerancia  = request.POST.get("admin_puede_configurar_tolerancia") == "on"
+            municipio.modulo_informes_activo             = request.POST.get("modulo_informes_activo") == "on"
+            municipio.puede_gestionar_subcuadras         = request.POST.get("puede_gestionar_subcuadras") == "on"
+            municipio.mapa_infracciones_activo           = request.POST.get("mapa_infracciones_activo") == "on"
+            municipio.tolerancia_multa_minutos           = _entero("tolerancia_multa_minutos", municipio.tolerancia_multa_minutos)
 
             # Coordenadas de la sede municipal (para el mapa de zonas)
             def _decimal(nombre, fallback):

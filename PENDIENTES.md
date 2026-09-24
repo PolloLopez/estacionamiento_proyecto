@@ -121,6 +121,24 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 - **Pago diario (módulo premium)** — superadmin habilita por municipio, municipio asigna valor. Requiere diseño de modelo antes de implementar.
 - **Verificación de dos pasos (2FA)** — para el go-live municipal, especialmente para roles admin y tesorero. Django tiene soporte nativo con `django-otp` o `django-two-factor-auth`. Evaluar después de la migración a DO.
 - **`/admin/mapa-infracciones/` — errores de consola**: Los `ChunkLoadError` son de la extensión de Chrome **Excalidraw** (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código de la app. La traza viene de `content.js:2` (content script de la extensión). La página funciona correctamente con Leaflet/OSM. Verificar desactivando la extensión. El banner "beforeinstallprompt" es del PWA y es intencional.
+- **Inspector cancela infraccion** — Asmin autoriza por municipio: Inspector cancela infraccion, otorgando un periodo de tiempo desde el momento de la infraccion. 
+- **Conductor** Al seleccionar sub cuadra, debe ver entre y entre. ver como implementar
+
+---
+
+## ✅ Resuelto (sesión 16 — 2026-09-24)
+
+- **Mapa subcuadras roto en `/superadmin/municipio/<id>/subcuadras/`**: Leaflet CSS/JS estaban dentro de `{% block content %}`. Movidos: CSS + `<style>` → `{% block extra_head %}`; JS de Leaflet + script de init → `{% block extra_scripts %}`. Agregado `mapa.invalidateSize()` para forzar recalculo del tamaño del contenedor. Razón: el script corría antes de que el CSS de `#mapa { height: 520px }` fuera procesado por el browser.
+
+- **QR scan — infracción ya pagada/cancelada**: `detalle_patente` en `views_pago_publico.py` solo consultaba infracciones `estado=pendiente`. Se agrega query de infracciones resueltas (`pagada`, `anulada`, `cancelada`) de los últimos 90 días como `infracciones_recientes`. El template `pago_publico/detalle_patente.html` las muestra antes del formulario de estacionar con badges de estado, evitando que el conductor crea que puede ignorar la situación.
+
+- **"Notificaciones" → "Sugerencias" en panel conductor**: eliminado el bloque `<details>` de preferencias de notificaciones (`notif_verificacion`, `notif_exencion`, `notif_sugerencia`) del pie de `inicio_usuarios.html`. Reemplazado por el patrón unificado de todos los roles: tutorial colapsable + link "💡 ¿Tenés alguna sugerencia? Enviala acá →".
+
+- **Conductor: alerta de saldo insuficiente antes de estacionar**: en `inicio_usuarios` view se calcula `saldo_insuficiente = saldo < tarifa.precio_por_hora` (excluyendo días libres). El template muestra warning "⚠️ Tu saldo no alcanza para 1 hora" + botón "💳 Recargar saldo" + link secundario "Estacionar igual" cuando aplica.
+
+- **Superadmin: gestión de tolerancia de multa + flag para admin**: nuevo campo `admin_puede_configurar_tolerancia` (BooleanField, default=True) en `Municipio`. Migración `0090` creada manualmente. El superadmin puede editar `tolerancia_multa_minutos` desde `editar_municipio.html` y controlar si el admin puede también hacerlo. El template `gestionar_tarifas.html` del admin muestra la fila editable si el flag está activo, o solo lectura con "🔒 Solo superadmin" si está inactivo. El endpoint `admin_guardar_tarifa` rechaza con error si el flag está desactivado.
+
+- **Tests nuevos**: `TestFlagToleranciaAdmin` en `tests_servicios.py` — cubre que el admin puede editar tolerancia con `flag=True` y no puede con `flag=False`.
 
 ---
 
