@@ -10,10 +10,16 @@
  *   - Star Micronics BLE
  *   - Alternativo genérico
  *
- * Persistencia:
- *   Chrome tiene un bug conocido: getDevices() devuelve vacío al navegar entre páginas.
- *   Solución: guardar {id, name, alias} en localStorage. Al reconectar, si getDevices()
- *   falla, se abre requestDevice() con filtro por nombre (diálogo pre-filtrado a UNA impresora).
+ * Estrategia de reconexión (más confiable que llamar gatt.connect() en frío):
+ *   1. getDevices() → obtiene el objeto device sin diálogo.
+ *   2. watchAdvertisements() → espera que la impresora emita un anuncio BLE (5s timeout).
+ *      Una vez detectada, gatt.connect() tiene altísima tasa de éxito.
+ *   3. Si watchAdvertisements no disponible o timeout, intenta gatt.connect() directo (3 reintentos).
+ *   4. Si getDevices() vacío → requestDevice() con filtro de nombre (diálogo con 1 dispositivo pre-seleccionado).
+ *
+ * Chrome bug: getDevices() puede devolver vacío al navegar entre páginas.
+ * watchAdvertisements() mitiga esto porque refresca la referencia al dispositivo
+ * y Chrome lo "recuerda" mejor tras la detección del anuncio.
  */
 
 'use strict';
@@ -111,35 +117,52 @@ async function conectarImpresora() {
 }
 
 /**
- * Reconecta a la impresora guardada SIN mostrar diálogo de selección.
+ * Reconecta a la impresora guardada SIN mostrar diálogo de selección (si es posible).
  *
- * Estrategia:
- *   1. getDevices() — silencioso, funciona cuando Chrome mantiene el permiso.
- *   2. Si falla (bug común en Chrome al navegar entre páginas), usa el nombre
- *      guardado en localStorage para abrir requestDevice() filtrado a ese nombre.
- *      Esto muestra el diálogo pero solo con la impresora conocida.
+ * Estrategia en orden:
+ *   1. getDevices() + watchAdvertisements → espera el anuncio BLE antes de conectar.
+ *      La tasa de éxito es muy alta porque la conexión se hace cuando el dispositivo
+ *      ya está activamente emitiendo.
+ *   2. Si watchAdvertisements no disponible o timeout, reintenta gatt.connect() directo.
+ *   3. Si getDevices() vacío → requestDevice() filtrado por nombre (diálogo mínimo
+ *      con la impresora ya pre-seleccionada: el inspector toca una vez).
  *
  * Retorna { device, caracteristica, perfil } o null.
  */
 async function reconectarImpresora() {
   if (!navigator.bluetooth) return null;
 
-  // Intento 1: reconexión silenciosa
+  // Intento 1: getDevices() + watchAdvertisements (reconexión completamente silenciosa)
   if (typeof navigator.bluetooth.getDevices === 'function') {
     try {
       var devs = await navigator.bluetooth.getDevices();
       if (devs.length) {
-        var conexion = await _abrirConexion(devs[0]);
-        guardarInfoImpresora(devs[0]);
-        return conexion;
+        var device = devs[0];
+        guardarInfoImpresora(device);
+
+        // Esperamos el anuncio BLE (5s) antes de conectar: mucho más confiable
+        // que llamar gatt.connect() en frío, especialmente después de navegar entre páginas.
+        try {
+          var cx = await _conectarViaAnuncio(device, 5000);
+          return cx;
+        } catch (eAnuncio) {
+          console.warn('[BLE] watchAdvertisements falló o timeout:', eAnuncio.message);
+        }
+
+        // Fallback dentro del mismo dispositivo: connect directo con reintentos
+        try {
+          return await _abrirConexionConReintentos(device, 3);
+        } catch (eDirecto) {
+          console.warn('[BLE] connect directo falló tras reintentos:', eDirecto.message);
+        }
       }
     } catch (e) {
       console.warn('[BLE] getDevices falló:', e.message);
     }
   }
 
-  // Intento 2: requestDevice filtrado por nombre conocido
-  // Muestra el diálogo, pero pre-filtrado a la impresora que ya usamos.
+  // Intento 2: requestDevice filtrado por nombre conocido.
+  // Muestra diálogo, pero pre-filtrado a UNA impresora → el inspector toca una vez.
   var info = obtenerInfoImpresora();
   if (info && info.name) {
     try {
@@ -147,7 +170,7 @@ async function reconectarImpresora() {
         filters: [{ name: info.name }],
         optionalServices: UUID_SERVICIOS_OPT,
       });
-      var conexion = await _abrirConexion(device);
+      var conexion = await _abrirConexionConReintentos(device, 2);
       guardarInfoImpresora(device);
       return conexion;
     } catch (e) {
@@ -157,6 +180,64 @@ async function reconectarImpresora() {
   }
 
   return null;
+}
+
+/**
+ * Espera que el dispositivo emita un anuncio BLE y luego conecta.
+ * Esto es mucho más confiable que gatt.connect() en frío, especialmente
+ * tras navegar entre páginas o después de un disconnect explícito.
+ *
+ * @param {BluetoothDevice} device - Dispositivo obtenido de getDevices()
+ * @param {number} timeoutMs - Tiempo máximo de espera (default 5000ms)
+ * @returns Promise<{device, caracteristica, perfil}>
+ */
+async function _conectarViaAnuncio(device, timeoutMs) {
+  timeoutMs = timeoutMs || 5000;
+  if (typeof device.watchAdvertisements !== 'function') {
+    throw new Error('watchAdvertisements no disponible');
+  }
+  return new Promise(function(resolve, reject) {
+    var controller = new AbortController();
+    var timer = setTimeout(function() {
+      try { controller.abort(); } catch (_) {}
+      reject(new Error('timeout esperando anuncio BLE'));
+    }, timeoutMs);
+
+    device.addEventListener('advertisementreceived', function onAnuncio() {
+      clearTimeout(timer);
+      device.removeEventListener('advertisementreceived', onAnuncio);
+      try { controller.abort(); } catch (_) {}
+      // Dispositivo está activamente emitiendo → conectar GATT
+      _abrirConexion(device).then(resolve).catch(reject);
+    }, { once: true });
+
+    device.watchAdvertisements({ signal: controller.signal }).catch(function(e) {
+      clearTimeout(timer);
+      reject(e);
+    });
+  });
+}
+
+/**
+ * Intenta gatt.connect() hasta `intentos` veces con pausa entre reintentos.
+ * Útil para el caso donde el dispositivo está en estado "desconectando"
+ * (ej: copia 1 recién terminó y llamamos para copia 2).
+ */
+async function _abrirConexionConReintentos(device, intentos) {
+  intentos = intentos || 3;
+  var ultimoError;
+  for (var i = 0; i < intentos; i++) {
+    try {
+      return await _abrirConexion(device);
+    } catch (e) {
+      ultimoError = e;
+      console.warn('[BLE] gatt.connect() intento ' + (i + 1) + ' falló:', e.message);
+      if (i < intentos - 1) {
+        await new Promise(function(r) { setTimeout(r, 600); });
+      }
+    }
+  }
+  throw ultimoError;
 }
 
 /**
@@ -234,11 +315,14 @@ async function diagnosticarImpresora() {
 }
 
 /**
- * Reconexión silenciosa: solo intenta getDevices(), sin abrir diálogos.
+ * Reconexión silenciosa: solo usa getDevices() + watchAdvertisements, sin diálogos.
  * Usar cuando NO hay gesto de usuario disponible (ej: entre copias en modo automático).
- * Si getDevices() falla (bug de Chrome al navegar), retorna null inmediatamente
- * en vez de intentar requestDevice() sin gesto → el caller puede mostrar un botón
- * de reintento que SÍ tiene gesto.
+ *
+ * Estrategia:
+ *   1. getDevices() → obtiene el device sin diálogo.
+ *   2. watchAdvertisements → espera anuncio BLE (4s) y conecta.
+ *   3. Si timeout o no disponible → connect directo con reintentos.
+ *   4. Si getDevices() vacío → null (el caller puede mostrar botón con gesto).
  *
  * Retorna { device, caracteristica, perfil } o null.
  */
@@ -248,9 +332,18 @@ async function reconectarSilencioso() {
   try {
     var devs = await navigator.bluetooth.getDevices();
     if (!devs.length) return null;
-    var conexion = await _abrirConexion(devs[0]);
-    guardarInfoImpresora(devs[0]);
-    return conexion;
+    var device = devs[0];
+    guardarInfoImpresora(device);
+
+    // Intentar vía anuncio BLE (más confiable, especialmente post-disconnect de copia 1)
+    try {
+      return await _conectarViaAnuncio(device, 4000);
+    } catch (eAnuncio) {
+      console.warn('[BLE] watchAdvertisements silencioso falló:', eAnuncio.message);
+    }
+
+    // Fallback: connect directo con reintentos
+    return await _abrirConexionConReintentos(device, 3);
   } catch (e) {
     console.warn('[BLE] reconexión silenciosa falló:', e.message);
     return null;
