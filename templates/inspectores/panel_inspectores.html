@@ -38,10 +38,12 @@
          href="{% url 'inspectores_verificar_vehiculo' %}">
         🚓 Verificar vehículo
       </a>
+      {% if inspector_ve_sus_infracciones %}
       <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;"
          href="{% url 'inspectores_resumen_infracciones' %}">
         📑 Mis infracciones
       </a>
+      {% endif %}
       {% if modulo_cobrador %}
       <a class="btn btn-outline" style="font-size:1.1rem; padding:0.9rem 1.2rem; text-align:center;
                                         color:var(--color-primary); border-color:var(--color-primary);"
@@ -207,8 +209,18 @@ function mostrarImpresoraOk(nombre) {
   // getDevices() vacío o no disponible: revisar localStorage
   var info = obtenerInfoImpresora();
   if (info) {
-    // Hay una impresora guardada pero no confirmada por el navegador
-    mostrarImpresoraOk(info.alias + ' (no confirmada)');
+    // Hay una impresora guardada pero no confirmada por el navegador.
+    // Mostramos el campo de alias con el ID del localStorage para que
+    // accionRenombrar() pueda guardar el alias aunque getDevices() esté vacío.
+    mostrarImpresoraOk((info.alias || info.name || 'Impresora') + ' (no confirmada)');
+    var cont = document.getElementById('cont-renombrar');
+    var inp  = document.getElementById('inp-alias');
+    if (cont && inp) {
+      inp.value = info.alias || '';
+      inp.placeholder = info.name || 'Ej: Mi impresora';
+      cont.dataset.deviceId = info.id;
+      cont.style.display = 'block';
+    }
   } else {
     // Sin impresora: dejar el banner visible
     mostrarSinImpresora();

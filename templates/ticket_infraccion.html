@@ -36,7 +36,6 @@
       display: inline-block;
     }
     .btn-imprimir { background: #333; color: #fff; border-color: #333; }
-    .btn-verificar { background: #1a7a3c; color: #fff; border-color: #1a7a3c; }
 
     /* ── Impresión 58mm (papel térmico) ──────────────────────────── */
     /*
@@ -185,18 +184,6 @@
       🔄 Reintentar impresión
     </button>
 
-    <!-- Botón "Verificar otro": aparece al terminar o si el inspector omite -->
-    <button class="btn-verificar" id="btn-verificar"
-            style="display:none; width:100%; max-width:300px;"
-            onclick="window.location.href='{% url 'inspectores_verificar_vehiculo' %}'">
-      🔍 Verificar otro vehículo
-    </button>
-
-    <a href="{% url 'inspectores_verificar_vehiculo' %}"
-       style="font-size:0.82rem; color:var(--color-text-muted, #888); margin-top:0.1rem;">
-      Omitir impresión →
-    </a>
-
   </div>
 
   {% if infraccion.foto %}
@@ -242,7 +229,6 @@ var URL_VERIFICAR = "{% url 'inspectores_verificar_vehiculo' %}";
 async function imprimirActa() {
   var btn    = document.getElementById('btn-imprimir');
   var estado = document.getElementById('estado-impresion');
-  var btnVer = document.getElementById('btn-verificar');
 
   // btn-imprimir empieza oculto; solo se muestra si hay error (reintento).
   btn.disabled = true;
@@ -276,7 +262,6 @@ async function imprimirActa() {
       btn.disabled = false;
       btn.textContent = '🔄 Reintentar impresión';
       btn.style.display = 'block';
-      btnVer.style.display = 'block';
       return;
     }
   }
@@ -356,7 +341,6 @@ async function imprimirActa() {
       btn.textContent = '🔄 Reintentar copia 2';
       btn.disabled = false;
       btn.style.display = 'block';
-      btnVer.style.display = 'block';
 
       // Override temporal del handler: al clickear solo envía la 2da copia
       btn.onclick = async function() {
@@ -386,7 +370,6 @@ async function imprimirActa() {
       btn.disabled = false;
       btn.textContent = '🔄 Reintentar impresión';
       btn.style.display = 'block';
-      btnVer.style.display = 'block';
     }
   }
 }
@@ -407,12 +390,10 @@ async function imprimirActa() {
 async function intentarAutoImprimir() {
   var btn    = document.getElementById('btn-imprimir');
   var estado = document.getElementById('estado-impresion');
-  var btnVer = document.getElementById('btn-verificar');
 
   if (!navigator.bluetooth) {
     estado.textContent = '⚠️ Impresión BLE no disponible. Usá Chrome en Android.';
     if (btn) { btn.textContent = '📱 Necesitás Chrome en Android'; btn.disabled = true; btn.style.display = 'block'; }
-    if (btnVer) btnVer.style.display = 'block';
     return;
   }
 
@@ -439,7 +420,6 @@ async function intentarAutoImprimir() {
       btn.style.display = 'block';
       btn.onclick = imprimirActa;
     }
-    if (btnVer) btnVer.style.display = 'block';
   }
 }
 
