@@ -2945,18 +2945,50 @@ def gestionar_subcuadras(request, municipio_id=None):
         elif accion == "crear":
             calle  = request.POST.get("calle", "").strip()
             altura = request.POST.get("altura", "").strip()
+            calles_entre = request.POST.get("calles_entre", "").strip()
             if not calle or not altura.lstrip("-").isdigit():
                 messages.error(request, "Calle y altura son obligatorias.")
             else:
-                _, creada = Subcuadra.objects.get_or_create(
+                sub, creada = Subcuadra.objects.get_or_create(
                     municipio=municipio,
                     calle=calle,
                     altura=int(altura),
                 )
+                if calles_entre:
+                    sub.calles_entre = calles_entre
+                    sub.save(update_fields=["calles_entre"])
                 if creada:
                     messages.success(request, f"✅ Subcuadra '{calle} {altura}' creada.")
                 else:
                     messages.warning(request, f"Ya existía la subcuadra '{calle} {altura}'.")
+
+        elif accion == "crear_con_coordenadas":
+            # Crea una nueva subcuadra directamente desde el mapa (panel-asignar).
+            # Recibe lat/lon del click en el mapa + calle/altura + calles_entre opcionales.
+            calle  = request.POST.get("calle", "").strip()
+            altura = request.POST.get("altura", "").strip()
+            lat    = request.POST.get("lat", "").strip()
+            lon    = request.POST.get("lon", "").strip()
+            calles_entre = request.POST.get("calles_entre", "").strip()
+            if not calle or not altura.lstrip("-").isdigit():
+                messages.error(request, "Calle y altura son obligatorias.")
+            elif not lat or not lon:
+                messages.error(request, "Coordenadas GPS no recibidas.")
+            else:
+                from decimal import Decimal as _D
+                sub, creada = Subcuadra.objects.get_or_create(
+                    municipio=municipio,
+                    calle=calle,
+                    altura=int(altura),
+                )
+                sub.lat = _D(lat)
+                sub.lon = _D(lon)
+                sub.calles_entre = calles_entre
+                sub.save(update_fields=["lat", "lon", "calles_entre"])
+                if creada:
+                    messages.success(request, f"✅ Subcuadra '{sub}' creada con GPS.")
+                else:
+                    messages.success(request, f"✅ GPS actualizado para '{sub}'.")
 
         elif accion == "editar":
             # Permite renombrar una subcuadra (cambiar calle y/o altura).
