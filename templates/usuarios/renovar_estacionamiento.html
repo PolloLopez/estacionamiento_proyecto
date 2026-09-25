@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 {% block title %}Renovar estacionamiento{% endblock %}
 
 {% block content %}
@@ -61,7 +62,7 @@
           {% for op in opciones_duracion %}
           <button type="button"
                   class="btn btn-outline opcion-hora"
-                  data-horas="{{ op.horas }}"
+                  data-horas="{{ op.horas|unlocalize }}"
                   data-costo="{{ op.costo }}"
                   data-label="{{ op.label }}"
                   style="font-size:1rem; padding:0.6rem 1rem; font-weight:600;">
@@ -99,10 +100,11 @@
 
 <script>
 (function() {
-  const tarifaHora  = parseFloat("{{ tarifa_hora }}");
-  const saldo       = parseFloat("{{ saldo }}");
+  // |unlocalize: evita que es-ar renderice decimales con coma ("0,5") que parseFloat no puede leer
+  const tarifaHora  = parseFloat("{{ tarifa_hora|unlocalize }}");
+  const saldo       = parseFloat("{{ saldo|unlocalize }}");
   const horaInicioTs = parseInt("{{ estacionamiento.hora_inicio|date:'U' }}", 10);
-  const duracionActualH = parseFloat("{{ estacionamiento.duracion_horas }}");
+  const duracionActualH = parseFloat("{{ estacionamiento.duracion_horas|unlocalize }}");
 
   // Mostrar hora de fin actual
   const horaFin = new Date((horaInicioTs + duracionActualH * 3600) * 1000);
