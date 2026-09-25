@@ -76,8 +76,8 @@
       <!-- Panel que aparece al clickear el mapa: asignar GPS a existente o crear nueva -->
       <div id="panel-asignar" class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
-          <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0;">
-            📍 <span id="coord-texto">—</span>
+          <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0;" id="panel-guia">
+            🗺️ <em>Hacé clic en el mapa para marcar el punto</em>
           </p>
           <button type="button" onclick="cerrarPanel()"
                   style="background:none; border:none; cursor:pointer; font-size:1.1rem; color:var(--color-text-muted); line-height:1;">
@@ -86,28 +86,42 @@
         </div>
 
         <!-- Asignar GPS a subcuadra existente -->
-        <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0 0 0.5rem;">
-          Seleccioná una subcuadra y guardá las coordenadas marcadas en el mapa:
-        </p>
         <form method="post">
           {% csrf_token %}
           <input type="hidden" name="accion" value="guardar_coordenadas">
-          <input type="hidden" name="lat" id="inp-lat">
-          <input type="hidden" name="lon" id="inp-lon">
-          <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-            <select name="subcuadra_id" id="sel-subcuadra" required
-                    style="flex:1; padding:0.4rem 0.6rem; border-radius:6px;
-                           border:1px solid var(--color-border); font-size:0.88rem;
-                           background:var(--color-surface); color:var(--color-text);">
-              <option value="">— elegí una subcuadra —</option>
-              {% for s in subcuadras %}
-              <option value="{{ s.id }}">{{ s }}{% if s.lat %} ✅{% endif %}</option>
-              {% endfor %}
-            </select>
-            <button type="submit" class="btn" style="font-size:0.85rem; white-space:nowrap;">
-              💾 Guardar GPS
-            </button>
+          <!-- Selector de subcuadra -->
+          <select name="subcuadra_id" id="sel-subcuadra" required
+                  style="width:100%; margin-bottom:0.5rem; padding:0.4rem 0.6rem; border-radius:6px;
+                         border:1px solid var(--color-border); font-size:0.88rem;
+                         background:var(--color-surface); color:var(--color-text);">
+            <option value="">— elegí una subcuadra —</option>
+            {% for s in subcuadras %}
+            <option value="{{ s.id }}">{{ s }}{% if s.lat %} ✅{% endif %}</option>
+            {% endfor %}
+          </select>
+          <!-- Coordenadas: se llenan desde el mapa O manualmente -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+            <div>
+              <label style="font-size:0.75rem; font-weight:600; display:block; margin-bottom:0.2rem;">Latitud</label>
+              <input type="text" name="lat" id="inp-lat" placeholder="-34.6037"
+                     inputmode="decimal" oninput="actualizarBtnGps()"
+                     style="width:100%; padding:0.35rem 0.5rem; border-radius:6px;
+                            border:1px solid var(--color-border); background:var(--color-surface);
+                            color:var(--color-text); font-size:0.85rem;">
+            </div>
+            <div>
+              <label style="font-size:0.75rem; font-weight:600; display:block; margin-bottom:0.2rem;">Longitud</label>
+              <input type="text" name="lon" id="inp-lon" placeholder="-58.3816"
+                     inputmode="decimal" oninput="actualizarBtnGps()"
+                     style="width:100%; padding:0.35rem 0.5rem; border-radius:6px;
+                            border:1px solid var(--color-border); background:var(--color-surface);
+                            color:var(--color-text); font-size:0.85rem;">
+            </div>
           </div>
+          <button type="submit" id="btn-guardar-gps" class="btn" disabled
+                  style="width:100%; font-size:0.85rem; opacity:0.5; cursor:not-allowed;">
+            💾 Guardar GPS
+          </button>
         </form>
       </div>
 
@@ -272,23 +286,9 @@
       <div class="card" style="padding:1rem;">
         <h3 style="margin:0 0 0.75rem; font-size:1rem;">+ Nueva subcuadra</h3>
 
-        <!-- Indicador de GPS capturado (oculto hasta que se clickea el mapa) -->
-        <div id="nuevo-gps-capturado" style="display:none; margin-bottom:0.6rem; padding:0.4rem 0.75rem;
-             background:#d4edda; color:#155724; border-radius:6px; font-size:0.85rem; font-weight:600;">
-          📍 <span id="nuevo-gps-texto">GPS capturado</span>
-          <button type="button" onclick="limpiarGpsNueva()"
-                  style="margin-left:0.5rem; background:none; border:none; color:#155724;
-                         cursor:pointer; font-size:0.85rem; text-decoration:underline;">
-            Quitar
-          </button>
-        </div>
-
         <form method="post">
           {% csrf_token %}
           <input type="hidden" name="accion" value="crear">
-          <!-- lat/lon opcionales: se llenan cuando el superadmin clickea el mapa antes de crear -->
-          <input type="hidden" name="lat" id="nueva-lat">
-          <input type="hidden" name="lon" id="nueva-lon">
 
           <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.5rem;">
             <input type="text" name="calle" placeholder="Calle" required
@@ -321,6 +321,41 @@
             </div>
             <button type="submit" class="btn" style="font-size:0.85rem; white-space:nowrap; padding:0.4rem 0.8rem;">Crear</button>
           </div>
+
+          <!-- Coordenadas GPS manuales (opcionales) -->
+          <details id="detalle-gps-nueva" style="margin-top:0.6rem;">
+            <summary style="cursor:pointer; font-size:0.82rem; color:var(--color-text-muted);
+                           user-select:none; padding:0.3rem 0;">
+              📍 Coordenadas GPS <span style="font-size:0.75rem;">(opcional — o hacé clic en el mapa)</span>
+            </summary>
+            <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:0.5rem;
+                        align-items:end; margin-top:0.4rem;">
+              <div>
+                <label style="font-size:0.75rem; font-weight:600; display:block; margin-bottom:0.2rem;">Latitud</label>
+                <input type="text" name="lat" id="nueva-lat" placeholder="-34.6037"
+                       inputmode="decimal"
+                       oninput="previewCoordNueva()"
+                       style="width:100%; padding:0.35rem 0.5rem; border-radius:6px;
+                              border:1px solid var(--color-border); background:var(--color-surface);
+                              color:var(--color-text); font-size:0.85rem;">
+              </div>
+              <div>
+                <label style="font-size:0.75rem; font-weight:600; display:block; margin-bottom:0.2rem;">Longitud</label>
+                <input type="text" name="lon" id="nueva-lon" placeholder="-58.3816"
+                       inputmode="decimal"
+                       oninput="previewCoordNueva()"
+                       style="width:100%; padding:0.35rem 0.5rem; border-radius:6px;
+                              border:1px solid var(--color-border); background:var(--color-surface);
+                              color:var(--color-text); font-size:0.85rem;">
+              </div>
+              <button type="button" onclick="centrarEnNueva()"
+                      class="btn btn-outline" style="font-size:0.8rem; padding:0.35rem 0.6rem; white-space:nowrap;">
+                🎯 Ver
+              </button>
+            </div>
+            <p id="nueva-coord-estado" style="font-size:0.78rem; margin:0.3rem 0 0; color:var(--color-text-muted);"></p>
+          </details>
+
         </form>
       </div>
 
@@ -364,7 +399,10 @@ if (marcadoresExistentes.length > 0) {
 // ── Inicializar mapa ──────────────────────────────────────────────────────
 // Se inicializa en extra_scripts (después del DOM) para garantizar que
 // el div #mapa ya existe y su CSS (height: 520px) ya fue aplicado.
-const mapa = L.map("mapa").setView([centroLat, centroLon], zoomInicial);
+// preferCanvas: true → renderiza markers en un canvas único en vez de elementos DOM individuales.
+// Mucho más rápido con muchos pins (50+). Sin costo: la única diferencia es que los markers
+// no son elementos HTML individuales, pero los popups y eventos funcionan igual.
+const mapa = L.map("mapa", { preferCanvas: true }).setView([centroLat, centroLon], zoomInicial);
 
 // CartoDB Voyager: tiles gratuitos sin API key, sin bloqueo de IP de servidor.
 // No usar OpenStreetMap directo en producción: bloquea IPs de servidores (Railway, etc.).
@@ -398,6 +436,9 @@ const iconoNaranja = crearIcono("#e67e22");  // naranja: click temporal
 const marcadoresPorId = {};
 
 // ── Marcadores existentes (coloreados según tipo_zona) ─────────────────────
+// Se agrupan en un LayerGroup y se agregan al mapa de una sola vez para
+// minimizar los repaints del DOM durante la carga inicial.
+const grupoMarcadores = L.layerGroup();
 marcadoresExistentes.forEach(m => {
   const icono = m.tipo_zona === "libre" ? iconoLibre : iconoPagado;
   const zonaTag = m.tipo_zona === "libre" ? "🟢 Zona libre" : "💳 Zona pagada";
@@ -421,11 +462,11 @@ marcadoresExistentes.forEach(m => {
         ✏️ Editar subcuadra
       </button>
     </div>`;
-  const marker = L.marker([m.lat, m.lon], { icon: icono })
-    .addTo(mapa)
-    .bindPopup(popupHtml);
+  const marker = L.marker([m.lat, m.lon], { icon: icono }).bindPopup(popupHtml);
   marcadoresPorId[m.id] = marker;
+  grupoMarcadores.addLayer(marker);
 });
+grupoMarcadores.addTo(mapa);
 
 // ── Pin de sede municipal ─────────────────────────────────────────────────
 // Se muestra si el superadmin configuró las coordenadas en editar_municipio
@@ -470,17 +511,16 @@ mapa.on("click", function(e) {
   // Llenar lat/lon en el panel "Asignar GPS a existente"
   document.getElementById("inp-lat").value = lat;
   document.getElementById("inp-lon").value = lon;
-  document.getElementById("coord-texto").textContent = `${lat}, ${lon}`;
 
-  // Llenar lat/lon en el formulario "Nueva subcuadra" (GPS opcional)
+  // Actualizar guía y habilitar botón
+  document.getElementById("panel-guia").innerHTML = `📍 <strong>Punto marcado en el mapa</strong>`;
+  actualizarBtnGps();
+
+  // Llenar lat/lon en el formulario "Nueva subcuadra" y abrir el detalle GPS
   document.getElementById("nueva-lat").value = lat;
   document.getElementById("nueva-lon").value = lon;
-  const capturadoDiv  = document.getElementById("nuevo-gps-capturado");
-  const capturadoText = document.getElementById("nuevo-gps-texto");
-  if (capturadoDiv) {
-    capturadoDiv.style.display = "block";
-    capturadoText.textContent = `GPS capturado: ${lat}, ${lon}`;
-  }
+  document.getElementById("detalle-gps-nueva").open = true;
+  document.getElementById("nueva-coord-estado").textContent = `📍 Capturado desde el mapa: ${lat}, ${lon}`;
 
   // Mostrar panel de asignación a existente
   const panel = document.getElementById("panel-asignar");
@@ -490,6 +530,14 @@ mapa.on("click", function(e) {
 
 function cerrarPanel() {
   document.getElementById("panel-asignar").style.display = "none";
+  // Resetear inputs y estado del botón para la próxima vez que se abra el panel
+  document.getElementById("inp-lat").value = "";
+  document.getElementById("inp-lon").value = "";
+  document.getElementById("panel-guia").innerHTML = `🗺️ <em>Hacé clic en el mapa para marcar el punto</em>`;
+  const btnGuardar = document.getElementById("btn-guardar-gps");
+  btnGuardar.disabled = true;
+  btnGuardar.style.opacity = "0.5";
+  btnGuardar.style.cursor = "not-allowed";
   if (marcadorTemporal) {
     mapa.removeLayer(marcadorTemporal);
     marcadorTemporal = null;
@@ -528,24 +576,60 @@ function seleccionarFila(fila) {
       marker.openPopup();
     }
   } else {
-    // Sin GPS: mostrar el panel para asignar coordenadas y hacer foco en él
+    // Sin GPS: mostrar el panel y guiar al usuario a clickear el mapa
     const panel = document.getElementById("panel-asignar");
     panel.style.display = "block";
+    // Restablecer guía (por si venía de un click anterior en el mapa)
+    const guia = document.getElementById("panel-guia");
+    if (!document.getElementById("inp-lat").value) {
+      guia.innerHTML = `🗺️ <em>Ahora hacé clic en el mapa para marcar el punto de <strong>${fila.dataset.nombre || "esta subcuadra"}</strong></em>`;
+    }
     panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 }
 
-// ── Limpiar GPS capturado en formulario Nueva subcuadra ───────────────────
-function limpiarGpsNueva() {
-  document.getElementById("nueva-lat").value = "";
-  document.getElementById("nueva-lon").value = "";
-  document.getElementById("nuevo-gps-capturado").style.display = "none";
-  // Quitar marcador temporal del mapa
-  if (marcadorTemporal) {
-    mapa.removeLayer(marcadorTemporal);
-    marcadorTemporal = null;
+// ── Habilitar/deshabilitar botón "Guardar GPS" según si hay coordenadas ──
+function actualizarBtnGps() {
+  const lat = parseFloat(document.getElementById("inp-lat").value);
+  const lon = parseFloat(document.getElementById("inp-lon").value);
+  const btn = document.getElementById("btn-guardar-gps");
+  const valido = !isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+  btn.disabled = !valido;
+  btn.style.opacity = valido ? "1" : "0.5";
+  btn.style.cursor  = valido ? "pointer" : "not-allowed";
+  // Preview marcador temporal al tipear manualmente
+  if (valido) {
+    if (marcadorTemporal) mapa.removeLayer(marcadorTemporal);
+    marcadorTemporal = L.marker([lat, lon], { icon: iconoNaranja }).addTo(mapa);
   }
-  document.getElementById("panel-asignar").style.display = "none";
+}
+
+// ── Coordenadas manuales en "Nueva subcuadra" ────────────────────────────
+
+// Muestra un marcador naranja provisional mientras el usuario tipea lat/lon a mano.
+function previewCoordNueva() {
+  const lat = parseFloat(document.getElementById("nueva-lat").value);
+  const lon = parseFloat(document.getElementById("nueva-lon").value);
+  const estado = document.getElementById("nueva-coord-estado");
+  if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+    // Coordenadas válidas: mover marcador temporal
+    if (marcadorTemporal) mapa.removeLayer(marcadorTemporal);
+    marcadorTemporal = L.marker([lat, lon], { icon: iconoNaranja }).addTo(mapa);
+    estado.textContent = `📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+    estado.style.color = "var(--color-success)";
+  } else {
+    estado.textContent = lat || lon ? "Coordenadas inválidas" : "";
+    estado.style.color = "var(--color-danger)";
+  }
+}
+
+// Botón "🎯 Ver": centra el mapa en las coordenadas ingresadas manualmente.
+function centrarEnNueva() {
+  const lat = parseFloat(document.getElementById("nueva-lat").value);
+  const lon = parseFloat(document.getElementById("nueva-lon").value);
+  if (!isNaN(lat) && !isNaN(lon)) {
+    mapa.flyTo([lat, lon], 17, { duration: 0.8 });
+  }
 }
 
 // ── Modal editar calle/altura ─────────────────────────────────────────────
