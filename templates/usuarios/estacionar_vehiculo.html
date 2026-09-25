@@ -130,44 +130,6 @@
     </p>
     {% endif %}
 
-    <!-- ─── AGREGAR VEHÍCULO (inline) ────────────────────────────────── -->
-    <div id="panel-agregar-vehiculo" style="margin-bottom:1.4rem;">
-      <button type="button" id="btn-mostrar-agregar"
-              onclick="toggleAgregarVehiculo()"
-              style="background:none; border:1px dashed var(--color-border);
-                     border-radius:10px; width:100%; padding:0.7rem 1rem;
-                     cursor:pointer; color:var(--color-text-muted); font-size:0.9rem;
-                     display:flex; align-items:center; justify-content:center; gap:0.5rem;">
-        ➕ Agregar vehículo
-      </button>
-      <div id="form-agregar-vehiculo" style="display:none; margin-top:0.6rem;
-           background:var(--color-surface-2); border-radius:10px; padding:0.9rem 1rem;">
-        <form method="post" action="{% url 'agregar_vehiculo' %}"
-              style="display:flex; gap:0.6rem; align-items:flex-end; flex-wrap:wrap;">
-          {% csrf_token %}
-          <div style="flex:1; min-width:140px;">
-            <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">Patente</label>
-            <input name="patente" placeholder="ABC123" required
-                   style="text-transform:uppercase; letter-spacing:2px; font-weight:700;
-                          font-size:1.05rem; width:100%;"
-                   oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
-          </div>
-          <div style="min-width:110px;">
-            <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">Tipo</label>
-            <select name="tipo" style="padding:0.45rem 0.6rem; border-radius:6px;
-                    border:1px solid var(--color-border); background:var(--color-surface);
-                    font-size:0.95rem; width:100%;">
-              <option value="auto">🚗 Auto</option>
-              <option value="moto">🛵 Moto</option>
-            </select>
-          </div>
-          <button type="submit" class="btn" style="font-size:0.9rem; padding:0.5rem 1rem;">
-            Agregar
-          </button>
-        </form>
-      </div>
-    </div>
-
     <!-- ─── SUBCUADRA: botón GPS + cascade manual ─────────────────────── -->
     {% if subcuadras %}
     <div id="seccion-subcuadra" style="display:none; margin-bottom:1.4rem;">
@@ -323,6 +285,48 @@
   background: #f0fff4 !important;
 }
 </style>
+
+<!-- ─── AGREGAR VEHÍCULO (inline) ────────────────────────────────────────
+     FUERA de form-estacionar para evitar forms anidados (HTML inválido).
+     Los browsers cortan el form exterior al encontrar un <form> anidado,
+     dejando btn-confirmar-est fuera del form → type="submit" no hace nada.
+-->
+<div id="panel-agregar-vehiculo" style="margin-bottom:1.4rem;">
+  <button type="button" id="btn-mostrar-agregar"
+          onclick="toggleAgregarVehiculo()"
+          style="background:none; border:1px dashed var(--color-border);
+                 border-radius:10px; width:100%; padding:0.7rem 1rem;
+                 cursor:pointer; color:var(--color-text-muted); font-size:0.9rem;
+                 display:flex; align-items:center; justify-content:center; gap:0.5rem;">
+    ➕ Agregar vehículo
+  </button>
+  <div id="form-agregar-vehiculo" style="display:none; margin-top:0.6rem;
+       background:var(--color-surface-2); border-radius:10px; padding:0.9rem 1rem;">
+    <form method="post" action="{% url 'agregar_vehiculo' %}"
+          style="display:flex; gap:0.6rem; align-items:flex-end; flex-wrap:wrap;">
+      {% csrf_token %}
+      <div style="flex:1; min-width:140px;">
+        <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">Patente</label>
+        <input name="patente" placeholder="ABC123" required
+               style="text-transform:uppercase; letter-spacing:2px; font-weight:700;
+                      font-size:1.05rem; width:100%;"
+               oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()" />
+      </div>
+      <div style="min-width:110px;">
+        <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.2rem;">Tipo</label>
+        <select name="tipo" style="padding:0.45rem 0.6rem; border-radius:6px;
+                border:1px solid var(--color-border); background:var(--color-surface);
+                font-size:0.95rem; width:100%;">
+          <option value="auto">🚗 Auto</option>
+          <option value="moto">🛵 Moto</option>
+        </select>
+      </div>
+      <button type="submit" class="btn" style="font-size:0.9rem; padding:0.5rem 1rem;">
+        Agregar
+      </button>
+    </form>
+  </div>
+</div>
 
 <!-- Form oculto para eliminar vehículo (evita forms anidados) -->
 <form id="form-eliminar-vehiculo" method="post" action="" style="display:none;">
@@ -489,11 +493,11 @@ function actualizarCostosSegunTipo(tipo) {
     btn.dataset.costo = nuevoCosto;
     if (btn.classList.contains("btn") && !btn.classList.contains("btn-outline")) {
       document.getElementById("costoTexto").innerText = "$" + nuevoCosto.toFixed(2);
-      var avisoSaldo   = document.getElementById("aviso-saldo-insuficiente");
-      var btnConfirmar = document.getElementById("btn-confirmar-est");
-      var saldoInsuficiente = nuevoCosto > SALDO_CONDUCTOR;
-      if (avisoSaldo)   avisoSaldo.style.display   = saldoInsuficiente ? "block" : "none";
-      if (btnConfirmar) btnConfirmar.disabled       = saldoInsuficiente;
+      // Usamos las vars del scope exterior (no re-declarar para evitar shadowing)
+      const avisoSaldo      = document.getElementById("aviso-saldo-insuficiente");
+      const saldoInsuficiente = nuevoCosto > SALDO_CONDUCTOR;
+      if (avisoSaldo)    avisoSaldo.style.display  = saldoInsuficiente ? "block" : "none";
+      if (btnConfirmar)  btnConfirmar.disabled      = saldoInsuficiente;
     }
   });
 }
