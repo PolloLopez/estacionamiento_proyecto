@@ -144,12 +144,21 @@
                               color:var(--color-text); font-size:0.88rem;">
               </div>
             </div>
-            <div style="margin-bottom:0.5rem;">
-              <label style="font-size:0.78rem; font-weight:600;">Entre calles <span style="font-weight:400; color:var(--color-text-muted);">(opcional)</span></label>
-              <input type="text" name="calles_entre" placeholder="Ej: Entre Av. 14 y Av. 16"
-                     style="width:100%; margin-top:0.2rem; padding:0.4rem 0.5rem; border-radius:6px;
-                            border:1px solid var(--color-border); background:var(--color-surface);
-                            color:var(--color-text); font-size:0.88rem;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-bottom:0.5rem;">
+              <div>
+                <label style="font-size:0.78rem; font-weight:600;">Entre <span style="color:var(--color-danger);">*</span></label>
+                <input type="text" name="interseccion_1" required placeholder="Ej: Av. 14"
+                       style="width:100%; margin-top:0.2rem; padding:0.4rem 0.5rem; border-radius:6px;
+                              border:1px solid var(--color-border); background:var(--color-surface);
+                              color:var(--color-text); font-size:0.88rem;">
+              </div>
+              <div>
+                <label style="font-size:0.78rem; font-weight:600;">Y <span style="color:var(--color-danger);">*</span></label>
+                <input type="text" name="interseccion_2" required placeholder="Ej: Av. 16"
+                       style="width:100%; margin-top:0.2rem; padding:0.4rem 0.5rem; border-radius:6px;
+                              border:1px solid var(--color-border); background:var(--color-surface);
+                              color:var(--color-text); font-size:0.88rem;">
+              </div>
             </div>
             <button type="submit" class="btn" style="width:100%; font-size:0.88rem;">
               ✅ Crear subcuadra con este GPS
@@ -177,6 +186,11 @@
               <td style="font-weight:600; padding:0.4rem 0.75rem;">
                 {{ s }}
                 {% if s.tipo_zona == "libre" %}<span style="font-size:0.7rem; color:#2e7d32; margin-left:0.3rem;">🟢 libre</span>{% endif %}
+                {% if s.entre_calles %}
+                  <div style="font-size:0.75rem; color:var(--color-text-muted); font-weight:400; margin-top:0.15rem;">
+                    📍 {{ s.entre_calles }}
+                  </div>
+                {% endif %}
               </td>
               <td style="text-align:center; padding:0.4rem 0.5rem;">
                 {% if s.lat %}
@@ -205,7 +219,7 @@
               <td style="white-space:nowrap; padding:0.4rem 0.5rem;">
                 <!-- Editar calle/altura -->
                 <button type="button"
-                        onclick="abrirEditar({{ s.id }}, '{{ s.calle|escapejs }}', '{{ s.altura }}')"
+                        onclick="abrirEditar({{ s.id }}, '{{ s.calle|escapejs }}', '{{ s.altura }}', '{{ s.interseccion_1|escapejs }}', '{{ s.interseccion_2|escapejs }}')"
                         class="btn btn-outline"
                         style="font-size:0.75rem; padding:0.2rem 0.5rem;"
                         title="Editar nombre de subcuadra">
@@ -262,12 +276,30 @@
                             border-radius:6px; border:1px solid var(--color-border);
                             background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
             </div>
-            <div style="margin-bottom:1rem;">
+            <div style="margin-bottom:0.75rem;">
               <label style="font-size:0.85rem; font-weight:600;">Altura</label>
               <input type="number" name="altura" id="editar-altura" required
                      style="width:100%; margin-top:0.3rem; padding:0.45rem 0.6rem;
                             border-radius:6px; border:1px solid var(--color-border);
                             background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
+              <div>
+                <label style="font-size:0.85rem; font-weight:600;">Entre <span style="color:var(--color-danger);">*</span></label>
+                <input type="text" name="interseccion_1" id="editar-int1" required
+                       placeholder="Ej: Av. 14"
+                       style="width:100%; margin-top:0.3rem; padding:0.45rem 0.6rem;
+                              border-radius:6px; border:1px solid var(--color-border);
+                              background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
+              </div>
+              <div>
+                <label style="font-size:0.85rem; font-weight:600;">Y <span style="color:var(--color-danger);">*</span></label>
+                <input type="text" name="interseccion_2" id="editar-int2" required
+                       placeholder="Ej: Av. 16"
+                       style="width:100%; margin-top:0.3rem; padding:0.45rem 0.6rem;
+                              border-radius:6px; border:1px solid var(--color-border);
+                              background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
+              </div>
             </div>
             <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
               <button type="button" onclick="cerrarEditar()"
@@ -280,7 +312,15 @@
 
       <!-- Crear nueva subcuadra sin GPS (el GPS se puede asignar después desde el mapa) -->
       <div class="card" style="padding:1rem;">
-        <h3 style="margin:0 0 0.75rem; font-size:1rem;">+ Nueva subcuadra <span style="font-size:0.8rem; font-weight:400; color:var(--color-text-muted);">(sin GPS — asignalo desde el mapa)</span></h3>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+          <h3 style="margin:0; font-size:1rem;">+ Nueva subcuadra <span style="font-size:0.8rem; font-weight:400; color:var(--color-text-muted);">(sin GPS — asignalo desde el mapa)</span></h3>
+          <!-- Toggle teclado numérico: útil cuando las calles son nombradas con números (Av. 14, Av. 7, etc.) -->
+          <label style="display:flex; align-items:center; gap:0.4rem; font-size:0.8rem; color:var(--color-text-muted); cursor:pointer; user-select:none;">
+            <input type="checkbox" id="toggle-numerico" onchange="alternarTecladoNumerico(this.checked)"
+                   style="width:15px; height:15px; cursor:pointer;">
+            🔢 Calles con número
+          </label>
+        </div>
         <form method="post">
           {% csrf_token %}
           <input type="hidden" name="accion" value="crear">
@@ -294,12 +334,26 @@
                           border:1px solid var(--color-border); background:var(--color-surface);
                           color:var(--color-text); font-size:0.88rem;">
           </div>
-          <div style="display:flex; gap:0.5rem; align-items:center;">
-            <input type="text" name="calles_entre" placeholder="Entre calles (opcional, ej: Entre Av. 14 y 16)"
-                   style="flex:1; padding:0.4rem 0.6rem; border-radius:6px;
-                          border:1px solid var(--color-border); background:var(--color-surface);
-                          color:var(--color-text); font-size:0.88rem;">
-            <button type="submit" class="btn" style="font-size:0.85rem; white-space:nowrap;">Crear</button>
+          <div style="display:grid; grid-template-columns:1fr 1fr auto; gap:0.5rem; align-items:end;">
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.2rem;">
+                Entre <span style="color:var(--color-danger);">*</span>
+              </label>
+              <input type="text" name="interseccion_1" required placeholder="Ej: Av. 14"
+                     style="width:100%; padding:0.4rem 0.6rem; border-radius:6px;
+                            border:1px solid var(--color-border); background:var(--color-surface);
+                            color:var(--color-text); font-size:0.88rem;">
+            </div>
+            <div>
+              <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.2rem;">
+                Y <span style="color:var(--color-danger);">*</span>
+              </label>
+              <input type="text" name="interseccion_2" required placeholder="Ej: Av. 16"
+                     style="width:100%; padding:0.4rem 0.6rem; border-radius:6px;
+                            border:1px solid var(--color-border); background:var(--color-surface);
+                            color:var(--color-text); font-size:0.88rem;">
+            </div>
+            <button type="submit" class="btn" style="font-size:0.85rem; white-space:nowrap; padding:0.4rem 0.8rem;">Crear</button>
           </div>
         </form>
       </div>
@@ -429,14 +483,32 @@ function cerrarPanel() {
 }
 
 // ── Modal editar calle/altura ─────────────────────────────────────────────
-function abrirEditar(id, calle, altura) {
-  document.getElementById("editar-id").value = id;
-  document.getElementById("editar-calle").value = calle;
+function abrirEditar(id, calle, altura, int1, int2) {
+  document.getElementById("editar-id").value     = id;
+  document.getElementById("editar-calle").value  = calle;
   document.getElementById("editar-altura").value = altura;
+  document.getElementById("editar-int1").value   = int1 || "";
+  document.getElementById("editar-int2").value   = int2 || "";
   document.getElementById("modal-editar").style.display = "flex";
 }
 function cerrarEditar() {
   document.getElementById("modal-editar").style.display = "none";
+}
+
+// ── Toggle teclado numérico ──────────────────────────────────────────────────
+// Cuando las calles son puramente numéricas (Av. 14, Calle 7, etc.),
+// activar este toggle para que el celular muestre teclado numérico en los
+// campos de intersección, agilizando la carga.
+function alternarTecladoNumerico(activo) {
+  const modo = activo ? "numeric" : "text";
+  // Aplica a todos los inputs de interseccion en la página
+  document.querySelectorAll("input[name='interseccion_1'], input[name='interseccion_2']")
+    .forEach(inp => { inp.inputMode = modo; });
+  // También a los del modal de edición
+  const int1 = document.getElementById("editar-int1");
+  const int2 = document.getElementById("editar-int2");
+  if (int1) int1.inputMode = modo;
+  if (int2) int2.inputMode = modo;
 }
 // Cerrar modal al clickear el fondo oscuro
 document.getElementById("modal-editar").addEventListener("click", function(e) {

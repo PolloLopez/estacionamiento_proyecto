@@ -2973,9 +2973,10 @@ def gestionar_subcuadras(request, municipio_id=None):
             messages.success(request, f"Coordenadas eliminadas de {sub}.")
 
         elif accion == "crear":
-            calle  = request.POST.get("calle", "").strip()
-            altura = request.POST.get("altura", "").strip()
-            calles_entre = request.POST.get("calles_entre", "").strip()
+            calle         = request.POST.get("calle", "").strip()
+            altura        = request.POST.get("altura", "").strip()
+            interseccion_1 = request.POST.get("interseccion_1", "").strip()
+            interseccion_2 = request.POST.get("interseccion_2", "").strip()
             if not calle or not altura.lstrip("-").isdigit():
                 messages.error(request, "Calle y altura son obligatorias.")
             else:
@@ -2984,9 +2985,9 @@ def gestionar_subcuadras(request, municipio_id=None):
                     calle=calle,
                     altura=int(altura),
                 )
-                if calles_entre:
-                    sub.calles_entre = calles_entre
-                    sub.save(update_fields=["calles_entre"])
+                sub.interseccion_1 = interseccion_1
+                sub.interseccion_2 = interseccion_2
+                sub.save(update_fields=["interseccion_1", "interseccion_2"])
                 if creada:
                     messages.success(request, f"✅ Subcuadra '{calle} {altura}' creada.")
                 else:
@@ -2994,12 +2995,13 @@ def gestionar_subcuadras(request, municipio_id=None):
 
         elif accion == "crear_con_coordenadas":
             # Crea una nueva subcuadra directamente desde el mapa (panel-asignar).
-            # Recibe lat/lon del click en el mapa + calle/altura + calles_entre opcionales.
-            calle  = request.POST.get("calle", "").strip()
-            altura = request.POST.get("altura", "").strip()
-            lat    = request.POST.get("lat", "").strip()
-            lon    = request.POST.get("lon", "").strip()
-            calles_entre = request.POST.get("calles_entre", "").strip()
+            # Recibe lat/lon del click en el mapa + calle/altura + intersecciones.
+            calle          = request.POST.get("calle", "").strip()
+            altura         = request.POST.get("altura", "").strip()
+            lat            = request.POST.get("lat", "").strip()
+            lon            = request.POST.get("lon", "").strip()
+            interseccion_1 = request.POST.get("interseccion_1", "").strip()
+            interseccion_2 = request.POST.get("interseccion_2", "").strip()
             if not calle or not altura.lstrip("-").isdigit():
                 messages.error(request, "Calle y altura son obligatorias.")
             elif not lat or not lon:
@@ -3013,8 +3015,9 @@ def gestionar_subcuadras(request, municipio_id=None):
                 )
                 sub.lat = _D(lat)
                 sub.lon = _D(lon)
-                sub.calles_entre = calles_entre
-                sub.save(update_fields=["lat", "lon", "calles_entre"])
+                sub.interseccion_1 = interseccion_1
+                sub.interseccion_2 = interseccion_2
+                sub.save(update_fields=["lat", "lon", "interseccion_1", "interseccion_2"])
                 if creada:
                     messages.success(request, f"✅ Subcuadra '{sub}' creada con GPS.")
                 else:
@@ -3035,9 +3038,11 @@ def gestionar_subcuadras(request, municipio_id=None):
             ).exclude(pk=sub.pk).exists():
                 messages.error(request, f"Ya existe la subcuadra '{nueva_calle} {nueva_altura}'.")
             else:
-                sub.calle  = nueva_calle
-                sub.altura = int(nueva_altura)
-                sub.save(update_fields=["calle", "altura"])
+                sub.calle          = nueva_calle
+                sub.altura         = int(nueva_altura)
+                sub.interseccion_1 = request.POST.get("interseccion_1", "").strip()
+                sub.interseccion_2 = request.POST.get("interseccion_2", "").strip()
+                sub.save(update_fields=["calle", "altura", "interseccion_1", "interseccion_2"])
                 messages.success(request, f"✅ Subcuadra renombrada a '{sub}'.")
 
         elif accion == "guardar_tipo_zona":

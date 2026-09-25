@@ -717,13 +717,37 @@ class Subcuadra(models.Model):
         max_length=200,
         blank=True,
         default="",
-        verbose_name="Entre calles",
-        help_text="Opcional. Ej: 'Entre Av. 14 y Av. 16'. Ayuda a los conductores que no conocen la altura.",
+        verbose_name="Entre calles (legado)",
+        help_text="Campo legado. Usar interseccion_1 e interseccion_2.",
+    )
+
+    # Dos intersecciones separadas permiten validar cada calle individualmente
+    # y mostrar al conductor "Entre X y Y" en el selector GPS/manual.
+    interseccion_1 = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Intersección 1",
+        help_text="Primera calle de la intersección. Ej: Av. San Martín",
+    )
+    interseccion_2 = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        verbose_name="Intersección 2",
+        help_text="Segunda calle de la intersección. Ej: Belgrano",
     )
 
     class Meta:
         # municipio incluido: distintos municipios pueden tener la misma calle+altura
         unique_together = ("municipio", "calle", "altura")
+
+    @property
+    def entre_calles(self):
+        """Texto legible 'Entre X y Y' para mostrar al conductor en selector y GPS."""
+        if self.interseccion_1 and self.interseccion_2:
+            return f"Entre {self.interseccion_1} y {self.interseccion_2}"
+        return ""
 
     def __str__(self):
         # Zona Única (altura=0) no muestra el número

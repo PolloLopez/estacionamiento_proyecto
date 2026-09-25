@@ -193,11 +193,11 @@
             <option value="{{ calle_group.grouper }}">{{ calle_group.grouper }}</option>
           {% endfor %}
         </select>
-        <select id="sel-altura" onchange="seleccionarSubcuadraManual()"
+        <select id="sel-altura" onchange="seleccionarSubcuadraManual()" aria-label="Intersección o altura"
                 style="width:100%; padding:0.5rem 0.75rem; border-radius:8px;
                        border:1px solid var(--color-border); font-size:1rem;
                        background:var(--color-surface);">
-          <option value="">— Altura —</option>
+          <option value="">— Altura o intersección —</option>
         </select>
       </div>
 
@@ -345,7 +345,7 @@ const URL_SUBCUADRA_CERCANA = "{% url 'conductor_subcuadra_cercana' %}";
 
 // Array de subcuadras para el selector manual en cascada
 var SUBCUADRAS = [
-  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: {{ s.altura }}, tipo_zona: "{{ s.tipo_zona|escapejs }}"},
+  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: {{ s.altura }}, tipo_zona: "{{ s.tipo_zona|escapejs }}", entre: "{{ s.entre_calles|escapejs }}"},
   {% endfor %}
 ];
 
@@ -411,7 +411,11 @@ function iniciarDeteccionGps() {
             const sel = document.getElementById("select-subcuadra");
             if (sel) sel.value = data.id;
             const gpsLabel = document.getElementById("gps-label");
-            if (gpsLabel) gpsLabel.textContent = `📍 Cuadra detectada: ${data.nombre}`;
+            if (gpsLabel) {
+              // Mostrar nombre de cuadra + intersecciones si están cargadas
+              gpsLabel.textContent = `📍 ${data.nombre}`;
+              if (data.entre) gpsLabel.textContent += ` — ${data.entre}`;
+            }
             actualizarZonaLibre(data.tipo_zona === "libre");
             // Si hay vehículo activo y no es zona libre, mostrar duración
             if (vehiculoActivo && data.tipo_zona !== "libre") {
@@ -456,7 +460,12 @@ function filtrarAlturas() {
   filtradas.forEach(s => {
     const opt = document.createElement("option");
     opt.value = s.id;
-    opt.textContent = s.altura === 0 ? s.calle : `${s.calle} ${s.altura}`;
+    // Si tiene intersecciones, mostrar "Entre X y Y"; si no, mostrar la altura
+    if (s.entre) {
+      opt.textContent = s.altura === 0 ? s.calle : `${s.entre}`;
+    } else {
+      opt.textContent = s.altura === 0 ? s.calle : `${s.calle} ${s.altura}`;
+    }
     opt.dataset.tipoZona = s.tipo_zona;
     selAltura.appendChild(opt);
   });
