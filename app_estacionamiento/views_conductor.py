@@ -1005,13 +1005,9 @@ def finalizar_estacionamiento(request, estacionamiento_id):
 
     usuario = request.user
     if request.method != "POST":
-        return render(request, "usuarios/finalizar_estacionamiento.html", {
-            "estacionamiento": estacionamiento,
-            "duracion_horas":  estacionamiento.duracion_horas,
-            "costo_estimado":  estacionamiento.costo_base,
-            "usuario":         usuario,
-            "saldo_conductor": obtener_saldo_conductor(usuario, usuario.municipio),
-        })
+        # El flujo de confirmación se maneja con confirm() en el frontend.
+        # Si alguien llega aquí por GET (URL directa), lo mandamos al inicio.
+        return redirect("inicio")
 
     resultado = finalizar_estacionamiento_uc(estacionamiento)
 

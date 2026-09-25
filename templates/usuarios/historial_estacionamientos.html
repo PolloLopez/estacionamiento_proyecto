@@ -107,9 +107,14 @@
             <a class="btn btn-outline"
                href="{% url 'usuarios_renovar_estacionamiento' e.id %}"
                style="font-size:0.88rem;">🔄 Renovar</a>
-            <a class="btn btn-danger"
-               href="{% url 'usuarios_finalizar_estacionamiento' e.id %}"
-               style="font-size:0.88rem;">⛔ Finalizar</a>
+            <form method="post" action="{% url 'usuarios_finalizar_estacionamiento' e.id %}" style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger"
+                      style="font-size:0.88rem;"
+                      onclick="return confirm('¿Finalizar el estacionamiento ahora?\nEl costo ya fue descontado al inicio.')">
+                ⛔ Finalizar
+              </button>
+            </form>
           </div>
           {% endif %}
         </div>
