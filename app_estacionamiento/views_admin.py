@@ -2992,6 +2992,11 @@ def gestionar_subcuadras(request, municipio_id=None):
                 sub.interseccion_2 = interseccion_2
                 update_fields = ["interseccion_1", "interseccion_2"]
                 # Si se seleccionó GPS desde el mapa, guardar coordenadas
+                tipo_zona = request.POST.get("tipo_zona", "pagado")
+                if tipo_zona not in ("pagado", "libre"):
+                    tipo_zona = "pagado"
+                sub.tipo_zona = tipo_zona
+                update_fields += ["tipo_zona"]
                 if lat_str and lon_str:
                     from decimal import Decimal as _D
                     sub.lat = _D(lat_str)

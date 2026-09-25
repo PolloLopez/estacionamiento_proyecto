@@ -196,6 +196,22 @@
               </button>
             </div>
             <p id="nueva-coord-estado" style="font-size:0.78rem; margin:0 0 0.5rem; color:var(--color-text-muted);"></p>
+            <!-- Tipo de zona: determina si el conductor paga o no en esta cuadra -->
+            <div style="margin-bottom:0.6rem;">
+              <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.3rem;">Tipo de zona</label>
+              <div style="display:flex; gap:0.5rem;">
+                <label style="flex:1; display:flex; align-items:center; gap:0.4rem; cursor:pointer;
+                              padding:0.35rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);
+                              background:var(--color-surface); font-size:0.88rem;">
+                  <input type="radio" name="tipo_zona" value="pagado" checked> 💰 Pagada
+                </label>
+                <label style="flex:1; display:flex; align-items:center; gap:0.4rem; cursor:pointer;
+                              padding:0.35rem 0.6rem; border-radius:6px; border:1px solid var(--color-border);
+                              background:var(--color-surface); font-size:0.88rem;">
+                  <input type="radio" name="tipo_zona" value="libre"> 🟢 Libre
+                </label>
+              </div>
+            </div>
             <button type="submit" class="btn" style="width:100%; font-size:0.85rem;">
               ✅ Crear subcuadra
             </button>
