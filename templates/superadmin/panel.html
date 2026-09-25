@@ -72,5 +72,28 @@
     {% endif %}
   </div>
 
+  <!-- Footer: tutorial + sugerencias -->
+  <div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--color-border);">
+    <details>
+      <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
+                      color:var(--color-text-muted); list-style:none; user-select:none;
+                      display:flex; align-items:center; gap:0.4rem;">
+        📖 ¿Cómo usar el panel?
+      </summary>
+      <div class="card" style="margin-top:0.5rem; padding:1rem 1.2rem;">
+        <ol style="margin:0; padding-left:1.3rem; display:flex; flex-direction:column; gap:0.55rem;
+                   font-size:0.88rem; line-height:1.4;">
+          <li>🌐 <strong>Gestionar municipios</strong>: hacé clic en "⚙️ Gestionar" para configurar tarifas, flags y módulos de cada municipio.</li>
+          <li>💰 <strong>Auditoría financiera</strong>: revisá movimientos globales de saldo y comisiones entre municipios.</li>
+          <li>💳 <strong>Liquidaciones</strong>: generá y descargá las liquidaciones de la plataforma.</li>
+          <li>💡 <strong>Sugerencias</strong>: revisá los mensajes enviados por conductores y operadores.</li>
+        </ol>
+      </div>
+    </details>
+    <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.75rem 0 0; text-align:center;">
+      💡 ¿Tenés alguna sugerencia? <a href="{% url 'enviar_sugerencia' %}" style="color:var(--color-primary);">Enviala acá →</a>
+    </p>
+  </div>
+
 </div>
 {% endblock %}
