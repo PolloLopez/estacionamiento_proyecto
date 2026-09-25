@@ -81,13 +81,18 @@ Inspector verifica vehículo con exención en circulación:
 
 ```
 1. Conductor inicia sesión (correo/contraseña o Google)
-2. Va a "Estacionar" → elige su vehículo o ingresa patente
-3. Elige duración (1, 2, 3 horas)
-4. Sistema calcula costo = duracion × tarifa_por_hora
-5. Descuenta de usuario.saldo
-6. Crea Estacionamiento ACTIVO
-7. Conductor ve timer en pantalla de inicio
-8. Al vencer: estado pasa a FINALIZADO automáticamente
+2. Va a "Estacionar" → elige su vehículo (recientes o "Otros vehículos" colapsado)
+3. Elige ubicación: GPS automático o calle/altura manual
+   → El selector de altura muestra número + entre calles (ej. "500 — Entre Av. San Martín y Belgrano")
+4. Elige duración en fracciones de 30 min (mínimo configurable por el admin)
+   → El botón de duración seleccionada se distingue visualmente (azul sólido)
+   → El botón confirmar es verde, distinto al GPS (azul contorneado)
+5. Sistema calcula costo = duracion × tarifa_por_hora
+6. Descuenta de usuario.saldo
+7. Crea Estacionamiento ACTIVO
+8. Conductor ve timer en pantalla de inicio
+   → Muestra "hasta HH:MM" (hora de vencimiento) + botón 🔄 Renovar inline
+9. Al vencer: estado pasa a FINALIZADO automáticamente
 ```
 
 ### Flujo de cobro manual (inspector o vendedor cobra en calle)

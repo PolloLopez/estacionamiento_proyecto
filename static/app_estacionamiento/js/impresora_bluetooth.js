@@ -15,7 +15,10 @@
  *   2. watchAdvertisements() → espera que la impresora emita un anuncio BLE (5s timeout).
  *      Una vez detectada, gatt.connect() tiene altísima tasa de éxito.
  *   3. Si watchAdvertisements no disponible o timeout, intenta gatt.connect() directo (3 reintentos).
- *   4. Si getDevices() vacío → requestDevice() con filtro de nombre (diálogo con 1 dispositivo pre-seleccionado).
+ *   4. Si getDevices() vacío → retorna null. El caller (imprimirActa) abre UN diálogo
+ *      limpio con acceptAllDevices. No se abre diálogo filtrado aquí para evitar
+ *      que el inspector vea dos diálogos seguidos cuando la impresora no aparece
+ *      en el filtro (Chrome bug: getDevices() vacío pero nombre guardado en localStorage).
  *
  * Chrome bug: getDevices() puede devolver vacío al navegar entre páginas.
  * watchAdvertisements() mitiga esto porque refresca la referencia al dispositivo
@@ -170,24 +173,10 @@ async function reconectarImpresora() {
     }
   }
 
-  // Intento 2: requestDevice filtrado por nombre conocido.
-  // Muestra diálogo, pero pre-filtrado a UNA impresora → el inspector toca una vez.
-  var info = obtenerInfoImpresora();
-  if (info && info.name) {
-    try {
-      var device = await navigator.bluetooth.requestDevice({
-        filters: [{ name: info.name }],
-        optionalServices: UUID_SERVICIOS_OPT,
-      });
-      var conexion = await _abrirConexionConReintentos(device, 2);
-      guardarInfoImpresora(device, conexion.perfil);
-      return conexion;
-    } catch (e) {
-      console.warn('[BLE] reconexión por nombre falló:', e.message);
-      return null;
-    }
-  }
-
+  // getDevices() vacío: retornar null para que imprimirActa() abra UN diálogo
+  // limpio con acceptAllDevices. Antes se abría un diálogo filtrado por nombre
+  // aquí, pero si la impresora no aparecía el inspector veía DOS diálogos
+  // consecutivos → confuso y parecía un bug de la app.
   return null;
 }
 

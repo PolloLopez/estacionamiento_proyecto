@@ -25,6 +25,32 @@
 
 ## 🔴 Alta prioridad
 
+### Subir Railway a plan Pro ($20/mes) — backups + deploy estable
+
+**Conclusión luego de evaluar Railway vs Digital Ocean:**
+Railway Pro a $20/mes plano (app + PostgreSQL con point-in-time recovery incluido) es mejor opción que DO App Platform + DO PostgreSQL ($27/mes + trabajo de migración). Mismas certificaciones operativas para la escala actual, cero fricción.
+
+**Por qué es urgente:** Railway en el plan Hobby **no hace backups automáticos del PostgreSQL**. Si la base de datos se corrompe o se borra por error, no hay recuperación. Para un sistema municipal con datos de ciudadanos esto es inaceptable.
+
+**Implementación (un solo paso):**
+Railway dashboard → tu proyecto → plan → "Upgrade to Pro" → $20/mes flat, backups activados automáticamente.
+
+**Backup manual inmediato (antes de subir de plan o ante cualquier deploy importante):**
+```powershell
+# Instalar herramientas PostgreSQL (solo una vez)
+winget install PostgreSQL.PostgreSQL   # destildar todo excepto "Command Line Tools"
+
+# Exportar la base de datos
+pg_dump "postgresql://postgres:PASSWORD@acela.proxy.rlwy.net:27429/railway" > backup_2026-09-24.sql
+```
+O sin instalar nada: Railway CLI → `railway run pg_dump $DATABASE_URL > backup.sql`
+O con GUI: DBeaver (gratuito) → clic derecho en DB → Backup.
+
+**Regenerar contraseña Railway (si quedó expuesta):**
+Railway dashboard → servicio Postgres → Settings → Danger Zone → "Reset Password".
+
+---
+
 ### Notificaciones push al conductor
 
 El conductor no recibe aviso cuando le queda poco tiempo ni cuando vence el abono. La app ya es PWA con `sw.js` registrado.
@@ -41,9 +67,11 @@ El conductor no recibe aviso cuando le queda poco tiempo ni cuando vence el abon
 
 ---
 
-### Migración a Digital Ocean App Platform
+### Migración a Digital Ocean App Platform *(solo si el contrato municipal exige SLA formal)*
 
-Railway es el ambiente de prueba. DO es el destino de producción municipal. Hacer en paralelo sin apagar Railway hasta confirmar que DO funciona.
+**Conclusión:** DO App Platform Basic ($12) + DO PostgreSQL dev ($15) = **$27/mes + trabajo de migración**. Railway Pro a $20/mes plano incluye lo mismo para la escala actual. Migrar a DO solo si la municipalidad exige contractualmente el SLA 99.99% formal o las certificaciones ISO 27001.
+
+Si se decide migrar: hacer en paralelo sin apagar Railway hasta confirmar que DO funciona. Actualizar webhook de MercadoPago, variables de entorno, DNS y cron jobs.
 
 **Paso 1 — Preparar DO (sin tocar Railway)**
 1. DO → App Platform → "Create App" → conectar repo GitHub (rama `main`).
