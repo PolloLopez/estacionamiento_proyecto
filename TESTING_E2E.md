@@ -1,6 +1,6 @@
 # Testing E2E — Flujo completo de punta a punta
 > Sistema de Estacionamiento Medido — Railway: https://estacionamiento.up.railway.app
-> Última actualización: 2026-09-22 (sesión 15)
+> Última actualización: 2026-09-24 (sesión 18)
 
 Seguí este archivo en orden. Cada fase depende de la anterior.
 Anotá tus observaciones en los espacios `___` — eso es el insumo para la siguiente sesión de mejoras.
@@ -83,7 +83,32 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 - Datos que faltan en el dashboard: `___`
 - Algo confuso en el período de fechas: `___`
 
-### 2.3 — Horario activo (crítico para la Fase 3)
+### 2.3 — Gestionar tarifas y duración mínima 🆕 *sesión 18*
+
+1. Ir a `/usuarios/admin-tarifas/`.
+2. Verificar que aparece la sección "Duración mínima de compra":
+   - [ ] Muestra el valor actual en minutos (ej: "30 min")
+   - [ ] Hay un `<select>` con opciones de 30, 60, 90, ... hasta 480 min
+3. Cambiar la duración mínima a **60 min** → guardar.
+4. En **Ventana D** (conductor): ir a "🅿️ Estacionar" → verificar que la primera opción de duración es **1 hora** (ya no aparece "30 min").
+   - [ ] Primera opción = 1 hora
+   - [ ] Opción "30 min" desaparece
+5. Volver a `/usuarios/admin-tarifas/` → restaurar a 30 min → verificar que "30 min" vuelve a aparecer para el conductor.
+   - [ ] Comportamiento consistente en ambas direcciones
+
+**Qué anotar:**
+- La opción de duración mínima fue fácil de encontrar: `[ ] Sí / [ ] No — ___`
+
+### 2.4 — Gestionar vendedores: nombre del negocio 🆕 *sesión 18*
+
+1. Ir a `/usuarios/admin-gestionar-vendedores/`.
+2. En el formulario de crear vendedor: verificar que aparece el campo **"Nombre del negocio / punto de venta"**.
+   - [ ] El campo existe y tiene placeholder descriptivo
+3. Crear (o editar) un vendedor: cargar `nombre_negocio` = "Kiosco Prueba".
+4. Verificar que la tabla de vendedores muestra el nombre del negocio como columna principal.
+   - [ ] "Kiosco Prueba" visible en la tabla
+
+### 2.6 — Horario activo (crítico para la Fase 3)
 
 > ⚠️ Si el horario no está activo para hoy, el inspector no puede operar. Verificar ahora.
 
@@ -93,7 +118,7 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 4. El testing de inspector (Fase 3) debe hacerse dentro de ese rango.
    - [ ] Horario confirmado para hoy
 
-### 2.4 — Auditoría de staff `/admin-staff/` 🆕 *sesión 15*
+### 2.7 — Auditoría de staff `/admin-staff/` 🆕 *sesión 15*
 
 1. Ir a `/usuarios/admin-staff/`.
 2. Verificar que se ven **dos tabs**: "💰 Vendedores" y "👮 Inspectores".
@@ -106,7 +131,7 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 **Qué anotar:**
 - Algo que confunde en los tabs: `___`
 
-### 2.5 — Módulo desactivado (acceso denegado con estilo) 🆕 *sesión 15*
+### 2.8 — Módulo desactivado (acceso denegado con estilo) 🆕 *sesión 15*
 
 1. En **Ventana A** (superadmin): desactivar `puede_gestionar_subcuadras` para el municipio.
 2. En **Ventana B** (admin): refrescar y verificar que "📍 Subcuadras" **ya no aparece** en el sidebar.
@@ -121,7 +146,7 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 **Qué anotar:**
 - El mensaje de la página bloqueada es claro: `[ ] Sí / [ ] No — ___`
 
-### 2.6 — Seguridad: admin no puede administrar a otro admin 🆕 *sesión 15*
+### 2.9 — Seguridad: admin no puede administrar a otro admin 🆕 *sesión 15*
 
 1. Ir a `/usuarios/admin-staff-municipio/` (gestionar staff).
 2. Si hay otro admin en la lista: intentar hacer clic en "Editar" o "Resetear contraseña".
@@ -242,21 +267,28 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
 **Qué anotar:**
 - El aviso de infracción pendiente fue claro: `[ ] Sí / [ ] No — ___`
 
-### 4.4 — Pago público `/pagar/` sin login 🆕 *sesión 15*
+### 4.4 — Pago público `/pagar/` sin login 🆕 *sesión 18*
 
-1. Sin cerrar sesión de conductor, abrir `/usuarios/pagar/` (o usar una pestaña sin login).
-2. Ingresar una patente en el **primer campo** (ej: `AA123BB`).
-3. Ingresar una patente **diferente** en el **segundo campo** (ej: `AA123BC`).
-   - [ ] Aparece aviso "⚠️ Las patentes no coinciden"
-   - [ ] El botón "Buscar →" queda deshabilitado
-4. Corregir el segundo campo para que coincida con el primero.
-   - [ ] El aviso desaparece
-   - [ ] El botón se habilita
-5. Enviar → verificar que busca correctamente.
+> El flujo cambió: ahora hay **un solo campo** de patente con un paso de confirmación antes de buscar.
+
+1. Abrir `/usuarios/pagar/` (sin login o en pestaña de incógnito).
+2. Tipear menos de 5 caracteres (ej: `AA1`).
+   - [ ] El botón "Buscar →" permanece deshabilitado
+3. Tipear `AA123BB` (≥ 5 caracteres).
+   - [ ] El botón "Buscar →" se habilita
+4. Hacer clic en "Buscar →" (NO envía aún).
+   - [ ] El campo de patente desaparece
+   - [ ] Aparece un bloque verde con la patente en grande: "¿Es correcta la patente?"
+   - [ ] Dos botones: "✅ Sí, buscar" y "✏️ Corregir"
+5. Hacer clic en "✏️ Corregir".
+   - [ ] Vuelve al campo de patente con foco
+   - [ ] La patente ingresada sigue cargada para corregirla
+6. Corregir a `AA123BC` → "Buscar →" → "✅ Sí, buscar".
+   - [ ] Envía el formulario con la patente correcta
    - [ ] Muestra deuda o estado del vehículo
 
 **Qué anotar:**
-- El flujo de confirmación de patente fue claro: `[ ] Sí / [ ] No — ___`
+- El flujo de un campo + confirmación fue más cómodo que antes: `[ ] Sí / [ ] No — ___`
 - Algo que confunde en /pagar/: `___`
 
 ---
@@ -274,7 +306,31 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
    - [ ] Pasos del tutorial correctos para el vendedor
    - [ ] "💡 Enviala acá →" funciona
 
-### 5.2 — Registrar estacionamiento en efectivo
+### 5.2 — Cargar saldo a un conductor 🆕 *sesión 18*
+
+1. En el panel del vendedor: verificar que existe el botón **"💰 Cargar saldo"**.
+   - [ ] Botón visible en el panel
+2. Hacer clic → lleva a `/usuarios/vendedores/cargar-saldo/`.
+3. Buscar al conductor por **correo**: ingresar el correo del conductor de prueba.
+   - [ ] Aparece el nombre y saldo actual del conductor
+4. Ingresar monto: `$500` → "✅ Cargar saldo".
+   - [ ] Aparece pantalla de comprobante con:
+     - Nombre del conductor
+     - Monto cargado ($500)
+     - Saldo nuevo = saldo anterior + $500
+     - "Registrado por": muestra el nombre del negocio del vendedor (si tiene `nombre_negocio` cargado) o su correo
+     - Fecha y hora
+5. En **Ventana D** (conductor): verificar que el saldo aumentó $500.
+   - [ ] Saldo del conductor actualizado correctamente
+6. Volver a `/usuarios/vendedores/cargar-saldo/` → buscar por **patente**.
+   - [ ] También encuentra al conductor correctamente
+
+**Qué anotar:**
+- La búsqueda por correo funcionó: `[ ] Sí / [ ] No — ___`
+- La búsqueda por patente funcionó: `[ ] Sí / [ ] No — ___`
+- El comprobante mostró el nombre del negocio: `[ ] Sí / [ ] No (solo correo)`
+
+### 5.3 — Registrar estacionamiento en efectivo
 
 1. Hacer clic en "🚗 Registrar estacionamiento".
 2. Ingresar patente: `___` (puede ser cualquier patente).
@@ -283,16 +339,33 @@ Abrí **4 ventanas** (o pestañas de incógnito separadas) para no mezclar sesio
    - [ ] El movimiento aparece en "Mi caja" del día
    - [ ] El monto es correcto
 
-### 5.3 — Cobrar una infracción
+### 5.4 — Cobrar una infracción con acta reciente → verificar notificación 🆕 *sesión 18*
 
-1. Hacer clic en "⚠️ Cobrar infracción".
-2. Ingresar la patente de la infracción creada en Fase 3.3: `___`
-3. Verificar que muestra el monto pendiente.
-4. Confirmar el cobro.
-   - [ ] La infracción pasa a estado "pagada"
-   - [ ] El movimiento aparece en "Mi caja"
+> Testea el caso donde el conductor paga dentro del período de gracia de una infracción reciente.
 
-### 5.4 — Ver resumen y cerrar caja
+**Caso A — pago dentro de la gracia (acta se cancela):**
+1. Asegurarse de que el conductor tiene una infracción **reciente** (dentro del período de tolerancia).
+2. En Ventana C (vendedor): "⚠️ Cobrar infracción" → ingresar la patente.
+3. El sistema cobra el estacionamiento y **cancela el acta automáticamente**.
+4. Verificar el ticket de cobro:
+   - [ ] Aparece banner naranja/amarillo visible
+   - [ ] Ícono ⚠️ grande
+   - [ ] Texto "AVISÁ AL CONDUCTOR" en mayúsculas
+   - [ ] Subtexto: "↩️ Acta #X cancelada por pago en período permitido"
+5. En **Ventana D** (conductor): verificar que la infracción figura como "anulada".
+   - [ ] Estado = anulada
+
+**Caso B — pago fuera de la gracia:**
+1. Cobrar una infracción **antigua** (fuera del período de tolerancia).
+   - [ ] El sistema cobra pero **no cancela** el acta
+   - [ ] No aparece el banner naranja
+   - [ ] La infracción sigue en estado "pendiente"
+
+**Qué anotar:**
+- El banner naranja fue notorio: `[ ] Sí / [ ] No — ___`
+- El vendedor entendió que tenía que avisar: `[ ] Sí / [ ] No`
+
+### 5.5 — Ver resumen y cerrar caja
 
 1. Ir a "🧾 Mi caja".
    - [ ] Se ven los movimientos del día con sus montos
@@ -494,6 +567,10 @@ Cuando terminés las 10 fases, revisá esto antes de reportar:
 - [ ] **Tabs de auditoría de staff**: sticky headers y URL con tab funcionan (Fase 2.4)
 - [ ] **Confirmación de patente en /pagar/**: bloquea con patentes distintas (Fase 4.4)
 - [ ] **Importar exenciones**: 6 columnas reconocidas, selector global/parcial funciona (Fase 9)
+- [ ] **Cargar saldo (vendedor)**: comprobante muestra `nombre_negocio` + correo entre paréntesis (Fase 5.2) 🆕 *sesión 18*
+- [ ] **nombre_negocio en admin**: campo visible en crear/editar vendedor, y en la tabla de gestión (Fase 2.x)  🆕 *sesión 18*
+- [ ] **Banner acta cancelada**: banner naranja ⚠️ visible y con texto claro al cobrar infracción dentro de gracia (Fase 5.4) 🆕 *sesión 18*
+- [ ] **Ticket de infracción**: impresión térmica con texto más grande (doble alto) funcionó (Fase 3.x) 🆕 *sesión 18*
 
 ---
 

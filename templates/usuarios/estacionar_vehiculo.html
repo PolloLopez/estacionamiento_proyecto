@@ -166,19 +166,13 @@
         </select>
       </div>
 
-      <!-- Opción de selección manual -->
-      <div style="text-align:center; margin-top:0.6rem;">
-        <button type="button"
-                onclick="mostrarSelectorManual()"
-                id="btn-manual"
-                style="background:none; border:none; font-size:0.85rem;
-                       color:var(--color-text-muted); cursor:pointer; text-decoration:underline;">
-          ¿No funciona el GPS? Ingresá la dirección manualmente
-        </button>
+      <!-- Separador entre GPS y selector manual -->
+      <div id="btn-manual" style="text-align:center; margin-top:0.6rem;">
+        <span style="font-size:0.8rem; color:var(--color-text-muted);">— o seleccioná la dirección manualmente —</span>
       </div>
 
-      <!-- Selector manual (empieza oculto) -->
-      <div id="selector-manual" style="display:none; margin-top:0.75rem;
+      <!-- Selector manual: siempre visible para que el conductor pueda elegir intersección sin GPS -->
+      <div id="selector-manual" style="margin-top:0.5rem;
            background:var(--color-surface-2); border-radius:10px; padding:0.75rem 1rem;">
         <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.5rem;">
           Seleccioná tu ubicación:
@@ -440,21 +434,18 @@ function iniciarDeteccionGps() {
 }
 
 function mostrarSelectorManual() {
-  const btnDetectar    = document.getElementById("btn-detectar-cuadra");
-  const gpsDetectando  = document.getElementById("gps-detectando");
-  const selectorManual = document.getElementById("selector-manual");
-  const btnManual      = document.getElementById("btn-manual");
-  if (btnDetectar)    btnDetectar.style.display    = "none";
-  if (gpsDetectando)  gpsDetectando.style.display  = "none";
-  if (selectorManual) selectorManual.style.display = "block";
-  if (btnManual)      btnManual.style.display       = "none";
+  // El selector manual ahora es siempre visible. Solo oculta el spinner de GPS si quedó activo.
+  const btnDetectar   = document.getElementById("btn-detectar-cuadra");
+  const gpsDetectando = document.getElementById("gps-detectando");
+  if (btnDetectar)   btnDetectar.style.display   = "none";
+  if (gpsDetectando) gpsDetectando.style.display = "none";
 }
 
 // ── Cascade manual ───────────────────────────────────────────────────────────
 function filtrarAlturas() {
   const calleSeleccionada = document.getElementById("sel-calle").value;
   const selAltura = document.getElementById("sel-altura");
-  selAltura.innerHTML = '<option value="">— Altura —</option>';
+  selAltura.innerHTML = '<option value="">— Altura o intersección —</option>';
 
   const filtradas = SUBCUADRAS.filter(s => s.calle === calleSeleccionada);
   filtradas.forEach(s => {

@@ -53,7 +53,7 @@
       </div>
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
         <a class="btn btn-outline" id="btn-renovar"
-           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}">🔄 Renovar</a>
+           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}">🔄 Extender</a>
         <form method="post" action="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}" style="display:inline;">
           {% csrf_token %}
           <button type="submit" class="btn btn-danger"
