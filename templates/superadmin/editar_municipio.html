@@ -51,9 +51,20 @@
             <small style="color:var(--color-text-muted);">Tiempo mínimo antes de poder infraccionar de nuevo al mismo vehículo. Defecto: 15 min.</small>
           </div>
 
-          <!-- Coordenadas de la sede municipal — aparecen en el mapa de zonas -->
+          <!-- Coordenadas de la sede municipal — aparecen en el mapa de zonas y subcuadras -->
           <div style="margin-bottom:0.75rem;">
             <label style="font-size:0.85rem; font-weight:600;">Ubicación de la sede municipal (para mapa de zonas)</label>
+
+            {% if municipio.sede_lat and municipio.sede_lon %}
+            {# Indicador visual cuando ya está configurada #}
+            <div style="margin-top:0.3rem; margin-bottom:0.5rem; padding:0.4rem 0.75rem;
+                        background:#d4edda; color:#155724; border-radius:6px;
+                        font-size:0.85rem; font-weight:600;">
+              🏛️ Sede configurada: {{ municipio.sede_lat }}, {{ municipio.sede_lon }}
+              <span style="font-weight:400; margin-left:0.4rem;">(editá los campos abajo para cambiarla)</span>
+            </div>
+            {% endif %}
+
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-top:0.25rem;">
               <div>
                 <small style="color:var(--color-text-muted);">Latitud</small>
@@ -71,7 +82,8 @@
               </div>
             </div>
             <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem;">
-              Se muestra como pin 🏛️ en el mapa de zonas. Podés obtener las coordenadas desde Google Maps.
+              Se muestra como pin 🏛️ en el mapa de zonas y en el mapa de subcuadras.
+              Coordenadas: abrí Google Maps → botón derecho sobre el punto → copiá los números.
             </small>
           </div>
 

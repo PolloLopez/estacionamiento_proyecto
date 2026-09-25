@@ -978,7 +978,9 @@ def renovar_estacionamiento(request, est_id):
         tarifa_hora=tarifa_hora,
         hora_inicio_est=estacionamiento.hora_inicio,
         duracion_actual_h=float(estacionamiento.duracion_horas),
-        duracion_minima_min=tarifa_obj.duracion_minima_minutos if tarifa_obj else 30,
+        # En renovación siempre habilitamos bloques de 30 min, aunque la tarifa mínima
+        # de inicio sea mayor (ej. 1 hora). Renovar en fracciones es más flexible.
+        duracion_minima_min=30,
     )
 
     return render(request, "usuarios/renovar_estacionamiento.html", {

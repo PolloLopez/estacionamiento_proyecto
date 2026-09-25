@@ -122,7 +122,9 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 - **Verificación de dos pasos (2FA)** — para el go-live municipal, especialmente para roles admin y tesorero. Django tiene soporte nativo con `django-otp` o `django-two-factor-auth`. Evaluar después de la migración a DO.
 - **`/admin/mapa-infracciones/` — errores de consola**: Los `ChunkLoadError` son de la extensión de Chrome **Excalidraw** (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código de la app. La traza viene de `content.js:2` (content script de la extensión). La página funciona correctamente con Leaflet/OSM. Verificar desactivando la extensión. El banner "beforeinstallprompt" es del PWA y es intencional.
 - **Inspector cancela infraccion** — Asmin autoriza por municipio: Inspector cancela infraccion, otorgando un periodo de tiempo desde el momento de la infraccion. 
-- **Conductor** Al seleccionar sub cuadra, debe ver entre y entre. ver como implementar
+- **Subcuadras — intersecciones (2 cambios relacionados)**:
+  - *Superadmin / carga*: al agregar una subcuadra, el formulario debe requerir las dos intersecciones (`interseccion_1` e `interseccion_2`). Hoy solo existen `calle` y `altura`. Evaluar si agregar campos al modelo `Subcuadra` o derivarlos del texto de la calle.
+  - *Conductor / selector GPS/manual*: en lugar de solo mostrar "Calle 25 Nº 300", mostrar "Entre **Av. San Martín** y **Belgrano**". En el selector manual en cascada: primero escribir/elegir la calle, luego ofrecer la altura **o** la intersección como "Entre ___ Y ___". Requiere que el modelo guarde las dos intersecciones primero.
 
 ---
 

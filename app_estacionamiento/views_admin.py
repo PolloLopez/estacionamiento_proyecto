@@ -2973,10 +2973,13 @@ def gestionar_subcuadras(request, municipio_id=None):
             messages.success(request, f"Coordenadas eliminadas de {sub}.")
 
         elif accion == "crear":
-            calle         = request.POST.get("calle", "").strip()
-            altura        = request.POST.get("altura", "").strip()
+            calle          = request.POST.get("calle", "").strip()
+            altura         = request.POST.get("altura", "").strip()
             interseccion_1 = request.POST.get("interseccion_1", "").strip()
             interseccion_2 = request.POST.get("interseccion_2", "").strip()
+            # lat/lon son opcionales: se llenan si el superadmin clickeó el mapa antes de guardar
+            lat_str = request.POST.get("lat", "").strip()
+            lon_str = request.POST.get("lon", "").strip()
             if not calle or not altura.lstrip("-").isdigit():
                 messages.error(request, "Calle y altura son obligatorias.")
             else:
@@ -2987,9 +2990,17 @@ def gestionar_subcuadras(request, municipio_id=None):
                 )
                 sub.interseccion_1 = interseccion_1
                 sub.interseccion_2 = interseccion_2
-                sub.save(update_fields=["interseccion_1", "interseccion_2"])
+                update_fields = ["interseccion_1", "interseccion_2"]
+                # Si se seleccionó GPS desde el mapa, guardar coordenadas
+                if lat_str and lon_str:
+                    from decimal import Decimal as _D
+                    sub.lat = _D(lat_str)
+                    sub.lon = _D(lon_str)
+                    update_fields += ["lat", "lon"]
+                sub.save(update_fields=update_fields)
                 if creada:
-                    messages.success(request, f"✅ Subcuadra '{calle} {altura}' creada.")
+                    gps_msg = " con GPS 📍" if lat_str else " (sin GPS — asignalo desde el mapa)"
+                    messages.success(request, f"✅ Subcuadra '{calle} {altura}' creada{gps_msg}.")
                 else:
                     messages.warning(request, f"Ya existía la subcuadra '{calle} {altura}'.")
 
@@ -3092,20 +3103,35 @@ def gestionar_subcuadras(request, municipio_id=None):
     # Escapa automáticamente <, >, &, comillas y cualquier otro carácter especial.
     marcadores_list = [
         {
-            "id":       s.id,
-            "nombre":   str(s),
-            "lat":      float(s.lat),
-            "lon":      float(s.lon),
-            "tipo_zona": s.tipo_zona,
+            "id":             s.id,
+            "nombre":         str(s),
+            "calle":          s.calle,
+            "altura":         s.altura,
+            "interseccion_1": s.interseccion_1,
+            "interseccion_2": s.interseccion_2,
+            "entre":          s.entre_calles,   # "Entre X y Y" o ""
+            "lat":            float(s.lat),
+            "lon":            float(s.lon),
+            "tipo_zona":      s.tipo_zona,
         }
         for s in subcuadras if s.lat is not None and s.lon is not None
     ]
 
+    # Sede municipal: se muestra como pin especial en el mapa de subcuadras
+    sede = None
+    if municipio.sede_lat and municipio.sede_lon:
+        sede = {
+            "lat":    float(municipio.sede_lat),
+            "lon":    float(municipio.sede_lon),
+            "nombre": f"Sede {municipio.nombre}",
+        }
+
     return render(request, "admin/subcuadras.html", {
-        "subcuadras":    subcuadras,
+        "subcuadras":      subcuadras,
         "marcadores_list": marcadores_list,
-        "municipio":     municipio,    # para el template (nombre, link de vuelta al superadmin)
-        "municipio_id":  municipio_id, # None si viene del admin municipal
+        "municipio":       municipio,    # para el template (nombre, link de vuelta al superadmin)
+        "municipio_id":    municipio_id, # None si viene del admin municipal
+        "sede":            sede,         # pin 🏛️ en el mapa si está configurada
     })
 
 
