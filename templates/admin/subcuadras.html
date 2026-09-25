@@ -218,9 +218,18 @@
         <table id="tabla-subcuadras" style="font-size:0.85rem; width:100%;">
           <thead>
             <tr>
-              <th style="padding:0.5rem 0.75rem;">Subcuadra</th>
-              <th style="text-align:center; padding:0.5rem 0.5rem;">GPS</th>
-              <th style="text-align:center; padding:0.5rem 0.5rem;">Zona</th>
+              <th style="padding:0.5rem 0.75rem; cursor:pointer; user-select:none; white-space:nowrap;"
+                  onclick="ordenarTabla('nombre')" title="Ordenar por nombre">
+                Subcuadra <span id="sort-ind-nombre" style="color:var(--color-primary);"></span>
+              </th>
+              <th style="text-align:center; padding:0.5rem 0.5rem; cursor:pointer; user-select:none; white-space:nowrap;"
+                  onclick="ordenarTabla('gps')" title="Ordenar por GPS">
+                GPS <span id="sort-ind-gps" style="color:var(--color-primary);"></span>
+              </th>
+              <th style="text-align:center; padding:0.5rem 0.5rem; cursor:pointer; user-select:none; white-space:nowrap;"
+                  onclick="ordenarTabla('zona')" title="Ordenar por zona">
+                Zona <span id="sort-ind-zona" style="color:var(--color-primary);"></span>
+              </th>
               <th style="padding:0.5rem 0.5rem;"></th>
             </tr>
           </thead>
@@ -230,6 +239,7 @@
             <tr id="fila-{{ s.id }}"
                 data-id="{{ s.id }}"
                 data-nombre="{{ s|escapejs }}"
+                data-tipo-zona="{{ s.tipo_zona }}"
                 {% if s.lat %}data-lat="{{ s.lat }}" data-lon="{{ s.lon }}"{% endif %}
                 style="{% if s.tipo_zona == 'libre' %}background:#f0fff4;{% endif %}
                        border-bottom:1px solid var(--color-border);">
@@ -666,5 +676,56 @@ function cerrarEditar() {
 document.getElementById("modal-editar").addEventListener("click", function(e) {
   if (e.target === this) cerrarEditar();
 });
+
+// ── Filtro persistente ────────────────────────────────────────────────────
+// sessionStorage sobrevive al POST → redirect → GET del formulario de edición.
+// Se limpia al cerrar la pestaña (no poluciona otras páginas).
+(function() {
+  const CLAVE = "filtro-subcuadras";
+  const input = document.getElementById("filtro-subcuadras");
+  const guardado = sessionStorage.getItem(CLAVE);
+  if (guardado) {
+    input.value = guardado;
+    filtrarTabla(guardado);
+  }
+  input.addEventListener("input", function() {
+    sessionStorage.setItem(CLAVE, this.value);
+  });
+})();
+
+// ── Ordenamiento de columnas ──────────────────────────────────────────────
+let sortEstado = { columna: null, dir: 1 };
+
+function ordenarTabla(columna) {
+  const tbody = document.querySelector("#tabla-subcuadras tbody");
+  const filas = Array.from(tbody.querySelectorAll("tr[data-id]"));
+
+  // Misma columna: invertir dirección. Columna nueva: orden ascendente.
+  sortEstado.dir = (sortEstado.columna === columna) ? sortEstado.dir * -1 : 1;
+  sortEstado.columna = columna;
+
+  filas.sort(function(a, b) {
+    if (columna === "nombre") {
+      return (a.dataset.nombre || "").toLowerCase()
+        .localeCompare((b.dataset.nombre || "").toLowerCase(), "es") * sortEstado.dir;
+    }
+    if (columna === "gps") {
+      // Con GPS primero en ascendente (1 > 0, negamos para que suba)
+      return ((b.dataset.lat ? 1 : 0) - (a.dataset.lat ? 1 : 0)) * sortEstado.dir;
+    }
+    if (columna === "zona") {
+      return (a.dataset.tipoZona || "").localeCompare(b.dataset.tipoZona || "", "es") * sortEstado.dir;
+    }
+    return 0;
+  });
+
+  filas.forEach(function(f) { tbody.appendChild(f); });
+
+  // Actualizar indicadores visuales en los headers
+  ["nombre", "gps", "zona"].forEach(function(col) {
+    const ind = document.getElementById("sort-ind-" + col);
+    if (ind) ind.textContent = col === columna ? (sortEstado.dir === 1 ? " ↑" : " ↓") : "";
+  });
+}
 </script>
 {% endblock %}
