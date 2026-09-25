@@ -1,106 +1,83 @@
-# Pendientes — Estacionamiento Proyecto
+# Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-24 (sesión 18)
+Última actualización: 2026-09-24 (sesión 19 — V1.0.1 presentación municipal)
 
 ---
 
 ## 🗺️ Estado del deploy
 
-- **Railway** → ambiente de prueba activo. No es producción municipal real.
-- **Digital Ocean App Platform** → deploy definitivo antes de entregar a un municipio real.
+| Ambiente | Estado |
+|---|---|
+| **Railway** (`develop` → `main`) | ✅ Activo — ambiente de prueba / demo municipal |
+| **Digital Ocean App Platform** | 🔴 Pendiente — destino de producción real |
 
-### Orden recomendado antes del go-live municipal
+### Orden recomendado antes del go-live real
 
 ```
-1. Comisiones test end-to-end (🟡 abajo)
-2. Migrar a Digital Ocean App Platform (🔴 abajo)
-3. Smoke test en DO con URL temporal
-4. Corte al municipio real → switch de dominio
+1. Test e2e comisiones completo (🟡 abajo)
+2. Fix verificar.html SUBCUADRAS_INS (🟡 abajo)
+3. Migrar a Digital Ocean App Platform (🔴 abajo)
+4. Smoke test en DO con URL temporal
+5. Switch de dominio al municipio real
 ```
 
 ---
 
 ## 🔴 Alta prioridad
 
-### Notificaciones push al conductor (vencimiento de estacionamiento / abono)
+### Notificaciones push al conductor
 
-El conductor no recibe aviso cuando le queda poco tiempo en el estacionamiento ni cuando le vence el abono. Esta feature es importante para la experiencia de uso diario.
+El conductor no recibe aviso cuando le queda poco tiempo ni cuando vence el abono. La app ya es PWA con `sw.js` registrado.
 
-**Tecnología:** la app ya es PWA con `sw.js` registrado. En Android Chrome las notificaciones push funcionan igual que en una app nativa. En iOS desde iOS 16.4 si la PWA está en el homescreen.
-
-**Implementación (cuando se encare):**
+**Implementación:**
 1. Generar VAPID keys (`py -m py_webpush generatekeys`).
-2. Instalar `pywebpush` + crear modelo `SuscripcionPush(usuario, endpoint, p256dh, auth)`.
+2. Instalar `pywebpush` + modelo `SuscripcionPush(usuario, endpoint, p256dh, auth)`.
 3. Endpoint `/push/suscribir/` que guarda la suscripción del navegador.
 4. Extender `sw.js` para manejar el evento `push` y mostrar la notificación.
-5. Tarea programada (o señal Django) que envía el push X minutos antes del vencimiento — configurable por municipio (`Municipio.minutos_aviso_vencimiento`).
-6. Misma infraestructura para abono: aviso N días antes del vencimiento del mes.
+5. Tarea programada (o señal Django) X minutos antes del vencimiento — configurable por municipio.
+6. Misma infra para abono: aviso N días antes del vencimiento mensual.
 
-**Nota:** no combinar con la sección "Notificaciones internas" (`Notificacion` model) — esas son avisos dentro de la app. Las push son notificaciones del sistema operativo, fuera de la app.
+**Nota:** no mezclar con el modelo `Notificacion` (avisos in-app). Las push son notificaciones del SO.
 
 ---
 
 ### Migración a Digital Ocean App Platform
 
-Railway es el ambiente de prueba actual. DO App Platform es el destino de producción municipal. Hacer en paralelo — no apagar Railway hasta confirmar que DO funciona.
+Railway es el ambiente de prueba. DO es el destino de producción municipal. Hacer en paralelo sin apagar Railway hasta confirmar que DO funciona.
 
-#### Paso 1 — Preparar DO (sin tocar Railway)
+**Paso 1 — Preparar DO (sin tocar Railway)**
+1. DO → App Platform → "Create App" → conectar repo GitHub (rama `main`).
+2. Run command: `gunicorn estacionamiento.wsgi --bind 0.0.0.0:$PORT`
+3. Build command: `pip install -r requirements.txt && python manage.py collectstatic --noinput`
+4. Post-deploy job: `python manage.py migrate`
+5. Agregar PostgreSQL (~$7/mes dev) → DO inyecta `DATABASE_URL` automáticamente.
 
-1. Crear cuenta DO → **App Platform** → "Create App" → conectar el repo de GitHub (rama `main`).
-2. DO detecta Python automáticamente. Configurar:
-   - **Run command:** `gunicorn estacionamiento.wsgi --bind 0.0.0.0:$PORT`
-   - **Build command:** `pip install -r requirements.txt && python manage.py collectstatic --noinput`
-   - **Post-deploy job:** `python manage.py migrate`
-3. Agregar base de datos: en el wizard → "Add Resource" → **PostgreSQL** (~$7/mes dev). DO inyecta `DATABASE_URL` automáticamente.
+**Paso 2 — Variables de entorno en DO** (copiar de Railway, salvo `DATABASE_URL` que DO inyecta sola):
+`SECRET_KEY`, `DEBUG=False`, `ALLOWED_HOSTS` (URL temporal DO + dominio final), `CLOUDINARY_*`, `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY`, `MP_WEBHOOK_SECRET`, `ANYMAIL_*`, `SENTRY_DSN`.
 
-#### Paso 2 — Variables de entorno en DO
-
-En App Platform → Settings → Environment Variables. Copiar de Railway:
-
-| Variable | ¿Cambia? | Acción |
-|---|---|---|
-| `SECRET_KEY` | No | Copiar igual |
-| `DATABASE_URL` | Sí | DO la inyecta automático — no setear manualmente |
-| `DEBUG` | No | Debe ser `False` |
-| `ALLOWED_HOSTS` | Sí | Agregar URL temporal de DO + dominio final del municipio |
-| `CLOUDINARY_*` | No | Copiar igual |
-| `MP_ACCESS_TOKEN`, `MP_PUBLIC_KEY` | No | Copiar igual |
-| `MP_WEBHOOK_SECRET` | No | Copiar igual |
-| `ANYMAIL_*` | No | Copiar igual |
-| `SENTRY_DSN` | No | Copiar igual (o nuevo proyecto Sentry para separar prod de prueba) |
-
-#### Paso 3 — Migrar la base de datos
-
+**Paso 3 — Migrar base de datos**
 ```bash
 pg_dump $RAILWAY_DATABASE_URL > backup_railway_$(date +%Y%m%d).sql
 psql $DO_DATABASE_URL < backup_railway_YYYYMMDD.sql
 python manage.py migrate --check
 ```
+Si Railway solo tiene datos de prueba, saltar el dump y correr solo `migrate`.
 
-Si los datos de Railway son solo de prueba, se puede saltear el dump y correr solo `python manage.py migrate` sobre la BD vacía de DO.
+**Paso 4 — Cron job en DO** (Jobs en schedule):
+- Nombre: `revocar-exenciones` / Command: `python manage.py revocar_exenciones_vencidas` / Schedule: `0 3 * * *`
 
-#### Paso 4 — Cron jobs en DO App Platform
-
-DO App Platform tiene "Jobs" en schedule:
-- **Nombre:** `revocar-exenciones`
-- **Command:** `python manage.py revocar_exenciones_vencidas`
-- **Schedule:** `0 3 * * *` (3am todos los días)
-
-#### Paso 5 — Smoke test (URL temporal, sin cambiar DNS)
-
-Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
+**Paso 5 — Smoke test (URL temporal, sin tocar DNS)**
 - [ ] Login de cada rol
-- [ ] Registrar estacionamiento completo (incluyendo débito de saldo)
-- [ ] Registrar infracción y cobrarla
+- [ ] Estacionamiento completo (débito de saldo)
+- [ ] Infracción + cobro
 - [ ] Rendición de vendedor → admin certifica → tesorero deposita
-- [ ] Verificar emails (Brevo/Resend)
-- [ ] Verificar que Cloudinary sirve imágenes
+- [ ] Emails (Brevo/Resend)
+- [ ] Cloudinary sirve imágenes
 
-#### Paso 6 — Corte: switch de dominio
-
-1. DO App Platform → Settings → Domains → agregar dominio del municipio. SSL automático.
-2. Registrador de dominio → apuntar DNS al valor de DO. Propagación: 5–30 min.
-3. **Actualizar webhook de MercadoPago** → Credenciales → Webhooks → nueva URL. Fácil de olvidar.
+**Paso 6 — Switch de dominio**
+1. DO → Settings → Domains → agregar dominio del municipio. SSL automático.
+2. DNS del registrador → apuntar a DO. Propagación: 5–30 min.
+3. ⚠️ **Actualizar webhook de MercadoPago** → fácil de olvidar.
 4. Actualizar UptimeRobot con la nueva URL.
 5. Dejar Railway activo 3–5 días como fallback, después apagar.
 
@@ -108,129 +85,100 @@ Con la app corriendo en `https://app-nombre-xyz.ondigitalocean.app`:
 
 ## 🟡 Media prioridad
 
-- **Comisiones de vendedores — test end-to-end** (hacer ANTES de la migración a DO)
-  Prueba manual completa según `GUIA_TESTING_ROLES.md` → sección "TEST COMPLETO: Flujo de comisiones de vendedores".
+### Comisiones de vendedores — test end-to-end
+
+Hacer ANTES de la migración a DO. Prueba manual completa según `GUIA_TESTING_ROLES.md` → sección "TEST COMPLETO: Flujo de comisiones de vendedores".
+
+---
+
+### Fix `verificar.html` — SUBCUADRAS_INS + autocomplete sel-calle + teclado numérico sel-altura
+
+Tres issues relacionados en el flujo del inspector:
+- `SUBCUADRAS_INS` bug pendiente de diagnóstico
+- Autocomplete en `sel-calle` (datalist)
+- `inputmode="numeric"` en `sel-altura`
 
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-- **Usuarios de staff con doble rol(admin, tesorero, inspectores deben poder gestionar su saldo y estacionamientos)** 
-- **OCR de patentes con cámara (mejora)** — actualmente hay un botón básico de escaneo. Mejora real con Google ML Kit o Tesseract.js, especialmente útil para el inspector en campo. Evaluar para después del go-live municipal cuando haya volumen real de uso.
-- **Tutorial GIFs en landing pública** — el tutorial por rol ya existe dentro del sistema como `<details>` colapsable. Pendiente: versión con GIFs animados para la landing pública.
-- **Pago diario (módulo premium)** — superadmin habilita por municipio, municipio asigna valor. Requiere diseño de modelo antes de implementar.
-- **Verificación de dos pasos (2FA)** — para el go-live municipal, especialmente para roles admin y tesorero. Django tiene soporte nativo con `django-otp` o `django-two-factor-auth`. Evaluar después de la migración a DO.
-- **`/admin/mapa-infracciones/` — errores de consola**: Los `ChunkLoadError` son de la extensión de Chrome **Excalidraw** (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código de la app. La traza viene de `content.js:2` (content script de la extensión). La página funciona correctamente con Leaflet/OSM. Verificar desactivando la extensión. El banner "beforeinstallprompt" es del PWA y es intencional.
-- **Inspector cancela infraccion** — Asmin autoriza por municipio: Inspector cancela infraccion, otorgando un periodo de tiempo desde el momento de la infraccion. 
-- **Subcuadras — intersecciones (2 cambios relacionados)**:
-  - *Superadmin / carga*: al agregar una subcuadra, el formulario debe requerir las dos intersecciones (`interseccion_1` e `interseccion_2`). Hoy solo existen `calle` y `altura`. Evaluar si agregar campos al modelo `Subcuadra` o derivarlos del texto de la calle.
-  - *Conductor / selector GPS/manual*: en lugar de solo mostrar "Calle 25 Nº 300", mostrar "Entre **Av. San Martín** y **Belgrano**". En el selector manual en cascada: primero escribir/elegir la calle, luego ofrecer la altura **o** la intersección como "Entre ___ Y ___". Requiere que el modelo guarde las dos intersecciones primero.
+- **Staff con doble rol** — admin, tesorero e inspectores deberían poder gestionar su saldo y estacionamientos como conductores.
+- **OCR de patentes con cámara** — actualmente hay botón básico. Mejora real con Google ML Kit o Tesseract.js para el inspector en campo. Evaluar post go-live.
+- **Tutorial GIFs en landing pública** — el tutorial por rol ya existe en `<details>`. Versión con GIFs animados para la landing pública.
+- **Pago diario (módulo premium)** — superadmin habilita por municipio, municipio asigna valor. Requiere diseño de modelo.
+- **2FA (verificación de dos pasos)** — para admin y tesorero. `django-otp` o `django-two-factor-auth`. Evaluar después de la migración a DO.
+- **Inspector cancela infracción** — admin autoriza por municipio: inspector cancela una infracción otorgando un período de gracia desde el momento de la infracción.
+- **`/admin/mapa-infracciones/` — ChunkLoadError en consola** — son errores de la extensión Chrome Excalidraw (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código. La página funciona correctamente. Verificar desactivando la extensión.
 
 ---
 
-## ✅ Resuelto (sesión 18 — 2026-09-24)
+## ✅ Resuelto — sesiones 18–19 (2026-09-24) — V1.0.1
 
-- **Datalist cascade en `registrar_infraccion.html`**: reemplazado patrón viejo `<select>` + evento `change` por `<datalist>` con `<input list="...">`. Dos inputs: calle (con datalist de calles únicas) y altura (datalist filtrado por calle seleccionada). Evento `input` en lugar de `change` — reacciona mientras el inspector escribe, no solo al perder foco. `inputmode="numeric"` en el campo altura para teclado numérico en móvil. Al haber una sola altura para la calle elegida, se autoselecciona y se llena el `hidden-subcuadra` automáticamente.
+**UX conductor — `estacionar_vehiculo.html`:**
+- `sel-altura` muestra altura + referencia de cuadra: "500 — Entre Av. San Martín y Belgrano" (antes solo el texto entre calles, sin número de altura).
+- Botones diferenciados visualmente: GPS → azul outline (`btn-detectar-cuadra`); duración seleccionada → nuevo `.duracion-activa` (azul sólido, toggle con clase dedicada en lugar de swapear `btn`/`btn-outline`); Confirmar → verde (#28a745). Tres acciones → tres colores distintos.
+- "Otros vehículos vinculados" colapsado en `<details>` — el conductor casi siempre usa los recientes; los demás no ocupan pantalla por defecto.
+- Tarjetas de vehículo: `font-size:1.1rem` + `letter-spacing:1.5px` + `word-break:break-all` + `min-width:130px` para que patentes de 7 chars (AA123BB) no desborden.
+- `renovar_estacionamiento`: fracciones de 30 min disponibles al renovar (`duracion_minima_min=30` forzado en la vista), antes solo de a 1 hora.
 
-- **Menú hamburguesa — X en rojo cuando está abierto**: `.menu-toggle.abierto span { background: #e74c3c; }` en `global.css`. Garantiza contraste visible del ícono X sobre cualquier color de fondo de la navbar.
+**UX conductor — `inicio_usuarios.html`:**
+- Línea de estado del estacionamiento dice "hasta HH:MM" (hora calculada desde el timer JS, `horaVencStr`) en lugar de "desde HH:MM".
+- Botón 🔄 Renovar inline junto a la ubicación y hora de vencimiento.
 
-- **Dark mode en `historial_infracciones.html`**: dos colores hardcodeados reemplazados por variables CSS existentes — `#f0fdf4` → `var(--color-success-bg)` (descuento disponible), `var(--color-danger-light)` (variable inexistente) → `var(--color-warning-bg)` + `border: 1px solid var(--color-warning)` (pago fuera del período de gracia).
+**UX admin — `subcuadras.html`:**
+- Popup Leaflet con botón ✏️ Editar subcuadra (atributos `data-*` + event delegation en `#mapa`).
+- Filtro de búsqueda en la tabla de subcuadras.
+- Click en primera celda de una fila → resalta la fila y centra el mapa en el marcador (`flyTo`).
+- Instrucciones colapsadas en `<details>` (antes siempre visibles).
+- Formulario unificado de nueva subcuadra: GPS opcional capturado desde click en el mapa; si no se clickea el mapa, crea la subcuadra marcada como "SIN GPS".
+- Eliminado toggle numérico `id="toggle-numerico"` confuso.
+- Pin 🏛️ de sede municipal en el mapa (requería que `views_admin.py::gestionar_subcuadras` pasara `sede` al contexto — estaba ausente).
 
-- **Flag `inspector_ve_sus_infracciones` en `panel_inspectores`**: la vista no lo pasaba al contexto. Agregado `"inspector_ve_sus_infracciones": getattr(municipio, "inspector_ve_sus_infracciones", False)` al `render()`. El template ya tenía el `{% if %}` correcto — solo faltaba el dato.
-
-- **`accionRenombrar()` — falla silenciosa en path de localStorage**: cuando `getDevices()` devuelve vacío (bug conocido de Chrome al navegar), el código tomaba el path de localStorage pero nunca llamaba a `mostrarRenombrado(device)`, por lo que `cont.dataset.deviceId` quedaba vacío y la función salía sin hacer nada. Fix: en el path de localStorage se puebla explícitamente `cont-renombrar` con `info.id`, `info.alias` y `info.name` antes de mostrar el panel de renombrado.
-
-- **SIA `PATENTE_NO_COINCIDE` — confirmación de patente antes de infraccionar**: en lugar de solo mostrar el error, se presenta un mini-diálogo "¿Ingresaste bien la patente XX?" con dos botones: "↩ No, corregir patente" (resetea el modal SIA) y "🚨 Sí, infraccionar igual" (redirige a `/inspectores/infraccion/?patente=XX`). Diferencia error humano vs. patente de vehículo diferente al QR.
-
-- **`ticket_infraccion.html` — solo opciones de impresión**: eliminado botón "🔍 Verificar otro vehículo" y link "Omitir impresión →". Después de generar un acta, la pantalla solo muestra el ticket y las opciones de impresión BLE. Se eliminó también la clase CSS `.btn-verificar` y todas las referencias a `btnVer` en JS (evitando TypeError por elemento inexistente).
-
-- **BLE impresora — reconexión via `watchAdvertisements()`**: reconexión más robusta para el problema de desvinculación en cada impresión. Estrategia en `reconectarSilencioso()`: (1) `watchAdvertisements()` 4s — espera que la impresora emita un anuncio BLE antes de conectar, (2) reintentos directos gatt.connect() x3 con 600ms entre intentos. `reconectarImpresora()` agrega un tercer nivel: `requestDevice` con filtro por nombre si los dos anteriores fallan. Agregado delay de 800ms antes de la reconexión para copia 2 para que el ciclo de desconexión anterior complete. Razón del problema original: `gatt.connect()` en frío fallaba porque la impresora aún no estaba en modo advertising tras la desconexión previa.
-
-- **Reintegro unificado en Módulos de pago**: eliminado el bloque "Módulo reintegro de estacionamiento" de ⚙️ Configuración general. Los campos `reintegro_minutos`, `reintegro_max_por_dia` y `reintegro_alcance` ahora aparecen directamente dentro del card del módulo `reintegro_residentes` en 🧩 Módulos de pago, pero solo cuando el módulo está activo. Nueva acción `guardar_reintegro` en `views_superadmin.py` para guardar únicamente esos 3 campos sin riesgo de pisar checkboxes ni otros campos de `guardar_general`.
-
-- **`btn-confirmar-est` — botón siempre deshabilitado tras error POST**: dos causas combinadas. Causa 1: los re-renders de error en `estacionar_vehiculo` devolvían un contexto mínimo sin `saldo_conductor` ni `opciones_duracion` → el JS recibía `SALDO_CONDUCTOR = 0` → cualquier costo > 0 bloqueaba el botón permanentemente. Fix: función `_contexto_base(extra=None)` dentro de la vista, usada en los 4 puntos de retorno de error para garantizar contexto completo. Causa 2 (UX): el botón solo se habilitaba al hacer clic en un botón de duración — el conductor no lo sabía. Fix: auto-click del primer `.duracion-btn` al final de `seleccionarVehiculo()` en el template, cuando no es día libre ni zona libre.
-
----
-
-## ✅ Resuelto (sesión 16 — 2026-09-24)
-
-- **Mapa subcuadras roto en `/superadmin/municipio/<id>/subcuadras/`**: Leaflet CSS/JS estaban dentro de `{% block content %}`. Movidos: CSS + `<style>` → `{% block extra_head %}`; JS de Leaflet + script de init → `{% block extra_scripts %}`. Agregado `mapa.invalidateSize()` para forzar recalculo del tamaño del contenedor. Razón: el script corría antes de que el CSS de `#mapa { height: 520px }` fuera procesado por el browser.
-
-- **QR scan — infracción ya pagada/cancelada**: `detalle_patente` en `views_pago_publico.py` solo consultaba infracciones `estado=pendiente`. Se agrega query de infracciones resueltas (`pagada`, `anulada`, `cancelada`) de los últimos 90 días como `infracciones_recientes`. El template `pago_publico/detalle_patente.html` las muestra antes del formulario de estacionar con badges de estado, evitando que el conductor crea que puede ignorar la situación.
-
-- **"Notificaciones" → "Sugerencias" en panel conductor**: eliminado el bloque `<details>` de preferencias de notificaciones (`notif_verificacion`, `notif_exencion`, `notif_sugerencia`) del pie de `inicio_usuarios.html`. Reemplazado por el patrón unificado de todos los roles: tutorial colapsable + link "💡 ¿Tenés alguna sugerencia? Enviala acá →".
-
-- **Conductor: alerta de saldo insuficiente antes de estacionar**: en `inicio_usuarios` view se calcula `saldo_insuficiente = saldo < tarifa.precio_por_hora` (excluyendo días libres). El template muestra warning "⚠️ Tu saldo no alcanza para 1 hora" + botón "💳 Recargar saldo" + link secundario "Estacionar igual" cuando aplica.
-
-- **Superadmin: gestión de tolerancia de multa + flag para admin**: nuevo campo `admin_puede_configurar_tolerancia` (BooleanField, default=True) en `Municipio`. Migración `0090` creada manualmente. El superadmin puede editar `tolerancia_multa_minutos` desde `editar_municipio.html` y controlar si el admin puede también hacerlo. El template `gestionar_tarifas.html` del admin muestra la fila editable si el flag está activo, o solo lectura con "🔒 Solo superadmin" si está inactivo. El endpoint `admin_guardar_tarifa` rechaza con error si el flag está desactivado.
-
-- **Tests nuevos**: `TestFlagToleranciaAdmin` en `tests_servicios.py` — cubre que el admin puede editar tolerancia con `flag=True` y no puede con `flag=False`.
+**UX superadmin — `editar_municipio.html`:**
+- Badge verde "🏛️ Sede configurada: lat, lon" cuando el municipio ya tiene coordenadas de sede cargadas. Antes los campos mostraban el valor pero no había indicador visual de estado.
 
 ---
 
-## ✅ Resuelto (sesión 15 — 2026-09-22)
+## ✅ Resuelto — sesión 18 (2026-09-24)
 
-- **Comentarios Django visibles en templates**: `rendiciones.html` y `verificar.html` tenían comentarios `{# ... #}` multi-línea con `{#` y `#}` en líneas separadas. El lexer de Django no los reconocía como comentario — el texto aparecía en pantalla. Convertidos a `<!-- ... -->`.
-
-- **Flag `mapa_infracciones_activo` por municipio**: campo `BooleanField(default=False)` en `Municipio`. Migración `0089` creada manualmente. El superadmin activa el flag desde `editar_municipio.html` (mismo patrón que `puede_gestionar_subcuadras`). `views_superadmin.py` guarda el valor del POST. Sidebar de admin muestra "🗺️ Mapa de calor" solo si el flag está activo.
-
-- **Sidebar admin — items condicionales por flags**: "📍 Subcuadras" y "📊 Cobertura" visibles solo si `puede_gestionar_subcuadras=True`; "🗺️ Mapa de calor" solo si `mapa_infracciones_activo=True`. Patrón `*([] if not flag else [...])` en el diccionario de sidebar en `views_admin.py`.
-
-- **`/admin-subcuadras/` y `/admin/mapa-infracciones/` sin permiso → página con estilo**: antes devolvían un 403 de texto plano sin CSS. Ahora renderizan `admin/acceso_denegado_modulo.html` con `HttpResponseForbidden(render_to_string(...))`. Template nuevo: 🔒, título del módulo, mensaje explicativo y botón "← Volver al panel".
-
-- **Seguridad: admin no puede administrar a otro admin/tesorero**: `views_admin.py::editar_staff` verifica si `staff.es_admin`; si el usuario actual no es superadmin, rechaza con redirect + mensaje de error. El tesorero queda protegido por el mismo gate implícito (el queryset de staff solo incluye vendedores e inspectores para admins no-superadmin).
-
-- **`/admin-staff/` — tabs Vendedores / Inspectores con sticky headers**: reescritura de `auditoria_staff.html`. Tabs con JS `cambiarTab()`. Headers de tabla con `position:sticky; top:0; background:var(--color-surface); z-index:1`. Tab activo persiste en URL (`?tab=vendedores|inspectores`) vía `history.replaceState()` sin recargar.
-
-- **Dashboard admin**: "Cobros por usuario" renombrado a "Cobros por vendedores" (columna `<th>Vendedor</th>`). Nueva sección "📋 Infracciones por día" con query `TruncDate("creado_en")` + `Count("id")` sobre el período seleccionado.
-
-- **Importar exenciones — formato Excel real**: código esperaba 7 columnas con "Condición" en índice 5; el Excel real tiene 6 columnas (Patente, Nombre y Apellido, Dirección, Teléfono, Fecha renovación, Vencimiento). Eliminada columna "Condición", `es_global` ahora viene de un radio selector `tipo_exencion` en el formulario (Parcial / Global), no del Excel. `_procesar_fila_exencion()` acepta `es_global=False` como parámetro.
-
-- **`/pagar/` — confirmación de patente**: segundo campo `id_patente_confirm` en `buscar.html`. JS `validarPatentes()` bloquea el botón "Buscar →" y muestra aviso "⚠️ Las patentes no coinciden" si los campos difieren. Handler en `submit` como doble seguro.
-
-- **Footer "📖 ¿Cómo usar el panel?" + sugerencias en todos los roles**: tutorial movido al pie del panel en admin, inspector y vendedor (tesorero ya lo tenía). Bloque unificado con `border-top`, `<details>` colapsable y link "💡 ¿Tenés alguna sugerencia? Enviala acá →" (`enviar_sugerencia`). Patrón idéntico en los 4 paneles.
-
-- **Inspector — botón y autosubmit moto (investigado)**: comportamiento correcto. El bloque `if (form && input)` no corre cuando `horario_activo=False` (formulario no existe en el DOM). Síntomas: botón invisible, placeholder estático, sin autosubmit. Causa: testeo fuera del horario activo. Para motos, seleccionar radio "🏍 Moto" antes de tipear; el regex `^[0-9]{3}[A-Z]{3}$` dispara el autosubmit al completar el patrón.
+- **Datalist cascade en `registrar_infraccion.html`**: `<datalist>` con `<input list>`. Evento `input` en lugar de `change`. `inputmode="numeric"` en altura. Auto-selección cuando hay una sola altura.
+- **Menú hamburguesa — X en rojo al abrir**: `.menu-toggle.abierto span { background: #e74c3c }` en `global.css`.
+- **Dark mode `historial_infracciones.html`**: colores hardcodeados reemplazados por variables CSS.
+- **Flag `inspector_ve_sus_infracciones`** faltaba en contexto de `panel_inspectores`.
+- **SIA `PATENTE_NO_COINCIDE` — mini-diálogo de confirmación**: "↩ No, corregir patente" vs "🚨 Sí, infraccionar igual", en lugar de solo mostrar error.
+- **`ticket_infraccion.html` — solo opciones de impresión** después de generar acta.
+- **BLE impresora — reconexión via `watchAdvertisements()`**: estrategia en 3 niveles para evitar desvinculación en copia 2.
+- **Reintegro unificado en Módulos de pago**: eliminado bloque duplicado de ⚙️ Configuración general. Los campos aparecen dentro del card del módulo cuando está activo.
+- **`btn-confirmar-est` siempre deshabilitado tras error POST**: función `_contexto_base()` garantiza contexto completo en todos los retornos de error. Auto-click del primer `.duracion-btn` al seleccionar vehículo.
 
 ---
 
-## ✅ Resuelto (sesión 14 — continuación — 2026-09-21)
+## ✅ Resuelto — sesiones 13–17 (2026-09-20 al 2026-09-22)
 
-- **Auditoría de reseteos de contraseña**: modelo `AuditoriaPassword` con ForeignKey a admin, conductor y municipio; campo `tipo` (choices: "dni" / "personalizada"), campo `ip` opcional, `fecha` con `auto_now_add=True`. Migración `0088` creada manualmente. `views_admin.py::detalle_usuario_admin` crea un registro en `cambiar_password` y en `resetear_password_dni`. Historial de los últimos 10 cambios se pasa al template en `historial_passwords` y se muestra dentro de la sección colapsable `🔑 Cambiar contraseña`.
-
-- **`/admin-subcuadras/` habilitado para admin con flag de superadmin**: campo `puede_gestionar_subcuadras` (BooleanField, default=False) en `Municipio`. Migración `0087`. `views_admin.py::gestionar_subcuadras` cambia de `@require_role("superadmin")` a `@require_role("admin", "superadmin")` + gate interno: si no es superadmin y el flag está desactivado → `HttpResponseForbidden` con mensaje explicativo. El superadmin activa el flag desde `editar_municipio.html` (nuevo checkbox, mismo patrón que `modulo_informes_activo`). `views_superadmin.py` guarda el valor del POST.
-
-## ✅ Resuelto (sesión 14 — continuación — 2026-09-20)
-
-- **BLE impresora — duplicado no imprime**: causa raíz: `gatt.connected` puede devolver `true` con la conexión stale; `writeValueWithoutResponse` enviaba bytes al vacío sin lanzar error. Fix en `ticket_infraccion.html`: (a) desconectar explícitamente después de copia 1, (b) reconectar siempre antes de copia 2 con `reconectarSilencioso()` (solo `getDevices()`, sin diálogo — porque el gesto de usuario expiró entre los awaits), (c) si `getDevices()` falla, lanzar error → catch → botón "Reintentar copia 2" que SÍ tiene gesto fresco. Nueva función `reconectarSilencioso()` en `impresora_bluetooth.js`.
-- **BLE impresora — vuelve a pedir vinculación**: límite de Chrome — `getDevices()` pierde la sesión al navegar entre páginas (bug conocido, sin fix del lado de la app). El workaround ya existía: Intento 2 en `reconectarImpresora()` usa `requestDevice({filters: [{name}]})` pre-filtrado. Para impresoras sin nombre de hardware (`device.name === null`), el diálogo abre sin filtro (comportamiento esperado). Mejora de UX: cuando se abre el diálogo, `imprimirActa()` ahora muestra el alias guardado ("Seleccioná 'MTP-II' en el diálogo...") para orientar al inspector.
-
-## ✅ Resuelto (sesión 14 — 2026-09-20)
-
-- **10 errores en tests** (2 FAIL + 8 ERROR): (a) `nombre_completo()` con paréntesis en 9 lugares de `views_inspector.py` y `views_admin.py` — es `@property`, no método, se quitaron los `()`. (b) `UnboundLocalError` en `panel_tesorero`: `cierres_admin_sin_certificar` se usaba antes de definirse, se movió la definición del queryset arriba del `.count()`. (c) Tests `test_saldo_se_descuenta_al_estacionar` y `test_conductor_sin_saldo_redirige_a_carga_mp` fallaban porque sin `HorarioEstacionamiento` el costo siempre es $0 — se agrega horario 00:00–23:59 para los 7 días en `BaseRolesTest.setUp()`.
-
-- **Refactor estilos inline → clases CSS**: 5 clases utilitarias en `global.css` (`.page-header`, `.form-narrow`, `.form-narrow-md`, `.card-empty`, `.td-sin-datos`, `.label-sm`). 84 reemplazos automáticos en 58 templates. Correctamente preservados 3 casos con propiedades extra (`flex-shrink`, `background`, `border`). Los tests se corren en local con `python manage.py test app_estacionamiento`.
-
-## ✅ Resuelto (sesión 13 continuación — 2026-09-20)
-
-- **`Municipio.modulo_informes_activo` — flag por municipio para tab Informes**: campo BooleanField agregado a `models.py`. Migración `0086`. `admin_rendiciones` en `views_admin.py` redirige a `cierres` si el flag está desactivado. Tab "📨 Informes" en `rendiciones.html` se muestra solo si el flag es True. Checkbox toggle agregado en `templates/superadmin/editar_municipio.html` (mismo patrón que `admin_puede_editar_plantillas`). `views_superadmin.py` guarda el valor del POST con `== "on"`.
-- **Rediseño UX `/admin-rendiciones/`**: banner de flujo de 3 pasos visible en todas las secciones (① Certificar cierres → ② Rendir a tesorería → ③ Tesorería valida), con estado visual dinámico (⏳/✅) según `conteo_pendientes`. Tabs renombrados con números. Tab de cierres muestra botón "② Crear rendición →" cuando no hay pendientes. Notas contextuales en tabs de rendición y comisiones explicando que las comisiones se generan automáticamente al crear la rendición.
-
-## ✅ Resuelto (sesión 13 — 2026-09-20)
-
-- **BilleteraConductor (saldo por municipio)**: modelo `BilleteraConductor(conductor, municipio, saldo)` creado con `UniqueConstraint`. Migración `0085`. `services/saldo.py` → `debitar_saldo_conductor()` y `cargar_saldo_conductor()` usan BilleteraConductor como fuente de verdad. `acreditar_saldo_mp` y `views_mp.py` pasan `municipio_id` en metadata de MP. `views_conductor.py` muestra saldo por municipio. Tests actualizados en `tests.py`, `tests_roles.py` y `tests_servicios.py` (reemplazado `usuario.saldo` por `obtener_saldo_conductor()`). `Usuario.saldo` queda como campo legacy.
-- **`/admin-subcuadras/` restringido a superadmin**: `@require_role` cambiado de `("admin", "superadmin")` a `("superadmin")`. Admin municipal recibe 403 hasta que se estabilice la vista. *(Revertido en sesión 14: ahora admin puede acceder si el superadmin activa el flag `puede_gestionar_subcuadras`.)*
-- **Mail automático al resetear contraseña al DNI**: `views_admin.py` handler `resetear_password_dni` envía mail con `send_mail(..., fail_silently=True)` dentro de `try/except`. No interrumpe el flujo si el mail falla. Usa nombre del municipio como remitente contextual.
-- **`panel_tesorero.html` — UX y bugs**: 3 tarjetas de stat al tope (rendiciones pendientes / comisiones a depositar / cierres sin certificar) con links de ancla a las secciones. Cierres sin certificar aparecen en el resumen de arriba con callout de advertencia en la sección de rendiciones. Nota explicativa en "Comisiones de vendedores" aclarando que se crean al generar rendición, no al certificar cierre. Tutorial movido al pie del panel. `views_tesorero.py` agrega `pendientes_cierres_admin` al contexto.
-- **Flujo confirmación depósito tesorero → vendedor**: `panel_vendedor.html` muestra alerta prominente en azul cuando hay comisiones en estado "depositada" esperando confirmación del vendedor. `views_vendedor.py` agrega `comisiones_a_certificar` al contexto. El vendedor puede confirmar desde su panel sin que el tesorero lo avise.
-
-## ✅ Resuelto (sesión 12 — 2026-09-20)
-
-- **`/mp/cargar/` — input de monto solo acepta enteros**: `inputmode="numeric"` + `sanitizarMonto()` que filtra con `/[^0-9]/g`. Sin decimales ni caracteres especiales.
-- **`/inicio/` — sección "Mis vehículos"**: muestra cada vehículo del conductor con iconos de estado: 🟢 estacionamiento activo, infracciones pendientes (⚠️ N), exento (🏷️). Links a historial e infracciones filtrados por `?patente=`.
-- **Multi-vehículo simultáneo**: la constraint de DB ya era por vehículo, no por conductor. La vista traía solo el primero con `.first()`. Corregido: lista completa con auto-cierre de expirados, anotación Python `tiene_estacionamiento_activo` en O(1).
-- **`/abono/` — agregar vehículo inline**: `<details>` expandible en la misma página, `accion=agregar_vehiculo`, pre-selecciona el nuevo vehículo en el select.
-- **`/mis-infracciones/` — cards responsive**: tabla reemplazada por cards con `toggleDetalle()`. Icono estado (✅/⚠️/🚫), sin la palabra "Calle" redundante, foto expandible, modal de pago fuera del card (z-index). Filtro por `?patente=` opcional.
-- **`/mis_estacionamientos/` — cards clickeables**: mismo patrón expandible. Icono 🟢/⚪ por estado, detalle con tabla y botones si activo.
-- **`/admin-usuarios/<id>/` — layout expandible**: secciones `<details>/<summary>`. "Cargar saldo" y "Agregar vehículo" siempre visibles como acciones rápidas. Sección de contraseña colapsada con borde de advertencia. Botón "Resetear al DNI" (usa `accion=resetear_password_dni`). `<section-password>` se abre automáticamente si el conductor tiene cambio pendiente.
-- **Resetear contraseña al DNI**: handler en `views_admin.py` (`accion=resetear_password_dni`), valida que el DNI tenga al menos 6 caracteres, activa `cambio_password_requerido=True`. Si no tiene DNI, el botón queda deshabilitado.
+- Mapa subcuadras roto en `/superadmin/` — Leaflet CSS/JS movidos a los blocks correctos.
+- QR scan — infracción ya pagada/cancelada: se muestran infracciones recientes antes de permitir estacionar.
+- Notificaciones → Sugerencias en panel conductor.
+- Alerta saldo insuficiente antes de estacionar.
+- Superadmin: gestión de tolerancia de multa + flag `admin_puede_configurar_tolerancia`.
+- Comentarios Django visibles en templates → convertidos a `<!-- -->`.
+- Flag `mapa_infracciones_activo` por municipio.
+- Sidebar admin — items condicionales por flags (`puede_gestionar_subcuadras`, `mapa_infracciones_activo`).
+- 403 con estilo en módulos deshabilitados.
+- Seguridad: admin no puede administrar a otro admin/tesorero.
+- Tabs Vendedores/Inspectores en `/admin-staff/` con sticky headers.
+- Dashboard admin: "Cobros por vendedores" + sección "Infracciones por día".
+- Importar exenciones — formato Excel real (6 columnas, `es_global` desde radio selector).
+- `/pagar/` — confirmación de patente antes de buscar.
+- Footer tutorial + sugerencias en todos los roles.
+- Flag `modulo_informes_activo` + rediseño UX `/admin-rendiciones/`.
+- Auditoría de reseteos de contraseña (`AuditoriaPassword`).
+- `/admin-subcuadras/` habilitado para admin con flag de superadmin.
+- BilleteraConductor (saldo por municipio).
+- Mail automático al resetear contraseña al DNI.
+- `panel_tesorero.html` — UX y bugs.
+- Flujo confirmación depósito tesorero → vendedor.
+- Refactor estilos inline → clases CSS (5 clases utilitarias, 84 reemplazos en 58 templates).
+- 10 errores en tests corregidos.
+- BLE impresora — duplicado no imprime + reconexión.
+- Multi-vehículo simultáneo en inicio.
+- Cards responsive en mis-infracciones, mis-estacionamientos.

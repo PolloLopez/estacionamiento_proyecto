@@ -62,9 +62,19 @@
           </button>
         </form>
       </div>
-      <p style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.75rem; margin-bottom:0;">
-        📍 {{ estacionamiento_activo.subcuadra }} &nbsp;·&nbsp; desde {{ estacionamiento_activo.hora_inicio|date:"H:i" }}
-      </p>
+      <!-- "hasta HH:MM" se rellena desde el timer JS (horaVencStr ya calculado) -->
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  flex-wrap:wrap; gap:0.4rem; margin-top:0.75rem; margin-bottom:0;">
+        <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0;">
+          📍 {{ estacionamiento_activo.subcuadra }} &nbsp;·&nbsp;
+          <span id="hasta-hora" style="font-weight:600;">calculando…</span>
+        </p>
+        <a class="btn btn-outline"
+           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}"
+           style="font-size:0.8rem; padding:0.25rem 0.65rem; white-space:nowrap;">
+          🔄 Renovar
+        </a>
+      </div>
       <script>
         const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
         const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_horas }}");
@@ -335,6 +345,10 @@
   // Hora de vencimiento formateada una sola vez
   const pad = n => String(n).padStart(2, "0");
   const horaVencStr = pad(fin.getHours()) + ":" + pad(fin.getMinutes());
+
+  // Rellenar el span "hasta HH:MM" debajo del timer (también accesible sin timer activo)
+  const hastaEl = document.getElementById("hasta-hora");
+  if (hastaEl) hastaEl.textContent = "hasta " + horaVencStr;
 
   let avisoMostrado = false;
 
