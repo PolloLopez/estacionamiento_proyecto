@@ -600,6 +600,9 @@ def subcuadra_cercana_conductor(request):
         # tipo_zona es "pagado" o "libre" — el template lo usa para mostrar
         # el banner de zona libre y ocultar el formulario de pago.
         "tipo_zona": mas_cercana.tipo_zona,
+        # entre_calles: "Entre X y Y" si tiene intersecciones cargadas, "" si no.
+        # El conductor lo ve debajo del nombre de la cuadra detectada por GPS.
+        "entre":     mas_cercana.entre_calles,
     })
 
 
