@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-24 (sesión 19 — V1.0.1 presentación municipal)
+Última actualización: 2026-09-25 (sesión 20 — bugs V1.0.1 + DB password Railway)
 
 ---
 
@@ -113,6 +113,12 @@ Si Railway solo tiene datos de prueba, saltar el dump y correr solo `migrate`.
 
 ## 🟡 Media prioridad
 
+### Bug — liquidación: "Monto variable (% recaudación)" calcula mal
+
+En `/superadmin/municipio/1/liquidacion/nueva/`, el campo "Monto variable — % recaudación ($)" debe calcular el porcentaje sobre el **total recaudado por el municipio en el período seleccionado**. Revisar si está calculando sobre otro valor (ej. sobre el monto base, o sobre la suma de rendiciones, en lugar de la recaudación total del período).
+
+---
+
 ### Comisiones de vendedores — test end-to-end
 
 Hacer ANTES de la migración a DO. Prueba manual completa según `GUIA_TESTING_ROLES.md` → sección "TEST COMPLETO: Flujo de comisiones de vendedores".
@@ -137,6 +143,15 @@ Tres issues relacionados en el flujo del inspector:
 - **2FA (verificación de dos pasos)** — para admin y tesorero. `django-otp` o `django-two-factor-auth`. Evaluar después de la migración a DO.
 - **Inspector cancela infracción** — admin autoriza por municipio: inspector cancela una infracción otorgando un período de gracia desde el momento de la infracción.
 - **`/admin/mapa-infracciones/` — ChunkLoadError en consola** — son errores de la extensión Chrome Excalidraw (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código. La página funciona correctamente. Verificar desactivando la extensión.
+
+---
+
+## ✅ Resuelto — sesión 20 (2026-09-25)
+
+- **BLE doble diálogo al infraccionar**: `reconectarImpresora()` abría un diálogo filtrado por nombre; si fallaba, `imprimirActa()` abría un segundo `acceptAllDevices`. Eliminado el diálogo filtrado de `reconectarImpresora()` → ahora retorna null y se abre un solo diálogo limpio.
+- **`agregar_vehiculo.html` botón sin estilo**: `class="btn-general"` no existe en `global.css` → cambiado a `class="btn"`.
+- **`renovar_estacionamiento.html` preview calcula mal con 30 min**: `LANGUAGE_CODE = "es-ar"` renderea `Decimal("0.5")` como `"0,5"` → `parseFloat` retorna 0. Agregado `{% load l10n %}` y `|unlocalize` en los 4 valores (3 en el bloque `<script>` + `data-horas` en el botón).
+- **Railway DB password**: contraseña reseteada vía `ALTER USER postgres WITH PASSWORD '...'` + actualización de `DATABASE_URL` en app service.
 
 ---
 
