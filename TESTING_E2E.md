@@ -1,6 +1,7 @@
 # Testing E2E — Flujo completo de punta a punta
 > Sistema de Estacionamiento Medido — Railway: https://estacionamiento.up.railway.app
-> Última actualización: 2026-09-24 (sesión 18)
+> Última actualización: 2026-09-25 (sesión 19 — V1.0.1)  
+> Para el smoke test rápido de V1.0.1: ver `testeo_v101.md`
 
 Seguí este archivo en orden. Cada fase depende de la anterior.
 Anotá tus observaciones en los espacios `___` — eso es el insumo para la siguiente sesión de mejoras.
