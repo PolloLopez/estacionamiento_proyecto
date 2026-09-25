@@ -968,7 +968,7 @@ def renovar_estacionamiento(request, est_id):
 
                         messages.success(
                             request,
-                            f"✅ Estacionamiento extendido {float(horas_extra):g}h más. "
+                            f"Estacionamiento extendido {float(horas_extra):g}h más. "
                             f"Se descontaron ${costo_extra:.2f} de tu saldo."
                         )
                         return redirect("inicio_usuarios")

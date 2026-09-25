@@ -30,6 +30,7 @@ Antes de arrancar, abrí **3 ventanas/tabs separados** (incógnito funciona bien
 
 ## Flujo 1 — Verificar vehículo (inspector) `[3 min]`
 
+
 > Ventana B — Inspector
 
 1. Ir a "Verificar vehículo" (`/usuarios/verificar/`).
@@ -42,7 +43,7 @@ Antes de arrancar, abrí **3 ventanas/tabs separados** (incógnito funciona bien
 - [ ] La subcuadra y la altura se ven correctamente (si el inspector tiene subcuadras asignadas).
 
 **Qué anotar:**
-- Algo confuso en la pantalla: `___`
+- Algo confuso en la pantalla: `_Todo verde!  ✅__`
 
 ---
 
@@ -60,8 +61,7 @@ Antes de arrancar, abrí **3 ventanas/tabs separados** (incógnito funciona bien
 - [ ] Si lo hizo el conductor: el botón de MercadoPago funciona (aunque sea en sandbox).
 
 **Qué anotar:**
-- ¿El flujo fue intuitivo para el conductor? `___`
-
+- ¿El flujo fue intuitivo para el conductor? `_/vendedores/cargar-saldo/ falta imprimir comprobante__`
 ---
 
 ## Flujo 3 — Estacionar (conductor) `[5 min]`
@@ -85,8 +85,8 @@ Antes de arrancar, abrí **3 ventanas/tabs separados** (incógnito funciona bien
 - [ ] "Otros vehículos vinculados" está colapsado por defecto (se expande con clic).
 
 **Qué anotar:**
-- ¿El conductor entendió qué botón tocar primero? `___`
-
+- ¿El conductor entendió qué botón tocar primero? `_Todo verde!  ✅
+ mejorar notificacion. # ── Notificacion de infraccion detectada al estacionar ──__`
 ---
 
 ## Flujo 4 — Generar infracción (inspector) `[4 min]`
@@ -106,7 +106,7 @@ Antes de arrancar, abrí **3 ventanas/tabs separados** (incógnito funciona bien
 - [ ] El conductor (Ventana C) ve la infracción en "Mis infracciones".
 
 **Qué anotar:**
-- ¿El formulario de infracción fue rápido de completar en el celular? `___`
+- ¿El formulario de infracción fue rápido de completar en el celular? `__el formulario Rapido. Sigue roto el flujo de vincular impresora para cada impresion _`
 
 ---
 
@@ -124,8 +124,7 @@ Antes de arrancar, abrí **3 ventanas/tabs separados** (incógnito funciona bien
 - [ ] El saldo del conductor se redujo correctamente.
 
 **Qué anotar:**
-- ¿El flujo de pago fue claro? `___`
-
+- ¿El flujo de pago fue claro? `__{% block title %}Agregar vehículo{% endblock %} Agregar - sin diseño_`
 ---
 
 ## Flujo 6 — Renovar / cancelar estacionamiento `[3 min]`
@@ -146,8 +145,19 @@ Antes de arrancar, abrí **3 ventanas/tabs separados** (incógnito funciona bien
    - (Si no hay opción de cancelar desde el conductor: anotar para el admin.)
 
 - [ ] El estacionamiento puede cancelarse (o queda claro que no se puede y por qué).
-
----
+- [ mejorar estilo: 
+<button type="submit" class="btn btn-danger" style="font-size:0.78rem; padding:0.2rem 0.5rem;"
+ onclick="return confirm('¿Finalizar {{ est.vehiculo.patente }}?\nEl costo ya fue descontado al inicio.')">⛔</button>
+renovar_estacionamiento.html
+if (saldo >= costo) {
+        previewDiv.style.background = "var(--color-success-bg)";
+        previewDiv.style.color = "var(--color-success)";
+        previewDiv.innerHTML = "+" + label + " · Costo: $<strong>" + costo.toFixed(2) +
+          "</strong> · Nuevo vencimiento: <strong>" + finStr + "</strong>";
+ onclick="return confirm('¿Finalizar {{ est.vehiculo.patente }}?\nEl costo ya fue descontado al inicio.')">⛔</button>
+        btnConfirmar.disabled = false;
+        
+        no calcula bien el nuevo final de estacionamiento cuando suma fracciones de 30 mintos, en horas enteras --- ]
 
 ## ¿Qué hacer si algo falla?
 
