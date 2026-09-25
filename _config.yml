@@ -14,6 +14,9 @@ exclude:
   - AUDITORIA_SEGURIDAD_2026-09-01.md
   - AUDITORIA_RENDIMIENTO_2026-09-01.md
   - AUDITORIA_BASE_DATOS_2026-09-01.md
+  - testeo_v101.md
+  - GUIA_TESTING_ROLES.md
+  - "TESTING*.md"
   # Archivos de configuración Python/Django (no son páginas)
   - manage.py
   - requirements.txt

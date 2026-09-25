@@ -218,9 +218,18 @@
         <table id="tabla-subcuadras" style="font-size:0.85rem; width:100%;">
           <thead>
             <tr>
-              <th style="padding:0.5rem 0.75rem;">Subcuadra</th>
-              <th style="text-align:center; padding:0.5rem 0.5rem;">GPS</th>
-              <th style="text-align:center; padding:0.5rem 0.5rem;">Zona</th>
+              <th style="padding:0.5rem 0.75rem; cursor:pointer; user-select:none; white-space:nowrap;"
+                  onclick="ordenarTabla('nombre')" title="Ordenar por nombre">
+                Subcuadra <span id="sort-ind-nombre" style="color:var(--color-primary);"></span>
+              </th>
+              <th style="text-align:center; padding:0.5rem 0.5rem; cursor:pointer; user-select:none; white-space:nowrap;"
+                  onclick="ordenarTabla('gps')" title="Ordenar por GPS">
+                GPS <span id="sort-ind-gps" style="color:var(--color-primary);"></span>
+              </th>
+              <th style="text-align:center; padding:0.5rem 0.5rem; cursor:pointer; user-select:none; white-space:nowrap;"
+                  onclick="ordenarTabla('zona')" title="Ordenar por zona">
+                Zona <span id="sort-ind-zona" style="color:var(--color-primary);"></span>
+              </th>
               <th style="padding:0.5rem 0.5rem;"></th>
             </tr>
           </thead>
@@ -230,6 +239,7 @@
             <tr id="fila-{{ s.id }}"
                 data-id="{{ s.id }}"
                 data-nombre="{{ s|escapejs }}"
+                data-tipo-zona="{{ s.tipo_zona }}"
                 {% if s.lat %}data-lat="{{ s.lat }}" data-lon="{{ s.lon }}"{% endif %}
                 style="{% if s.tipo_zona == 'libre' %}background:#f0fff4;{% endif %}
                        border-bottom:1px solid var(--color-border);">
@@ -397,7 +407,16 @@ let centroLat = -38.4;
 let centroLon = -63.6;
 let zoomInicial = 5;
 
-if (marcadoresExistentes.length > 0) {
+// Restaurar posición y zoom desde sessionStorage (sobrevive al POST → redirect → GET).
+// Así, al guardar coordenadas o editar una subcuadra, el mapa vuelve al mismo punto
+// en vez de recentrarse en el promedio de todos los marcadores.
+const _vistaGuardada = sessionStorage.getItem("subcuadras-mapa-view");
+if (_vistaGuardada) {
+  try {
+    const _v = JSON.parse(_vistaGuardada);
+    centroLat = _v.lat; centroLon = _v.lon; zoomInicial = _v.zoom;
+  } catch(e) { /* JSON corrupto: usar defaults */ }
+} else if (marcadoresExistentes.length > 0) {
   centroLat = marcadoresExistentes.reduce((a, m) => a + m.lat, 0) / marcadoresExistentes.length;
   centroLon = marcadoresExistentes.reduce((a, m) => a + m.lon, 0) / marcadoresExistentes.length;
   zoomInicial = 15;
@@ -417,6 +436,14 @@ L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_M
   attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, HERE, Garmin, © OpenStreetMap contributors',
   maxZoom: 19,
 }).addTo(mapa);
+
+// Guardar posición/zoom en sessionStorage al mover el mapa para restaurarlos al recargar
+mapa.on("moveend", function() {
+  const c = mapa.getCenter();
+  sessionStorage.setItem("subcuadras-mapa-view", JSON.stringify({
+    lat: c.lat, lon: c.lng, zoom: mapa.getZoom()
+  }));
+});
 
 // Fuerza recalculo del tamaño por si el container tuvo cambios al renderizar.
 // Se llama dos veces: inmediato (por si ya está listo) y con delay (por si el
@@ -483,20 +510,8 @@ marcadoresExistentes.forEach(m => {
 });
 grupoMarcadores.addTo(mapa);
 
-// ── Pin de sede municipal ─────────────────────────────────────────────────
-// Se muestra si el superadmin configuró las coordenadas en editar_municipio
-{% if sede %}
-const sedeDatos = {{ sede|safe }};
-const iconoSede = L.divIcon({
-  className: "",
-  html: `<div style="font-size:1.3rem; filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));">🏛️</div>`,
-  iconAnchor: [10, 10],
-});
-L.marker([sedeDatos.lat, sedeDatos.lon], { icon: iconoSede })
-  .addTo(mapa)
-  .bindPopup(`<strong>${sedeDatos.nombre}</strong><br><small>Sede municipal</small>`)
-  .openPopup();
-{% endif %}
+// Nota: el pin de sede municipal no se muestra acá (pantalla de gestión GPS).
+// Sí figura en /admin/mapa-zonas/ donde el conductor/inspector lo necesita como referencia.
 
 // ── Click delegado en el mapa: botones de popup ───────────────────────────
 // Leaflet inserta el popup en el DOM solo al abrirse → usamos delegación de eventos
@@ -666,5 +681,68 @@ function cerrarEditar() {
 document.getElementById("modal-editar").addEventListener("click", function(e) {
   if (e.target === this) cerrarEditar();
 });
+
+// ── Ordenamiento de columnas ──────────────────────────────────────────────
+let sortEstado = { columna: null, dir: 1 };
+
+// Aplica el sort (puro: no hace toggle, no guarda). Usado tanto al clickear
+// el header como al restaurar el estado guardado en sessionStorage.
+function _aplicarSort(columna, dir) {
+  const tbody = document.querySelector("#tabla-subcuadras tbody");
+  const filas = Array.from(tbody.querySelectorAll("tr[data-id]"));
+  filas.sort(function(a, b) {
+    if (columna === "nombre") {
+      return (a.dataset.nombre || "").toLowerCase()
+        .localeCompare((b.dataset.nombre || "").toLowerCase(), "es") * dir;
+    }
+    if (columna === "gps") {
+      return ((b.dataset.lat ? 1 : 0) - (a.dataset.lat ? 1 : 0)) * dir;
+    }
+    if (columna === "zona") {
+      return (a.dataset.tipoZona || "").localeCompare(b.dataset.tipoZona || "", "es") * dir;
+    }
+    return 0;
+  });
+  filas.forEach(function(f) { tbody.appendChild(f); });
+  ["nombre", "gps", "zona"].forEach(function(col) {
+    const ind = document.getElementById("sort-ind-" + col);
+    if (ind) ind.textContent = col === columna ? (dir === 1 ? " ↑" : " ↓") : "";
+  });
+}
+
+// Click en header: toggle dirección, aplica sort y guarda estado.
+function ordenarTabla(columna) {
+  sortEstado.dir    = (sortEstado.columna === columna) ? sortEstado.dir * -1 : 1;
+  sortEstado.columna = columna;
+  _aplicarSort(columna, sortEstado.dir);
+  sessionStorage.setItem("subcuadras-sort", JSON.stringify(sortEstado));
+}
+
+// ── Filtro + sort persistentes ────────────────────────────────────────────
+// sessionStorage sobrevive al POST → redirect → GET de cualquier formulario de la página.
+// Se limpia al cerrar la pestaña, así no "ensucio" otras sesiones.
+(function() {
+  const input = document.getElementById("filtro-subcuadras");
+
+  // 1. Restaurar filtro
+  const filtroGuardado = sessionStorage.getItem("subcuadras-filtro");
+  if (filtroGuardado) {
+    input.value = filtroGuardado;
+    filtrarTabla(filtroGuardado);
+  }
+  input.addEventListener("input", function() {
+    sessionStorage.setItem("subcuadras-filtro", this.value);
+  });
+
+  // 2. Restaurar sort (DESPUÉS del filtro para que ordene solo las filas visibles)
+  const sortGuardado = sessionStorage.getItem("subcuadras-sort");
+  if (sortGuardado) {
+    try {
+      const s = JSON.parse(sortGuardado);
+      sortEstado = s;               // restaurar estado exacto sin toggle
+      _aplicarSort(s.columna, s.dir); // aplicar sin guardar de nuevo
+    } catch(e) { /* JSON corrupto: ignorar */ }
+  }
+})();
 </script>
 {% endblock %}
