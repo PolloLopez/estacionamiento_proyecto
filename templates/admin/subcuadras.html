@@ -407,7 +407,16 @@ let centroLat = -38.4;
 let centroLon = -63.6;
 let zoomInicial = 5;
 
-if (marcadoresExistentes.length > 0) {
+// Restaurar posición y zoom desde sessionStorage (sobrevive al POST → redirect → GET).
+// Así, al guardar coordenadas o editar una subcuadra, el mapa vuelve al mismo punto
+// en vez de recentrarse en el promedio de todos los marcadores.
+const _vistaGuardada = sessionStorage.getItem("subcuadras-mapa-view");
+if (_vistaGuardada) {
+  try {
+    const _v = JSON.parse(_vistaGuardada);
+    centroLat = _v.lat; centroLon = _v.lon; zoomInicial = _v.zoom;
+  } catch(e) { /* JSON corrupto: usar defaults */ }
+} else if (marcadoresExistentes.length > 0) {
   centroLat = marcadoresExistentes.reduce((a, m) => a + m.lat, 0) / marcadoresExistentes.length;
   centroLon = marcadoresExistentes.reduce((a, m) => a + m.lon, 0) / marcadoresExistentes.length;
   zoomInicial = 15;
@@ -427,6 +436,14 @@ L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_M
   attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, HERE, Garmin, © OpenStreetMap contributors',
   maxZoom: 19,
 }).addTo(mapa);
+
+// Guardar posición/zoom en sessionStorage al mover el mapa para restaurarlos al recargar
+mapa.on("moveend", function() {
+  const c = mapa.getCenter();
+  sessionStorage.setItem("subcuadras-mapa-view", JSON.stringify({
+    lat: c.lat, lon: c.lng, zoom: mapa.getZoom()
+  }));
+});
 
 // Fuerza recalculo del tamaño por si el container tuvo cambios al renderizar.
 // Se llama dos veces: inmediato (por si ya está listo) y con delay (por si el
@@ -493,20 +510,8 @@ marcadoresExistentes.forEach(m => {
 });
 grupoMarcadores.addTo(mapa);
 
-// ── Pin de sede municipal ─────────────────────────────────────────────────
-// Se muestra si el superadmin configuró las coordenadas en editar_municipio
-{% if sede %}
-const sedeDatos = {{ sede|safe }};
-const iconoSede = L.divIcon({
-  className: "",
-  html: `<div style="font-size:1.3rem; filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));">🏛️</div>`,
-  iconAnchor: [10, 10],
-});
-L.marker([sedeDatos.lat, sedeDatos.lon], { icon: iconoSede })
-  .addTo(mapa)
-  .bindPopup(`<strong>${sedeDatos.nombre}</strong><br><small>Sede municipal</small>`)
-  .openPopup();
-{% endif %}
+// Nota: el pin de sede municipal no se muestra acá (pantalla de gestión GPS).
+// Sí figura en /admin/mapa-zonas/ donde el conductor/inspector lo necesita como referencia.
 
 // ── Click delegado en el mapa: botones de popup ───────────────────────────
 // Leaflet inserta el popup en el DOM solo al abrirse → usamos delegación de eventos
