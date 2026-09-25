@@ -52,12 +52,13 @@
            data-id="{{ v.id }}"
            data-tipo="{{ v.tipo|default:'auto' }}"
            onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
-           style="flex:1; min-width:120px; max-width:180px;
+           style="flex:1; min-width:130px; max-width:180px;
                   border:3px solid var(--color-border); border-radius:14px;
                   padding:1rem 0.9rem; text-align:center; cursor:pointer;
                   background:var(--color-surface); transition:border-color 0.15s, background 0.15s;
                   position:relative;">
-        <div style="font-size:1.4rem; font-weight:800; letter-spacing:2px;">
+        <!-- font-size reducido a 1.1rem para que patentes de 7 caracteres (AA123BB) no desborden -->
+        <div style="font-size:1.1rem; font-weight:800; letter-spacing:1.5px; word-break:break-all;">
           {{ v.patente }}
         </div>
         <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
@@ -83,24 +84,27 @@
 
     {% with otros=vehiculos|dictsortreversed:"id" %}
     {% if vehiculos|length > vehiculos_recientes|length %}
-    <!-- Otros vehículos vinculados (no recientes) -->
-    <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0.6rem 0 0.4rem;">
-      Otros vinculados
-    </p>
+    <!-- Otros vehículos vinculados (no recientes) → colapsado para no ocupar espacio -->
+    <details style="margin-bottom:1.4rem;">
+      <summary style="font-size:0.8rem; color:var(--color-text-muted); cursor:pointer;
+                      margin:0.4rem 0; list-style:none; user-select:none; display:flex;
+                      align-items:center; gap:0.3rem;">
+        ▸ Otros vehículos vinculados
+      </summary>
     <div {% if not vehiculos_recientes %}id="tarjetas-vehiculos"{% endif %}
-         style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-bottom:1.4rem;">
+         style="display:flex; flex-wrap:wrap; gap:0.75rem; margin-top:0.5rem;">
       {% for v in vehiculos %}
         {% if v.id not in ids_recientes %}
         <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
              data-id="{{ v.id }}"
              data-tipo="{{ v.tipo|default:'auto' }}"
              onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
-             style="flex:1; min-width:120px; max-width:180px;
+             style="flex:1; min-width:130px; max-width:180px;
                     border:3px solid var(--color-border); border-radius:14px;
                     padding:1rem 0.9rem; text-align:center; cursor:pointer;
                     background:var(--color-surface); transition:border-color 0.15s, background 0.15s;
                     position:relative;">
-          <div style="font-size:1.4rem; font-weight:800; letter-spacing:2px;">{{ v.patente }}</div>
+          <div style="font-size:1.1rem; font-weight:800; letter-spacing:1.5px; word-break:break-all;">{{ v.patente }}</div>
           <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
             {% if v.tipo == "moto" %}🛵 Moto{% else %}🚗 Auto{% endif %}
           </div>
@@ -121,6 +125,7 @@
         {% endif %}
       {% endfor %}
     </div>
+    </details>
     {% endif %}
     {% endwith %}
 
@@ -263,8 +268,10 @@
         </a>
       </div>
 
+      <!-- Verde: acción principal final — distinto del GPS (azul) y la duración seleccionada (azul fill) -->
       <button class="btn" type="submit" id="btn-confirmar-est"
-              style="width:100%; font-size:1.2rem; padding:1rem;" disabled>
+              style="width:100%; font-size:1.2rem; padding:1rem;
+                     background:#28a745; border-color:#28a745;" disabled>
         ✅ Confirmar estacionamiento
       </button>
     </div>
@@ -277,6 +284,14 @@
 .tarjeta-vehiculo.seleccionada {
   border-color: var(--color-primary) !important;
   background: #f0fff4 !important;
+}
+/* Duración seleccionada: azul con fondo sólido — distinto del botón GPS (también azul outline)
+   y del botón Confirmar (verde). Tres acciones → tres colores distintos. */
+.duracion-activa {
+  background: var(--color-primary) !important;
+  color: #fff !important;
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,.15);
 }
 </style>
 
@@ -453,7 +468,8 @@ function filtrarAlturas() {
     opt.value = s.id;
     // Si tiene intersecciones, mostrar "Entre X y Y"; si no, mostrar la altura
     if (s.entre) {
-      opt.textContent = s.altura === 0 ? s.calle : `${s.entre}`;
+      // Mostrar altura + referencia de cuadra: "500 — Entre Av. San Martín y Bolívar"
+      opt.textContent = s.altura === 0 ? s.calle : `${s.altura} — ${s.entre}`;
     } else {
       opt.textContent = s.altura === 0 ? s.calle : `${s.calle} ${s.altura}`;
     }
@@ -491,7 +507,7 @@ function actualizarCostosSegunTipo(tipo) {
     const horas = parseFloat(btn.dataset.horas);
     const nuevoCosto = Math.round(horas * precioHora * 100) / 100;
     btn.dataset.costo = nuevoCosto;
-    if (btn.classList.contains("btn") && !btn.classList.contains("btn-outline")) {
+    if (btn.classList.contains("duracion-activa")) {
       document.getElementById("costoTexto").innerText = "$" + nuevoCosto.toFixed(2);
       // Usamos las vars del scope exterior (no re-declarar para evitar shadowing)
       const avisoSaldo      = document.getElementById("aviso-saldo-insuficiente");
@@ -557,9 +573,11 @@ const btnConfirmar = document.getElementById("btn-confirmar-est");
 
 botones.forEach(btn => {
   btn.addEventListener("click", () => {
-    botones.forEach(b => { b.classList.remove("btn"); b.classList.add("btn-outline"); });
-    btn.classList.remove("btn-outline");
-    btn.classList.add("btn");
+    // Quitamos el estado activo de todos y lo ponemos solo al clickeado.
+    // Usamos .duracion-activa en lugar de swapear btn/btn-outline para no
+    // confundirlo visualmente con el botón GPS ni con el botón Confirmar.
+    botones.forEach(b => b.classList.remove("duracion-activa"));
+    btn.classList.add("duracion-activa");
 
     const horas = parseFloat(btn.dataset.horas);
     const costo = parseFloat(btn.dataset.costo);
