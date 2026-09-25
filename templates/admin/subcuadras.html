@@ -404,11 +404,10 @@ if (marcadoresExistentes.length > 0) {
 // no son elementos HTML individuales, pero los popups y eventos funcionan igual.
 const mapa = L.map("mapa", { preferCanvas: true }).setView([centroLat, centroLon], zoomInicial);
 
-// OpenStreetMap: tiles gratuitos, sin API key, servidos por el browser del usuario
-// (no por el servidor de Railway → no hay restricción de IP).
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  subdomains: "abc",
+// Esri World Street Map: gratuito, sin API key, sin restricciones de uso en producción.
+// CartoDB requiere API key desde 2025; OSM bloquea por política de uso en sus servidores voluntarios.
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+  attribution: 'Tiles &copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, HERE, Garmin, © OpenStreetMap contributors',
   maxZoom: 19,
 }).addTo(mapa);
 
