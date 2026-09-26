@@ -212,6 +212,16 @@
                 </label>
               </div>
             </div>
+            <!-- Precio custom por hora: vacío = usa la tarifa general del municipio -->
+            <div style="margin-bottom:0.75rem;">
+              <label style="font-size:0.78rem; font-weight:600; display:block; margin-bottom:0.2rem;">💲 Precio/hora custom (opcional)</label>
+              <input type="number" name="precio_por_hora_custom"
+                     min="0" step="0.01" placeholder="Vacío = tarifa general"
+                     style="width:100%; padding:0.35rem 0.5rem; border-radius:6px;
+                            border:1px solid var(--color-border); background:var(--color-surface);
+                            color:var(--color-text); font-size:0.88rem;">
+              <small style="color:var(--color-text-muted);">Si se configura, reemplaza la tarifa general del municipio.</small>
+            </div>
             <button type="submit" class="btn" style="width:100%; font-size:0.85rem;">
               ✅ Crear subcuadra
             </button>
@@ -299,7 +309,7 @@
               <td style="white-space:nowrap; padding:0.4rem 0.5rem;">
                 <!-- Editar calle/altura -->
                 <button type="button"
-                        onclick="abrirEditar({{ s.id }}, '{{ s.calle|escapejs }}', '{{ s.altura }}', '{{ s.interseccion_1|escapejs }}', '{{ s.interseccion_2|escapejs }}')"
+                        onclick="abrirEditar({{ s.id }}, '{{ s.calle|escapejs }}', '{{ s.altura }}', '{{ s.interseccion_1|escapejs }}', '{{ s.interseccion_2|escapejs }}', '{{ s.precio_por_hora_custom|default:'' }}')"
                         class="btn btn-outline"
                         style="font-size:0.75rem; padding:0.2rem 0.5rem;"
                         title="Editar nombre de subcuadra">
@@ -365,7 +375,7 @@
                             border-radius:6px; border:1px solid var(--color-border);
                             background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:1rem;">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin-bottom:0.75rem;">
               <div>
                 <label style="font-size:0.85rem; font-weight:600;">Entre <span style="color:var(--color-danger);">*</span></label>
                 <input type="text" name="interseccion_1" id="editar-int1" required
@@ -382,6 +392,15 @@
                               border-radius:6px; border:1px solid var(--color-border);
                               background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
               </div>
+            </div>
+            <div style="margin-bottom:1rem;">
+              <label style="font-size:0.85rem; font-weight:600;">💲 Precio/hora custom (vacío = tarifa general)</label>
+              <input type="number" name="precio_por_hora_custom" id="editar-precio"
+                     min="0" step="0.01" placeholder="Ej: 350.00"
+                     style="width:100%; margin-top:0.3rem; padding:0.45rem 0.6rem;
+                            border-radius:6px; border:1px solid var(--color-border);
+                            background:var(--color-surface); color:var(--color-text); font-size:0.9rem;">
+              <small style="color:var(--color-text-muted);">Si se configura, reemplaza la tarifa general del municipio para esta subcuadra.</small>
             </div>
             <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
               <button type="button" onclick="cerrarEditar()"
@@ -506,6 +525,7 @@ marcadoresExistentes.forEach(m => {
                 data-altura="${m.altura}"
                 data-int1="${m.interseccion_1}"
                 data-int2="${m.interseccion_2}"
+                data-precio="${m.precio_por_hora_custom}"
                 style="flex:1; padding:0.3rem 0.5rem; border-radius:6px;
                        border:1px solid #ccc; cursor:pointer;
                        font-size:0.82rem; background:#f5f5f5;">
@@ -540,7 +560,8 @@ document.getElementById("mapa").addEventListener("click", function(e) {
       btnEditar.dataset.calle,
       parseInt(btnEditar.dataset.altura),
       btnEditar.dataset.int1,
-      btnEditar.dataset.int2
+      btnEditar.dataset.int2,
+      btnEditar.dataset.precio
     );
     return;
   }
@@ -681,12 +702,13 @@ function confirmarEliminar(id, nombre) {
 }
 
 // ── Modal editar calle/altura ─────────────────────────────────────────────
-function abrirEditar(id, calle, altura, int1, int2) {
+function abrirEditar(id, calle, altura, int1, int2, precio) {
   document.getElementById("editar-id").value     = id;
   document.getElementById("editar-calle").value  = calle;
   document.getElementById("editar-altura").value = altura;
   document.getElementById("editar-int1").value   = int1 || "";
   document.getElementById("editar-int2").value   = int2 || "";
+  document.getElementById("editar-precio").value = precio || "";
   document.getElementById("modal-editar").style.display = "flex";
 }
 function cerrarEditar() {

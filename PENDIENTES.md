@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-25 (sesión 20 — bugs V1.0.1 + DB password Railway)
+Última actualización: 2026-09-26 (sesión 22 — geoloc + precio subcuadra + domicilio electrónico)
 
 ---
 
@@ -136,6 +136,28 @@ Tres issues relacionados en el flujo del inspector:
 
 ## 🟢 Baja prioridad / Futuras versiones
 
+### Verificación documental con adjuntos configurables (módulo premium por municipio)
+
+Flujo completo para que el conductor valide su identidad subiendo documentos definidos por el superadmin.
+
+**Modelos nuevos (1 migración):**
+- `ConfigDocumentoVerificacion` (municipio, nombre, tipo_predefinido, obligatorio, orden, activo) — define qué docs pide el municipio
+- `DocumentoVerificacion` (solicitud FK, config FK, archivo → Cloudinary, subido_en) — archivos del conductor
+- `Municipio.modulo_verificacion_documental_activo = BooleanField(default=False)` — flag premium por municipio
+- `SolicitudVerificacion.acepta_domicilio_electronico = BooleanField(default=False)` — vincula verificación aprobada al domicilio electrónico
+
+**Tipos de documento predefinidos:** `dni_frente`, `dni_dorso`, `cedula_verde`, `domicilio`, `licencia_conducir`, `custom` (libre)
+
+**Flujo conductor:** formulario dinámico generado desde `ConfigDocumentoVerificacion.objects.filter(municipio=..., activo=True)`. Cada campo obligatorio se valida en POST. Checkbox "¿Declarás [email] como domicilio electrónico oficial?" solo si el conductor tiene domicilio_electronico cargado.
+
+**Flujo admin:** panel de revisión muestra docs con links a Cloudinary. Aprobar → `usuario.es_verificado=True`, si `acepta_domicilio_electronico=True` queda formalmente registrado.
+
+**Flujo superadmin:** en `editar_municipio.html`, toggle del módulo + CRUD de `ConfigDocumentoVerificacion` (agregar tipos, marcar obligatorio, reordenar). Mismo patrón visual que horarios/tarifas.
+
+---
+
+- **Registro anticipado de estacionamiento** — si el conductor registra antes de que inicie el horario (ej: a las 07:58 con apertura a las 08:00), permitir el registro pero que `hora_inicio` del `Estacionamiento` se fije en la hora de apertura del municipio, no en el momento real del registro. Actualmente se bloquea hasta las 08:00 (comportamiento esperado hoy).
+
 - **Staff con doble rol** — admin, tesorero e inspectores deberían poder gestionar su saldo y estacionamientos como conductores.
 - **OCR de patentes con cámara** — actualmente hay botón básico. Mejora real con Google ML Kit o Tesseract.js para el inspector en campo. Evaluar post go-live.
 - **Tutorial GIFs en landing pública** — el tutorial por rol ya existe en `<details>`. Versión con GIFs animados para la landing pública.
@@ -143,6 +165,14 @@ Tres issues relacionados en el flujo del inspector:
 - **2FA (verificación de dos pasos)** — para admin y tesorero. `django-otp` o `django-two-factor-auth`. Evaluar después de la migración a DO.
 - **Inspector cancela infracción** — admin autoriza por municipio: inspector cancela una infracción otorgando un período de gracia desde el momento de la infracción.
 - **`/admin/mapa-infracciones/` — ChunkLoadError en consola** — son errores de la extensión Chrome Excalidraw (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código. La página funciona correctamente. Verificar desactivando la extensión.
+
+---
+
+## ✅ Resuelto — sesión 22 (2026-09-26)
+
+- **Geolocalización conductor + inspector por municipio** — `Municipio.geoloc_conductor_activa / geoloc_inspector_activa` (BooleanField). Inspector: GPS capturado ya existía; envuelto en `{% if geoloc_inspector_activa %}` para que el botón no quede bloqueado si el municipio no activó el flag. Conductor: captura silenciosa (sin bloqueo UI) con `navigator.geolocation`; coords enviadas como hidden fields y guardadas en `Estacionamiento.gps_lat / gps_lon`. Superadmin: checkboxes en `editar_municipio.html`. Migración: `0096`.
+- **Precio por hora custom por subcuadra** — `Subcuadra.precio_por_hora_custom = DecimalField(null=True)`. Prioridad en `obtener_tarifa_hora()`: custom > moto > general > fallback. UI en `admin/subcuadras.html`: popup Leaflet + modal editar + tab nueva subcuadra. Migración: `0096`.
+- **Domicilio electrónico del conductor** — `UsuarioCustom.domicilio_electronico = EmailField(blank=True)`. View `guardar_domicilio_electronico` con validación via `validate_email`. URL `perfil/domicilio-electronico/`. Sección colapsable `<details>` en card PERFIL de `inicio_usuarios.html` (muestra badge "configurado" y email actual). Migración: `0096`.
 
 ---
 

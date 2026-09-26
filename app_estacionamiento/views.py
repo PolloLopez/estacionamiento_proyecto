@@ -67,6 +67,7 @@ from .views_conductor import (
     inicio_usuarios,
     marcar_notificacion_leida,
     guardar_preferencias_notificaciones,
+    guardar_domicilio_electronico,
     solicitar_verificacion,
     pagar_infraccion,
     agregar_vehiculo,

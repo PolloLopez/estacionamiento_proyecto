@@ -19,7 +19,7 @@ REDIRECT_OK        = "inicio_usuarios"
 REDIRECT_SIN_SALDO = "mp_iniciar_carga"
 
 
-def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
+def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion, gps_lat=None, gps_lon=None):
     """
     Registra un estacionamiento para el conductor.
 
@@ -68,7 +68,8 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
         costo = Decimal("0")
     else:
         tarifa_obj  = Tarifa.objects.filter(municipio=usuario.municipio).first()
-        tarifa_hora = obtener_tarifa_hora(tarifa_obj, vehiculo)
+        # subcuadra.precio_por_hora_custom tiene prioridad sobre la tarifa general
+        tarifa_hora = obtener_tarifa_hora(tarifa_obj, vehiculo, subcuadra=subcuadra)
         costo_base  = duracion * tarifa_hora
 
         # Descuento para conductores verificados (configurado por el superadmin).
@@ -152,6 +153,18 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion):
             duracion=duracion,
             costo_base=costo
         )
+
+        # GPS del conductor: solo se guarda si el municipio tiene geoloc activa
+        # y si el frontend envió coords válidas (el campo puede llegar vacío si el
+        # navegador denegó permiso o el flag estaba desactivado al cargar la página).
+        if gps_lat is not None and gps_lon is not None:
+            from decimal import InvalidOperation
+            try:
+                estacionamiento.gps_lat = Decimal(str(gps_lat))
+                estacionamiento.gps_lon = Decimal(str(gps_lon))
+                estacionamiento.save(update_fields=["gps_lat", "gps_lon"])
+            except (InvalidOperation, ValueError):
+                pass  # coords inválidas: se ignoran silenciosamente
 
         # debitar_saldo_conductor descuenta saldo y registra el egreso en caja.
         # usuario_db ya esta bloqueado con select_for_update(), no abre nueva transaccion.
