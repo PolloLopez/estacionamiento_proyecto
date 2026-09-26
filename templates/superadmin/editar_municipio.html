@@ -263,6 +263,46 @@
             </div>
           </div>
 
+          {# ── Selector manual de subcuadra (conductor) ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.3rem; text-transform:uppercase; letter-spacing:0.5px;">
+              🗺️ Selector de ubicación del conductor
+            </p>
+            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.6rem;">
+              Controla si el conductor puede indicar su ubicación manualmente (además del GPS).
+              Si se desactiva, el conductor <strong>solo puede usar GPS</strong> para seleccionar su cuadra.
+            </p>
+            <div style="margin-bottom:0.6rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" name="selector_manual_conductor_activo"
+                       {% if municipio.selector_manual_conductor_activo %}checked{% endif %}>
+                <span style="font-size:0.85rem; font-weight:600;">Selector manual activo</span>
+              </label>
+              <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+                Activo (por defecto): el conductor escribe la calle y elige altura o intersección.
+                Desactivado: GPS obligatorio, sin opción manual.
+              </small>
+            </div>
+          </div>
+
+          {# ── Verificación documental ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.3rem; text-transform:uppercase; letter-spacing:0.5px;">
+              📋 Verificación documental
+            </p>
+            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.6rem;">
+              Permite al conductor adjuntar documentos (PDF/imagen) al solicitar verificación de identidad.
+              Útil para declaración jurada formal con domicilio, vehículos y aceptación de domicilio electrónico.
+            </p>
+            <div style="margin-bottom:0.75rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" name="modulo_verificacion_documental_activo"
+                       {% if municipio.modulo_verificacion_documental_activo %}checked{% endif %}>
+                <span style="font-size:0.85rem; font-weight:600;">Módulo activo para este municipio</span>
+              </label>
+            </div>
+          </div>
+
           {# ── Dashboard TV ── #}
           <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
             <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.5px;">
@@ -870,4 +910,120 @@ function generarTokenTV() {
   });
 }());
 </script>
+
+{# ── Panel de documentos configurables (verificación documental) ── #}
+{# Está fuera del form principal para poder tener sus propios forms de POST #}
+{% if municipio.modulo_verificacion_documental_activo %}
+<div class="card" style="margin-top:1.5rem;">
+  <h3 style="margin-bottom:0.75rem;">📋 Documentos de verificación</h3>
+  <p style="font-size:0.88rem; color:var(--color-text-muted); margin-bottom:1rem;">
+    Definí qué documentos debe adjuntar el conductor al solicitar verificación.
+    Los obligatorios bloquean el envío si no se adjuntan.
+  </p>
+
+  {# Lista de configs activos #}
+  {% if configs_documentos %}
+  <table style="width:100%; border-collapse:collapse; font-size:0.88rem; margin-bottom:1rem;">
+    <thead>
+      <tr style="border-bottom:2px solid var(--color-border);">
+        <th style="text-align:left; padding:0.35rem 0.5rem;">Documento</th>
+        <th style="text-align:left; padding:0.35rem 0.5rem;">Tipo</th>
+        <th style="text-align:center; padding:0.35rem 0.5rem;">Obligatorio</th>
+        <th style="text-align:center; padding:0.35rem 0.5rem;">Estado</th>
+        <th style="padding:0.35rem 0.5rem;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cfg in configs_documentos %}
+      <tr style="border-bottom:1px solid var(--color-border);">
+        <td style="padding:0.45rem 0.5rem; font-weight:600;">{{ cfg.nombre }}</td>
+        <td style="padding:0.45rem 0.5rem; color:var(--color-text-muted);">
+          {{ cfg.get_tipo_predefinido_display }}
+        </td>
+        <td style="text-align:center; padding:0.45rem 0.5rem;">
+          <form method="post" action="{% url 'editar_municipio' municipio.id %}" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="toggle_obligatorio_config">
+            <input type="hidden" name="config_id" value="{{ cfg.id }}">
+            <button type="submit"
+                    style="background:none; border:none; cursor:pointer; font-size:1rem;"
+                    title="Clic para cambiar">
+              {% if cfg.obligatorio %}✅{% else %}⬜{% endif %}
+            </button>
+          </form>
+        </td>
+        <td style="text-align:center; padding:0.45rem 0.5rem;">
+          {% if cfg.activo %}
+            <span style="color:var(--color-success, #27ae60); font-size:0.8rem; font-weight:600;">activo</span>
+          {% else %}
+            <span style="color:var(--color-text-muted); font-size:0.8rem;">inactivo</span>
+          {% endif %}
+        </td>
+        <td style="padding:0.45rem 0.5rem; text-align:right;">
+          <form method="post" action="{% url 'editar_municipio' municipio.id %}" style="display:inline;"
+                onsubmit="return confirm('¿Eliminar o desactivar \'{{ cfg.nombre|escapejs }}\'?')">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="eliminar_documento_config">
+            <input type="hidden" name="config_id" value="{{ cfg.id }}">
+            <button type="submit" class="btn btn-outline"
+                    style="font-size:0.78rem; padding:0.2rem 0.55rem; color:var(--color-danger, #c0392b);">
+              🗑
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="font-size:0.88rem; color:var(--color-text-muted); margin-bottom:1rem;">
+    No hay documentos configurados todavía.
+  </p>
+  {% endif %}
+
+  {# Formulario agregar nuevo documento #}
+  <details style="margin-top:0.5rem;">
+    <summary style="cursor:pointer; font-size:0.85rem; font-weight:600; color:var(--color-primary);
+                    list-style:none; display:flex; align-items:center; gap:0.4rem;">
+      + Agregar documento
+    </summary>
+    <form method="post" action="{% url 'editar_municipio' municipio.id %}"
+          style="margin-top:0.75rem; display:flex; flex-wrap:wrap; gap:0.6rem; align-items:flex-end;">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="agregar_documento_config">
+      <div style="flex:1; min-width:180px;">
+        <label style="font-size:0.8rem; color:var(--color-text-muted); display:block; margin-bottom:0.2rem;">
+          Nombre del documento
+        </label>
+        <input type="text" name="nombre" required placeholder="Ej: DNI (frente)"
+               style="width:100%; padding:0.35rem 0.6rem; font-size:0.88rem;
+                      border:1px solid var(--color-border); border-radius:4px;
+                      background:var(--color-bg);">
+      </div>
+      <div style="min-width:180px;">
+        <label style="font-size:0.8rem; color:var(--color-text-muted); display:block; margin-bottom:0.2rem;">
+          Tipo predefinido
+        </label>
+        <select name="tipo_predefinido"
+                style="width:100%; padding:0.35rem 0.6rem; font-size:0.88rem;
+                       border:1px solid var(--color-border); border-radius:4px;
+                       background:var(--color-bg);">
+          {% for valor, etiqueta in tipos_predefinidos %}
+          <option value="{{ valor }}">{{ etiqueta }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="display:flex; align-items:center; gap:0.4rem; padding-bottom:0.1rem;">
+        <input type="checkbox" name="obligatorio" id="obligatorio_nuevo" checked>
+        <label for="obligatorio_nuevo" style="font-size:0.85rem; cursor:pointer;">Obligatorio</label>
+      </div>
+      <button type="submit" class="btn btn-outline"
+              style="font-size:0.85rem; padding:0.35rem 0.9rem; white-space:nowrap;">
+        Agregar
+      </button>
+    </form>
+  </details>
+</div>
+{% endif %}
+
 {% endblock %}

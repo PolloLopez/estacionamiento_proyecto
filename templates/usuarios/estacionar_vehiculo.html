@@ -176,29 +176,36 @@
         <span style="font-size:0.8rem; color:var(--color-text-muted);">— o seleccioná la dirección manualmente —</span>
       </div>
 
-      <!-- Selector manual: siempre visible para que el conductor pueda elegir intersección sin GPS -->
+      <!-- Selector manual: visible solo si el superadmin lo habilitó.
+           Usa autocomplete (datalist) para la calle y teclado numérico para la altura,
+           igual que el panel del inspector. Asigna la subcuadra más cercana si la altura
+           no coincide exactamente. -->
+      {% if selector_manual_activo %}
       <div id="selector-manual" style="margin-top:0.5rem;
            background:var(--color-surface-2); border-radius:10px; padding:0.75rem 1rem;">
         <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.5rem;">
           Seleccioná tu ubicación:
         </p>
-        <select id="sel-calle" onchange="filtrarAlturas()"
-                style="width:100%; padding:0.5rem 0.75rem; border-radius:8px;
-                       border:1px solid var(--color-border); font-size:1rem;
-                       background:var(--color-surface); margin-bottom:0.5rem;">
-          <option value="">— Calle —</option>
-          {% regroup subcuadras by calle as calles_list %}
-          {% for calle_group in calles_list %}
-            <option value="{{ calle_group.grouper }}">{{ calle_group.grouper }}</option>
-          {% endfor %}
-        </select>
-        <select id="sel-altura" onchange="seleccionarSubcuadraManual()" aria-label="Intersección o altura"
-                style="width:100%; padding:0.5rem 0.75rem; border-radius:8px;
-                       border:1px solid var(--color-border); font-size:1rem;
-                       background:var(--color-surface);">
-          <option value="">— Altura o intersección —</option>
-        </select>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+          <input id="sel-calle" list="list-calles-cond" autocomplete="off"
+                 placeholder="Escribí la calle..."
+                 style="flex:2; min-width:130px; padding:0.5rem 0.75rem; border-radius:8px;
+                        border:1px solid var(--color-border); font-size:1rem;
+                        background:var(--color-surface);">
+          <datalist id="list-calles-cond"></datalist>
+
+          <input id="sel-altura" list="list-alturas-cond" inputmode="numeric" autocomplete="off"
+                 placeholder="Altura" disabled
+                 style="flex:1; min-width:80px; padding:0.5rem 0.75rem; border-radius:8px;
+                        border:1px solid var(--color-border); font-size:1rem;
+                        background:var(--color-surface);">
+          <datalist id="list-alturas-cond"></datalist>
+        </div>
+        <!-- Referencia de intersección: se muestra cuando hay una subcuadra seleccionada -->
+        <p id="entre-calles-ref" style="font-size:0.8rem; color:var(--color-text-muted);
+           margin:0.4rem 0 0; display:none;"></p>
       </div>
+      {% endif %}
 
     </div>
     {% endif %}
@@ -463,49 +470,123 @@ function mostrarSelectorManual() {
   if (gpsDetectando) gpsDetectando.style.display = "none";
 }
 
-// ── Cascade manual ───────────────────────────────────────────────────────────
-function filtrarAlturas() {
-  const calleSeleccionada = document.getElementById("sel-calle").value;
-  const selAltura = document.getElementById("sel-altura");
-  selAltura.innerHTML = '<option value="">— Altura o intersección —</option>';
+// ── Cascade manual — datalist autocomplete ────────────────────────────────────
+// sel-calle: texto libre con sugerencias de calles (datalist).
+// sel-altura: teclado numérico con sugerencias; asigna la subcuadra más cercana.
+// El campo oculto select-subcuadra (name="subcuadra_id") recibe el id final.
+(function initCascadeConductor() {
+  var selCalle    = document.getElementById("sel-calle");
+  var selAltura   = document.getElementById("sel-altura");
+  var listCalles  = document.getElementById("list-calles-cond");
+  var listAlturas = document.getElementById("list-alturas-cond");
+  if (!selCalle || !listCalles) return; // selector manual deshabilitado por superadmin
 
-  const filtradas = SUBCUADRAS.filter(s => s.calle === calleSeleccionada);
-  filtradas.forEach(s => {
-    const opt = document.createElement("option");
-    opt.value = s.id;
-    // Si tiene intersecciones, mostrar "Entre X y Y"; si no, mostrar la altura
-    if (s.entre) {
-      // Mostrar altura + referencia de cuadra: "500 — Entre Av. San Martín y Bolívar"
-      opt.textContent = s.altura === 0 ? s.calle : `${s.altura} — ${s.entre}`;
-    } else {
-      opt.textContent = s.altura === 0 ? s.calle : `${s.calle} ${s.altura}`;
+  // Poblar datalist de calles con valores únicos
+  var callesVistas = {};
+  SUBCUADRAS.forEach(function(s) {
+    if (!callesVistas[s.calle]) {
+      callesVistas[s.calle] = true;
+      var opt = document.createElement("option");
+      opt.value = s.calle;
+      listCalles.appendChild(opt);
     }
-    opt.dataset.tipoZona = s.tipo_zona;
-    selAltura.appendChild(opt);
   });
 
-  // Si hay una sola opción, seleccionarla automáticamente
-  if (filtradas.length === 1) {
-    selAltura.value = filtradas[0].id;
-    seleccionarSubcuadraManual();
+  // Puebla el datalist de alturas/intersecciones para la calle dada.
+  // Cada opción muestra "500 — Entre San Martín y Bolívar" (si hay intersección)
+  // o solo "500" (si solo hay altura). El conductor puede tipear cualquiera de los dos.
+  // Retorna las subcuadras filtradas para autoselección inmediata.
+  function poblarAlturas(calle) {
+    listAlturas.innerHTML = "";
+    selAltura.value = "";
+    var selPrincipal = document.getElementById("select-subcuadra");
+    if (selPrincipal) selPrincipal.value = "";
+    var entreRef = document.getElementById("entre-calles-ref");
+    if (entreRef) entreRef.style.display = "none";
+
+    var filtradas = SUBCUADRAS.filter(function(s) { return s.calle === calle; });
+    filtradas.forEach(function(s) {
+      var opt = document.createElement("option");
+      // value = lo que se autocompleta al tipear; muestra altura e intersección si existe
+      if (s.entre) {
+        opt.value = s.altura ? s.altura + " — " + s.entre : s.entre;
+      } else {
+        opt.value = String(s.altura);
+      }
+      listAlturas.appendChild(opt);
+    });
+    selAltura.disabled = filtradas.length === 0;
+    return filtradas;
   }
-}
 
-function seleccionarSubcuadraManual() {
-  const selAltura = document.getElementById("sel-altura");
-  const opt = selAltura.selectedOptions[0];
-  if (!opt || !opt.value) return;
+  // Busca la subcuadra que mejor coincide con lo que escribió el conductor.
+  // Acepta: altura numérica, "altura — intersección", o texto libre de intersección.
+  // Si no hay coincidencia exacta, usa la subcuadra más cercana por número.
+  function asignarSubcuadraCercana(calle, texto) {
+    var filtradas = SUBCUADRAS.filter(function(s) { return s.calle === calle; });
+    if (!filtradas.length) return;
 
-  // Sincronizar con el select oculto del GPS (mismo name="subcuadra_id")
-  const selPrincipal = document.getElementById("select-subcuadra");
-  if (selPrincipal) selPrincipal.value = opt.value;
+    // Intentar extraer la altura numérica del texto (ej. "500 — Entre..." → 500)
+    var alturaNum = parseInt(texto, 10);
 
-  const esLibre = opt.dataset.tipoZona === "libre";
-  actualizarZonaLibre(esLibre);
-  if (!esLibre && vehiculoActivo) {
-    document.getElementById("seccion-duracion").style.display = "block";
+    var sub =
+      // 1. Coincidencia exacta con el value del datalist (altura + entre)
+      filtradas.find(function(s) {
+        var label = s.entre ? (s.altura ? s.altura + " — " + s.entre : s.entre) : String(s.altura);
+        return label === texto;
+      }) ||
+      // 2. El texto es un número que coincide exactamente con una altura
+      filtradas.find(function(s) { return !isNaN(alturaNum) && s.altura === alturaNum; }) ||
+      // 3. El texto aparece en alguna intersección (búsqueda parcial)
+      filtradas.find(function(s) { return s.entre && s.entre.toLowerCase().includes(texto.toLowerCase()); }) ||
+      // 4. Altura numérica más cercana (fallback)
+      (!isNaN(alturaNum) ? filtradas.reduce(function(prev, curr) {
+        return Math.abs(curr.altura - alturaNum) < Math.abs(prev.altura - alturaNum) ? curr : prev;
+      }) : null);
+
+    if (!sub) return;
+
+    var selPrincipal = document.getElementById("select-subcuadra");
+    if (selPrincipal) selPrincipal.value = sub.id;
+
+    // Mostrar referencia de intersección si existe y no está ya en el input
+    var entreRef = document.getElementById("entre-calles-ref");
+    if (entreRef && sub.entre && !texto.includes(sub.entre)) {
+      entreRef.textContent = "📍 " + (sub.altura ? sub.altura + " — " + sub.entre : sub.entre);
+      entreRef.style.display = "block";
+    } else if (entreRef) {
+      entreRef.style.display = "none";
+    }
+
+    actualizarZonaLibre(sub.tipo_zona === "libre");
+    if (sub.tipo_zona !== "libre" && vehiculoActivo) {
+      var seccion = document.getElementById("seccion-duracion");
+      if (seccion) seccion.style.display = "block";
+    }
   }
-}
+
+  // Al escribir / seleccionar una calle del datalist
+  selCalle.addEventListener("input", function() {
+    var calle = selCalle.value.trim();
+    var filtradas = poblarAlturas(calle);
+    actualizarZonaLibre(false); // reset hasta que se elija altura
+    // Autocompletar si solo hay una subcuadra para esta calle
+    if (filtradas.length === 1) {
+      var label = filtradas[0].entre
+        ? (filtradas[0].altura ? filtradas[0].altura + " — " + filtradas[0].entre : filtradas[0].entre)
+        : String(filtradas[0].altura);
+      selAltura.value = label;
+      asignarSubcuadraCercana(calle, label);
+    }
+  });
+
+  // Al escribir / seleccionar del datalist de alturas/intersecciones
+  selAltura.addEventListener("input", function() {
+    var calle = selCalle.value.trim();
+    var texto = selAltura.value.trim();
+    if (calle && texto) asignarSubcuadraCercana(calle, texto);
+  });
+})();
 
 // ── Vehículos ────────────────────────────────────────────────────────────────
 function actualizarCostosSegunTipo(tipo) {

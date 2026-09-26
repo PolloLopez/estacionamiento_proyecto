@@ -256,6 +256,41 @@
   </div>
   {% endif %}{# fin solicita_exencion #}
 
+  {# ── Documentos del módulo documental (si está activo para el municipio) ── #}
+  {% if modulo_documental_activo %}
+    {% with docs=s.documentos.all %}
+    {% if docs %}
+    <div style="border-top:1px solid #eee; padding-top:1rem; margin-top:0.75rem;">
+      <strong style="font-size:0.88rem; display:block; margin-bottom:0.5rem;">
+        📋 Documentos adjuntados por el conductor:
+      </strong>
+      <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+        {% for doc in docs %}
+          <a href="{{ doc.archivo.url }}" target="_blank"
+             class="btn btn-outline"
+             style="font-size:0.82rem; padding:0.3rem 0.8rem;"
+             title="Subido: {{ doc.subido_en|date:'d/m/Y H:i' }}">
+            📄 {{ doc.config.nombre }}
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    {# ── Domicilio electrónico declarado ──────────────────────────────────── #}
+    {% if s.acepta_domicilio_electronico and s.usuario.domicilio_electronico %}
+    <div style="border-top:1px solid #eee; padding-top:0.75rem; margin-top:0.75rem;
+                font-size:0.88rem;">
+      📬 <strong>Domicilio electrónico declarado:</strong>
+      {{ s.usuario.domicilio_electronico }}
+      <span style="font-size:0.8rem; color:#155724; margin-left:0.4rem;">
+        ✅ Aceptado por el conductor en esta solicitud
+      </span>
+    </div>
+    {% endif %}
+  {% endif %}{# fin modulo_documental_activo #}
+
 </div>
 {% endfor %}
 

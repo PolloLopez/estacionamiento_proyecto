@@ -257,13 +257,49 @@ def solicitar_verificacion(request):
       - Marcando "Solicito exención" aparecen: tipo, vehículo y documentos.
       - discapacidad  → documento_1 = CUD
       - frentista     → documento_1 = licencia, documento_2 = cédula de domicilio
+
+    Flujo de verificación documental (módulo opcional por municipio):
+      - Si Municipio.modulo_verificacion_documental_activo=True, se muestran
+        los campos de archivos definidos en ConfigDocumentoVerificacion.
+      - Los obligatorios bloquean el envío si no se adjuntan.
+      - El conductor puede declarar su domicilio electrónico como oficial
+        marcando acepta_domicilio_electronico (solo si tiene uno configurado).
     """
+    from app_estacionamiento.models import ConfigDocumentoVerificacion, DocumentoVerificacion
+
     usuario = request.user
+    municipio = getattr(usuario, "municipio", None)
 
     try:
         solicitud = usuario.solicitud_verificacion
     except SolicitudVerificacion.DoesNotExist:
         solicitud = None
+
+    # Documentos ya adjuntados en solicitudes anteriores (para mostrar en el template).
+    # documentos_previos: {config_id: DocumentoVerificacion} — para la lógica de reemplazo.
+    # docs_url_por_config: {config_id: url_del_archivo} — para el template (sin lógica Python).
+    documentos_previos = {}
+    docs_url_por_config = {}
+    if solicitud:
+        for doc in solicitud.documentos.select_related("config").all():
+            documentos_previos[doc.config_id] = doc
+            try:
+                docs_url_por_config[doc.config_id] = doc.archivo.url
+            except Exception:
+                pass
+
+    # Configs de documentos del municipio (solo si el módulo está activo)
+    modulo_documental_activo = bool(municipio and municipio.modulo_verificacion_documental_activo)
+    configs_documentos = []
+    if modulo_documental_activo:
+        configs_documentos = list(
+            ConfigDocumentoVerificacion.objects.filter(municipio=municipio, activo=True)
+        )
+
+    # Anotamos cada config con flags listos para el template (evita filtros custom de dict)
+    for cfg in configs_documentos:
+        cfg._ya_adjunto = cfg.id in documentos_previos
+        cfg._doc_url = docs_url_por_config.get(cfg.id)
 
     # Vehículos registrados del conductor para el selector de exención
     vehiculos_usuario = Vehiculo.objects.filter(
@@ -334,6 +370,29 @@ def solicitar_verificacion(request):
                     "solicitud": solicitud, "vehiculos": vehiculos_usuario,
                 })
 
+        # ── Validar docs dinámicos ANTES de crear/actualizar la solicitud ──────
+        # Esto evita que la solicitud quede guardada si falta un doc obligatorio
+        # que el conductor nunca adjuntó (sin solicitud previa).
+        ctx_error_docs = {
+            "solicitud": solicitud, "vehiculos": vehiculos_usuario,
+            "configs_documentos":    configs_documentos,
+            "documentos_previos":    documentos_previos,
+            "docs_url_por_config":   docs_url_por_config,
+            "modulo_documental_activo": modulo_documental_activo,
+        }
+        if modulo_documental_activo and configs_documentos:
+            for cfg in configs_documentos:
+                campo   = f"doc_config_{cfg.id}"
+                archivo = request.FILES.get(campo)
+                if archivo:
+                    error_doc = _validar_documento(archivo)
+                    if error_doc:
+                        messages.error(request, f"{cfg.nombre}: {error_doc}")
+                        return render(request, "usuarios/solicitar_verificacion.html", ctx_error_docs)
+                elif cfg.obligatorio and cfg.id not in documentos_previos:
+                    messages.error(request, f"El documento '{cfg.nombre}' es obligatorio.")
+                    return render(request, "usuarios/solicitar_verificacion.html", ctx_error_docs)
+
         # ── Crear o actualizar la solicitud ─────────────────────────────────
         if solicitud:
             solicitud.nombre    = nombre
@@ -380,12 +439,67 @@ def solicitar_verificacion(request):
 
             solicitud = SolicitudVerificacion.objects.create(**kwargs)
 
+        # ── Domicilio electrónico como parte de la solicitud ─────────────────
+        # Solo se registra si el municipio tiene el módulo documental activo y
+        # el conductor marcó el checkbox (debe tener un domicilio_electronico cargado).
+        if modulo_documental_activo:
+            acepta = request.POST.get("acepta_domicilio_electronico") == "on"
+            if acepta != solicitud.acepta_domicilio_electronico:
+                solicitud.acepta_domicilio_electronico = acepta
+                solicitud.save(update_fields=["acepta_domicilio_electronico"])
+
+        # ── Documentos dinámicos (ConfigDocumentoVerificacion) ───────────────
+        # Se validan y guardan solo si el módulo está activo.
+        # Cada config que tenga archivo en el POST → crea/reemplaza su DocumentoVerificacion.
+        # Si el doc es obligatorio y no viene en el POST ni existe uno previo → error.
+        if modulo_documental_activo and configs_documentos:
+            hay_error = False
+            for cfg in configs_documentos:
+                campo = f"doc_config_{cfg.id}"
+                archivo = request.FILES.get(campo)
+
+                # Validar tipo y tamaño si se subió algo
+                if archivo:
+                    error_doc = _validar_documento(archivo)
+                    if error_doc:
+                        messages.error(request, f"{cfg.nombre}: {error_doc}")
+                        hay_error = True
+                        continue
+
+                    # Reemplazar o crear el DocumentoVerificacion
+                    doc_existente = documentos_previos.get(cfg.id)
+                    if doc_existente:
+                        # Borrar el archivo viejo antes de reemplazar
+                        if doc_existente.archivo:
+                            doc_existente.archivo.delete(save=False)
+                        doc_existente.archivo = archivo
+                        doc_existente.save(update_fields=["archivo"])
+                    else:
+                        DocumentoVerificacion.objects.create(
+                            solicitud=solicitud,
+                            config=cfg,
+                            archivo=archivo,
+                        )
+                elif cfg.obligatorio and cfg.id not in documentos_previos:
+                    # Obligatorio y no adjuntado ni previamente guardado
+                    messages.error(request, f"El documento '{cfg.nombre}' es obligatorio.")
+                    hay_error = True
+
+            if hay_error:
+                # Devolver el formulario con los errores; la solicitud ya fue creada/actualizada
+                # pero los docs faltantes quedan pendientes.
+                return render(request, "usuarios/solicitar_verificacion.html", ctx_error_docs)
+
         messages.success(request, "¡Solicitud enviada! El admin la revisará a la brevedad.")
         return redirect("inicio_usuarios")
 
     return render(request, "usuarios/solicitar_verificacion.html", {
         "solicitud": solicitud,
         "vehiculos": vehiculos_usuario,
+        "configs_documentos":    configs_documentos,
+        "documentos_previos":    documentos_previos,
+        "docs_url_por_config":   docs_url_por_config,
+        "modulo_documental_activo": modulo_documental_activo,
     })
 
 
@@ -892,6 +1006,10 @@ def estacionar_vehiculo(request):
         "saldo_conductor":        obtener_saldo_conductor(usuario, usuario.municipio),
         # Si el superadmin activó geoloc para conductores, el template pide GPS silenciosamente
         "geoloc_conductor_activa": bool(usuario.municipio and usuario.municipio.geoloc_conductor_activa),
+        # El superadmin puede deshabilitar el selector manual para forzar GPS exclusivo
+        "selector_manual_activo": bool(
+            not usuario.municipio or usuario.municipio.selector_manual_conductor_activo
+        ),
     })
 
 

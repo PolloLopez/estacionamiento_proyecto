@@ -328,6 +328,22 @@ class Municipio(models.Model):
         verbose_name="Geolocalización del inspector activa",
         help_text="Si está habilitado, se captura y guarda la ubicación GPS del inspector al infraccionar.",
     )
+    # Módulo de verificación documental: el conductor adjunta PDFs/imágenes como
+    # declaración jurada de identidad, vehículos y domicilio.
+    # El superadmin lo habilita por municipio (puede implicar un tier diferente de soporte).
+    modulo_verificacion_documental_activo = models.BooleanField(
+        default=False,
+        verbose_name="Módulo verificación documental activo",
+        help_text="Permite al conductor adjuntar documentos de identidad/domicilio/vehículos para verificación formal.",
+    )
+    # Selector manual de subcuadra para el conductor.
+    # Si está activo (default), el conductor puede elegir su cuadra manualmente además del GPS.
+    # El superadmin puede desactivarlo para forzar que solo use GPS (mayor precisión de ubicación).
+    selector_manual_conductor_activo = models.BooleanField(
+        default=True,
+        verbose_name="Selector manual de subcuadra activo (conductor)",
+        help_text="Si está desactivado, el conductor solo puede usar el GPS para indicar su ubicación.",
+    )
 
     # ── Branding por municipio ────────────────────────────────────────────────
     # El admin carga el logo y elige los colores; cada municipio tiene su propia
@@ -1392,6 +1408,17 @@ class SolicitudVerificacion(models.Model):
         help_text="Motivo de rechazo de la exención."
     )
 
+    # ── Verificación documental ───────────────────────────────────────────────
+    # Cuando el municipio tiene modulo_verificacion_documental_activo=True,
+    # el conductor puede adjuntar documentos adicionales (ver DocumentoVerificacion).
+    # Este campo registra si el conductor aceptó formalmente su domicilio electrónico
+    # como parte de la solicitud. Solo tiene efecto legal si la solicitud está aprobada.
+    acepta_domicilio_electronico = models.BooleanField(
+        default=False,
+        verbose_name="Acepta domicilio electrónico",
+        help_text="El conductor declaró su domicilio electrónico como válido para notificaciones oficiales.",
+    )
+
     class Meta:
         ordering = ["-fecha_solicitud"]
         verbose_name = "Solicitud de verificación"
@@ -1399,6 +1426,99 @@ class SolicitudVerificacion(models.Model):
 
     def __str__(self):
         return f"{self.usuario} — {self.estado}"
+
+
+class ConfigDocumentoVerificacion(models.Model):
+    """
+    Define qué documentos debe adjuntar el conductor al solicitar verificación,
+    configurado por el superadmin por municipio.
+
+    El superadmin puede agregar tipos predefinidos (DNI, cédula verde, etc.)
+    o tipos personalizados (tipo_predefinido="custom") con nombre libre.
+    Los documentos obligatorios bloquean el envío si no se adjuntan.
+    """
+    TIPOS_PREDEFINIDOS = [
+        ("dni_frente",   "DNI (frente)"),
+        ("dni_dorso",    "DNI (dorso)"),
+        ("cedula_verde", "Cédula verde / título del vehículo"),
+        ("domicilio",    "Comprobante de domicilio"),
+        ("licencia",     "Licencia de conducir"),
+        ("custom",       "Documento personalizado"),
+    ]
+
+    municipio        = models.ForeignKey(
+        "Municipio",
+        on_delete=models.CASCADE,
+        related_name="configs_documentos_verificacion",
+    )
+    nombre           = models.CharField(
+        max_length=120,
+        verbose_name="Nombre del documento",
+        help_text="Ej: 'DNI (frente)', 'Cédula verde', 'Constancia de domicilio'.",
+    )
+    tipo_predefinido = models.CharField(
+        max_length=30,
+        choices=TIPOS_PREDEFINIDOS,
+        default="custom",
+        verbose_name="Tipo predefinido",
+        help_text="Permite identificar el documento en el flujo de verificación.",
+    )
+    obligatorio      = models.BooleanField(
+        default=True,
+        verbose_name="Obligatorio",
+        help_text="Si está marcado, el conductor no puede enviar la solicitud sin adjuntar este documento.",
+    )
+    orden            = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Orden de aparición",
+    )
+    activo           = models.BooleanField(
+        default=True,
+        verbose_name="Activo",
+        help_text="Documentos inactivos no aparecen en el formulario pero se conservan en las solicitudes previas.",
+    )
+
+    class Meta:
+        ordering = ["orden", "id"]
+        verbose_name = "Configuración de documento de verificación"
+        verbose_name_plural = "Configuraciones de documentos de verificación"
+
+    def __str__(self):
+        return f"{self.municipio} — {self.nombre}"
+
+
+class DocumentoVerificacion(models.Model):
+    """
+    Archivo adjunto por el conductor en su SolicitudVerificacion.
+    Cada DocumentoVerificacion corresponde a un ConfigDocumentoVerificacion
+    del municipio — de esa forma el admin sabe qué tipo de documento es cada archivo.
+    """
+    solicitud = models.ForeignKey(
+        SolicitudVerificacion,
+        on_delete=models.CASCADE,
+        related_name="documentos",
+    )
+    config    = models.ForeignKey(
+        ConfigDocumentoVerificacion,
+        on_delete=models.PROTECT,
+        related_name="documentos",
+        verbose_name="Tipo de documento",
+    )
+    archivo   = models.FileField(
+        upload_to="verificacion_documental/",
+        verbose_name="Archivo",
+        help_text="PDF o imagen (JPG/PNG). Máximo 5 MB.",
+    )
+    subido_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["config__orden", "subido_en"]
+        verbose_name = "Documento de verificación"
+        verbose_name_plural = "Documentos de verificación"
+
+    def __str__(self):
+        return f"{self.solicitud.usuario} — {self.config.nombre}"
+
 
 # 🗓️ Abono mensual de estacionamiento por vehículo
 class AbonoMensual(models.Model):

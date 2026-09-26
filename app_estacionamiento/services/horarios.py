@@ -72,11 +72,13 @@ def es_dia_libre_conductor(municipio):
     Retorna True si hoy es un día sin cobro para el conductor.
     Cubre dos casos:
     - DiaEspecial con cobro_activo=False (feriado / día especial sin cobro)
-    - Sin horario configurado para el día de hoy (día destildado)
+    - Sin horario configurado para el día de hoy (nunca se creó un registro)
 
-    En ambos el conductor puede registrar estacionamiento con costo $0.
-    Diferencia con es_dia_sin_horario: también detecta DiaEspecial.
-    Usada en vistas y use cases para no duplicar esta lógica.
+    Distingue entre "día libre" (sin registro) y "día cerrado" (registro con activo=False).
+    El admin que destilda un día lo cierra explícitamente → no es día libre → retorna False.
+    Esto es consistente con puede_estacionar_ahora(), que usa el mismo criterio.
+
+    En días libres el conductor puede registrar estacionamiento con costo $0.
     """
     ahora     = timezone.localtime()
     hoy_fecha = ahora.date()
@@ -89,10 +91,20 @@ def es_dia_libre_conductor(municipio):
     if dia_especial and not dia_especial.cobro_activo:
         return True
 
-    # Sin horario configurado para hoy → día libre por defecto
-    return not HorarioEstacionamiento.objects.filter(
-        municipio=municipio, dia_semana=hoy_dia, activo=True
-    ).exists()
+    # Sin horario configurado para hoy → día libre por defecto.
+    # IMPORTANTE: distinguir entre "no existe registro" (día libre) y
+    # "existe con activo=False" (día cerrado explícitamente por el admin).
+    # puede_estacionar_ahora() ya hace esta distinción; acá seguimos el mismo criterio
+    # para no mostrar "Hoy no hay cobro" cuando el admin deshabilitó el día.
+    horario = HorarioEstacionamiento.objects.filter(
+        municipio=municipio, dia_semana=hoy_dia
+    ).order_by("-id").first()
+
+    if horario is None:
+        # El día nunca se configuró → día libre (ej: el municipio no cobra domingos)
+        return True
+    # Si existe con activo=False, el admin lo cerró explícitamente → no es día libre
+    return False
 
 
 def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):

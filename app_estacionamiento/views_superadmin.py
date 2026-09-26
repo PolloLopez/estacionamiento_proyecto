@@ -311,6 +311,16 @@ def editar_municipio(request, municipio_id):
             municipio.geoloc_conductor_activa = request.POST.get("geoloc_conductor_activa") == "on"
             municipio.geoloc_inspector_activa = request.POST.get("geoloc_inspector_activa") == "on"
 
+            # Módulo de verificación documental
+            municipio.modulo_verificacion_documental_activo = (
+                request.POST.get("modulo_verificacion_documental_activo") == "on"
+            )
+
+            # Selector manual de subcuadra para conductores
+            municipio.selector_manual_conductor_activo = (
+                request.POST.get("selector_manual_conductor_activo") == "on"
+            )
+
             municipio.save()
             messages.success(request, "Configuración general guardada.")
             return redirect("editar_municipio", municipio_id=municipio.id)
@@ -361,6 +371,64 @@ def editar_municipio(request, municipio_id):
             return redirect("editar_municipio", municipio_id=municipio.id)
 
         # ── Sección: branding / identidad visual ─────────────────────────
+        # ── Sección: configuración de documentos de verificación ────────────
+        if accion == "agregar_documento_config":
+            from app_estacionamiento.models import ConfigDocumentoVerificacion
+            nombre           = request.POST.get("nombre", "").strip()
+            tipo_predefinido = request.POST.get("tipo_predefinido", "custom").strip()
+            obligatorio      = request.POST.get("obligatorio") == "on"
+            if nombre:
+                # El orden es el siguiente disponible
+                ultimo_orden = (
+                    ConfigDocumentoVerificacion.objects
+                    .filter(municipio=municipio)
+                    .order_by("-orden")
+                    .values_list("orden", flat=True)
+                    .first()
+                ) or 0
+                ConfigDocumentoVerificacion.objects.create(
+                    municipio=municipio,
+                    nombre=nombre,
+                    tipo_predefinido=tipo_predefinido,
+                    obligatorio=obligatorio,
+                    orden=ultimo_orden + 1,
+                )
+                messages.success(request, f"Documento '{nombre}' agregado.")
+            else:
+                messages.error(request, "El nombre del documento no puede estar vacío.")
+            return redirect("editar_municipio", municipio_id=municipio.id)
+
+        if accion == "eliminar_documento_config":
+            from app_estacionamiento.models import ConfigDocumentoVerificacion
+            config_id = request.POST.get("config_id", "").strip()
+            try:
+                config = ConfigDocumentoVerificacion.objects.get(id=config_id, municipio=municipio)
+                nombre = config.nombre
+                # Si tiene documentos adjuntos, solo desactivar; si no, eliminar
+                if config.documentos.exists():
+                    config.activo = False
+                    config.save(update_fields=["activo"])
+                    messages.success(request, f"'{nombre}' desactivado (tiene documentos adjuntos).")
+                else:
+                    config.delete()
+                    messages.success(request, f"'{nombre}' eliminado.")
+            except ConfigDocumentoVerificacion.DoesNotExist:
+                messages.error(request, "Documento no encontrado.")
+            return redirect("editar_municipio", municipio_id=municipio.id)
+
+        if accion == "toggle_obligatorio_config":
+            from app_estacionamiento.models import ConfigDocumentoVerificacion
+            config_id = request.POST.get("config_id", "").strip()
+            try:
+                config = ConfigDocumentoVerificacion.objects.get(id=config_id, municipio=municipio)
+                config.obligatorio = not config.obligatorio
+                config.save(update_fields=["obligatorio"])
+                estado = "obligatorio" if config.obligatorio else "opcional"
+                messages.success(request, f"'{config.nombre}' marcado como {estado}.")
+            except ConfigDocumentoVerificacion.DoesNotExist:
+                messages.error(request, "Documento no encontrado.")
+            return redirect("editar_municipio", municipio_id=municipio.id)
+
         if accion == "guardar_branding":
             color_primario   = request.POST.get("color_primario_hex", "").strip()
             color_secundario = request.POST.get("color_secundario_hex", "").strip()
@@ -418,11 +486,16 @@ def editar_municipio(request, municipio_id):
             "porcentaje":  instancia.porcentaje_modulo if instancia else Decimal("0"),
         })
 
+    from app_estacionamiento.models import ConfigDocumentoVerificacion
+    configs_documentos = ConfigDocumentoVerificacion.objects.filter(municipio=municipio)
+
     return render(request, "superadmin/editar_municipio.html", {
-        "municipio":      municipio,
-        "admins":         admins,
-        "tesoreros":      tesoreros,
-        "todos_modulos":  todos_modulos,
+        "municipio":         municipio,
+        "admins":            admins,
+        "tesoreros":         tesoreros,
+        "todos_modulos":     todos_modulos,
+        "configs_documentos": configs_documentos,
+        "tipos_predefinidos": ConfigDocumentoVerificacion.TIPOS_PREDEFINIDOS,
     })
 
 

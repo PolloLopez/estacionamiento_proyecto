@@ -41,6 +41,7 @@ from .utils import sanitizar_patente
 from .models import (
     CierreCaja,
     DiaEspecial,
+    DocumentoVerificacion,
     Estacionamiento,
     HorarioEstacionamiento,
     Infraccion,
@@ -1903,12 +1904,16 @@ def gestionar_verificaciones(request):
     """
     Lista solicitudes de verificación filtradas por estado.
     Pendiente muestra tanto identidades como exenciones sin resolver.
+    Incluye prefetch de documentos configurables (módulo documental) para evitar N+1.
     """
     municipio     = getattr(request.user, "municipio", None)
     estado_filtro = request.GET.get("estado", "pendiente")
 
     solicitudes = SolicitudVerificacion.objects.select_related(
         "usuario", "vehiculo"
+    ).prefetch_related(
+        # Traer los DocumentoVerificacion y su config en una sola query
+        "documentos__config",
     ).filter(usuario__municipio=municipio)
 
     if estado_filtro == "pendiente":
@@ -1923,13 +1928,15 @@ def gestionar_verificaciones(request):
     ).count()
 
     subcuadras = Subcuadra.objects.filter(municipio=municipio).order_by("calle", "altura")
+    modulo_documental_activo = bool(municipio and municipio.modulo_verificacion_documental_activo)
 
     return render(request, "admin/gestionar_verificaciones.html", {
-        "solicitudes":       solicitudes,
-        "estado_filtro":     estado_filtro,
-        "conteo_pendientes": conteo_pendientes,
-        "subcuadras":        subcuadras,
-        "tipos_exencion":    TIPOS_EXENCION,
+        "solicitudes":              solicitudes,
+        "estado_filtro":            estado_filtro,
+        "conteo_pendientes":        conteo_pendientes,
+        "subcuadras":               subcuadras,
+        "tipos_exencion":           TIPOS_EXENCION,
+        "modulo_documental_activo": modulo_documental_activo,
     })
 
 
@@ -1966,6 +1973,19 @@ def resolver_verificacion(request, solicitud_id):
 
         messages.success(request, f"✅ Identidad aprobada: {solicitud.usuario.correo}.")
 
+        # Si el conductor declaró su domicilio electrónico en esta solicitud,
+        # informamos en el mensaje de aprobación que también fue aceptado.
+        domicilio_electronico_declarado = (
+            solicitud.acepta_domicilio_electronico
+            and solicitud.usuario.domicilio_electronico
+        )
+        mensaje_verificacion = "✅ ¡Tu identidad fue verificada! El municipio confirmó tu cuenta."
+        if domicilio_electronico_declarado:
+            mensaje_verificacion += (
+                f" Tu domicilio electrónico ({solicitud.usuario.domicilio_electronico}) "
+                "quedó registrado como válido para notificaciones oficiales."
+            )
+
         _enviar_email_verificacion(
             correo=solicitud.usuario.correo,
             nombre=solicitud.nombre or solicitud.usuario.correo,
@@ -1973,7 +1993,7 @@ def resolver_verificacion(request, solicitud_id):
         )
         enviar_notificacion(
             destinatario=solicitud.usuario,
-            mensaje="✅ ¡Tu identidad fue verificada! El municipio confirmó tu cuenta.",
+            mensaje=mensaje_verificacion,
             tipo="verificacion",
         )
 
