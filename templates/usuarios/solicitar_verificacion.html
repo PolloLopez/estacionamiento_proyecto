@@ -220,6 +220,59 @@
           {% endif %}{# fin if vehiculos #}
         </div>{# fin seccion_exencion #}
 
+        {# ── Documentos de verificación (módulo documental activo) ──── #}
+        {% if modulo_documental_activo and configs_documentos %}
+        <div style="margin-top:1.5rem; border-top:1px solid var(--color-border); padding-top:1rem;">
+          <h3 style="font-size:1rem; margin-bottom:0.5rem;">📋 Documentación requerida</h3>
+          <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:1rem;">
+            El municipio solicita los siguientes documentos para verificar tu identidad.
+            Formatos aceptados: PDF, JPG, PNG. Máximo 10 MB por archivo.
+          </p>
+
+          {% for cfg in configs_documentos %}
+          <div class="form-group" style="margin-bottom:1rem;">
+            <label for="doc_config_{{ cfg.id }}">
+              {{ cfg.nombre }}
+              {% if cfg.obligatorio %}
+                <span style="color:#c0392b;">*</span>
+              {% else %}
+                <span style="font-weight:400; color:var(--color-text-muted); font-size:0.85rem;">(opcional)</span>
+              {% endif %}
+              {% if cfg._ya_adjunto %}
+                <span style="font-size:0.82rem; color:#155724; font-weight:400; margin-left:0.3rem;">
+                  ✅ Ya adjunto
+                  {% if cfg._doc_url %}
+                    — <a href="{{ cfg._doc_url }}" target="_blank"
+                         style="font-size:0.8rem;" title="Ver archivo actual">🔗 Ver</a>
+                  {% endif %}
+                </span>
+              {% endif %}
+            </label>
+            <input type="file" id="doc_config_{{ cfg.id }}" name="doc_config_{{ cfg.id }}"
+                   accept=".pdf,.jpg,.jpeg,.png,.webp"
+                   {% if cfg.obligatorio and not cfg._ya_adjunto %}required{% endif %}>
+          </div>
+          {% endfor %}
+
+          {# ── Aceptación de domicilio electrónico ─────────────────── #}
+          {% if request.user.domicilio_electronico %}
+          <div style="margin-top:1rem; padding:0.75rem 1rem; background:var(--color-surface,#f8f9fa);
+                      border:1px solid var(--color-border); border-radius:8px; font-size:0.9rem;">
+            <label style="display:flex; align-items:flex-start; gap:0.6rem; cursor:pointer;">
+              <input type="checkbox" name="acepta_domicilio_electronico"
+                     {% if solicitud and solicitud.acepta_domicilio_electronico %}checked{% endif %}
+                     style="margin-top:0.2rem; width:17px; height:17px; cursor:pointer; flex-shrink:0;">
+              <span>
+                Declaro que <strong>{{ request.user.domicilio_electronico }}</strong>
+                es mi domicilio electrónico constituido para notificaciones oficiales del municipio,
+                con plena validez legal.
+              </span>
+            </label>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
         <button type="submit" class="btn" style="width:100%; margin-top:1.5rem;">
           Enviar solicitud
         </button>

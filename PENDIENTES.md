@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-26 (sesión 22 — geoloc + precio subcuadra + domicilio electrónico)
+Última actualización: 2026-09-26 (sesión 23 — verificación documental completa + selector manual conductor + bug es_dia_libre + plan React)
 
 ---
 
@@ -136,6 +136,119 @@ Tres issues relacionados en el flujo del inspector:
 
 ## 🟢 Baja prioridad / Futuras versiones
 
+### Migración frontend a React (SPA con DRF + JWT)
+
+Decisiones ya tomadas: Vite + React SPA, JWT tokens (djangorestframework-simplejwt), Railway (backend) + Vercel (frontend), migración incremental por rol.
+
+**Por qué incremental por rol y no todo de golpe:** la app tiene vistas muy distintas por rol (conductor mobile, inspector en campo, admin en desktop, superadmin puntual). Migrar conductor primero permite validar toda la infraestructura DRF+JWT+CORS+Vercel con el rol más simple, sin arriesgar el flujo del inspector o el admin.
+
+**Stack:**
+- `djangorestframework` + `djangorestframework-simplejwt` + `django-cors-headers` (backend)
+- Vite + React 18 + react-router-dom + Axios (frontend)
+- Vercel (deploy frontend) → Railway (backend, sin cambios)
+
+---
+
+**Fase 0 — Backend: DRF + JWT (prerequisito de todo lo demás)**
+
+```bash
+pip install djangorestframework djangorestframework-simplejwt django-cors-headers
+```
+
+En `settings.py`:
+```python
+INSTALLED_APPS += ["rest_framework", "corsheaders"]
+
+MIDDLEWARE = ["corsheaders.middleware.CorsMiddleware", ...MIDDLEWARE]
+
+CORS_ALLOWED_ORIGINS = ["https://tu-app.vercel.app"]  # o CORS_ALLOW_ALL_ORIGINS=True en dev
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+}
+```
+
+Crear `api/` app con:
+- `api/urls.py` bajo `/api/v1/`
+- Endpoint `/api/v1/auth/login/` → devuelve `{access, refresh, usuario: {rol, nombre, municipio_id}}`
+- Endpoint `/api/v1/auth/refresh/`
+- Patrón: una carpeta `api/views/` por rol (conductores/, inspectores/, admins/, etc.)
+
+---
+
+**Fase 1 — Conductor (primera migración, la más simple)**
+
+Endpoints necesarios:
+- `GET /api/v1/conductor/inicio/` → saldo, vehículos, último estacionamiento
+- `POST /api/v1/conductor/estacionar/` → crea Estacionamiento
+- `GET /api/v1/conductor/historial/`
+- `GET /api/v1/conductor/perfil/`
+- `POST /api/v1/conductor/verificacion/` → solicitar verificación
+
+Frontend (carpeta `frontend/` en la raíz del repo):
+```bash
+npm create vite@latest frontend -- --template react
+cd frontend && npm install react-router-dom axios
+```
+
+Estructura:
+```
+frontend/src/
+  auth/           → AuthContext, useAuth hook, AxiosInstance con interceptor de refresh
+  pages/          → Login, InicioConductor, Estacionar, Historial, Perfil, Verificacion
+  components/     → Button, Card, LoadingSpinner, ErrorMessage (reutilizables)
+```
+
+El interceptor de Axios renueva el access token automáticamente con el refresh token — sin que el usuario tenga que loguear de nuevo.
+
+Deploy: conectar `frontend/` a Vercel (auto-detecta Vite). Variable `VITE_API_URL=https://tu-app.up.railway.app`.
+
+---
+
+**Fase 2 — Inspector**
+
+Endpoints: verificar vehículo (GET patente), crear infracción (POST), historial del día, GPS de la subcuadra.
+
+---
+
+**Fase 3 — Admin** *(el más complejo — dejar para después de validar fases 1 y 2)*
+
+Gestionar staff, subcuadras, verificaciones, reportes, rendiciones. El panel admin tiene más formularios y tablas complejas — considerar una librería de componentes (shadcn/ui o similar) si el esfuerzo de CSS empieza a pesar.
+
+---
+
+**Fase 4 — Vendedor + Tesorero**
+
+Relativamente simples: flujo de pago en efectivo y confirmación de depósitos.
+
+---
+
+**Fase 5 — Superadmin**
+
+Poco frecuente, puede quedar en Django templates por más tiempo sin impacto real.
+
+---
+
+**Consideraciones de seguridad con JWT:**
+- Guardar access token en memoria (variable JS), no en localStorage (XSS).
+- Guardar refresh token en `httpOnly cookie` si se quiere máxima seguridad.
+- O simplemente usar localStorage con el entendimiento de que el refresh expira en 7 días.
+- `SECURE=True` en cookies, `HTTPS` obligatorio en producción (Railway ya lo tiene).
+
+**Costo estimado de migración:** Fase 0 + Fase 1: 2-3 sesiones de trabajo. Fases 2-5: 6-10 sesiones adicionales dependiendo de la complejidad de cada rol.
+
+---
+
 ### Verificación documental con adjuntos configurables (módulo premium por municipio)
 
 Flujo completo para que el conductor valide su identidad subiendo documentos definidos por el superadmin.
@@ -165,6 +278,16 @@ Flujo completo para que el conductor valide su identidad subiendo documentos def
 - **2FA (verificación de dos pasos)** — para admin y tesorero. `django-otp` o `django-two-factor-auth`. Evaluar después de la migración a DO.
 - **Inspector cancela infracción** — admin autoriza por municipio: inspector cancela una infracción otorgando un período de gracia desde el momento de la infracción.
 - **`/admin/mapa-infracciones/` — ChunkLoadError en consola** — son errores de la extensión Chrome Excalidraw (`chrome-extension://lkeokcighogdliiajgbbdjibidaaeang`), NO del código. La página funciona correctamente. Verificar desactivando la extensión.
+
+---
+
+## ✅ Resuelto — sesión 23 (2026-09-26)
+
+- **Verificación documental — conductor (`solicitar_verificacion.html`)**: fix del dict-key lookup con variable en Django templates. Solución: anotamos cada `ConfigDocumentoVerificacion` con `cfg._ya_adjunto` y `cfg._doc_url` en la vista antes de pasar al template (evita necesidad de filtro custom). Campo `required` condicionado a `cfg.obligatorio and not cfg._ya_adjunto`. Muestra "✅ Ya adjunto — 🔗 Ver" para documentos previos.
+- **Verificación documental — admin (`gestionar_verificaciones`)**: la vista ahora hace `prefetch_related("documentos__config")` y muestra los archivos adjuntos del conductor como botones con link a Cloudinary. También muestra el domicilio electrónico declarado si `acepta_domicilio_electronico=True`. Al aprobar, el mensaje de verificación incluye el domicilio electrónico si corresponde.
+- **Bug `es_dia_libre_conductor()`**: la función usaba filtro `activo=True`, por lo que un día con horario configurado como `activo=False` (cerrado explícitamente por el admin) era tratado como día libre. Fix: query sin filtro `activo` + check separado — si no existe registro → día libre; si existe con cualquier valor de `activo` → no es día libre.
+- **Selector manual de subcuadra (conductor) — UX autocomplete**: reemplazados los `<select>` encadenados por `<input>` + `<datalist>`. El campo de altura muestra "500 — Entre San Martín y Bolívar" (altura + intersección combinados). El usuario puede buscar por número de altura O por texto de intersección. Matching en 4 niveles: label exacto → altura exacta → intersección parcial → altura más cercana. `inputmode="numeric"` en altura para teclado numérico en mobile.
+- **`Municipio.selector_manual_conductor_activo`**: nuevo BooleanField (default=True). Migración `0098`. Superadmin puede desactivarlo desde `editar_municipio.html`. Vista `estacionar_vehiculo` respeta el flag en el contexto y el template envuelve el selector en `{% if selector_manual_activo %}`.
 
 ---
 
