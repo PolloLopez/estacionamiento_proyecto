@@ -151,6 +151,13 @@ class Usuario(AbstractUser):
         verbose_name="Domicilio",
         help_text="Dirección del conductor. Requerido para exención de frentista."
     )
+    # Dirección de email que el conductor declara para recibir notificaciones oficiales
+    # del municipio (actas, resoluciones, etc.). Distinto del correo de login.
+    domicilio_electronico = models.EmailField(
+        blank=True, default="",
+        verbose_name="Domicilio electrónico",
+        help_text="Email declarado para notificaciones oficiales del municipio (distinto al correo de acceso).",
+    )
     # El admin verifica manualmente que el conductor vive en el municipio.
     # Si el módulo reintegro_residentes usa alcance="residentes", solo estos reciben reintegro.
     es_residente_verificado = models.BooleanField(
@@ -304,6 +311,22 @@ class Municipio(models.Model):
         default=50000,
         verbose_name='Monto máximo de carga MP ($)',
         help_text='Monto máximo que puede cargar un conductor via MercadoPago en una sola operación.',
+    )
+
+    # ── Geolocalización ───────────────────────────────────────────────────────
+    # El superadmin habilita captura de GPS por separado para cada rol.
+    # Si está activa, la app solicita permiso de ubicación y guarda las coords
+    # en el modelo correspondiente (Estacionamiento o Infraccion).
+    # Si no está activa, no se pide permiso ni se guardan coords.
+    geoloc_conductor_activa = models.BooleanField(
+        default=False,
+        verbose_name="Geolocalización del conductor activa",
+        help_text="Si está habilitado, se captura y guarda la ubicación GPS del conductor al estacionar.",
+    )
+    geoloc_inspector_activa = models.BooleanField(
+        default=False,
+        verbose_name="Geolocalización del inspector activa",
+        help_text="Si está habilitado, se captura y guarda la ubicación GPS del inspector al infraccionar.",
     )
 
     # ── Branding por municipio ────────────────────────────────────────────────
@@ -712,7 +735,7 @@ class Subcuadra(models.Model):
     )
 
     # Referencia por intersecciones, útil para conductores que no conocen las alturas.
-    # Ej: "Entre Av. 14 y Av. 16". Opcional.
+    # Ej: "Entre 14 y 16". Opcional.
     calles_entre = models.CharField(
         max_length=200,
         blank=True,
@@ -728,14 +751,24 @@ class Subcuadra(models.Model):
         blank=True,
         default="",
         verbose_name="Intersección 1",
-        help_text="Primera calle de la intersección. Ej: Av. San Martín",
+        help_text="Primera calle de la intersección. Ej: 29 - Av. San Martín",
     )
     interseccion_2 = models.CharField(
         max_length=100,
         blank=True,
         default="",
         verbose_name="Intersección 2",
-        help_text="Segunda calle de la intersección. Ej: Belgrano",
+        help_text="Segunda calle de la intersección. Ej: 60 - Belgrano",
+    )
+
+    # Precio custom por hora para esta subcuadra. Si está definido, tiene
+    # prioridad sobre la tarifa general del municipio (Tarifa.precio_por_hora).
+    # Útil para zonas premium, zonas liberadas con tarifa diferencial, etc.
+    precio_por_hora_custom = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        verbose_name="Precio/hora custom",
+        help_text="Si se configura, reemplaza la tarifa general del municipio para esta subcuadra.",
     )
 
     class Meta:
@@ -746,7 +779,7 @@ class Subcuadra(models.Model):
     def entre_calles(self):
         """Texto legible 'Entre X y Y' para mostrar al conductor en selector y GPS."""
         if self.interseccion_1 and self.interseccion_2:
-            return f"Entre {self.interseccion_1} y {self.interseccion_2}"
+            return f"E/ {self.interseccion_1} y {self.interseccion_2}"
         return ""
 
     def __str__(self):
@@ -860,6 +893,20 @@ class Estacionamiento(models.Model):
 
     costo_base = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     costo_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # Ubicación GPS del conductor al momento de estacionar.
+    # Solo se registra si Municipio.geoloc_conductor_activa == True.
+    # No se usa para validar zona; es solo para trazabilidad y auditoría.
+    gps_lat = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        null=True, blank=True,
+        verbose_name="Latitud GPS (conductor)",
+    )
+    gps_lon = models.DecimalField(
+        max_digits=9, decimal_places=6,
+        null=True, blank=True,
+        verbose_name="Longitud GPS (conductor)",
+    )
 
     creado_en = models.DateTimeField(auto_now_add=True)
 

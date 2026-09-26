@@ -80,18 +80,19 @@
       </div>
     </div>
 
-    <!-- GPS: coordenadas visibles -->
+    {% if geoloc_inspector_activa %}
+    <!-- GPS: coordenadas visibles (solo cuando el superadmin habilitó geoloc del inspector) -->
     <div style="margin-bottom:1rem;">
       <span id="gps_chip" class="gps-chip esperando">
         <span id="gps_icono">⏳</span>
         <span id="gps_texto">Obteniendo ubicación...</span>
       </span>
     </div>
-
     <!-- Campos ocultos GPS -->
     <input type="hidden" id="gps_lat" name="gps_lat" value="" />
     <input type="hidden" id="gps_lon" name="gps_lon" value="" />
     <input type="hidden" id="gps_acc" name="gps_acc" value="" />
+    {% endif %}
 
     <button type="submit" id="btnGrabar" class="btn btn-danger btn-grabar" disabled>
       🚨 Grabar acta de infracción
@@ -102,6 +103,8 @@
 </div>
 
 <script>
+{% if geoloc_inspector_activa %}
+// GPS activo: el superadmin habilitó la captura de coordenadas para el inspector.
 (function () {
   var btn     = document.getElementById("btnGrabar");
   var chip    = document.getElementById("gps_chip");
@@ -143,6 +146,10 @@
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 }());
+{% else %}
+// GPS desactivado por el superadmin para este municipio: habilitar el botón directamente.
+document.getElementById("btnGrabar").disabled = false;
+{% endif %}
 
 // ── Cascade Calle → Altura con autocomplete (datalist) ───────────────────────
 var SUBCUADRAS_INF = [

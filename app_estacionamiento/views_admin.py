@@ -1385,12 +1385,16 @@ def gestionar_horarios(request):
             )
 
         # Limpiar caché de horario para que el cambio se aplique de inmediato.
-        # La función puede_estacionar_ahora() cachea por municipio+fecha+hora;
-        # al guardar invalidamos todas las horas del día actual para este municipio.
+        # puede_estacionar_ahora() cachea por (municipio, fecha, minuto) con clave
+        # "puede_estacionar_{id}_{fecha}_{HHMM}". Borramos el minuto actual y el
+        # siguiente para cubrir la transición entre minutos al momento de guardar.
         from django.core.cache import cache
-        hoy = timezone.localtime().date()
-        for hora in range(24):
-            cache.delete(f"puede_estacionar_{municipio.id}_{hoy}_{hora}")
+        ahora = timezone.localtime()
+        hoy   = ahora.date()
+        for delta in range(2):
+            from datetime import timedelta as _td
+            t = ahora + _td(minutes=delta)
+            cache.delete(f"puede_estacionar_{municipio.id}_{hoy}_{t.strftime('%H%M')}")
 
         return redirect("gestionar_horarios")
 
@@ -2991,6 +2995,14 @@ def gestionar_subcuadras(request, municipio_id=None):
                 sub.interseccion_1 = interseccion_1
                 sub.interseccion_2 = interseccion_2
                 update_fields = ["interseccion_1", "interseccion_2"]
+                # Precio custom por hora (vacío = usar tarifa general del municipio)
+                precio_str = request.POST.get("precio_por_hora_custom", "").strip()
+                from decimal import Decimal as _D, InvalidOperation as _IE
+                try:
+                    sub.precio_por_hora_custom = _D(precio_str) if precio_str else None
+                except _IE:
+                    sub.precio_por_hora_custom = None
+                update_fields += ["precio_por_hora_custom"]
                 # Si se seleccionó GPS desde el mapa, guardar coordenadas
                 tipo_zona = request.POST.get("tipo_zona", "pagado")
                 if tipo_zona not in ("pagado", "libre"):
@@ -2998,7 +3010,6 @@ def gestionar_subcuadras(request, municipio_id=None):
                 sub.tipo_zona = tipo_zona
                 update_fields += ["tipo_zona"]
                 if lat_str and lon_str:
-                    from decimal import Decimal as _D
                     sub.lat = _D(lat_str)
                     sub.lon = _D(lon_str)
                     update_fields += ["lat", "lon"]
@@ -3058,7 +3069,14 @@ def gestionar_subcuadras(request, municipio_id=None):
                 sub.altura         = int(nueva_altura)
                 sub.interseccion_1 = request.POST.get("interseccion_1", "").strip()
                 sub.interseccion_2 = request.POST.get("interseccion_2", "").strip()
-                sub.save(update_fields=["calle", "altura", "interseccion_1", "interseccion_2"])
+                # Precio custom por hora (vacío = usar tarifa general del municipio)
+                precio_str = request.POST.get("precio_por_hora_custom", "").strip()
+                from decimal import Decimal as _D, InvalidOperation as _IE
+                try:
+                    sub.precio_por_hora_custom = _D(precio_str) if precio_str else None
+                except _IE:
+                    sub.precio_por_hora_custom = None
+                sub.save(update_fields=["calle", "altura", "interseccion_1", "interseccion_2", "precio_por_hora_custom"])
                 messages.success(request, f"✅ Subcuadra renombrada a '{sub}'.")
 
         elif accion == "guardar_tipo_zona":
@@ -3108,16 +3126,17 @@ def gestionar_subcuadras(request, municipio_id=None):
     # Escapa automáticamente <, >, &, comillas y cualquier otro carácter especial.
     marcadores_list = [
         {
-            "id":             s.id,
-            "nombre":         str(s),
-            "calle":          s.calle,
-            "altura":         s.altura,
-            "interseccion_1": s.interseccion_1,
-            "interseccion_2": s.interseccion_2,
-            "entre":          s.entre_calles,   # "Entre X y Y" o ""
-            "lat":            float(s.lat),
-            "lon":            float(s.lon),
-            "tipo_zona":      s.tipo_zona,
+            "id":                    s.id,
+            "nombre":                str(s),
+            "calle":                 s.calle,
+            "altura":                s.altura,
+            "interseccion_1":        s.interseccion_1,
+            "interseccion_2":        s.interseccion_2,
+            "entre":                 s.entre_calles,   # "Entre X y Y" o ""
+            "lat":                   float(s.lat),
+            "lon":                   float(s.lon),
+            "tipo_zona":             s.tipo_zona,
+            "precio_por_hora_custom": str(s.precio_por_hora_custom) if s.precio_por_hora_custom is not None else "",
         }
         for s in subcuadras if s.lat is not None and s.lon is not None
     ]

@@ -307,6 +307,10 @@ def editar_municipio(request, municipio_id):
             municipio.descuento_verificados_pct = _decimal("descuento_verificados_pct", None)
             municipio.descuento_solo_vecinos    = request.POST.get("descuento_solo_vecinos") == "on"
 
+            # Geolocalización por rol (el superadmin habilita cada uno por separado)
+            municipio.geoloc_conductor_activa = request.POST.get("geoloc_conductor_activa") == "on"
+            municipio.geoloc_inspector_activa = request.POST.get("geoloc_inspector_activa") == "on"
+
             municipio.save()
             messages.success(request, "Configuración general guardada.")
             return redirect("editar_municipio", municipio_id=municipio.id)

@@ -17,6 +17,46 @@
     {% if saldo_conductor < 100 %}
       <p class="danger">⚠️ Saldo bajo</p>
     {% endif %}
+
+    {# ── Domicilio electrónico ──────────────────────────────────────── #}
+    {# Email formal para notificaciones del municipio (distinto al correo de acceso) #}
+    <details style="margin-top:0.75rem; border-top:1px solid var(--color-border); padding-top:0.6rem;">
+      <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
+                      color:var(--color-text-muted); list-style:none; user-select:none;
+                      display:flex; align-items:center; gap:0.4rem;">
+        📬 Domicilio electrónico
+        {% if request.user.domicilio_electronico %}
+          <span style="font-size:0.78rem; font-weight:400; color:var(--color-primary);
+                       background:var(--color-bg-subtle,#f0f4ff); border-radius:4px;
+                       padding:0.05rem 0.4rem; margin-left:0.3rem;">configurado</span>
+        {% endif %}
+      </summary>
+      <div style="margin-top:0.6rem; font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.5rem;">
+        Email declarado para notificaciones oficiales del municipio (intimaciones, avisos formales).
+        Distinto al correo de acceso a la app.
+      </div>
+      <form method="post" action="{% url 'guardar_domicilio_electronico' %}">
+        {% csrf_token %}
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+          <input type="email" name="domicilio_electronico"
+                 value="{{ request.user.domicilio_electronico }}"
+                 placeholder="tu@email.com"
+                 style="flex:1; min-width:180px; font-size:0.88rem;
+                        padding:0.35rem 0.6rem; border:1px solid var(--color-border);
+                        border-radius:4px; background:var(--color-bg);">
+          <button type="submit" class="btn btn-outline"
+                  style="font-size:0.85rem; padding:0.35rem 0.8rem; white-space:nowrap;">
+            Guardar
+          </button>
+        </div>
+        {% if request.user.domicilio_electronico %}
+        <p style="margin:0.35rem 0 0; font-size:0.8rem; color:var(--color-text-muted);">
+          Actual: <strong>{{ request.user.domicilio_electronico }}</strong>
+          — dejá el campo vacío y guardá para borrarlo.
+        </p>
+        {% endif %}
+      </form>
+    </details>
   </div>
 
   <!-- 🚗 ESTADO VEHÍCULO -->

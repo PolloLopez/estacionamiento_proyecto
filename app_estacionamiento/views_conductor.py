@@ -759,7 +759,16 @@ def estacionar_vehiculo(request):
         else:
             subcuadra = get_subcuadra_default(usuario.municipio)
 
-        result    = ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion)
+        # GPS del conductor: solo enviado cuando el municipio tiene geoloc_conductor_activa
+        # y el navegador concedió permiso. Campos opcionales — nunca bloquean el flujo.
+        conductor_gps_lat = request.POST.get("conductor_gps_lat", "").strip() or None
+        conductor_gps_lon = request.POST.get("conductor_gps_lon", "").strip() or None
+
+        result    = ejecutar_estacionamiento(
+            usuario, vehiculo, subcuadra, duracion,
+            gps_lat=conductor_gps_lat,
+            gps_lon=conductor_gps_lon,
+        )
 
         for w in result.get("warnings", []):
             messages.warning(request, w)
@@ -881,6 +890,8 @@ def estacionar_vehiculo(request):
         "mensaje_horario":        msg_horario_get,
         "dia_libre_hoy":          dia_libre_hoy,
         "saldo_conductor":        obtener_saldo_conductor(usuario, usuario.municipio),
+        # Si el superadmin activó geoloc para conductores, el template pide GPS silenciosamente
+        "geoloc_conductor_activa": bool(usuario.municipio and usuario.municipio.geoloc_conductor_activa),
     })
 
 
@@ -1526,4 +1537,35 @@ def guardar_preferencias_notificaciones(request):
     usuario.save(update_fields=["notif_verificacion", "notif_exencion", "notif_sugerencia"])
 
     messages.success(request, "✅ Preferencias de notificaciones guardadas.")
+    return redirect("inicio_usuarios")
+
+
+@require_role("conductor")
+def guardar_domicilio_electronico(request):
+    """
+    Permite al conductor declarar su domicilio electrónico oficial.
+
+    Es un email adicional, distinto al correo de acceso (request.user.correo),
+    pensado para notificaciones formales del municipio (ej: intimaciones, vencimientos).
+    Puede quedar vacío si el conductor no quiere declarar uno.
+    """
+    if request.method != "POST":
+        return redirect("inicio_usuarios")
+
+    usuario = request.user
+    email = request.POST.get("domicilio_electronico", "").strip().lower()
+
+    # Validar formato básico (o vacío para borrar)
+    if email:
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError
+        try:
+            validate_email(email)
+        except ValidationError:
+            messages.error(request, "❌ El email ingresado no es válido.")
+            return redirect("inicio_usuarios")
+
+    usuario.domicilio_electronico = email
+    usuario.save(update_fields=["domicilio_electronico"])
+    messages.success(request, "✅ Domicilio electrónico guardado.")
     return redirect("inicio_usuarios")

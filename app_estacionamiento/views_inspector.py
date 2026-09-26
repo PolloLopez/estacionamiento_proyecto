@@ -318,6 +318,8 @@ def registrar_infraccion(request):
         "infracciones_recientes": infracciones_recientes,
         "subcuadra_default": subcuadra_default,
         "resultado": resultado,
+        # Controla si el template pide GPS al inspector (flag habilitado por superadmin)
+        "geoloc_inspector_activa": municipio.geoloc_inspector_activa,
     })
 
 

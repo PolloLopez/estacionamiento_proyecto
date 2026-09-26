@@ -26,19 +26,27 @@ from app_estacionamiento.models import (
 TARIFA_HORA_FALLBACK = Decimal("100")
 
 
-def obtener_tarifa_hora(tarifa_obj, vehiculo, fallback=None):
+def obtener_tarifa_hora(tarifa_obj, vehiculo, fallback=None, subcuadra=None):
     """
-    Devuelve el precio por hora según el tipo de vehículo.
+    Devuelve el precio por hora según el tipo de vehículo y la subcuadra.
 
-    Lógica:
-    - Moto con precio_por_hora_moto configurado y > 0 → usa precio_moto
-    - Caso contrario → usa precio_por_hora del tarifa_obj
-    - Sin tarifa_obj → fallback (default: TARIFA_HORA_FALLBACK = $100)
+    Lógica de prioridad:
+    1. subcuadra.precio_por_hora_custom (si está configurado) → precio único para esa subcuadra,
+       sin distinción auto/moto. Útil para zonas con tarifas diferenciales.
+    2. Moto con precio_por_hora_moto configurado y > 0 → usa precio_moto
+    3. tarifa_obj.precio_por_hora → tarifa general del municipio
+    4. Sin tarifa_obj → fallback (default: TARIFA_HORA_FALLBACK = $100)
 
     Centraliza la selección de tarifa que antes se repetía en use_cases y views.
     """
     if fallback is None:
         fallback = TARIFA_HORA_FALLBACK
+
+    # Precio custom de la subcuadra tiene prioridad sobre todo lo demás
+    precio_custom = getattr(subcuadra, "precio_por_hora_custom", None)
+    if precio_custom is not None and precio_custom > 0:
+        return precio_custom
+
     if not tarifa_obj:
         return fallback
     es_moto     = getattr(vehiculo, "tipo", "auto") == "moto"
@@ -134,20 +142,29 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
         return resultado
 
     # Horario semanal para el día actual.
-    # order_by('-id') → si hay duplicados (update_or_create creó más de uno),
-    # siempre usamos el registro más reciente.
+    # Consultamos SIN filtrar por activo para distinguir dos casos distintos:
+    #   · No existe registro → día libre (nunca se configuró cobro para ese día)
+    #   · Existe con activo=False → el admin lo deshabilitó explícitamente → día cerrado
+    # Antes ambos casos caían en "sin horario = libre" y permitían estacionar gratis,
+    # lo cual era un bug: destildar un día debería bloquearlo, no volverlo libre.
     horario = HorarioEstacionamiento.objects.filter(
-        municipio=municipio, dia_semana=hoy_dia, activo=True
+        municipio=municipio, dia_semana=hoy_dia
     ).order_by("-id").first()
 
     if horario is None:
+        # No existe ningún registro para este día → día libre (sin cobro)
         if bloquear_sin_horario:
             # Sin horario para hoy → el inspector no trabaja este día.
             # No cachear: el conductor sí puede estacionar gratis, y comparten la
             # misma cache_key; cachear False aquí rompería el flujo del conductor.
             return (False, "No hay horario de cobro configurado para hoy.")
-        # Para conductores: sin horario = libre de cobro todo el día
         resultado = (True, None)
+        cache.set(cache_key, resultado, timeout=60)
+        return resultado
+
+    if not horario.activo:
+        # Existe pero el admin lo deshabilitó explícitamente → día cerrado, no libre
+        resultado = (False, "El estacionamiento no está habilitado para el día de hoy.")
         cache.set(cache_key, resultado, timeout=60)
         return resultado
 

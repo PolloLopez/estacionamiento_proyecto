@@ -232,6 +232,37 @@
             </div>
           </div>
 
+          {# ── Geolocalización ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.5px;">
+              📍 Geolocalización
+            </p>
+            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.75rem;">
+              Cuando está activa, la app solicita permiso de ubicación al usuario y guarda las coordenadas GPS
+              junto a cada operación. Solo registra coords; no valida zona. Cada rol se habilita por separado.
+            </p>
+            <div style="margin-bottom:0.6rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" name="geoloc_conductor_activa"
+                       {% if municipio.geoloc_conductor_activa %}checked{% endif %}>
+                <span style="font-size:0.85rem; font-weight:600;">Conductor — capturar GPS al estacionar</span>
+              </label>
+              <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+                Guarda latitud y longitud en el estacionamiento. Útil para auditoría y trazabilidad.
+              </small>
+            </div>
+            <div style="margin-bottom:0.6rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" name="geoloc_inspector_activa"
+                       {% if municipio.geoloc_inspector_activa %}checked{% endif %}>
+                <span style="font-size:0.85rem; font-weight:600;">Inspector — capturar GPS al infraccionar</span>
+              </label>
+              <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+                Guarda latitud y longitud en la infracción. El campo ya existe en el modelo desde antes.
+              </small>
+            </div>
+          </div>
+
           {# ── Dashboard TV ── #}
           <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
             <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.5px;">
