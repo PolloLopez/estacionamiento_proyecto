@@ -44,6 +44,9 @@
                       font-size:0.97rem; background:var(--color-surface); color:var(--color-text);">
         <datalist id="list-alturas-inf"></datalist>
       </div>
+      <p id="entre-calles-ref-inf"
+         style="font-size:0.78rem; color:var(--color-text-muted);
+                margin:0.25rem 0 0; display:none;"></p>
       <input type="hidden" name="subcuadra_id" id="hidden-subcuadra" required>
     </div>
 
@@ -152,8 +155,15 @@ document.getElementById("btnGrabar").disabled = false;
 {% endif %}
 
 // ── Cascade Calle → Altura con autocomplete (datalist) ───────────────────────
+// El inspector puede buscar por número de altura O por nombre de intersección.
+// altura es número (no string) para que el matching numérico funcione correctamente.
 var SUBCUADRAS_INF = [
-  {% for s in subcuadras %}{id: {{ s.id }}, calle: "{{ s.calle|escapejs }}", altura: "{{ s.altura|escapejs }}"},
+  {% for s in subcuadras %}{
+    id: {{ s.id }},
+    calle: "{{ s.calle|escapejs }}",
+    altura: {{ s.altura }},
+    entre_calles: "{{ s.entre_calles|escapejs }}"
+  },
   {% endfor %}
 ];
 
@@ -163,6 +173,7 @@ var SUBCUADRAS_INF = [
   var listCalles  = document.getElementById("list-calles-inf");
   var listAlturas = document.getElementById("list-alturas-inf");
   var hidden      = document.getElementById("hidden-subcuadra");
+  var refEl       = document.getElementById("entre-calles-ref-inf");
 
   // Poblar datalist de calles únicas
   var callesVistas = {};
@@ -175,38 +186,87 @@ var SUBCUADRAS_INF = [
     }
   });
 
+  // Arma el label combinado: "500 — E/ San Martín y Bolívar" (o solo "500" si no hay intersección)
+  function labelAltura(s) {
+    return s.entre_calles ? s.altura + " — " + s.entre_calles : String(s.altura);
+  }
+
+  // Muestra u oculta la referencia de intersección bajo el selector
+  function mostrarRef(sub) {
+    if (!refEl) return;
+    if (sub && sub.entre_calles) {
+      refEl.textContent = sub.entre_calles;
+      refEl.style.display = "block";
+    } else {
+      refEl.style.display = "none";
+    }
+  }
+
   // Puebla el datalist de alturas para la calle dada.
   function poblarAlturas(calle) {
     listAlturas.innerHTML = "";
     selAltura.value = "";
     hidden.value = "";
+    mostrarRef(null);
     var filtradas = SUBCUADRAS_INF.filter(function(s) { return s.calle === calle; });
     filtradas.forEach(function(s) {
       var opt = document.createElement("option");
-      opt.value = s.altura;
+      opt.value = labelAltura(s);
       listAlturas.appendChild(opt);
     });
     selAltura.disabled = filtradas.length === 0;
     return filtradas;
   }
 
+  // Matching en 4 niveles: label exacto → altura numérica → intersección parcial → más cercana
+  function asignarSubcuadraINF(calle, texto) {
+    var subs = SUBCUADRAS_INF.filter(function(s) { return s.calle === calle; });
+    if (!subs.length) return null;
+    var textoLower = texto.toLowerCase().trim();
+
+    var porLabel = subs.find(function(s) {
+      return labelAltura(s).toLowerCase() === textoLower;
+    });
+    if (porLabel) return porLabel;
+
+    var num = parseInt(texto, 10);
+    if (!isNaN(num)) {
+      var porNum = subs.find(function(s) { return s.altura === num; });
+      if (porNum) return porNum;
+    }
+
+    var porInterseccion = subs.find(function(s) {
+      return s.entre_calles && s.entre_calles.toLowerCase().indexOf(textoLower) !== -1;
+    });
+    if (porInterseccion) return porInterseccion;
+
+    if (!isNaN(num)) {
+      return subs.reduce(function(mejor, s) {
+        return Math.abs(s.altura - num) < Math.abs(mejor.altura - num) ? s : mejor;
+      });
+    }
+
+    return null;
+  }
+
   selCalle.addEventListener("input", function() {
     var calle = selCalle.value.trim();
     var filtradas = poblarAlturas(calle);
-    // Si solo hay una altura para esa calle, autocompletar
+    // Si solo hay una subcuadra para esa calle, autocompletar
     if (filtradas.length === 1) {
-      selAltura.value = filtradas[0].altura;
+      selAltura.value = labelAltura(filtradas[0]);
       hidden.value = filtradas[0].id;
+      mostrarRef(filtradas[0]);
     }
   });
 
   selAltura.addEventListener("input", function() {
-    var calle  = selCalle.value.trim();
-    var altura = selAltura.value.trim();
-    var sub = SUBCUADRAS_INF.find(function(s) {
-      return s.calle === calle && s.altura === altura;
-    });
+    var texto = selAltura.value.trim();
+    if (!texto) { hidden.value = ""; mostrarRef(null); return; }
+    var calle = selCalle.value.trim();
+    var sub = asignarSubcuadraINF(calle, texto);
     hidden.value = sub ? sub.id : "";
+    mostrarRef(sub);
   });
 
   // Preseleccionar subcuadra_default (viene de sesión del inspector)
@@ -216,8 +276,9 @@ var SUBCUADRAS_INF = [
     if (sub) {
       selCalle.value = sub.calle;
       selCalle.dispatchEvent(new Event("input")); // pobla alturas
-      selAltura.value = sub.altura;
+      selAltura.value = labelAltura(sub);
       hidden.value = sub.id;
+      mostrarRef(sub);
     }
   }
 })();
