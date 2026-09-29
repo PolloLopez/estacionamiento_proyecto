@@ -60,35 +60,101 @@
   <!-- Se muestran cuando el conductor escanea un QR de infracción ya pagada/anulada,
      para evitar confusión: ve el estado real antes de intentar estacionar. -->
   {% if infracciones_recientes %}
-  <div class="card" style="margin-bottom:1.25rem; border-left:4px solid var(--color-text-muted);">
-    <h2 style="font-size:1rem; margin-bottom:0.75rem; color:var(--color-text-muted);">
-      📋 Infracciones recientes (últimos 90 días)
-    </h2>
-    {% for inf in infracciones_recientes %}
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;
-                gap:0.4rem; padding:0.6rem 0;
-                {% if not forloop.last %}border-bottom:1px solid var(--color-border);{% endif %}">
-      <div>
-        <div style="font-size:0.82rem; color:var(--color-text-muted);">
-          {{ inf.creado_en|date:"d/m/Y H:i" }} · {{ inf.subcuadra|default:"—" }}
+  {% for inf in infracciones_recientes %}
+
+    {% if inf.estado == "anulada" %}
+    <!-- Infracción anulada: banner prominente + motivo + acuse de notificación -->
+    <div id="inf-anulada-{{ inf.id }}" class="card"
+         style="margin-bottom:1.25rem; border-left:4px solid #0d6efd; background:var(--color-surface);">
+      <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">
+        <span style="font-size:1.5rem;">✅</span>
+        <div>
+          <div style="font-size:1.05rem; font-weight:800; color:#0d6efd;">
+            Esta infracción fue anulada por el municipio
+          </div>
+          <div style="font-size:0.82rem; color:var(--color-text-muted);">
+            Labrada el {{ inf.creado_en|date:"d/m/Y H:i" }} · {{ inf.subcuadra|default:"—" }}
+          </div>
         </div>
-        <div style="font-size:0.88rem;">{{ inf.motivo }}</div>
       </div>
-      <div>
-        {% if inf.estado == "pagada" %}
-          <span style="background:#d4edda; color:#155724; padding:0.2rem 0.7rem;
-                       border-radius:20px; font-size:1rem; font-weight:700;">✅ Pagada</span>
-        {% elif inf.estado == "anulada" %}
-          <span style="background:#e2e3e5; color:#383d41; padding:0.2rem 0.7rem;
-                       border-radius:20px; font-size:1rem; font-weight:700;">🚫 Anulada</span>
-        {% elif inf.estado == "cancelada" %}
-          <span style="background:#fff3cd; color:#856404; padding:0.2rem 0.7rem;
-                       border-radius:20px; font-size:1rem; font-weight:700;">↩️ Cancelada</span>
+
+      <div style="background:var(--color-bg); border-radius:8px; padding:0.75rem; margin-bottom:0.75rem;">
+        <div style="font-size:0.82rem; color:var(--color-text-muted); margin-bottom:0.2rem;">
+          Motivo de la infracción
+        </div>
+        <div style="font-size:0.92rem; font-weight:600;">{{ inf.motivo }}</div>
+        {% if inf.motivo_anulacion %}
+        <div style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.4rem;">
+          Motivo de anulación: {{ inf.motivo_anulacion }}
+        </div>
         {% endif %}
+        <div style="margin-top:0.4rem; font-size:0.85rem;">
+          Monto original: <strong>${{ inf.monto }}</strong>
+          <span style="color:#0d6efd; font-weight:700; margin-left:0.5rem;">→ No debés nada</span>
+        </div>
+      </div>
+
+      <!-- Estado del acuse -->
+      {% if inf.notificado_anulacion_en %}
+      <div style="background:#d1e7dd; border-radius:8px; padding:0.6rem 0.75rem;
+                  color:#0a3622; font-size:0.88rem; font-weight:600;">
+        ✅ Notificaste que te enteraste el {{ inf.notificado_anulacion_en|date:"d/m/Y H:i" }}
+      </div>
+      {% else %}
+      <div id="acuse-box-{{ inf.id }}">
+        <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0 0 0.5rem;">
+          ¿Ya sabías que tu infracción fue anulada? Confirmalo para dejar registro.
+        </p>
+        <button type="button"
+                onclick="confirmarAcuse({{ inf.id }})"
+                id="btn-acuse-{{ inf.id }}"
+                class="btn btn-outline"
+                style="font-size:0.9rem; border-color:#0d6efd; color:#0d6efd; width:100%;">
+          👀 Confirmar que me notifiqué
+        </button>
+      </div>
+      {% endif %}
+    </div>
+
+    {% elif inf.estado == "pagada" %}
+    <!-- Infracción pagada: banner verde simple -->
+    <div class="card" style="margin-bottom:1.25rem; border-left:4px solid #198754;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.5rem;">
+        <div>
+          <div style="font-size:0.92rem; font-weight:700; color:#198754;">✅ Infracción pagada</div>
+          <div style="font-size:0.82rem; color:var(--color-text-muted);">
+            {{ inf.creado_en|date:"d/m/Y H:i" }} · {{ inf.subcuadra|default:"—" }}
+          </div>
+          <div style="font-size:0.88rem; margin-top:0.2rem;">{{ inf.motivo }}</div>
+          {% if inf.fecha_pago %}
+          <div style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.2rem;">
+            Pagada el {{ inf.fecha_pago|date:"d/m/Y H:i" }}
+          </div>
+          {% endif %}
+        </div>
+        <div style="font-size:1.1rem; font-weight:800; color:#198754;">${{ inf.monto_pagado|default:inf.monto }}</div>
       </div>
     </div>
-    {% endfor %}
-  </div>
+
+    {% else %}
+    <!-- Otro estado (cancelada, etc.) -->
+    <div class="card" style="margin-bottom:1.25rem; border-left:4px solid var(--color-text-muted);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div>
+          <div style="font-size:0.82rem; color:var(--color-text-muted);">
+            {{ inf.creado_en|date:"d/m/Y H:i" }} · {{ inf.subcuadra|default:"—" }}
+          </div>
+          <div style="font-size:0.88rem;">{{ inf.motivo }}</div>
+        </div>
+        <span style="background:#e2e3e5; color:#383d41; padding:0.2rem 0.7rem;
+                     border-radius:20px; font-size:0.9rem; font-weight:700;">
+          {{ inf.get_estado_display }}
+        </span>
+      </div>
+    </div>
+    {% endif %}
+
+  {% endfor %}
   {% endif %}
 
   <!-- ══ 2. ESTACIONAR AHORA ═════════════════════════════════════════════ -->
@@ -544,5 +610,39 @@ function detectarGPS() {
 
 // Calcular precio inicial
 actualizarPrecio();
+</script>
+
+<script>
+// ── Acuse de notificación de anulación ────────────────────────────────────────
+// El conductor toca "Confirmar que me notifiqué" → llamada fetch sin recargar
+// la página → botón desaparece y aparece el mensaje de confirmación.
+function confirmarAcuse(infraccionId) {
+  var btn = document.getElementById('btn-acuse-' + infraccionId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  fetch('/push/acuse-anulacion/' + infraccionId + '/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.ok) {
+      var box = document.getElementById('acuse-box-' + infraccionId);
+      if (box) {
+        var ahora = new Date();
+        var fecha = ahora.toLocaleDateString('es-AR') + ' ' + ahora.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+        box.innerHTML =
+          '<div style="background:#d1e7dd; border-radius:8px; padding:0.6rem 0.75rem; ' +
+          'color:#0a3622; font-size:0.88rem; font-weight:600;">' +
+          '✅ Notificaste que te enteraste el ' + fecha +
+          '</div>';
+      }
+    }
+  })
+  .catch(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '👀 Confirmar que me notifiqué'; }
+    alert('No se pudo registrar. Intentá de nuevo.');
+  });
+}
 </script>
 {% endblock %}

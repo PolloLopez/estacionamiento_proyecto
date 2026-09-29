@@ -285,6 +285,29 @@
             </div>
           </div>
 
+          {# ── Notificaciones push ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.3rem; text-transform:uppercase; letter-spacing:0.5px;">
+              🔔 Notificaciones push al conductor
+            </p>
+            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.6rem;">
+              Minutos antes del vencimiento del estacionamiento para enviar la notificación del SO (Web Push).
+              <strong>0 = desactivado</strong>. Requiere que el conductor haya otorgado permiso en su browser
+              y que el cron <code>*/1 * * * * python manage.py enviar_alertas_vencimiento</code> esté
+              configurado en Railway.
+            </p>
+            <div style="margin-bottom:0.6rem;">
+              <label style="font-size:0.85rem; font-weight:600;">
+                Minutos de alerta antes del vencimiento
+              </label>
+              <input type="number" name="minutos_alerta_push" min="0" max="60"
+                     value="{{ municipio.minutos_alerta_push }}"
+                     style="width:100px; margin-top:0.3rem; font-size:0.95rem;
+                            padding:0.4rem 0.6rem; border:1.5px solid var(--color-border);
+                            border-radius:8px; background:var(--color-surface); color:var(--color-text);">
+            </div>
+          </div>
+
           {# ── Verificación documental ── #}
           <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
             <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.3rem; text-transform:uppercase; letter-spacing:0.5px;">

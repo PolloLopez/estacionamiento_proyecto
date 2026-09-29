@@ -345,6 +345,18 @@ class Municipio(models.Model):
         help_text="Si está desactivado, el conductor solo puede usar el GPS para indicar su ubicación.",
     )
 
+    # ── Notificaciones push al conductor ─────────────────────────────────────
+    # El SW (service worker) ya existe; estas flags habilitan el uso de la
+    # Push API del navegador para notificaciones del SO (no solo in-app).
+    minutos_alerta_push = models.PositiveIntegerField(
+        default=10,
+        verbose_name="Minutos de alerta antes del vencimiento (push)",
+        help_text=(
+            "Cuántos minutos antes del vencimiento del estacionamiento se envía "
+            "la notificación push al conductor. 0 = desactivado."
+        ),
+    )
+
     # ── Branding por municipio ────────────────────────────────────────────────
     # El admin carga el logo y elige los colores; cada municipio tiene su propia
     # identidad visual sin tocar el código.
@@ -1186,6 +1198,19 @@ class Infraccion(models.Model):
     sia_verificado_en = models.DateTimeField(null=True, blank=True)
     # Observación automática generada cuando el SIA no pudo verificarse
     sia_observacion   = models.TextField(blank=True, default="")
+
+    # ── Trazabilidad de acuse por parte del conductor ─────────────────────────
+    # Cuando una infracción se anula, el conductor puede confirmar que se enteró
+    # desde la vista pública (/pagar/ o QR del acta).
+    # Deja registro inmutable: fecha/hora y dirección IP del dispositivo.
+    notificado_anulacion_en = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Conductor notificado de anulación el",
+    )
+    notificado_anulacion_ip = models.GenericIPAddressField(
+        null=True, blank=True,
+        verbose_name="IP del acuse de anulación",
+    )
 
     # ── Geolocalización del inspector al labrar el acta ───────────────────────
     # Se captura desde el navegador del inspector (GPS del dispositivo móvil).
@@ -2286,3 +2311,36 @@ class AuditoriaPassword(models.Model):
             f"{self.admin} → {self.conductor} "
             f"[{self.get_tipo_display()}] {self.fecha:%Y-%m-%d %H:%M}"
         )
+
+
+class SuscripcionPush(models.Model):
+    """
+    Suscripción Web Push de un conductor para recibir notificaciones del SO.
+
+    Se crea/actualiza cuando el navegador otorga permiso y el frontend llama
+    a POST /push/suscribir/. Una misma persona puede tener varias suscripciones
+    (un dispositivo distinto por cada uno que use).
+
+    Ciclo de vida:
+      - Se crea cuando el conductor acepta el permiso de notificaciones.
+      - Se elimina automáticamente si el envío devuelve 410 Gone (suscripción
+        expirada o revocada por el browser).
+    """
+    usuario    = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name="suscripciones_push",
+    )
+    # endpoint: URL única del servidor de push del browser (Chrome/Firefox/etc.)
+    endpoint   = models.TextField(unique=True)
+    # p256dh y auth: claves criptográficas para cifrar el payload
+    p256dh     = models.TextField()
+    auth       = models.TextField()
+    creado_en  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = "Suscripción push"
+        verbose_name_plural = "Suscripciones push"
+
+    def __str__(self):
+        return f"Push → {self.usuario.correo} [{self.endpoint[:40]}...]"

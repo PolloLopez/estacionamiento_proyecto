@@ -70,10 +70,14 @@ def manifest_json(request):
 
 def service_worker(request):
     """
-    Service worker con estrategia network-first para páginas HTML.
-    - Intenta la red primero.
+    Service worker con estrategia network-first para páginas HTML
+    y soporte de Web Push para notificaciones del sistema operativo.
+
+    - Intenta la red primero en navegación HTML.
     - Si falla (sin conexión), devuelve la página cacheada.
     - No intercepta requests de API ni archivos estáticos.
+    - Maneja el evento 'push': muestra notificación del SO.
+    - Maneja 'notificationclick': abre la URL adjunta al pulsar la notificación.
     """
     sw_js = """
 const CACHE_NAME = 'estacionar-v1';
@@ -112,6 +116,52 @@ self.addEventListener('fetch', event => {
         return response;
       })
       .catch(() => caches.match(OFFLINE_URL))
+  );
+});
+
+// ── Web Push: muestra la notificación del SO al recibir un push ──────────────
+// El payload es JSON: { title, body, url }
+self.addEventListener('push', event => {
+  if (!event.data) return;
+
+  let datos = {};
+  try { datos = event.data.json(); } catch(e) { datos = { title: 'Estacionamiento', body: event.data.text(), url: '/' }; }
+
+  const titulo = datos.title || 'Estacionamiento';
+  const opciones = {
+    body:    datos.body  || '',
+    icon:    '/static/icons/icon-192.png',
+    badge:   '/static/icons/icon-192.png',
+    data:    { url: datos.url || '/' },
+    // vibrate: patrón de vibración en ms (vibra - pausa - vibra)
+    vibrate: [200, 100, 200],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(titulo, opciones)
+  );
+});
+
+// ── Notificationclick: abre la URL al tocar la notificación ──────────────────
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ventanas => {
+      // Si hay una pestaña ya abierta en la app, enfocarla y navegar ahí
+      for (const ventana of ventanas) {
+        if (ventana.url.includes(self.location.origin) && 'focus' in ventana) {
+          ventana.focus();
+          ventana.navigate(url);
+          return;
+        }
+      }
+      // Si no hay pestaña abierta, abrir una nueva
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
   );
 });
 """.strip()

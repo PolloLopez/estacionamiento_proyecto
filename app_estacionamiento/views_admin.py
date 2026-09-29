@@ -66,6 +66,50 @@ from .models import (
 # Helpers privados
 # ─────────────────────────────────────────────────────────────────────────────
 
+import logging
+_logger_admin = logging.getLogger(__name__)
+
+
+def _enviar_push_anulacion(infraccion):
+    """
+    Envía una notificación push al conductor del vehículo infraccionado,
+    informando que la infracción fue anulada por el municipio.
+
+    Solo actúa si el vehículo tiene un conductor asociado con suscripciones push.
+    Los errores se loguean pero no bloquean el flujo principal de anulación.
+    """
+    try:
+        from .models import SuscripcionPush, VehiculoUsuario
+        from .views_push import enviar_push
+
+        # Buscar el conductor propietario del vehículo
+        vinculo = VehiculoUsuario.objects.filter(
+            vehiculo=infraccion.vehiculo
+        ).select_related("usuario").first()
+
+        if not vinculo:
+            return  # Vehículo sin conductor registrado en el sistema
+
+        suscripciones = SuscripcionPush.objects.filter(usuario=vinculo.usuario)
+        if not suscripciones.exists():
+            return
+
+        patente = infraccion.vehiculo.patente
+        url_detalle = f"/pagar/{patente}/"
+        titulo = "✅ Tu infracción fue anulada"
+        cuerpo = (
+            f"La infracción #{infraccion.id} de la patente {patente} "
+            f"fue anulada por el municipio. Tocá para ver el detalle."
+        )
+
+        for suscripcion in suscripciones:
+            enviar_push(suscripcion, titulo, cuerpo, url_detalle)
+
+    except Exception as exc:
+        # Nunca romper el flujo de anulación por un error de push
+        _logger_admin.warning("Error enviando push de anulación: %s", exc)
+
+
 def _correo_invalido(correo):
     """Devuelve True si el correo no pasa la validación de Django."""
     try:
@@ -1079,6 +1123,12 @@ def admin_infracciones(request):
                 inf.motivo_anulacion = motivo_anulacion
                 inf.save(update_fields=["estado", "motivo_anulacion"])
                 messages.success(request, f"Infracción #{inf.id} anulada.")
+
+                # Notificar al conductor por push si tiene suscripciones activas.
+                # La push es un aviso anticipado; el conductor también puede ver
+                # el estado desde el QR del acta o desde /pagar/<patente>/.
+                _enviar_push_anulacion(inf)
+
                 # Redirigir sin ?detalle=ID para que el modal no se reabra
                 return redirect(reverse("admin_infracciones"))
 
@@ -3759,7 +3809,9 @@ def forzar_cierre_vendedor(request, vendedor_id):
     vendedor = get_object_or_404(
         Usuario, id=vendedor_id, es_vendedor=True, municipio=request.user.municipio
     )
-    cierre = generar_cierre_caja(vendedor, periodo="Cierre forzado por admin")
+    # periodo="" porque los choices de CierreCaja solo aceptan diario/semanal/mensual/"".
+    # creado_por=request.user para registrar que fue el admin quien forzó el cierre.
+    cierre = generar_cierre_caja(vendedor, creado_por=request.user)
     if cierre:
         messages.success(request, f"Caja de {vendedor.nombre_completo} cerrada correctamente.")
     else:
