@@ -421,6 +421,20 @@ class TestCierreCajaPeriodo(TestCase):
         self.assertIsNotNone(cierre)
         self.assertEqual(cierre.periodo, "semanal")
 
+    def test_cierre_forzado_por_admin_registra_creado_por(self):
+        """
+        Cuando el admin fuerza el cierre (creado_por=admin), el campo
+        creado_por del CierreCaja debe ser el admin, no el vendedor.
+        Esto previene el bug donde se pasaba periodo="Cierre forzado por admin"
+        (22 chars) a un CharField(max_length=10) y explotaba en PostgreSQL.
+        """
+        from app_estacionamiento.models import CierreCaja
+        admin = crear_admin(self.municipio)
+        cierre = generar_cierre_caja(self.vendedor, creado_por=admin)
+        self.assertIsNotNone(cierre)
+        self.assertEqual(cierre.creado_por, admin)
+        self.assertEqual(cierre.periodo, "")  # campo vacío, no string largo
+
     def test_cerrar_caja_view_periodo_invalido_no_cierra(self):
         """POST con un valor de período inválido no debe crear cierre."""
         from app_estacionamiento.models import CierreCaja

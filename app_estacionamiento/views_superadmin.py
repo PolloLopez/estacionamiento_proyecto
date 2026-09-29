@@ -321,6 +321,13 @@ def editar_municipio(request, municipio_id):
                 request.POST.get("selector_manual_conductor_activo") == "on"
             )
 
+            # Notificaciones push: minutos de alerta antes del vencimiento
+            try:
+                minutos_push = int(request.POST.get("minutos_alerta_push", 10))
+                municipio.minutos_alerta_push = max(0, min(60, minutos_push))
+            except (ValueError, TypeError):
+                pass  # Si el valor es inválido, conservar el anterior
+
             municipio.save()
             messages.success(request, "Configuración general guardada.")
             return redirect("editar_municipio", municipio_id=municipio.id)

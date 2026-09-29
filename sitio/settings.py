@@ -339,6 +339,21 @@ MP_CLIENT_SECRET  = os.getenv("MP_CLIENT_SECRET", "")
 # Sin esta variable, la verificación se omite (modo permisivo para entornos de prueba).
 MP_WEBHOOK_SECRET = os.getenv("MP_WEBHOOK_SECRET", "")
 
+# ─── Web Push / VAPID ─────────────────────────────────────────────────────────
+# Generar claves la primera vez (en la terminal del proyecto):
+#   python -c "
+#   from py_vapid import Vapid; v = Vapid(); v.generate_keys()
+#   print('Private PEM:', v.private_pem().decode())
+#   print('Public base64url:', v.public_key)
+#   "
+# Luego setear en Railway como variables de entorno:
+#   VAPID_PRIVATE_KEY → contenido completo del PEM (incluyendo -----BEGIN...-----)
+#   VAPID_PUBLIC_KEY  → clave pública en base64url (sin padding)
+#   VAPID_ADMIN_EMAIL → email de contacto del sistema
+VAPID_PRIVATE_KEY  = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY   = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_ADMIN_EMAIL  = os.getenv("VAPID_ADMIN_EMAIL", "admin@municipio.gob.ar")
+
 # ─── Misc ─────────────────────────────────────────────────────────────────────
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

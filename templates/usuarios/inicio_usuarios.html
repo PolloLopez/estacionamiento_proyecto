@@ -474,3 +474,75 @@
 
 </div>
 {% endblock %}
+
+{% block extra_scripts %}
+{% if municipio_branding.minutos_alerta_push %}
+<script>
+// ── Suscripción Web Push ─────────────────────────────────────────────────────
+// Solo se activa si el municipio tiene minutos_alerta_push > 0 (configurado
+// por el superadmin en editar_municipio.html).
+// Pide permiso al conductor la primera vez; si ya lo otorgó, solo registra
+// la suscripción (no vuelve a mostrar el diálogo).
+(function () {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    // El browser no soporta push — no hacer nada (sin ruido para el usuario)
+    return;
+  }
+
+  // Convierte la clave pública VAPID de base64url a Uint8Array
+  // (formato que pide pushManager.subscribe)
+  function base64UrlToUint8Array(base64url) {
+    var padding = '='.repeat((4 - base64url.length % 4) % 4);
+    var base64  = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var raw     = window.atob(base64);
+    var arr     = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) { arr[i] = raw.charCodeAt(i); }
+    return arr;
+  }
+
+  // Envía la suscripción al backend para guardarla en BD
+  function guardarSuscripcion(suscripcion) {
+    var datos = suscripcion.toJSON();
+    fetch('{% url "push_suscribir" %}', {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken':  '{{ csrf_token }}',
+      },
+      body: JSON.stringify(datos),
+    }).catch(function(err) {
+      console.warn('[push] Error guardando suscripción:', err);
+    });
+  }
+
+  // Flujo principal: obtener clave VAPID → suscribirse → guardar
+  navigator.serviceWorker.ready.then(function (registro) {
+    // Primero traemos la clave pública VAPID del servidor
+    return fetch('{% url "push_vapid_public_key" %}')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var vapidPublicKey = data.publicKey;
+        if (!vapidPublicKey) return;
+
+        // Suscribirse — si ya tiene permiso no muestra ningún diálogo
+        return registro.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
+        });
+      })
+      .then(function(suscripcion) {
+        if (suscripcion) {
+          guardarSuscripcion(suscripcion);
+        }
+      })
+      .catch(function(err) {
+        // 'NotAllowedError' = el conductor rechazó el permiso → no hacer nada
+        if (err.name !== 'NotAllowedError') {
+          console.warn('[push] No se pudo suscribir:', err);
+        }
+      });
+  });
+}());
+</script>
+{% endif %}
+{% endblock %}

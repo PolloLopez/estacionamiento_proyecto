@@ -6,6 +6,7 @@ from . import views_superadmin
 from . import views_pwa
 from . import views_pago_publico
 from . import views_publico
+from . import views_push
 
 # Handler 500 personalizado: usa render() para que los context_processors
 # corran y la plantilla tenga acceso a municipio_branding (colores del municipio).
@@ -23,6 +24,14 @@ urlpatterns = [
     # =========================
     path("manifest.json", views_pwa.manifest_json,  name="manifest_json"),
     path("sw.js",         views_pwa.service_worker, name="service_worker"),
+
+    # =========================
+    # 🔔 WEB PUSH
+    # =========================
+    path("push/vapid-public-key/",            views_push.vapid_public_key, name="push_vapid_public_key"),
+    path("push/suscribir/",                   views_push.suscribir_push,   name="push_suscribir"),
+    path("push/acuse-anulacion/<int:infraccion_id>/", views_push.acuse_anulacion, name="push_acuse_anulacion"),
+
 
     # =========================
     # 🌐 LANDING PÚBLICA

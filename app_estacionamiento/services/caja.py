@@ -52,7 +52,7 @@ def registrar_cobro_efectivo(cobrador, monto: Decimal, descripcion: str = "", co
         )
 
 
-def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None, periodo=""):
+def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None, periodo="", creado_por=None):
     """
     Genera un CierreCaja atómico para el usuario (inspector o vendedor).
 
@@ -60,6 +60,11 @@ def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None, periodo="")
     - Aplica el porcentaje_ganancia del usuario para calcular
       ganancia_usuario y monto_municipio.
     - Retorna el CierreCaja creado, o None si no había movimientos.
+
+    Parámetros:
+        creado_por: instancia de Usuario que genera el cierre. Si es None,
+                    se usa el propio usuario (cierre propio). Útil cuando un
+                    admin fuerza el cierre de un vendedor.
     """
     with transaction.atomic():
         movimientos = MovimientoCaja.objects.select_for_update().filter(
@@ -125,7 +130,9 @@ def generar_cierre_caja(usuario, fecha_desde=None, fecha_hasta=None, periodo="")
             total_digital=total_digital,
             fecha_apertura=fecha_apertura,
             cantidad_movimientos=movimientos.count(),
-            creado_por=usuario,
+            # Si el admin fuerza el cierre, registramos al admin como creador.
+            # Si el vendedor cierra su propia caja, creado_por queda como el propio usuario.
+            creado_por=creado_por if creado_por is not None else usuario,
             periodo=periodo,
             porcentaje_ganancia_aplicado=porcentaje,
             ganancia_usuario=ganancia,
