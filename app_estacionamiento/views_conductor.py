@@ -850,16 +850,18 @@ def estacionar_vehiculo(request):
                               _contexto_base({"error": msg_horario, "warning": warning}))
 
         # ── Duración ─────────────────────────────────────────────────────────
+        # El mínimo viene de Tarifa.duracion_minima_minutos (configurable por admin).
+        # Lo buscamos antes del try para que el except pueda usarlo en el mensaje.
+        _tarifa_post = Tarifa.objects.filter(municipio=usuario.municipio).first()
+        _minutos_min = _tarifa_post.duracion_minima_minutos if _tarifa_post else 30
         try:
             duracion = Decimal(duracion)
-            # Mínimo 30 min: el selector siempre ofrece al menos esa opción
-            # (en la franja final del horario). Validamos en servidor por si
-            # el POST viene manipulado.
-            if duracion < Decimal("0.5"):
+            duracion_minima_h = Decimal(str(round(_minutos_min / 60, 4)))
+            if duracion < duracion_minima_h:
                 raise ValueError()
         except Exception:
             return render(request, "usuarios/estacionar_vehiculo.html",
-                          _contexto_base({"error": "La duración mínima es 30 minutos.",
+                          _contexto_base({"error": f"La duración mínima es {_minutos_min} minutos.",
                                           "warning": warning}))
 
         # Subcuadra: usa la informada por el conductor (GPS o selector manual),

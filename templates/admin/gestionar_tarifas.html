@@ -80,7 +80,7 @@
             <span class="campo-label">Duración mínima por ticket</span>
             <span class="campo-ayuda">Múltiplo de 30 min. El máximo lo define el horario.</span>
           </div>
-          <form id="form-duracion_minima" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <form id="form-acion_minimadur" method="post" action="{% url 'admin_guardar_tarifa' %}" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
             {% csrf_token %}
             <input type="hidden" name="seccion" value="duracion_minima">
             <select class="campo-input" name="duracion_minima_minutos" style="width:160px;" data-label="Duración mínima" data-actual="{{ tarifa_actual.duracion_minima_minutos|default:30 }}" data-prefijo="" data-sufijo=" min">
