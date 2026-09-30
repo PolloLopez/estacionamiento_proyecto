@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-29 (sesión 26 cont. — fixes UX/bugs post-testing: timer vencido, confirm dialog, decimal_places)
+Última actualización: 2026-09-30 (sesión 27 — UX subcuadra compacta, preselección de vehículo, API JSON fase 2)
 
 ---
 
@@ -94,21 +94,17 @@ El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un ta
 
 ---
 
-### Migración frontend a React (SPA con DRF + JWT)
+### Migración frontend a React — hibridación incremental (sin DRF por ahora)
 
-**Decisiones tomadas:** Vite + React SPA · JWT (djangorestframework-simplejwt) · Railway (backend) + Vercel (frontend) · migración incremental por rol.
-
-**Estimación:** ~14-20 sesiones. Las primeras 3-4 son más lentas por curva de aprendizaje.
+**Estrategia actual:** Django como shell (navbar, routing, base), React como capa interactiva embebida. Sin DRF — `JsonResponse` puro hasta que la escala lo justifique.
 
 **Fases:**
-- **Fase 0** (1 sesión): DRF + JWT en backend. `pip install djangorestframework djangorestframework-simplejwt django-cors-headers`. Crear `api/` app, endpoint `/api/v1/auth/login/` y `/api/v1/auth/refresh/`.
-- **Fase 1** (3-4 sesiones): Conductor. Setup Vite en `frontend/`, AuthContext + Axios interceptor de refresh, 6 páginas (Login, Inicio, Estacionar, Historial, Perfil, Verificacion). Deploy Vercel apuntando a Railway.
-- **Fase 2** (2-3 sesiones): Inspector. Verificar vehículo, infraccionar, GPS subcuadra.
-- **Fase 3** (5-7 sesiones): Admin. El más complejo — subcuadras, staff, reportes, rendiciones, verificaciones.
-- **Fase 4** (1-2 sesiones): Vendedor + Tesorero.
-- **Fase 5** (2-3 sesiones): Superadmin. Puede quedar en Django templates por más tiempo sin impacto real.
+- **Fase 2** ✅ (esta sesión): API JSON pura — `views_api.py` con `GET /api/conductor/dashboard/` y `GET /api/conductor/estacionamientos/activos/`. Sin DRF, sin dependencias nuevas.
+- **Fase 3** (próxima): Componente `PanelEstado` en React — timer de cuenta regresiva + botón "Renovar", montado en `inicio_usuarios.html`. Primer componente React real en producción.
+- **Fase 4**: Flujo completo del conductor en React (estacionar, historial, perfil).
+- **Fase 5**: `verificar.html` del inspector en React (verificación + GPS + infracciones).
 
-**Valor clave:** los componentes repetidos hoy (`<SelectorSubcuadra />`, modal SIA, tarjetas de vehículo, banner zona libre) pasan a ser un componente único reutilizable en todos los roles.
+**Pendiente antes de Fase 3:** validar en producción que `GET /api/conductor/dashboard/` y `/api/conductor/estacionamientos/activos/` devuelven los datos correctos con un conductor real logueado. Chequear en Network tab del navegador.
 
 ---
 
