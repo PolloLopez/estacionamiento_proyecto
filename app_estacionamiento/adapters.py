@@ -68,7 +68,7 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
         Flujo bloqueado:
         - El email existe en la BD sin cuenta Google → posible takeover.
         """
-        from allauth.exceptions import ImmediateHttpResponse
+        from allauth.core.exceptions import ImmediateHttpResponse
         from allauth.socialaccount.models import SocialAccount
         from django.shortcuts import render
 
