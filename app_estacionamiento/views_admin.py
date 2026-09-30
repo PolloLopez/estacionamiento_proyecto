@@ -1267,10 +1267,9 @@ def gestionar_tarifas(request):
                 messages.success(request, f"✅ Precio/hora Moto actualizado a ${valor:,.2f}." if valor else "✅ Precio/hora Moto eliminado (usará el precio de auto).")
 
             elif seccion == "duracion_minima":
-                # Validar que sea múltiplo de 30 y esté en el rango permitido (30–480 min).
-                valor = _entero("duracion_minima_minutos", minimo=30)
-                if valor % 30 != 0:
-                    raise ValueError("La duración mínima debe ser múltiplo de 30 minutos.")
+                # Valores < 30 están permitidos para testing (ej. 5, 10, 15, 20 min).
+                # En producción usar siempre 30 min o más.
+                valor = _entero("duracion_minima_minutos", minimo=5)
                 if valor > 480:
                     raise ValueError("La duración mínima no puede superar 8 horas (480 minutos).")
                 tarifa_qs.update(duracion_minima_minutos=valor)
