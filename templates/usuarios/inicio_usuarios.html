@@ -117,8 +117,8 @@
                     padding:0.35rem 0; border-bottom:1px solid var(--color-border); flex-wrap:wrap; gap:0.4rem;">
           <div>
             <strong style="letter-spacing:1px;">{{ est.vehiculo.patente }}</strong>
-            <span style="font-size:0.85rem; color:var(--color-text-muted); margin-left:0.4rem;">
-              desde {{ est.hora_inicio|date:"H:i" }}
+            <span style="font-size:1rem; font-weight:700; margin-left:0.5rem;">
+              hasta {{ est.hora_vencimiento|date:"H:i" }}
             </span>
           </div>
           <a class="btn btn-outline"
@@ -128,10 +128,6 @@
         {% endfor %}
       </div>
     {% endif %}
-
-    <div style="margin-top:0.75rem;">
-      <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">+ Estacionar otro vehículo</a>
-    </div>
   </div>
 
   {% else %}
@@ -307,11 +303,11 @@
     {# Sin solicitud → invitar a verificarse (opcional, no bloquea ninguna función) #}
     <div style="margin-top:1rem; font-size:0.85rem; color:var(--color-text-muted);
                 display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-      <span>💡 Opcional: podés
+      <span>💡 Podés
         <a href="{% url 'solicitar_verificacion' %}" style="color:var(--color-primary);">
           verificar tu identidad
         </a>
-        para acceder a exenciones (discapacidad, frentista, etc.).
+        para acceder a exenciones (vecino, frentista, etc.).
       </span>
     </div>
   {% endif %}
@@ -328,7 +324,7 @@
 
 
   <div class="card">
-    <h4>📜 Historial</h4>
+    <h4>📜 Estacionamientos</h4>
     <a class="btn btn-outline"
        href="{% url 'usuarios_historial_estacionamientos' %}">
       Ver historial
