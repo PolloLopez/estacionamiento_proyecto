@@ -74,50 +74,47 @@
     <h3>🚗 Estado del vehículo</h3>
     <div class="status-ok">🟢 {% if estacionamientos_activos|length > 1 %}{{ estacionamientos_activos|length }} vehículos activos{% else %}Estacionamiento activo{% endif %}</div>
 
-    {# Si hay UN solo vehículo activo: vista detallada con timer #}
+    {# Si hay UN solo vehículo activo: patente + hora de finalización + extender #}
     {% if estacionamientos_activos|length == 1 %}
-      <p style="font-size:1.5rem; font-weight:800; letter-spacing:2px; margin:0.5rem 0 0.2rem;">
-        {{ estacionamiento_activo.vehiculo.patente }}
-      </p>
-      <div class="timer-box" style="margin:0.3rem 0 0.5rem;">
-        <span id="timer" style="font-size:1.3rem; font-weight:700;">calculando…</span>
-      </div>
-      <div class="progress-bar"><div id="progress"></div></div>
-      <div id="aviso-tiempo" style="display:none; margin-top:0.5rem;" class="alert alert-warning">
-        ⚠️ <strong>¡Te quedan menos de 5 minutos!</strong>
-        <a class="btn btn-outline"
-           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}"
-           style="font-size:0.85rem; padding:0.3rem 0.8rem; margin-left:0.5rem; white-space:nowrap;">
-          🔄 Renovar ahora
-        </a>
-      </div>
-      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem;">
+        <div>
+          <p style="font-size:1.5rem; font-weight:800; letter-spacing:2px; margin:0 0 0.15rem;">
+            {{ estacionamiento_activo.vehiculo.patente }}
+          </p>
+          <p style="font-size:0.95rem; color:var(--color-text-muted); margin:0;">
+            hasta las <span id="hasta-hora" style="font-weight:700; color:var(--color-text);">calculando…</span>
+          </p>
+        </div>
         <a class="btn btn-outline" id="btn-renovar"
            href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}">🔄 Extender</a>
+      </div>
+
+      <div id="aviso-tiempo" style="display:none; margin-top:0.5rem;" class="alert alert-warning">
+        ⚠️ <strong>¡Quedan menos de 5 minutos!</strong>
+      </div>
+
+      <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0.6rem 0 0.75rem;">
+        📍 {{ estacionamiento_activo.subcuadra }}
+      </p>
+
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+        <a class="btn" href="{% url 'usuarios_estacionar_vehiculo' %}">+ Estacionar otro vehículo</a>
         <form method="post" action="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}" style="display:inline;">
           {% csrf_token %}
-          <button type="submit" class="btn btn-danger"
+          <button type="submit" class="btn btn-outline"
+                  style="font-size:0.85rem; color:var(--color-danger); border-color:var(--color-danger);"
                   onclick="return confirm('¿Finalizar el estacionamiento ahora?')">
             ⛔ Finalizar
           </button>
         </form>
       </div>
-      <!-- "hasta HH:MM" se rellena desde el timer JS (horaVencStr ya calculado) -->
-      <div style="display:flex; align-items:center; justify-content:space-between;
-                  flex-wrap:wrap; gap:0.4rem; margin-top:0.75rem; margin-bottom:0;">
-        <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0;">
-          📍 {{ estacionamiento_activo.subcuadra }} &nbsp;·&nbsp;
-          <span id="hasta-hora" style="font-weight:600;">calculando…</span>
-        </p>
-        <a class="btn btn-outline"
-           href="{% url 'usuarios_renovar_estacionamiento' estacionamiento_activo.id %}"
-           style="font-size:0.8rem; padding:0.25rem 0.65rem; white-space:nowrap;">
-          🔄 Renovar
-        </a>
-      </div>
+
       <script>
         const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
-        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_horas }}");
+        {# |unlocalize evita que LANGUAGE_CODE="es-ar" formatee el decimal con coma ("0,1667"),
+           lo que haría que parseFloat() devolviera 0 y el timer mostrara el tiempo ya vencido. #}
+        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_horas|unlocalize }}");
       </script>
 
     {# Si hay VARIOS vehículos activos: lista compacta #}
@@ -377,8 +374,6 @@
   const duracionMs = duracionHoras * 60 * 60 * 1000;
   const fin = new Date(horaInicio.getTime() + duracionMs);
 
-  const timerEl    = document.getElementById("timer");
-  const progressEl = document.getElementById("progress");
   const avisoEl    = document.getElementById("aviso-tiempo");
   const btnRenovar = document.getElementById("btn-renovar");
 
@@ -386,9 +381,9 @@
   const pad = n => String(n).padStart(2, "0");
   const horaVencStr = pad(fin.getHours()) + ":" + pad(fin.getMinutes());
 
-  // Rellenar el span "hasta HH:MM" debajo del timer (también accesible sin timer activo)
+  // Mostrar la hora de finalización en el span "hasta HH:MM"
   const hastaEl = document.getElementById("hasta-hora");
-  if (hastaEl) hastaEl.textContent = "hasta " + horaVencStr;
+  if (hastaEl) hastaEl.textContent = horaVencStr;
 
   let avisoMostrado = false;
   let intervalo;
@@ -398,15 +393,8 @@
     const restante = fin - ahora;
 
     if (restante <= 0) {
-      // Detener el interval para no correr innecesariamente
+      // Tiempo vencido: detener el interval y mostrar aviso
       if (intervalo) clearInterval(intervalo);
-      // Mostramos la hora de vencimiento (ya calculada) sin texto de alarma
-      timerEl.innerText = "Vence " + horaVencStr;
-      timerEl.style.color = "var(--color-danger)";
-      if (progressEl) {
-        progressEl.style.width = "100%";
-        progressEl.style.background = "var(--color-danger)";
-      }
       if (avisoEl) {
         const strong = avisoEl.querySelector("strong");
         if (strong) strong.textContent = "El tiempo ya venció.";
@@ -416,38 +404,15 @@
     }
 
     const minutosRestantes = Math.floor(restante / 60000);
-    const segundos = Math.floor((restante % 60000) / 1000);
 
-    if (minutosRestantes < 5) {
-      // Últimos 5 minutos: mostrar countdown numérico MM:SS
-      timerEl.innerText = pad(minutosRestantes) + ":" + pad(segundos);
-      timerEl.style.color = "var(--color-danger)";
-      timerEl.style.fontSize = "1.6rem";
-
-      if (!avisoMostrado) {
-        if (avisoEl) avisoEl.style.display = "flex";
-        // Destacar el botón Renovar
-        if (btnRenovar) {
-          btnRenovar.classList.remove("btn-outline");
-          btnRenovar.classList.add("btn");
-        }
-        avisoMostrado = true;
+    if (minutosRestantes < 5 && !avisoMostrado) {
+      // Menos de 5 minutos: mostrar aviso y destacar el botón Extender
+      if (avisoEl) avisoEl.style.display = "flex";
+      if (btnRenovar) {
+        btnRenovar.classList.remove("btn-outline");
+        btnRenovar.classList.add("btn");
       }
-    } else {
-      // Tiempo suficiente: mostrar hora de vencimiento
-      const horas    = Math.floor(minutosRestantes / 60);
-      const minutos  = minutosRestantes % 60;
-      let restanteStr = "";
-      if (horas > 0)   restanteStr += horas + "h ";
-      if (minutos > 0) restanteStr += minutos + "m";
-      timerEl.innerText = "Vence " + horaVencStr + " — " + restanteStr;
-
-      // Barra de progreso
-      if (progressEl) {
-        const transcurrido = duracionMs - restante;
-        const pct = Math.min(100, Math.round(transcurrido / duracionMs * 100));
-        progressEl.style.width = pct + "%";
-      }
+      avisoMostrado = true;
     }
   }
 
