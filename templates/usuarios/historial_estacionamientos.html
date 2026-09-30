@@ -91,7 +91,7 @@
             </tr>
             <tr>
               <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Duración</td>
-              <td>{{ e.duracion_horas }}h</td>
+              <td>{{ e.duracion_horas|floatformat:"-2" }}h</td>
             </tr>
             <tr>
               <td style="padding:0.2rem 0.75rem 0.2rem 0; color:var(--color-text-muted);">Costo</td>
