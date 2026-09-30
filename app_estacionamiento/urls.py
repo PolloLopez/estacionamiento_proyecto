@@ -7,6 +7,7 @@ from . import views_pwa
 from . import views_pago_publico
 from . import views_publico
 from . import views_push
+from . import views_api
 
 # Handler 500 personalizado: usa render() para que los context_processors
 # corran y la plantilla tenga acceso a municipio_branding (colores del municipio).
@@ -18,6 +19,19 @@ urlpatterns = [
     # 🩺 HEALTH CHECK (UptimeRobot)
     # =========================
     path("health/", views.health_check, name="health_check"),
+
+    # =========================
+    # 🔌 API JSON (React)
+    # Endpoints para la migración incremental a React.
+    # Replican la lógica de las vistas de template pero como JSON.
+    # Ver views_api.py para el detalle de cada endpoint.
+    # =========================
+    path("api/conductor/dashboard/",
+         views_api.api_conductor_dashboard,
+         name="api_conductor_dashboard"),
+    path("api/conductor/estacionamientos/activos/",
+         views_api.api_conductor_estacionamientos_activos,
+         name="api_conductor_estacionamientos_activos"),
 
     # =========================
     # 📱 PWA
