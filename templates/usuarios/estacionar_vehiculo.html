@@ -585,7 +585,12 @@ function seleccionarVehiculo(id, patente, tipo) {
   if (tieneAbono) {
     const btnConf = document.getElementById("btn-confirmar-est");
     if (btnConf) btnConf.disabled = true;
-    return; // no mostrar secciones de subcuadra ni duración
+    // Ocultar secciones que puedan haber quedado visibles de una selección anterior.
+    // Si no lo hacemos, los botones de duración quedan activos y pueden re-habilitar el botón.
+    if (seccionSubcuadra) seccionSubcuadra.style.display = "none";
+    const secDuracion = document.getElementById("seccion-duracion");
+    if (secDuracion) secDuracion.style.display = "none";
+    return;
   }
 
   actualizarCostosSegunTipo(tipoVehiculoActivo);
@@ -648,11 +653,15 @@ botones.forEach(btn => {
     if (avisoSaldo)    avisoSaldo.style.display  = saldoInsuficiente ? "block" : "none";
     if (btnConfirmar) {
       btnConfirmar.disabled = saldoInsuficiente;
-      // Mostrar el monto en el botón de confirmar para que el conductor
-      // sepa exactamente cuánto se debitará antes de tocar.
+      // Mostrar patente y monto en el botón para que el conductor confirme
+      // visualmente qué vehículo y cuánto se va a debitar.
+      const tarjetaActiva = vehiculoActivo
+        ? document.querySelector(`.tarjeta-vehiculo[data-id="${vehiculoActivo}"]`)
+        : null;
+      const patenteActiva = tarjetaActiva?.dataset.patente || "";
       btnConfirmar.textContent = saldoInsuficiente
         ? "✅ Confirmar estacionamiento"
-        : `✅ Confirmar — $${costo.toFixed(2)}`;
+        : `✅ ${patenteActiva} — $${costo.toFixed(2)}`;
     }
   });
 });
