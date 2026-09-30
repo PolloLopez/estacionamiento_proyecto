@@ -31,8 +31,6 @@
   <div class="alert alert-danger">{{ error }}</div>
   {% endif %}
 
-  {# Wrapper que se deshabilita visualmente cuando está fuera de horario.
-     Envuelve tanto la sección de vehículos (ahora fuera del form) como el form. #}
   <div {% if fuera_de_horario %}style="pointer-events:none; opacity:0.45; filter:grayscale(50%);"{% endif %}>
 
   <!-- ─── VEHÍCULOS (fuera del form principal) ─────────────────────────────
@@ -67,19 +65,18 @@
                 padding:1rem 0.9rem; text-align:center; cursor:pointer;
                 background:var(--color-surface); transition:border-color 0.15s, background 0.15s;
                 position:relative;">
-      <!-- font-size reducido a 1.1rem para que patentes de 7 caracteres (AA123BB) no desborden -->
-      <div style="font-size:1.1rem; font-weight:800; letter-spacing:1.5px; word-break:break-all;">
+      <div style="font-size:1.5rem; font-weight:800; letter-spacing:2px; word-break:break-all; line-height:1.1;">
         {{ v.patente }}
       </div>
-      <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
-        {% if v.tipo == "moto" %}🛵{% else %}🚗{% endif %}
+      <div style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.35rem;">
+        {% if v.tipo == "moto" %}🛵 Moto{% else %}🚗 Auto{% endif %}
       </div>
       {% if v.id in ids_con_abono %}
-        <div style="font-size:0.75rem; color:var(--color-warning); margin-top:0.3rem; font-weight:600;">
+        <div style="font-size:0.72rem; color:var(--color-warning); margin-top:0.25rem; font-weight:700;">
           🗓️ Abono activo
         </div>
       {% elif v.exento_global %}
-        <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.3rem; font-weight:600;">
+        <div style="font-size:0.72rem; color:var(--color-primary); margin-top:0.25rem; font-weight:700;">
           ✅ Exento
         </div>
       {% endif %}
@@ -119,16 +116,16 @@
                     padding:1rem 0.9rem; text-align:center; cursor:pointer;
                     background:var(--color-surface); transition:border-color 0.15s, background 0.15s;
                     position:relative;">
-          <div style="font-size:1.1rem; font-weight:800; letter-spacing:1.5px; word-break:break-all;">{{ v.patente }}</div>
-          <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
-            {% if v.tipo == "moto" %}🛵{% else %}🚗{% endif %}
+          <div style="font-size:1.5rem; font-weight:800; letter-spacing:2px; word-break:break-all; line-height:1.1;">{{ v.patente }}</div>
+          <div style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.35rem;">
+            {% if v.tipo == "moto" %}🛵 Moto{% else %}🚗 Auto{% endif %}
           </div>
           {% if v.id in ids_con_abono %}
-            <div style="font-size:0.75rem; color:var(--color-warning); margin-top:0.3rem; font-weight:600;">
+            <div style="font-size:0.72rem; color:var(--color-warning); margin-top:0.25rem; font-weight:700;">
               🗓️ Abono activo
             </div>
           {% elif v.exento_global %}
-            <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.3rem; font-weight:600;">
+            <div style="font-size:0.72rem; color:var(--color-primary); margin-top:0.25rem; font-weight:700;">
               ✅ Exento
             </div>
           {% endif %}
@@ -190,8 +187,7 @@
   <!-- Aviso abono activo: aparece por JS al seleccionar un vehículo con abono vigente.
        El backend también bloquea el POST, pero avisamos antes del submit. -->
   <div id="aviso-abono-activo" class="alert alert-warning" style="display:none;">
-    🗓️ <strong>Este vehículo tiene un abono mensual activo.</strong>
-    Ya pagaste por estacionar libremente este mes — el inspector verá el abono al verificar la patente.
+    🗓️ <strong>Abono mensual activo.</strong> Ya podés circular — el inspector lo verá al verificar la patente.
   </div>
 
   <!-- ─── FORM PRINCIPAL ────────────────────────────────────────────────────
