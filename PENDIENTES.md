@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-29 (sesión 26 — fix bug Error 500 forzar cierre caja vendedor)
+Última actualización: 2026-09-29 (sesión 26 cont. — fixes UX/bugs post-testing: timer vencido, confirm dialog, decimal_places)
 
 ---
 
@@ -79,6 +79,20 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
 ---
 
 ## 🟢 Baja prioridad / Futuras versiones
+
+### Superadmin: configurar tamaño de fuente en ticket de infracción y QR
+
+El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un tamaño de fuente fijo. Diferentes impresoras térmicas y diferentes tamaños de papel pueden requerir ajustes de fuente. Propuesta:
+
+1. Agregar `Municipio.ticket_fuente_size = IntegerField(default=14)` y `qr_fuente_size = IntegerField(default=12)` (o un campo único de escala: `ticket_escala_pct = IntegerField(default=100)`).
+2. Exponer el campo en `editar_municipio.html` → sección de impresión.
+3. Pasar el valor al template del ticket e inyectarlo como variable CSS o inline style en el contenedor principal.
+
+**Por qué vale la pena evaluarlo**: cada municipio puede tener impresoras distintas (58mm vs 80mm) y el texto puede quedar cortado o demasiado grande. Un campo configurable evita hardcodear y tener que deployar para ajustar la impresión.
+
+**Evaluación pendiente**: revisar si conviene un slider (1–3: pequeño/normal/grande) o un campo numérico libre. Un slider tipo `<input type="range" min="10" max="20">` es más amigable para un admin no técnico.
+
+---
 
 ### Migración frontend a React (SPA con DRF + JWT)
 

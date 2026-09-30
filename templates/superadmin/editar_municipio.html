@@ -552,7 +552,7 @@
                   <span style="color:var(--color-text-muted); font-size:0.82rem;">○ Inactivo</span>
                 {% endif %}
               </td>
-              <td>
+              <td style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center;">
                 <form method="post" action="{% url 'toggle_admin' admin.id %}" style="margin:0;">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-outline"
@@ -561,6 +561,22 @@
                     {% if admin.is_active %}Desactivar{% else %}Activar{% endif %}
                   </button>
                 </form>
+                <details style="font-size:0.82rem;">
+                  <summary class="btn btn-outline"
+                           style="font-size:0.78rem; padding:0.2rem 0.6rem; cursor:pointer; list-style:none;">
+                    🔑 Contraseña
+                  </summary>
+                  <form method="post" action="{% url 'resetear_password_admin' admin.id %}"
+                        style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.3rem; min-width:200px;">
+                    {% csrf_token %}
+                    <input type="password" name="nueva_password" placeholder="Nueva contraseña"
+                           required minlength="6" style="font-size:0.82rem; padding:0.3rem 0.5rem;">
+                    <input type="password" name="confirmar_password" placeholder="Confirmar"
+                           required minlength="6" style="font-size:0.82rem; padding:0.3rem 0.5rem;">
+                    <button type="submit" class="btn"
+                            style="font-size:0.78rem; padding:0.2rem 0.6rem;">Restablecer</button>
+                  </form>
+                </details>
               </td>
             </tr>
             {% endfor %}
@@ -587,7 +603,7 @@
                     <span style="color:var(--color-text-muted); font-size:0.82rem;">○ Inactivo</span>
                   {% endif %}
                 </td>
-                <td>
+                <td style="display:flex; gap:0.4rem; flex-wrap:wrap; align-items:center;">
                   <form method="post" action="{% url 'toggle_admin' teso.id %}" style="margin:0;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline"
@@ -596,6 +612,22 @@
                       {% if teso.is_active %}Desactivar{% else %}Activar{% endif %}
                     </button>
                   </form>
+                  <details style="font-size:0.82rem;">
+                    <summary class="btn btn-outline"
+                             style="font-size:0.78rem; padding:0.2rem 0.6rem; cursor:pointer; list-style:none;">
+                      🔑 Contraseña
+                    </summary>
+                    <form method="post" action="{% url 'resetear_password_admin' teso.id %}"
+                          style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.3rem; min-width:200px;">
+                      {% csrf_token %}
+                      <input type="password" name="nueva_password" placeholder="Nueva contraseña"
+                             required minlength="6" style="font-size:0.82rem; padding:0.3rem 0.5rem;">
+                      <input type="password" name="confirmar_password" placeholder="Confirmar"
+                             required minlength="6" style="font-size:0.82rem; padding:0.3rem 0.5rem;">
+                      <button type="submit" class="btn"
+                              style="font-size:0.78rem; padding:0.2rem 0.6rem;">Restablecer</button>
+                    </form>
+                  </details>
                 </td>
               </tr>
               {% endfor %}
