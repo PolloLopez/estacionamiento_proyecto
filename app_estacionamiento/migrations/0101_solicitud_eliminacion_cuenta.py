@@ -1,5 +1,4 @@
 import django.db.models.deletion
-from django.conf import settings
 from django.db import migrations, models
 
 
@@ -7,16 +6,16 @@ class Migration(migrations.Migration):
     """
     Crea el modelo SolicitudEliminacionCuenta.
 
-    Este modelo existía en models.py pero nunca tuvo su migración correspondiente,
-    lo que causaba el warning 'Your models have changes that are not yet reflected
-    in a migration' en cada deploy de Railway.
+    El modelo existía en models.py pero nunca tuvo su migración correspondiente,
+    causando el warning 'models have changes not reflected in a migration' en
+    cada deploy de Railway.
 
-    El modelo registra cuando un conductor solicita eliminar su cuenta.
+    Registra cuando un conductor inicia el proceso de eliminar su cuenta.
+    La cuenta se desactiva (soft-delete: is_active=False) una vez confirmado.
     """
 
     dependencies = [
         ("app_estacionamiento", "0100_duracion_horas_mayor_precision"),
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
@@ -44,15 +43,15 @@ class Migration(migrations.Migration):
                         max_length=15,
                     ),
                 ),
-                ("motivo",      models.TextField(blank=True, default="")),
-                ("creado_en",   models.DateTimeField(auto_now_add=True)),
-                ("resuelto_en", models.DateTimeField(blank=True, null=True)),
+                ("motivo",       models.TextField(blank=True, default="")),
+                ("creado_en",    models.DateTimeField(auto_now_add=True)),
+                ("resuelto_en",  models.DateTimeField(blank=True, null=True)),
                 (
                     "usuario",
                     models.OneToOneField(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="solicitud_eliminacion",
-                        to=settings.AUTH_USER_MODEL,
+                        to="app_estacionamiento.usuario",
                     ),
                 ),
             ],
