@@ -104,9 +104,9 @@
 
       <script>
         const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
-        {# |unlocalize evita que LANGUAGE_CODE="es-ar" formatee el decimal con coma ("0,1667"),
-           lo que haría que parseFloat() devolviera 0 y el timer mostrara el tiempo ya vencido. #}
-        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_horas|unlocalize }}");
+        {# stringformat:"g" fuerza formato punto decimal ignorando LANGUAGE_CODE="es-ar",
+           que de otro modo renderizaría "0,1667" → parseFloat devolvería 0. #}
+        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_horas|stringformat:'g' }}");
       </script>
 
     {# Si hay VARIOS vehículos activos: lista compacta #}
