@@ -300,9 +300,9 @@
    Se carga solo en esta página — no impacta al resto del sistema.
    Cuando migremos a Vite en Fase 4 estos tres <script> desaparecen y
    el bundle compilado los reemplaza. #}
-{# unpkg siempre tiene todas las versiones de npm — más confiable que cdnjs para versiones nuevas #}
-<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+{# jsdelivr: más estable que unpkg para servir archivos UMD sin redirects #}
+<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
 <script src="{% static 'app_estacionamiento/js/panel_estado_conductor.js' %}"></script>
 
 {% if municipio_branding.minutos_alerta_push %}
