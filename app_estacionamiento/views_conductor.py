@@ -894,9 +894,8 @@ def estacionar_vehiculo(request):
             if error_code == "abono_activo":
                 messages.info(
                     request,
-                    "ℹ️ Este vehículo tiene un abono mensual activo. "
-                    "No necesitás registrar estacionamiento por hora: el inspector "
-                    "verá el abono vigente al verificar la patente."
+                    "ℹ️ Abono mensual activo. "
+                    "No necesitás registrar estacionamiento por hora, teniendo el abono vigente."
                 )
             elif result["redirect"] == "mp_iniciar_carga":
                 messages.warning(
@@ -955,6 +954,16 @@ def estacionar_vehiculo(request):
         if len(vehiculos_recientes) >= 3:
             break
     ids_recientes = {v.id for v in vehiculos_recientes}
+
+    # Si el conductor viene de agregar un vehículo nuevo (agregar_vehiculo redirige
+    # con ?patente=XXX), ese vehículo no tiene historial → no aparece en vehiculos_recientes
+    # y quedaría colapsado en "Otros vehículos". Lo promovemos al principio de la lista
+    # para que aparezca visible y el JS lo preseleccione correctamente.
+    if patente_preseleccionada:
+        v_presel = next((v for v in vehiculos if v.patente == patente_preseleccionada), None)
+        if v_presel and v_presel.id not in ids_recientes:
+            vehiculos_recientes.insert(0, v_presel)
+            ids_recientes.add(v_presel.id)
 
     # Chequeo de horario en GET: si está fuera de horario se muestra el banner
     # y el formulario queda bloqueado. Mismo chequeo que en POST, pero acá

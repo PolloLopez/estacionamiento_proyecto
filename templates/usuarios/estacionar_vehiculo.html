@@ -57,6 +57,7 @@
     {% for v in vehiculos_recientes %}
     <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
          data-id="{{ v.id }}"
+         data-patente="{{ v.patente }}"
          data-tipo="{{ v.tipo|default:'auto' }}"
          data-tiene-abono="{% if v.id in ids_con_abono %}true{% else %}false{% endif %}"
          onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
@@ -108,6 +109,7 @@
         {% if v.id not in ids_recientes %}
         <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
              data-id="{{ v.id }}"
+             data-patente="{{ v.patente }}"
              data-tipo="{{ v.tipo|default:'auto' }}"
              data-tiene-abono="{% if v.id in ids_con_abono %}true{% else %}false{% endif %}"
              onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
@@ -198,75 +200,56 @@
     <input type="hidden" name="vehiculo_id" id="vehiculo_id_input">
     <input type="hidden" name="horas"       id="horas" value="1">
 
-    <!-- ─── SUBCUADRA: botón GPS + cascade manual ─────────────────────── -->
+    <!-- ─── SUBCUADRA ────────────────────────────────────────────────────
+         El GPS se dispara automáticamente al seleccionar el vehículo (en
+         seleccionarVehiculo()). No hay botón: el conductor no tiene que hacer
+         ningún tap extra. El label #gps-label muestra el estado inline. -->
     {% if subcuadras %}
-    <div id="seccion-subcuadra" style="display:none; margin-bottom:1.4rem;">
+    <div id="seccion-subcuadra" style="display:none; margin-bottom:1.2rem;">
 
-      <h3 style="margin-bottom:0.75rem;">📍 ¿Dónde estás?</h3>
+      <h3 style="margin-bottom:0.4rem;">📍 ¿Dónde estás?</h3>
 
-      <!-- Botón principal: detectar cuadra -->
-      <button type="button" id="btn-detectar-cuadra"
-              onclick="iniciarDeteccionGps()"
-              style="width:100%; padding:0.9rem 1rem; font-size:1rem; font-weight:700;
-                     background:var(--color-primary); color:#fff; border:none;
-                     border-radius:10px; cursor:pointer; display:flex;
-                     align-items:center; justify-content:center; gap:0.5rem;">
-        📍 Detectar mi cuadra
-      </button>
+      <!-- Estado GPS: texto inline (reemplaza al botón + spinner previos) -->
+      <p id="gps-label"
+         style="font-size:0.82rem; color:var(--color-text-muted); margin:0 0 0.4rem;
+                display:flex; align-items:center; gap:0.4rem;">
+        📡 Detectando tu cuadra…
+      </p>
 
-      <!-- Estado GPS: detectando -->
-      <div id="gps-detectando" style="display:none; text-align:center;
-           font-size:0.9rem; color:var(--color-text-muted); padding:0.75rem 0;">
-        ⏳ Detectando ubicación…
-      </div>
+      <!-- Selector de subcuadra: siempre en el DOM.
+           GPS lo preselecciona; el conductor puede cambiarlo tocando el dropdown. -->
+      <select name="subcuadra_id" id="select-subcuadra"
+              style="width:100%; padding:0.55rem 0.75rem; border-radius:8px;
+                     border:1px solid var(--color-border); font-size:1rem;
+                     background:var(--color-surface);">
+        <option value="">— Sin informar zona —</option>
+        {% for s in subcuadras %}
+        <option value="{{ s.id }}" data-tipo-zona="{{ s.tipo_zona }}">{{ s }}</option>
+        {% endfor %}
+      </select>
 
-      <!-- Estado GPS: resultado (subcuadra detectada o fallo) -->
-      <div id="gps-resultado" style="display:none; margin-top:0.6rem;">
-        <p id="gps-label" style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.4rem;"></p>
-        <select name="subcuadra_id" id="select-subcuadra"
-                style="width:100%; padding:0.5rem 0.75rem; border-radius:8px;
-                       border:1px solid var(--color-border); font-size:1rem;
-                       background:var(--color-surface);">
-          <option value="">— Sin informar zona —</option>
-          {% for s in subcuadras %}
-          <option value="{{ s.id }}" data-tipo-zona="{{ s.tipo_zona }}">{{ s }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <!-- Separador entre GPS y selector manual -->
-      <div id="btn-manual" style="text-align:center; margin-top:0.6rem;">
-        <span style="font-size:0.8rem; color:var(--color-text-muted);">— o seleccioná la dirección manualmente —</span>
-      </div>
-
-      <!-- Selector manual: visible solo si el superadmin lo habilitó.
-           Usa autocomplete (datalist) para la calle y teclado numérico para la altura,
-           igual que el panel del inspector. Asigna la subcuadra más cercana si la altura
-           no coincide exactamente. -->
+      <!-- Selector manual (solo si el superadmin lo habilitó).
+           Aparece cuando GPS falla; el conductor puede ingresar calle y altura. -->
       {% if selector_manual_activo %}
-      <div id="selector-manual" style="margin-top:0.5rem;
-           background:var(--color-surface-2); border-radius:10px; padding:0.75rem 1rem;">
-        <p style="font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.5rem;">
-          Seleccioná tu ubicación:
-        </p>
+      <div id="selector-manual" style="margin-top:0.6rem; display:none;
+           background:var(--color-surface-2); border-radius:8px; padding:0.65rem 0.85rem;">
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
           <input id="sel-calle" list="list-calles-cond" autocomplete="off"
-                 placeholder="Escribí la calle..."
-                 style="flex:2; min-width:130px; padding:0.5rem 0.75rem; border-radius:8px;
+                 placeholder="Calle…"
+                 style="flex:2; min-width:130px; padding:0.5rem 0.65rem; border-radius:6px;
                         border:1px solid var(--color-border); font-size:1rem;
                         background:var(--color-surface);">
           <datalist id="list-calles-cond"></datalist>
 
           <input id="sel-altura" list="list-alturas-cond" inputmode="numeric" autocomplete="off"
                  placeholder="Altura" disabled
-                 style="flex:1; min-width:80px; padding:0.5rem 0.75rem; border-radius:8px;
+                 style="flex:1; min-width:80px; padding:0.5rem 0.65rem; border-radius:6px;
                         border:1px solid var(--color-border); font-size:1rem;
                         background:var(--color-surface);">
           <datalist id="list-alturas-cond"></datalist>
         </div>
-        <!-- Referencia de intersección: se muestra cuando hay una subcuadra seleccionada -->
-        <p id="entre-calles-ref" style="font-size:0.8rem; color:var(--color-text-muted);
-           margin:0.4rem 0 0; display:none;"></p>
+        <p id="entre-calles-ref" style="font-size:0.78rem; color:var(--color-text-muted);
+           margin:0.3rem 0 0; display:none;"></p>
       </div>
       {% endif %}
 
@@ -413,18 +396,13 @@ function actualizarZonaLibre(esLibre) {
 }
 
 // ── GPS ──────────────────────────────────────────────────────────────────────
-// El GPS no se lanza automáticamente. El conductor lo activa con el botón.
+// Se llama automáticamente desde seleccionarVehiculo() al mostrar la sección de subcuadra.
+// El dropdown siempre está en el DOM — el GPS solo pre-selecciona la opción más cercana.
 function iniciarDeteccionGps() {
   if (gpsYaCorrio) return;
   gpsYaCorrio = true;
 
-  const btnDetectar   = document.getElementById("btn-detectar-cuadra");
-  const gpsDetectando = document.getElementById("gps-detectando");
-  const gpsResultado  = document.getElementById("gps-resultado");
-  const btnManual     = document.getElementById("btn-manual");
-
-  if (btnDetectar)   { btnDetectar.style.display   = "none"; }
-  if (gpsDetectando) { gpsDetectando.style.display  = "block"; }
+  const gpsLabel = document.getElementById("gps-label");
 
   if (!navigator.geolocation) {
     mostrarSelectorManual();
@@ -437,13 +415,9 @@ function iniciarDeteccionGps() {
       fetch(`${URL_SUBCUADRA_CERCANA}?lat=${lat}&lon=${lon}`)
         .then(r => r.json())
         .then(data => {
-          if (gpsDetectando) gpsDetectando.style.display = "none";
-          if (gpsResultado)  gpsResultado.style.display  = "block";
-          if (btnManual)     btnManual.style.display      = "block";
           if (data.id) {
             const sel = document.getElementById("select-subcuadra");
             if (sel) sel.value = data.id;
-            const gpsLabel = document.getElementById("gps-label");
             if (gpsLabel) {
               gpsLabel.textContent = `📍 ${data.nombre}`;
               if (data.entre) gpsLabel.textContent += ` — ${data.entre}`;
@@ -453,28 +427,23 @@ function iniciarDeteccionGps() {
               document.getElementById("seccion-duracion").style.display = "block";
             }
           } else {
-            const gpsLabel = document.getElementById("gps-label");
-            if (gpsLabel) gpsLabel.textContent = "No encontramos tu cuadra — seleccionala manualmente:";
+            // GPS respondió pero no encontró una cuadra cercana
+            mostrarSelectorManual();
           }
         })
-        .catch(() => {
-          if (gpsDetectando) gpsDetectando.style.display = "none";
-          mostrarSelectorManual();
-        });
+        .catch(() => mostrarSelectorManual());
     },
-    () => {
-      if (gpsDetectando) gpsDetectando.style.display = "none";
-      mostrarSelectorManual();
-    },
+    () => mostrarSelectorManual(),
     { timeout: 8000 }
   );
 }
 
 function mostrarSelectorManual() {
-  const btnDetectar   = document.getElementById("btn-detectar-cuadra");
-  const gpsDetectando = document.getElementById("gps-detectando");
-  if (btnDetectar)   btnDetectar.style.display   = "none";
-  if (gpsDetectando) gpsDetectando.style.display = "none";
+  // GPS falló o no encontró cuadra: mostrar selector manual y actualizar el label
+  const gpsLabel     = document.getElementById("gps-label");
+  const selectorMan  = document.getElementById("selector-manual");
+  if (gpsLabel)    gpsLabel.textContent   = "No pudimos detectar tu ubicación — seleccioná manualmente:";
+  if (selectorMan) selectorMan.style.display = "block";
 }
 
 // ── Cascade manual — datalist autocomplete ────────────────────────────────────
@@ -621,8 +590,11 @@ function seleccionarVehiculo(id, patente, tipo) {
 
   actualizarCostosSegunTipo(tipoVehiculoActivo);
 
-  // Mostrar sección de subcuadra si hay subcuadras configuradas
-  if (seccionSubcuadra) seccionSubcuadra.style.display = "block";
+  // Mostrar sección de subcuadra si hay subcuadras configuradas, y disparar GPS automáticamente
+  if (seccionSubcuadra) {
+    seccionSubcuadra.style.display = "block";
+    iniciarDeteccionGps(); // auto-detecta la cuadra al seleccionar el vehículo
+  }
 
   // Mostrar sección de duración solo si la subcuadra activa no es libre
   const selPrincipal = document.getElementById("select-subcuadra");
@@ -709,9 +681,10 @@ function eliminarVehiculo(url, patente) {
 window.addEventListener("DOMContentLoaded", () => {
   const tarjetas = document.querySelectorAll(".tarjeta-vehiculo");
   if (preseleccionada) {
+    // Usar data-patente en vez de innerText — más robusto y funciona aunque la tarjeta esté dentro
+    // de un <details> cerrado (innerText devuelve "" en elementos ocultos).
     tarjetas.forEach(t => {
-      const pat = t.querySelector("div")?.innerText.trim();
-      if (pat === preseleccionada) t.click();
+      if (t.dataset.patente === preseleccionada) t.click();
     });
   } else if (tarjetas.length === 1) {
     tarjetas[0].click();
