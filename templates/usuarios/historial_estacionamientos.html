@@ -103,18 +103,10 @@
             </tr>
           </table>
           {% if e.estado == "ACTIVO" %}
-          <div style="display:flex; gap:0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
+          <div style="margin-top:0.75rem;">
             <a class="btn btn-outline"
                href="{% url 'usuarios_renovar_estacionamiento' e.id %}"
                style="font-size:0.88rem;">🔄 Extender</a>
-            <form method="post" action="{% url 'usuarios_finalizar_estacionamiento' e.id %}" style="display:inline;">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-danger"
-                      style="font-size:0.88rem;"
-                      onclick="return confirm('¿Finalizar el estacionamiento ahora?')">
-                ⛔ Finalizar
-              </button>
-            </form>
           </div>
           {% endif %}
         </div>
