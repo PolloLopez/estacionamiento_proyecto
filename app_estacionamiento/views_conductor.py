@@ -890,9 +890,15 @@ def estacionar_vehiculo(request):
             messages.warning(request, w)
 
         if not result["ok"]:
-            # Informar al conductor por qué no puede estacionar antes de redirigir.
-            # Sin este mensaje, el usuario ve una redirección silenciosa a MP y no entiende qué pasó.
-            if result["redirect"] == "mp_iniciar_carga":
+            error_code = result.get("error_code")
+            if error_code == "abono_activo":
+                messages.info(
+                    request,
+                    "ℹ️ Este vehículo tiene un abono mensual activo. "
+                    "No necesitás registrar estacionamiento por hora: el inspector "
+                    "verá el abono vigente al verificar la patente."
+                )
+            elif result["redirect"] == "mp_iniciar_carga":
                 messages.warning(
                     request,
                     "⚠️ No tenés saldo suficiente para estacionar. "
@@ -990,10 +996,22 @@ def estacionar_vehiculo(request):
         municipio=usuario.municipio,
     ).exclude(calle="Zona Única").order_by("calle", "altura")
 
+    # IDs de vehículos con abono mensual activo: el template los usa para mostrar
+    # un aviso antes de que el conductor intente estacionar por hora.
+    from datetime import date as _date
+    from app_estacionamiento.models import AbonoMensual as _AbonoMensual
+    _mes_actual = _date.today().replace(day=1)
+    ids_con_abono = set(
+        _AbonoMensual.objects
+        .filter(municipio=usuario.municipio, mes=_mes_actual)
+        .values_list("vehiculo_id", flat=True)
+    )
+
     return render(request, "usuarios/estacionar_vehiculo.html", {
         "vehiculos":              vehiculos,
         "vehiculos_recientes":    vehiculos_recientes,
         "ids_recientes":          ids_recientes,
+        "ids_con_abono":          ids_con_abono,
         "usuario":                usuario,
         "tarifa_hora":            tarifa_hora_auto_efectiva,
         "tarifa_hora_auto":       tarifa_hora_auto_efectiva,

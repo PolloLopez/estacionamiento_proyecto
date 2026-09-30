@@ -34,11 +34,14 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion, gps_lat=Non
        c. Crea el Estacionamiento y debita el saldo.
 
     Retorna dict con:
-      - ok       (bool)
-      - redirect (str)    — nombre de URL
-      - warnings (list)   — avisos de VehiculoPolicy
-      - info_infraccion   — None, o dict con datos de la infraccion detectada
+      - ok         (bool)
+      - redirect   (str)  — nombre de URL
+      - warnings   (list) — avisos de VehiculoPolicy
+      - error_code (str|None) — motivo del rechazo si ok=False
+      - info_infraccion — None, o dict con datos de la infraccion detectada
     """
+    from datetime import date
+    from app_estacionamiento.models import AbonoMensual
 
     try:
         duracion = Decimal(duracion)
@@ -49,9 +52,33 @@ def ejecutar_estacionamiento(usuario, vehiculo, subcuadra, duracion, gps_lat=Non
             "ok": False,
             "redirect": "inicio",
             "warnings": [],
+            "error_code": None,
             "info_infraccion": None,
             "info_reintegro":  None,
         }
+
+    # Bloqueo de abono mensual activo:
+    # Si el vehículo tiene abono para este mes y municipio, el conductor
+    # ya pagó por estacionar libremente — no se puede cobrar por hora encima.
+    # El inspector ve "abono activo" al verificar, así que el registro
+    # por hora es redundante y representaría un doble cobro injusto.
+    if usuario.municipio:
+        mes_actual = date.today().replace(day=1)
+        tiene_abono_activo = AbonoMensual.objects.filter(
+            vehiculo=vehiculo,
+            municipio=usuario.municipio,
+            mes=mes_actual,
+        ).exists()
+
+        if tiene_abono_activo:
+            return {
+                "ok": False,
+                "redirect": "inicio_usuarios",
+                "warnings": [],
+                "error_code": "abono_activo",
+                "info_infraccion": None,
+                "info_reintegro":  None,
+            }
 
     # Zona libre o día sin horario: el estacionamiento se registra igualmente
     # (para que el inspector vea "PAGADO") pero el costo es $0.
