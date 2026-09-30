@@ -1150,8 +1150,7 @@ def finalizar_estacionamiento(request, estacionamiento_id):
     if resultado["ok"]:
         messages.success(
             request,
-            f"✅ Estacionamiento finalizado ({resultado['minutos_transcurridos']} min). "
-            f"Costo descontado al inicio: ${resultado['costo']}"
+            f"✅ Estacionamiento finalizado ({resultado['minutos_transcurridos']} min)."
         )
     else:
         messages.error(request, resultado.get("error", "Error al finalizar"))

@@ -562,19 +562,74 @@ def crear_admin(request, municipio_id):
 @require_role("superadmin")
 def toggle_admin(request, admin_id):
     """
-    Activa o desactiva un usuario admin (sin eliminarlo).
+    Activa o desactiva un usuario admin o tesorero (sin eliminarlo).
     Solo acepta POST.
     """
-    admin = get_object_or_404(Usuario, id=admin_id, es_admin=True)
+    # Aceptamos tanto admin como tesorero
+    staff = get_object_or_404(
+        Usuario, id=admin_id
+    )
+    if not (staff.es_admin or staff.es_tesorero):
+        messages.error(request, "El usuario no es admin ni tesorero.")
+        return redirect("panel_superadmin")
 
     if request.method != "POST":
         return redirect("panel_superadmin")
 
-    admin.is_active = not admin.is_active
-    admin.save(update_fields=["is_active"])
-    estado = "activado" if admin.is_active else "desactivado"
-    messages.success(request, f"Admin {admin.correo} {estado}.")
-    return redirect("editar_municipio", municipio_id=admin.municipio_id)
+    staff.is_active = not staff.is_active
+    staff.save(update_fields=["is_active"])
+    rol    = "Admin" if staff.es_admin else "Tesorero"
+    estado = "activado" if staff.is_active else "desactivado"
+    messages.success(request, f"{rol} {staff.correo} {estado}.")
+    return redirect("editar_municipio", municipio_id=staff.municipio_id)
+
+
+@require_role("superadmin")
+def resetear_password_admin(request, staff_id):
+    """
+    Permite al superadmin establecer una nueva contraseña para un admin o tesorero.
+
+    Por qué solo el superadmin puede hacer esto:
+    - El admin municipal puede resetear conductores e inspectores de su municipio.
+    - Resetear la contraseña de otro admin/tesorero es un privilegio mayor
+      que solo corresponde al superadmin (quien creó esos usuarios).
+
+    Flujo: POST → valida contraseña → set_password → marca cambio requerido
+    → redirige a editar_municipio.
+    """
+    from django.contrib.auth.hashers import make_password as _make_password
+
+    staff = get_object_or_404(Usuario, id=staff_id)
+    if not (staff.es_admin or staff.es_tesorero):
+        messages.error(request, "El usuario no es admin ni tesorero.")
+        return redirect("panel_superadmin")
+
+    if request.method != "POST":
+        return redirect("editar_municipio", municipio_id=staff.municipio_id)
+
+    nueva    = request.POST.get("nueva_password", "").strip()
+    confirma = request.POST.get("confirmar_password", "").strip()
+
+    if not nueva:
+        messages.error(request, "La contraseña no puede estar vacía.")
+    elif nueva != confirma:
+        messages.error(request, "Las contraseñas no coinciden.")
+    elif len(nueva) < 6:
+        messages.error(request, "Mínimo 6 caracteres.")
+    else:
+        staff.set_password(nueva)
+        # Forzar cambio en el próximo login: la contraseña que el superadmin
+        # establece es temporal; el usuario debe elegir la suya propia.
+        staff.cambio_password_requerido = True
+        staff.save(update_fields=["password", "cambio_password_requerido"])
+        rol = "Admin" if staff.es_admin else "Tesorero"
+        messages.success(
+            request,
+            f"Contraseña de {rol} {staff.correo} restablecida. "
+            f"El usuario deberá cambiarla al iniciar sesión."
+        )
+
+    return redirect("editar_municipio", municipio_id=staff.municipio_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

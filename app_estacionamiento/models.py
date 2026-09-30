@@ -915,7 +915,7 @@ class Estacionamiento(models.Model):
     # Antes era IntegerField, lo que truncaba Decimal("1.5") → 1 silenciosamente,
     # haciendo que el estacionamiento venciera 30 min antes de lo pagado.
     duracion_horas = models.DecimalField(
-        max_digits=4, decimal_places=1, default=1,
+        max_digits=6, decimal_places=4, default=1,
         verbose_name="Duración (horas)"
     )
 
@@ -1646,7 +1646,7 @@ class PagoPublico(models.Model):
     # Datos necesarios para crear el Estacionamiento al confirmar el pago
     subcuadra      = models.ForeignKey('Subcuadra', on_delete=models.SET_NULL,
                                         null=True, blank=True)
-    duracion_horas = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
+    duracion_horas = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
 
     # Primer día del mes del abono (ej: 2026-08-01)
     mes_abono = models.DateField(null=True, blank=True,

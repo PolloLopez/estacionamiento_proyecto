@@ -97,7 +97,7 @@
         <form method="post" action="{% url 'usuarios_finalizar_estacionamiento' estacionamiento_activo.id %}" style="display:inline;">
           {% csrf_token %}
           <button type="submit" class="btn btn-danger"
-                  onclick="return confirm('¿Finalizar el estacionamiento ahora?\nEl costo ya fue descontado al inicio.')">
+                  onclick="return confirm('¿Finalizar el estacionamiento ahora?')">
             ⛔ Finalizar
           </button>
         </form>
@@ -140,7 +140,7 @@
               {% csrf_token %}
               <button type="submit" class="btn btn-danger"
                       style="font-size:0.78rem; padding:0.2rem 0.5rem;"
-                      onclick="return confirm('¿Finalizar {{ est.vehiculo.patente }}?\nEl costo ya fue descontado al inicio.')">
+                      onclick="return confirm('¿Finalizar el estacionamiento de {{ est.vehiculo.patente }}?')">
                 ⛔
               </button>
             </form>
@@ -391,17 +391,26 @@
   if (hastaEl) hastaEl.textContent = "hasta " + horaVencStr;
 
   let avisoMostrado = false;
+  let intervalo;
 
   function actualizarTimer() {
     const ahora    = new Date();
     const restante = fin - ahora;
 
     if (restante <= 0) {
-      timerEl.innerText = "VENCIDO";
+      // Detener el interval para no correr innecesariamente
+      if (intervalo) clearInterval(intervalo);
+      // Mostramos la hora de vencimiento (ya calculada) sin texto de alarma
+      timerEl.innerText = "Vence " + horaVencStr;
       timerEl.style.color = "var(--color-danger)";
       if (progressEl) {
         progressEl.style.width = "100%";
         progressEl.style.background = "var(--color-danger)";
+      }
+      if (avisoEl) {
+        const strong = avisoEl.querySelector("strong");
+        if (strong) strong.textContent = "El tiempo ya venció.";
+        avisoEl.style.display = "flex";
       }
       return;
     }
@@ -443,7 +452,7 @@
   }
 
   actualizarTimer();
-  setInterval(actualizarTimer, 1000);
+  intervalo = setInterval(actualizarTimer, 1000);
 
 })();
 </script>
