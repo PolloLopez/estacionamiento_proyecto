@@ -33,15 +33,5 @@ class Migration(migrations.Migration):
                 verbose_name="Duración (horas)",
             ),
         ),
-        # PreferenciaEstacionamiento.duracion_horas
-        migrations.AlterField(
-            model_name="preferenciaestacionamiento",
-            name="duracion_horas",
-            field=models.DecimalField(
-                blank=True,
-                decimal_places=4,
-                max_digits=6,
-                null=True,
-            ),
-        ),
+
     ]
