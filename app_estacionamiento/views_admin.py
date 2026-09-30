@@ -1386,8 +1386,14 @@ def gestionar_tarifas(request):
         activo=True,
     ).exists()
 
-    # Opciones de duración mínima para el select del template (múltiplos de 30 hasta 8h).
-    duracion_minima_opciones = []
+    # Opciones de duración mínima para el select del template.
+    # Incluye valores cortos (5–20 min) para facilitar testing, y múltiplos de 30 hasta 8h.
+    duracion_minima_opciones = [
+        {"valor": 5,  "label": "5 min (testing)"},
+        {"valor": 10, "label": "10 min (testing)"},
+        {"valor": 15, "label": "15 min"},
+        {"valor": 20, "label": "20 min"},
+    ]
     for n in range(1, 17):  # n=1→30min, n=16→8h
         minutos = n * 30
         if minutos < 60:

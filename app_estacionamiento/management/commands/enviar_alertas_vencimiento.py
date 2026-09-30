@@ -2,13 +2,13 @@
 """
 Envía notificaciones push a conductores cuyo estacionamiento está próximo a vencer.
 
-Diseñado para correr cada minuto desde Railway Cron:
-  Cron expression: */1 * * * *
+Diseñado para correr cada 5 minutos desde Railway Cron:
+  Cron expression: */5 * * * *
   Comando:         python manage.py enviar_alertas_vencimiento
 
 Lógica:
-  - Busca estacionamientos activos que vencen en [minutos_alerta - 1, minutos_alerta + 1]
-    (ventana de 2 minutos para absorber la variabilidad del cron).
+  - Busca estacionamientos activos que vencen en [minutos_alerta - 3, minutos_alerta + 3]
+    (ventana de 6 minutos para garantizar al menos una corrida con cron cada 5 min).
   - Solo envía si el municipio tiene minutos_alerta_push > 0.
   - Solo envía si el conductor tiene al menos una SuscripcionPush activa.
   - No envía duplicados: guarda en caché de sesión si ya se envió la alerta
@@ -68,10 +68,17 @@ class Command(BaseCommand):
             if not hora_venc:
                 continue
 
-            # Ventana de alerta: [umbral - 1 min, umbral + 1 min]
+            # Ventana de alerta: [umbral - 3 min, umbral + 3 min] = 6 min de ancho.
+            # Con cron cada 5 min, una ventana de ±1 min (2 min) tenía 60% de
+            # probabilidad de no atrapar la alerta. Con ±3 min (6 min) garantizamos
+            # siempre al menos una corrida dentro de la ventana.
+            # Contrapartida: ~1 min de overlap entre ventanas → ~17% de chance de push
+            # duplicado por sesión. Es aceptable (una push de más no es error de datos).
+            # Si se quiere idempotencia perfecta: agregar Estacionamiento.push_enviada
+            # = BooleanField(default=False) y filtrar aquí.
             umbral    = timedelta(minutes=minutos)
             diferencia = hora_venc - ahora
-            if not (umbral - timedelta(minutes=1) <= diferencia <= umbral + timedelta(minutes=1)):
+            if not (umbral - timedelta(minutes=3) <= diferencia <= umbral + timedelta(minutes=3)):
                 continue
 
             # El conductor tiene suscripciones push?

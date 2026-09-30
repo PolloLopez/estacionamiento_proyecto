@@ -204,7 +204,8 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
     limitadas al cierre del horario del día.
 
     Parámetro duracion_minima_min: mínimo configurable por el admin del municipio
-    (viene de Tarifa.duracion_minima_minutos, default 30). Debe ser múltiplo de 30.
+    (viene de Tarifa.duracion_minima_minutos, default 30).
+    Si es < 30, se agrega esa opción puntual y se continúa con bloques de 30 min.
     El máximo lo determina el horario de cierre del día.
 
     Regla de mínimo de duración:
@@ -272,13 +273,24 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
         costo = round(1.0 * float(tarifa_hora), 2)
         return [{"horas": 1.0, "label": "1 hora", "costo": costo}]
 
-    # ── Normal: mínimo configurable, bloques de 30 min hasta el cierre ─────
+    # ── Normal: mínimo configurable, bloques hasta el cierre ───────────────
     # duracion_minima_min viene de Tarifa.duracion_minima_minutos (default 30).
-    # Lo convertimos a "n" (posición en la tabla de medios bloques de 30 min):
-    # n=1 → 30 min, n=2 → 60 min, n=3 → 90 min, etc.
-    n_minimo = max(1, duracion_minima_min // 30)   # nunca menos de 30 min
+    # Si el mínimo es < 30 (ej. para testing), generamos primero esa opción
+    # puntual y luego continuamos con bloques de 30 min.
     opciones = []
-    for n in range(n_minimo, 17):   # hasta 8 horas (n=16 → 8h)
+
+    if duracion_minima_min < 30:
+        # Opción corta exacta (ej. 10 min, 15 min, 20 min)
+        horas_min = round(duracion_minima_min / 60, 4)
+        costo_min = round(horas_min * float(tarifa_hora), 2)
+        opciones.append({"horas": horas_min, "label": f"{duracion_minima_min} min", "costo": costo_min})
+        # Continuamos con bloques de 30 min desde 30 en adelante
+        n_inicio = 1
+    else:
+        # Comportamiento normal: bloques de 30 min desde el mínimo configurado
+        n_inicio = max(1, duracion_minima_min // 30)
+
+    for n in range(n_inicio, 17):   # hasta 8 horas (n=16 → 8h)
         horas   = n * 0.5
         minutos = int(horas * 60)
         if minutos > minutos_disponibles:
