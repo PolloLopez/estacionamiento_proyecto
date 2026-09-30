@@ -103,10 +103,11 @@
       </div>
 
       <script>
-        const horaInicio = new Date({{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000);
-        {# stringformat:"g" fuerza formato punto decimal ignorando LANGUAGE_CODE="es-ar",
-           que de otro modo renderizaría "0,1667" → parseFloat devolvería 0. #}
-        const duracionHoras = parseFloat("{{ estacionamiento_activo.duracion_horas|stringformat:'g' }}");
+        {# Pasamos la hora de fin como Unix timestamp calculado en Python (sin aritmética JS),
+           y la duración en ms para el aviso de 5 minutos. date:"U" siempre es UTC entero. #}
+        const horaFinUnix = {{ estacionamiento_activo.hora_vencimiento|date:"U" }};
+        const horaFinMs   = horaFinUnix * 1000;
+        const horaInicioMs = {{ estacionamiento_activo.hora_inicio|date:"U" }} * 1000;
       </script>
 
     {# Si hay VARIOS vehículos activos: lista compacta #}
@@ -346,20 +347,24 @@
 <script>
 (function() {
 
-  if (typeof horaInicio === "undefined") return;
-  if (isNaN(horaInicio.getTime())) return;
+  // horaFinMs y horaInicioMs son Unix timestamps (ms) calculados en Python,
+  // sin aritmética de decimales en JS (que fallaría con locale es-ar).
+  if (typeof horaFinMs === "undefined") return;
 
-  const duracionMs = duracionHoras * 60 * 60 * 1000;
-  const fin = new Date(horaInicio.getTime() + duracionMs);
+  const fin   = new Date(horaFinMs);
+  const inicio = new Date(horaInicioMs);
+  const duracionMs = horaFinMs - horaInicioMs;
+
+  if (isNaN(fin.getTime())) return;
 
   const avisoEl    = document.getElementById("aviso-tiempo");
   const btnRenovar = document.getElementById("btn-renovar");
 
-  // Hora de vencimiento formateada una sola vez
+  // Hora de vencimiento formateada una sola vez (usa timezone local del navegador)
   const pad = n => String(n).padStart(2, "0");
   const horaVencStr = pad(fin.getHours()) + ":" + pad(fin.getMinutes());
 
-  // Mostrar la hora de finalización en el span "hasta HH:MM"
+  // Mostrar la hora de finalización en el span "hasta HH:MM" — inmediatamente
   const hastaEl = document.getElementById("hasta-hora");
   if (hastaEl) hastaEl.textContent = horaVencStr;
 
