@@ -164,7 +164,7 @@
     <p class="text-muted" style="font-size:0.9rem; margin:0;">
       Esta patente ya tiene un estacionamiento activo hasta las
       <strong>{{ estacionamiento_activo.hora_vencimiento|time:"H:i" }}</strong>
-      ({{ estacionamiento_activo.duracion_horas }}h).
+      ({{ estacionamiento_activo.duracion_horas|floatformat:"-2" }}h).
     </p>
   </div>
   {% else %}

@@ -78,7 +78,7 @@
               {% if est.duracion_horas == 1.0 %}
                 1 hora
               {% elif est.duracion_horas %}
-                {{ est.duracion_horas }}h
+                {{ est.duracion_horas|floatformat:"-2" }}h
               {% else %}
                 <span class="text-muted">—</span>
               {% endif %}

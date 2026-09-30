@@ -20,7 +20,7 @@
       <div style="text-align:right;">
         <div class="text-muted" style="font-size:0.85rem;">Duración actual</div>
         <div style="font-size:1.4rem; font-weight:800; color:var(--color-primary);">
-          {{ estacionamiento.duracion_horas }}h
+          {{ estacionamiento.duracion_horas|floatformat:"-2" }}h
         </div>
       </div>
     </div>
