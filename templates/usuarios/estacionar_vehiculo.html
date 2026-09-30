@@ -51,6 +51,7 @@
       <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
            data-id="{{ v.id }}"
            data-tipo="{{ v.tipo|default:'auto' }}"
+           data-tiene-abono="{% if v.id in ids_con_abono %}true{% else %}false{% endif %}"
            onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
            style="flex:1; min-width:130px; max-width:180px;
                   border:3px solid var(--color-border); border-radius:14px;
@@ -64,7 +65,11 @@
         <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
           {% if v.tipo == "moto" %}🛵{% else %}🚗{% endif %}
         </div>
-        {% if v.exento_global %}
+        {% if v.id in ids_con_abono %}
+          <div style="font-size:0.75rem; color:#856404; margin-top:0.3rem; font-weight:600;">
+            🗓️ Abono activo
+          </div>
+        {% elif v.exento_global %}
           <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.3rem; font-weight:600;">
             ✅ Exento
           </div>
@@ -98,6 +103,7 @@
         <div class="tarjeta-vehiculo {% if patente_preseleccionada == v.patente %}seleccionada{% endif %}"
              data-id="{{ v.id }}"
              data-tipo="{{ v.tipo|default:'auto' }}"
+             data-tiene-abono="{% if v.id in ids_con_abono %}true{% else %}false{% endif %}"
              onclick="seleccionarVehiculo({{ v.id }}, '{{ v.patente }}', '{{ v.tipo|default:'auto' }}')"
              style="flex:1; min-width:130px; max-width:180px;
                     border:3px solid var(--color-border); border-radius:14px;
@@ -108,7 +114,11 @@
           <div style="font-size:0.8rem; color:var(--color-text-muted); margin-top:0.2rem;">
             {% if v.tipo == "moto" %}🛵{% else %}🚗{% endif %}
           </div>
-          {% if v.exento_global %}
+          {% if v.id in ids_con_abono %}
+            <div style="font-size:0.75rem; color:#856404; margin-top:0.3rem; font-weight:600;">
+              🗓️ Abono activo
+            </div>
+          {% elif v.exento_global %}
             <div style="font-size:0.75rem; color:var(--color-primary); margin-top:0.3rem; font-weight:600;">
               ✅ Exento
             </div>
@@ -134,6 +144,16 @@
       Todavía no tenés vehículos. Agregá uno abajo para empezar.
     </p>
     {% endif %}
+
+    <!-- Aviso abono activo: se muestra por JS cuando el conductor selecciona
+         un vehículo con abono mensual vigente. El backend también lo bloquea,
+         pero avisamos antes del submit para evitar confusión. -->
+    <div id="aviso-abono-activo" style="display:none; margin-bottom:1rem;"
+         class="alert" style="background:#fff3cd; color:#856404;
+         border:1px solid #ffc107; border-radius:8px; padding:0.75rem 1rem;">
+      🗓️ <strong>Este vehículo tiene un abono mensual activo.</strong><br>
+      <span style="font-size:0.9rem;">Ya pagaste por estacionar libremente este mes — no hace falta registrar por hora. El inspector verá el abono al verificar la patente.</span>
+    </div>
 
     <!-- ─── SUBCUADRA: botón GPS + cascade manual ─────────────────────── -->
     {% if subcuadras %}
@@ -615,6 +635,18 @@ function seleccionarVehiculo(id, patente, tipo) {
   if (tarjetaActual) tarjetaActual.classList.add("seleccionada");
 
   document.getElementById("vehiculo_id_input").value = id;
+
+  // Si el vehículo tiene abono mensual activo: mostrar aviso y bloquear el form.
+  // El backend igualmente rechaza el POST, pero avisamos antes del submit.
+  const avisoAbono  = document.getElementById("aviso-abono-activo");
+  const tieneAbono  = tarjetaActual && tarjetaActual.dataset.tieneAbono === "true";
+  if (avisoAbono) avisoAbono.style.display = tieneAbono ? "block" : "none";
+  if (tieneAbono) {
+    const btnConf = document.getElementById("btn-confirmar-est");
+    if (btnConf) btnConf.disabled = true;
+    return; // no mostrar secciones de subcuadra ni duración
+  }
+
   actualizarCostosSegunTipo(tipoVehiculoActivo);
 
   // Mostrar sección de subcuadra si hay subcuadras configuradas
