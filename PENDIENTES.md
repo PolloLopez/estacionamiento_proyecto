@@ -116,6 +116,18 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
 
 ---
 
+### Fase 6 — Fix SIA modal + tests endpoints inspector
+
+**Fix puntual (antes de go-live):** en el modal SIA, el caso `PATENTE_NO_COINCIDE` genera un enlace `href` a `inspectores_registrar_infraccion`. Eso navega a otra página → rompe BLE. Fix: cambiar ese enlace para que llame a una función JS global `iniciarInfraccionInline(patente)` que el componente React exponga como `window.iniciarInfraccionInline`. El React component captura esa llamada y activa `setFase("formulario")` sin navegar.
+
+**Tests nuevos:**
+- `test_api_inspector_registrar_infraccion_ok` — POST con foto válida → 200, `datos_acta` correcto
+- `test_api_inspector_registrar_infraccion_sin_subcuadra` → 400
+- `test_api_inspector_registrar_infraccion_fuera_horario` → 403
+- `test_api_inspector_verificar_ok` — verificación básica (si no existe ya)
+
+---
+
 ## 🟢 Baja prioridad / Futuras versiones
 
 ### Superadmin: configurar tamaño de fuente en ticket de infracción y QR ✅ (sesión 33)
@@ -156,6 +168,30 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
   - `verificar.html` — carga `impresora_bluetooth.js` antes del componente React. `data-url-registrar` y `data-geoloc` en el mount point.
   - `views_inspector.py` — pasa `municipio` al contexto para el template.
   - **Fix BLE**: el inspector ya no navega entre páginas → la sesión BLE sobrevive todo el flujo.
+- **Fase 6** (pendiente): ver sección 🟡 abajo.
+
+---
+
+### Smoke test Fases 5A + 5B en producción (pendiente)
+
+**Fase 5A:**
+- [ ] Verificar patente → resultado inline sin recarga
+- [ ] GPS preselecciona subcuadra correctamente
+- [ ] Sonidos y vibración funcionan
+- [ ] Botón ♿ SIA abre el modal SIA correctamente
+- [ ] Historial de patentes recientes se muestra
+- [ ] Zona libre oculta el componente correctamente
+
+**Fase 5B:**
+- [ ] Click "🚨 INFRACCIONAR" → muestra `FormularioInfraccion` sin navegar
+- [ ] GPS chip pide ubicación (si `geoloc_inspector_activa=True`)
+- [ ] Foto: abre cámara trasera, muestra preview, permite retomar
+- [ ] Submit → `POST /api/inspector/registrar_infraccion/` → crea el acta
+- [ ] `ModalTicket` aparece con confirmación del acta
+- [ ] BLE: si la impresora ya estaba conectada (Fase 5A) → imprime sin diálogo
+- [ ] "Nueva verificación" vuelve al input de patente sin recarga
+
+**Bug potencial:** el modal SIA tiene un enlace hardcodeado a `inspectores_registrar_infraccion` cuando `PATENTE_NO_COINCIDE`. Ese enlace navega → rompe el BLE. Fix pendiente: Fase 6 o fix puntual.
 
 ---
 

@@ -576,6 +576,18 @@
       if (inputRef.current) inputRef.current.focus();
     }, []);
 
+    // Expone función global para que el modal SIA (JS vanilla en verificar.html)
+    // pueda activar el formulario inline de React sin navegar a otra página.
+    // Si no expusiéramos esto, el modal tendría que usar un <a href> al Django view
+    // viejo → navegación → Chrome pierde getDevices() → sesión BLE se corta.
+    useEffect(function () {
+      window.iniciarInfraccionInline = function (patenteParam) {
+        setResultado({ patente: patenteParam, necesita_infraccion: true });
+        setFase("formulario");
+      };
+      return function () { delete window.iniciarInfraccionInline; };
+    }, []);
+
     // ── Verificar patente (Fase 5A) ─────────────────────────────────────────
 
     function verificar(patenteParam) {

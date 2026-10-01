@@ -492,6 +492,18 @@ function cerrarModalSia() {
     document.getElementById("modal-sia").style.display = "none";
 }
 
+// Activa el formulario inline de React desde el modal SIA.
+// Reemplaza el enlace viejo a registrar_infraccion.html (Fase 5B).
+// Si React no está disponible, hace fallback a la página Django.
+function iniciarInfraccionDesdeModalSia(patente) {
+    cerrarModalSia();
+    if (typeof window.iniciarInfraccionInline === "function") {
+        window.iniciarInfraccionInline(patente);
+    } else {
+        window.location.href = "{% url 'inspectores_registrar_infraccion' %}?patente=" + encodeURIComponent(patente);
+    }
+}
+
 function _siaLog(msg) {
     var el = document.getElementById("sia-estado");
     if (el) el.textContent = msg;
@@ -695,13 +707,14 @@ function enviarVerificacionSia(qrUrl) {
         // Caso especial: la patente del SIA no coincide con la controlada.
         // Puede ser un error de tipeo del inspector. Pedimos confirmación antes de infraccionar.
         if (data.estado === "PATENTE_NO_COINCIDE") {
-            var urlInfraccion = "{% url 'inspectores_registrar_infraccion' %}?patente=" + patente;
+            // Usamos <button> con iniciarInfraccionDesdeModalSia() en lugar de <a href>.
+            // El <a href> navegaba a registrar_infraccion.html → Chrome perdía la sesión BLE.
             var confirmacion = "<div style='margin-top:0.75rem; display:flex; flex-direction:column; gap:0.5rem;'>"
                 + "<p style='font-size:0.88rem; margin:0 0 0.4rem;'>¿Ingresaste <strong>" + patente + "</strong>?</p>"
                 + "<button onclick='resetearModalSia()' class='btn btn-outline' style='font-size:0.85rem; padding:0.4rem 0.8rem;'>"
                 + "↩ No, corregir patente</button>"
-                + "<a href='" + urlInfraccion + "' class='btn btn-danger' style='font-size:0.85rem; padding:0.4rem 0.8rem; text-align:center;'>"
-                + "🚨 Sí, infraccionar igual</a>"
+                + "<button onclick='iniciarInfraccionDesdeModalSia(\"" + patente + "\")' class='btn btn-danger' style='font-size:0.85rem; padding:0.4rem 0.8rem; text-align:center;'>"
+                + "🚨 Sí, infraccionar igual</button>"
                 + "</div>";
             mostrarResultadoSia("warn", data.mensaje + detalles + confirmacion);
             document.getElementById("sia-estado").textContent = "";
