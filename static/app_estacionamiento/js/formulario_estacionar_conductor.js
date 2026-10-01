@@ -18,7 +18,7 @@
 
 "use strict";
 
-const ce = React.createElement;
+var ce = React.createElement;
 const { useState, useEffect, useRef } = React;
 
 // ── Helpers GPS ───────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ function obtenerCsrf() {
 
 // ── TarjetaVehiculo ───────────────────────────────────────────────────────────
 
-function TarjetaVehiculo({ vehiculo, seleccionado, onSeleccionar, urlEliminarBase }) {
+function TarjetaVehiculo({ vehiculo, seleccionado, onSeleccionar, urlEliminarBase, onEliminar }) {
   var icono = vehiculo.tipo === "moto" ? "🛵" : "🚗";
   var estiloTarjeta = {
     flex: "1", minWidth: "130px", maxWidth: "180px",
@@ -84,18 +84,20 @@ function TarjetaVehiculo({ vehiculo, seleccionado, onSeleccionar, urlEliminarBas
 
   function eliminar(e) {
     e.stopPropagation();
+    e.preventDefault();
     if (!confirm("¿Eliminar " + vehiculo.patente + " de tu cuenta?")) return;
     var url = urlEliminarBase.replace("/0/", "/" + vehiculo.id + "/");
-    var form = document.createElement("form");
-    form.method = "POST";
-    form.action = url;
-    var csrf = document.createElement("input");
-    csrf.type = "hidden";
-    csrf.name = "csrfmiddlewaretoken";
-    csrf.value = obtenerCsrf();
-    form.appendChild(csrf);
-    document.body.appendChild(form);
-    form.submit();
+    // Usamos fetch para no recargar la página — actualizamos el estado localmente
+    fetch(url, {
+      method: "POST",
+      headers: { "X-CSRFToken": obtenerCsrf() },
+      credentials: "same-origin",
+      redirect: "follow",
+    }).then(function() {
+      onEliminar(vehiculo.id);
+    }).catch(function() {
+      alert("No se pudo eliminar el vehículo. Intentá de nuevo.");
+    });
   }
 
   return ce("div", { style: estiloTarjeta, onClick: function() { onSeleccionar(vehiculo); } },
@@ -127,12 +129,16 @@ function TarjetaVehiculo({ vehiculo, seleccionado, onSeleccionar, urlEliminarBas
 }
 
 // ── SeccionSubcuadra ──────────────────────────────────────────────────────────
+//
+// Selector de cuadra con dos capas:
+//   1. Input de calle (autocomplete con datalist) — GPS lo pre-llena
+//   2. Botonera de cuadras filtradas por esa calle — GPS resalta la detectada
+//
+// Reemplaza el <select> anterior que resultaba incómodo en mobile.
 
 function SeccionSubcuadra({
-  subcuadras, selectorManualActivo,
-  gpsEstado, subcuadraId, subcuadraNombre,
-  calleManual, alturaManual,
-  onSubcuadraChange, onCalleChange, onAlturaChange,
+  subcuadras, gpsEstado, subcuadraId,
+  calleManual, onSubcuadraChange, onCalleChange,
 }) {
   // Calles únicas para el datalist
   var callesUnicas = [];
@@ -145,73 +151,83 @@ function SeccionSubcuadra({
   });
   callesUnicas.sort();
 
-  var subcuadrasFiltradas = calleManual
-    ? subcuadras.filter(function(s) { return s.calle === calleManual; })
-    : [];
+  // Si hay pocas subcuadras (≤ 12), mostrar todas cuando no hay filtro de calle;
+  // si hay muchas, esperar a que el usuario filtre para no saturar la pantalla.
+  var mostrarTodas = subcuadras.length <= 12;
+  var subcuadrasMostradas = calleManual
+    ? subcuadras.filter(function(s) {
+        return s.calle.toLowerCase().includes(calleManual.toLowerCase());
+      })
+    : (mostrarTodas ? subcuadras : []);
 
-  var labelTexto = "📡 Detectando tu cuadra…";
-  if (gpsEstado === "detectado") labelTexto = "📍 " + subcuadraNombre;
-  if (gpsEstado === "fallo")     labelTexto = "No pudimos detectar tu ubicación — seleccioná manualmente:";
-
-  var mostrarManual = selectorManualActivo && gpsEstado === "fallo";
+  var labelGps = null;
+  if (gpsEstado === "detectando") labelGps = "📡 Detectando tu cuadra…";
+  if (gpsEstado === "fallo")      labelGps = "⚠️ No se pudo detectar la ubicación.";
 
   return ce("div", { style: { marginBottom: "1.2rem" } },
     ce("h3", { style: { marginBottom: "0.4rem" } }, "📍 ¿Dónde estás?"),
-    ce("p", {
-      style: { fontSize: "0.82rem", color: "var(--color-text-muted)", margin: "0 0 0.4rem", display: "flex", alignItems: "center", gap: "0.4rem" }
-    }, labelTexto),
 
-    // Selector principal de subcuadra
-    ce("select", {
-      value: subcuadraId || "",
-      onChange: function(e) {
-        var id = Number(e.target.value) || null;
-        var sub = id ? subcuadras.find(function(s) { return s.id === id; }) : null;
-        onSubcuadraChange(id, sub);
-      },
-      style: { width: "100%", padding: "0.55rem 0.75rem", borderRadius: "8px", border: "1px solid var(--color-border)", fontSize: "1rem", background: "var(--color-surface)" },
-    },
-      ce("option", { value: "" }, "— Sin informar zona —"),
-      subcuadras.map(function(s) {
-        var label = s.calle + " " + s.altura + (s.entre ? " — " + s.entre : "");
-        return ce("option", { key: s.id, value: s.id }, label);
-      })
+    // Status GPS (solo cuando está en curso o falló — el éxito se ve en la botonera)
+    labelGps && ce("p", {
+      style: { fontSize: "0.82rem", color: "var(--color-text-muted)", margin: "0 0 0.6rem" }
+    }, labelGps),
+
+    // Input de calle — siempre visible, pre-llenado por GPS cuando detecta
+    ce("div", { style: { display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.6rem" } },
+      ce("input", {
+        list: "list-calles-react",
+        placeholder: "Calle…",
+        value: calleManual,
+        onChange: function(e) { onCalleChange(e.target.value); },
+        autoComplete: "off",
+        style: {
+          flex: "1", padding: "0.5rem 0.65rem", borderRadius: "6px",
+          border: "1px solid var(--color-border)", fontSize: "1rem",
+          background: "var(--color-surface)",
+        },
+      }),
+      ce("datalist", { id: "list-calles-react" },
+        callesUnicas.map(function(c) { return ce("option", { key: c, value: c }); })
+      ),
+      // Botón para limpiar el filtro de calle
+      calleManual && ce("button", {
+        type: "button",
+        onClick: function() { onCalleChange(""); },
+        title: "Limpiar calle",
+        style: {
+          padding: "0.45rem 0.7rem", borderRadius: "6px",
+          border: "1px solid var(--color-border)", background: "var(--color-surface)",
+          cursor: "pointer", fontSize: "0.95rem", color: "var(--color-text-muted)", flexShrink: "0",
+        },
+      }, "✕")
     ),
 
-    // Selector manual (calle + altura) si GPS falló y está habilitado por superadmin
-    mostrarManual && ce("div", {
-      style: { marginTop: "0.6rem", background: "var(--color-surface-2)", borderRadius: "8px", padding: "0.65rem 0.85rem" }
-    },
-      ce("div", { style: { display: "flex", gap: "0.5rem", flexWrap: "wrap" } },
-        ce("input", {
-          list: "list-calles-react",
-          placeholder: "Calle…",
-          value: calleManual,
-          onChange: function(e) { onCalleChange(e.target.value); },
-          autoComplete: "off",
-          style: { flex: "2", minWidth: "130px", padding: "0.5rem 0.65rem", borderRadius: "6px", border: "1px solid var(--color-border)", fontSize: "1rem", background: "var(--color-surface)" },
-        }),
-        ce("datalist", { id: "list-calles-react" },
-          callesUnicas.map(function(c) { return ce("option", { key: c, value: c }); })
-        ),
-        ce("input", {
-          list: "list-alturas-react",
-          placeholder: "Altura",
-          value: alturaManual,
-          disabled: !calleManual,
-          onChange: function(e) { onAlturaChange(e.target.value, subcuadrasFiltradas); },
-          inputMode: "numeric",
-          autoComplete: "off",
-          style: { flex: "1", minWidth: "80px", padding: "0.5rem 0.65rem", borderRadius: "6px", border: "1px solid var(--color-border)", fontSize: "1rem", background: "var(--color-surface)" },
-        }),
-        ce("datalist", { id: "list-alturas-react" },
-          subcuadrasFiltradas.map(function(s) {
-            var label = s.entre ? (s.altura ? s.altura + " — " + s.entre : s.entre) : String(s.altura);
-            return ce("option", { key: s.id, value: label });
+    // Botonera de cuadras (filtradas por calle o todas si son pocas)
+    subcuadrasMostradas.length > 0
+      ? ce("div", { style: { display: "flex", flexWrap: "wrap", gap: "0.4rem" } },
+          subcuadrasMostradas.map(function(s) {
+            var activa = s.id === subcuadraId;
+            // Si hay calle filtrada, mostrar solo la altura/entre para no repetir la calle
+            var nombreBtn = calleManual
+              ? (s.altura + (s.entre ? " — " + s.entre : ""))
+              : (s.calle + " " + s.altura);
+            return ce("button", {
+              key: s.id, type: "button",
+              onClick: function() { onSubcuadraChange(s.id, s); },
+              style: {
+                padding: "0.4rem 0.75rem", borderRadius: "6px", fontSize: "0.88rem",
+                border: activa ? "2px solid var(--color-primary)" : "1px solid var(--color-border)",
+                background: activa ? "var(--color-primary-light)" : "var(--color-surface)",
+                color: activa ? "var(--color-primary)" : "var(--color-text)",
+                cursor: "pointer", fontWeight: activa ? "700" : "400",
+                transition: "border-color 0.12s, background 0.12s",
+              },
+            }, nombreBtn);
           })
         )
-      )
-    )
+      : ce("p", {
+          style: { fontSize: "0.84rem", color: "var(--color-text-muted)", fontStyle: "italic", margin: "0.3rem 0" }
+        }, calleManual ? "Sin cuadras para esa calle." : "Escribí la calle para ver las cuadras disponibles.")
   );
 }
 
@@ -324,6 +340,9 @@ function FormularioEstacionar({
           setSubcuadraNombre(resultado.nombre + (resultado.entre ? " — " + resultado.entre : ""));
           setSubcuadraTipo(resultado.tipo_zona || "paga");
           setGpsEstado("detectado");
+          // Pre-llenar el input de calle para que la botonera muestre solo esa calle
+          var subCercana = d.subcuadras && d.subcuadras.find(function(s) { return s.id === resultado.id; });
+          if (subCercana) setCalleManual(subCercana.calle);
         } else {
           setGpsEstado("fallo");
         }
@@ -345,12 +364,15 @@ function FormularioEstacionar({
     setSubcuadraId(id);
     if (subcuadra) {
       setSubcuadraTipo(subcuadra.tipo_zona || "paga");
-      setSubcuadraNombre(subcuadra.calle + " " + subcuadra.altura);
+      // Incluir entre_calles en el nombre para mostrar en el banner de zona libre
+      setSubcuadraNombre(
+        subcuadra.calle + " " + subcuadra.altura +
+        (subcuadra.entre ? " — " + subcuadra.entre : "")
+      );
     } else {
       setSubcuadraTipo("paga");
     }
-    // Al cambiar subcuadra manualmente, limpiar la duración seleccionada
-    // solo si cambió a zona libre (para que el botón confirmar se actualice)
+    // Limpiar duración si cambió a zona libre (no se usa duración en ese caso)
     if (subcuadra && subcuadra.tipo_zona === "libre") {
       setDuracionSel(null);
     }
@@ -363,39 +385,36 @@ function FormularioEstacionar({
     setSubcuadraTipo("paga");
   }
 
-  function onAlturaChange(texto, subcuadrasFiltradas) {
-    setAlturaManual(texto);
-    if (!texto || !subcuadrasFiltradas.length) return;
-    var alturaNum = parseInt(texto, 10);
-    // Buscar coincidencia exacta primero, luego altura numérica, luego más cercana
-    var sub = subcuadrasFiltradas.find(function(s) {
-      var label = s.entre ? (s.altura ? s.altura + " — " + s.entre : s.entre) : String(s.altura);
-      return label === texto;
-    });
-    if (!sub) sub = subcuadrasFiltradas.find(function(s) { return !isNaN(alturaNum) && s.altura === alturaNum; });
-    if (!sub && !isNaN(alturaNum) && subcuadrasFiltradas.length > 0) {
-      sub = subcuadrasFiltradas.reduce(function(prev, curr) {
-        return Math.abs(curr.altura - alturaNum) < Math.abs(prev.altura - alturaNum) ? curr : prev;
+  // ── Eliminar vehículo ────────────────────────────────────────────────────
+  function eliminarVehiculo(vehiculoId) {
+    // Actualizar el estado local sin recargar la página
+    setDatos(function(d) {
+      if (!d) return d;
+      return Object.assign({}, d, {
+        vehiculos: d.vehiculos.filter(function(v) { return v.id !== vehiculoId; })
       });
-    }
-    if (sub) {
-      setSubcuadraId(sub.id);
-      setSubcuadraTipo(sub.tipo_zona || "paga");
-    }
+    });
+    // Deseleccionar si era el vehículo activo
+    setVehiculoSel(function(sel) {
+      return (sel && sel.id === vehiculoId) ? null : sel;
+    });
   }
 
   // ── Confirmar estacionamiento ────────────────────────────────────────────
+  //
+  // "sinServicio" (zonaLibre o dia_libre_hoy) → NO se registra.
+  //   El botón de confirmar no se muestra en esos casos; este guard es protección extra.
   function confirmar() {
     if (!vehiculoSel) { setErrorForm("Seleccioná un vehículo."); return; }
-    var esLibreTotal = zonaLibre || (datos && datos.dia_libre_hoy);
-    if (!esLibreTotal && !duracionSel) { setErrorForm("Seleccioná una duración."); return; }
+    if (zonaLibre || (datos && datos.dia_libre_hoy)) return; // guard: no debe llegar acá
+    if (!duracionSel) { setErrorForm("Seleccioná una duración."); return; }
 
     setEnviando(true);
     setErrorForm(null);
 
     var body = {
       vehiculo_id:       vehiculoSel.id,
-      horas:             esLibreTotal ? 1 : duracionSel.horas,
+      horas:             duracionSel.horas,
       subcuadra_id:      subcuadraId || null,
       conductor_gps_lat: gpsLat || null,
       conductor_gps_lon: gpsLon || null,
@@ -431,11 +450,16 @@ function FormularioEstacionar({
     style: { textAlign: "center", padding: "2rem", color: "var(--color-text-muted)" }
   }, "⏳ Cargando...");
 
-  var zonaLibre         = subcuadraTipo === "libre";
-  var esLibreTotal      = zonaLibre || datos.dia_libre_hoy;
+  var zonaLibre   = subcuadraTipo === "libre";
+  // sinServicio: ningún caso requiere registro (zona libre permanente o día sin inspectores).
+  // En ambos casos NO se crea Estacionamiento — el conductor puede circular libremente.
+  // Diferencia: dia_libre_hoy aplica a todo el municipio; zonaLibre aplica a una cuadra puntual.
+  var sinServicio = zonaLibre || datos.dia_libre_hoy;
+
   var saldo             = datos.saldo;
   var costoActual       = duracionSel ? duracionSel.costo : 0;
-  var saldoInsuficiente = !esLibreTotal && costoActual > saldo;
+  // Saldo insuficiente solo cuando hay cobro real
+  var saldoInsuficiente = !sinServicio && costoActual > saldo;
 
   var vehiculosRecientes = datos.vehiculos.filter(function(v) { return v.es_reciente; });
   var vehiculosOtros     = datos.vehiculos.filter(function(v) { return !v.es_reciente; });
@@ -443,14 +467,17 @@ function FormularioEstacionar({
     ? (vehiculoSel.tipo === "moto" ? datos.opciones_duracion_moto : datos.opciones_duracion_auto)
     : [];
 
+  // Duración y confirmación solo cuando hay servicio activo
   var mostrarSeccionSubcuadra = vehiculoSel && !vehiculoSel.tiene_abono && datos.subcuadras.length > 0;
-  var mostrarSeccionDuracion  = vehiculoSel && !vehiculoSel.tiene_abono && !zonaLibre;
+  var mostrarSeccionDuracion  = vehiculoSel && !vehiculoSel.tiene_abono && !sinServicio;
 
   var textoBtnConfirmar = enviando
     ? "⏳ Confirmando..."
-    : (duracionSel && !esLibreTotal
-        ? "✅ " + vehiculoSel.patente + " — $" + duracionSel.costo.toFixed(2)
-        : "✅ Confirmar estacionamiento");
+    : !vehiculoSel
+      ? "✅ Confirmar estacionamiento"
+      : duracionSel
+        ? "✅ Estacionar " + vehiculoSel.patente + " · " + duracionSel.label + " · $" + Number(duracionSel.costo).toLocaleString("es-AR")
+        : "✅ Confirmar estacionamiento";
 
   return ce("div", null,
 
@@ -466,7 +493,7 @@ function FormularioEstacionar({
 
     // ── Alertas de horario ────────────────────────────────────────────────
     datos.dia_libre_hoy && ce("div", { className: "alert alert-success" },
-      "🟢 ", ce("strong", null, "Hoy no hay cobro."), " Podés registrar el estacionamiento sin costo ($0)."
+      "🟢 ", ce("strong", null, "Hoy es día libre."), " No hay inspectores en la vía pública. No necesitás registrar tu estacionamiento."
     ),
     datos.fuera_de_horario && ce("div", { className: "alert alert-warning" },
       "⏰ ", ce("strong", null, "Fuera de horario."), " " + (datos.mensaje_horario || "")
@@ -532,6 +559,7 @@ function FormularioEstacionar({
               seleccionado: vehiculoSel && vehiculoSel.id === v.id,
               onSeleccionar: function(sel) { seleccionarVehiculo(sel); },
               urlEliminarBase: urlEliminarBase,
+              onEliminar: eliminarVehiculo,
             });
           })
         )
@@ -549,6 +577,7 @@ function FormularioEstacionar({
               seleccionado: vehiculoSel && vehiculoSel.id === v.id,
               onSeleccionar: function(sel) { seleccionarVehiculo(sel); },
               urlEliminarBase: urlEliminarBase,
+              onEliminar: eliminarVehiculo,
             });
           })
         )
@@ -565,16 +594,34 @@ function FormularioEstacionar({
 
       // ── Subcuadra (GPS + cascade manual) ────────────────────────────────
       mostrarSeccionSubcuadra && ce(SeccionSubcuadra, {
-        subcuadras:           datos.subcuadras,
-        selectorManualActivo: datos.selector_manual_activo,
-        gpsEstado, subcuadraId, subcuadraNombre,
-        calleManual, alturaManual,
-        onSubcuadraChange, onCalleChange, onAlturaChange,
+        subcuadras: datos.subcuadras,
+        gpsEstado, subcuadraId,
+        calleManual, onSubcuadraChange, onCalleChange,
       }),
 
-      // ── Banner zona libre ────────────────────────────────────────────────
-      zonaLibre && vehiculoSel && !vehiculoSel.tiene_abono && ce("div", { className: "alert alert-success" },
-        "🟢 ", ce("strong", null, "Zona de estacionamiento libre."), " No hay cobro en esta área."
+      // ── Banner zona libre ─────────────────────────────────────────────────
+      // En zona libre NO se crea un Estacionamiento: el conductor puede estacionar
+      // sin registrarse. Se muestra la subcuadra detectada/seleccionada claramente
+      // para que el conductor pueda verificar que el GPS acertó.
+      zonaLibre && vehiculoSel && !vehiculoSel.tiene_abono && ce("div", {
+        style: {
+          background: "#d4edda", border: "1px solid #c3e6cb", borderRadius: "10px",
+          padding: "1rem 1.2rem", marginTop: "0.5rem",
+        }
+      },
+        ce("p", { style: { fontWeight: "700", fontSize: "1.05rem", margin: "0 0 0.3rem", color: "#155724" } },
+          "🟢 Zona de estacionamiento libre"
+        ),
+        subcuadraNombre
+          ? ce("p", { style: { margin: "0 0 0.4rem", fontSize: "0.95rem", color: "#155724" } },
+              "📍 ", ce("strong", null, subcuadraNombre)
+            )
+          : ce("p", { style: { margin: "0 0 0.4rem", fontSize: "0.9rem", color: "#155724", fontStyle: "italic" } },
+              "Seleccioná la cuadra en el mapa de arriba para confirmar tu ubicación."
+            ),
+        ce("p", { style: { margin: "0", fontSize: "0.9rem", color: "#155724" } },
+          "No necesitás registrar tu vehículo. Podés estacionar sin costo ni trámite."
+        )
       ),
 
       // ── Duración ─────────────────────────────────────────────────────────
@@ -587,22 +634,10 @@ function FormularioEstacionar({
         ce(BotoneraDuracion, { opciones: opcionesActuales, seleccionada: duracionSel, onSeleccionar: setDuracionSel })
       ),
 
-      // ── Resumen + Confirmar ───────────────────────────────────────────────
-      vehiculoSel && !vehiculoSel.tiene_abono && ce("div", null,
-        ce("div", {
-          className: "resumen",
-          style: { display: "flex", justifyContent: "space-between", alignItems: "center" }
-        },
-          ce("span", { style: { fontSize: "1rem", color: "var(--color-text-muted)" } },
-            ce("strong", null, vehiculoSel.patente),
-            " · ",
-            ce("span", null, esLibreTotal ? "Sin costo" : (duracionSel ? duracionSel.label : "—"))
-          ),
-          ce("span", { style: { fontSize: "1.4rem", fontWeight: "800", color: "var(--color-primary)" } },
-            esLibreTotal ? "$0.00" : (duracionSel ? "$" + duracionSel.costo.toFixed(2) : "—")
-          )
-        ),
-
+      // ── Confirmar ────────────────────────────────────────────────────────
+      // No se muestra si no hay servicio (zonaLibre o dia_libre_hoy).
+      // El banner correspondiente ya explica que no hace falta registrar.
+      vehiculoSel && !vehiculoSel.tiene_abono && !sinServicio && ce("div", null,
         saldoInsuficiente && ce("div", { className: "alert alert-danger", style: { fontWeight: "600" } },
           "⚠️ Saldo insuficiente para esta duración. ",
           ce("a", { href: urlCargaSaldo, style: { color: "var(--color-danger)", textDecoration: "underline" } },
@@ -616,7 +651,7 @@ function FormularioEstacionar({
           type: "button",
           className: "btn btn-big",
           style: { background: "#28a745", borderColor: "#28a745", marginTop: "0.5rem" },
-          disabled: enviando || saldoInsuficiente || (!esLibreTotal && !duracionSel),
+          disabled: enviando || saldoInsuficiente || !duracionSel,
           onClick: confirmar,
         }, textoBtnConfirmar)
       )

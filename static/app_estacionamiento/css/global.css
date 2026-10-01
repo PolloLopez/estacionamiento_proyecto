@@ -684,7 +684,7 @@ input:focus, select:focus, textarea:focus {
   color: var(--color-warning);
   border: 2px solid #d97706;
   border-radius: 8px;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem .5rem;
   font-weight: 700;
   font-size: 1.02rem;
   margin-bottom: 0.8rem;
