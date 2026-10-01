@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-30 (sesión 28 — Fase 3 React completa: PanelEstado en producción, React desde static propio)
+Última actualización: 2026-09-30 (sesión 29 — Fase 4A + 4B React completas en producción)
 
 ---
 
@@ -25,29 +25,19 @@
 
 ## 🔴 Alta prioridad
 
-### Fix — botón "🔄 Extender" da 404
+### Fase 4C — FormularioEstacionar (próxima sesión)
 
-El componente `PanelEstado` (React) muestra un botón "Extender" que apunta a `/estacionar/renovar/<id>/`. Esa URL no está definida en `urls.py`. Implementar antes de Fase 4.
+Migración de `estacionar_vehiculo.html` a React. Es la pantalla más compleja del conductor (GPS, selector de vehículo, duración, abono bloqueante, confirmación). Hacerla última porque tiene mayor riesgo.
 
-**Qué hacer:** definir la vista `renovar_estacionamiento` en `views_conductor.py` + URL en `urls.py`. La vista puede ser un redirect a `estacionar_vehiculo.html` con el vehículo preseleccionado (camino más simple), o una pantalla propia de extensión.
+**Estrategia:**
+1. Crear `POST /api/conductor/estacionar/` que llama al `use_case` existente
+2. Migrar por partes: primero selector vehículo + duración, después GPS + subcuadra, después confirm
+3. El formulario Django sigue activo como fallback hasta que React pase todos los tests en producción
 
----
-
-### Fase 4 — Migración React incremental (sin Vite, UMD puro)
-
-**Estrategia:** migrar pantallas Django a React una por una, sin romper nada. Misma técnica que Fase 3 (UMD + `React.createElement`, sin JSX, sin build step). Orden de migración:
-
-1. **HistorialEstacionamientos** — tabla con historial del conductor (`/inicio/` → sección debajo del panel). Solo lectura, datos de la API, paginación.
-2. **FormularioEstacionar** — pantalla completa de `estacionar_vehiculo.html`. La más compleja (GPS, selector de vehículo, duración, abono, confirmación). Migrar por partes: primero el selector de vehículo, después el resto.
-3. **Inspector** — pantalla de verificación/infracción del inspector (Fase 5, próximo sprint).
-
-**Checklist antes de arrancar Fase 4:**
-- [ ] Fix botón "Extender" (404)
-- [ ] Testear Panel Estado fuera de horario (¿qué muestra?)
-- [ ] Testear Panel Estado sin estacionamiento activo (¿qué muestra?)
-- [ ] Testear flujo completo estacionar_vehiculo.html: GPS → subcuadra → duración → patente en botón → confirm
-- [ ] Testear que abono activo bloquea el botón correctamente
-- [ ] Smoke test completo por rol antes de deployar Fase 4 a main
+**Checklist antes de arrancar 4C:**
+- [ ] Smoke test completo del flujo estacionar como conductor (GPS → subcuadra → duración → confirm)
+- [ ] Verificar que el caso de abono activo bloquea correctamente el botón
+- [ ] 202+ tests OK
 
 ---
 
@@ -146,7 +136,9 @@ El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un ta
 **Fases:**
 - **Fase 2** ✅: API JSON — `views_api.py` con `GET /api/conductor/dashboard/` y `GET /api/conductor/estacionamientos/activos/`.
 - **Fase 3** ✅: `PanelEstado` en `inicio_usuarios.html` — timer de cuenta regresiva, polling 30s, estados múltiples. En producción.
-- **Fase 4** 🔴 (próxima): HistorialEstacionamientos + FormularioEstacionar. Ver sección 🔴 arriba.
+- **Fase 4A** ✅: `HistorialConductor` en `/mis_estacionamientos/` — paginación sin recarga, expand/collapse. Modal inline de renovar en `PanelEstado` — timer se actualiza sin recargar. `calcular_opciones_duracion` respeta `duracion_minima_min` en franja final.
+- **Fase 4B** ✅: `MisVehiculos` en `/inicio/` — badges 🟢/🔵/⚪, infracciones pendientes, links a historial. Fallback Django siempre presente.
+- **Fase 4C** 🔴 (próxima): FormularioEstacionar — `estacionar_vehiculo.html`. Ver sección 🔴 arriba.
 - **Fase 5**: Inspector en React — pantalla de verificación + GPS + infracciones.
 
 ---
