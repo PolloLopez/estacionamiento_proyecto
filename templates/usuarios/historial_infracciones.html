@@ -155,7 +155,7 @@
                 <button class="btn"
                         style="font-size:0.88rem;"
                         onclick="document.getElementById('modal-pagar-{{ i.id }}').style.display='flex'">
-                  💳 Pagar con saldo
+                  💳 Abonar
                 </button>
               {% else %}
                 <a href="{% url 'mp_iniciar_carga' %}" class="btn btn-outline" style="font-size:0.88rem;">
@@ -165,7 +165,7 @@
             {% endif %}
             {% if i.estado == "pendiente" or i.estado == "pagada" %}
               <a href="{% url 'crear_impugnacion' i.id %}" class="btn btn-outline"
-                 style="font-size:0.88rem;">📋 Impugnar</a>
+                 style="font-size:0.88rem;">📋 Solicitar Impugnación</a>
             {% endif %}
           </div>
 

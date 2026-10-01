@@ -13,7 +13,7 @@
 
 "use strict";
 
-const ce = React.createElement;
+var ce = React.createElement;
 
 // ── FilaVehiculo ──────────────────────────────────────────────────────────────
 /**

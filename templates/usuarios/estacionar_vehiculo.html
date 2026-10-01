@@ -1,8 +1,21 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Estacionar{% endblock %}
 
 {% block content %}
 <div class="container">
+
+<!-- Mount point React: FormularioEstacionar -->
+<div id="formulario-estacionar-react"
+     data-url-datos="{% url 'api_conductor_datos_estacionar' %}"
+     data-url-estacionar="{% url 'api_conductor_estacionar' %}"
+     data-url-agregar-vehiculo="{% url 'agregar_vehiculo' %}"
+     data-url-eliminar-base="{% url 'eliminar_vehiculo' 0 %}"
+     data-url-carga-saldo="{% url 'mp_iniciar_carga' %}">
+</div>
+
+<!-- Fallback Django: siempre en el DOM, oculto por React al montar correctamente -->
+<div id="formulario-estacionar-fallback">
 
   <!-- SALDO -->
   <div style="display:flex; justify-content:space-between; align-items:center;
@@ -722,4 +735,12 @@ window.addEventListener("DOMContentLoaded", () => {
 </script>
 {% endif %}
 
+</div><!-- /container -->
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'app_estacionamiento/js/react.production.min.js' %}"></script>
+<script src="{% static 'app_estacionamiento/js/react-dom.production.min.js' %}"></script>
+<script src="{% static 'app_estacionamiento/js/formulario_estacionar_conductor.js' %}"></script>
 {% endblock %}

@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-30 (sesión 29 — Fase 4A + 4B React completas en producción)
+Última actualización: 2026-10-01 (sesión 30 — Fase 4C React: FormularioEstacionar implementado)
 
 ---
 
@@ -25,18 +25,23 @@
 
 ## 🔴 Alta prioridad
 
-### Fase 4C — FormularioEstacionar (próxima sesión)
+### Fase 4C — FormularioEstacionar ✅ (sesión 30 — pendiente smoke test en producción)
 
-Migración de `estacionar_vehiculo.html` a React. Es la pantalla más compleja del conductor (GPS, selector de vehículo, duración, abono bloqueante, confirmación). Hacerla última porque tiene mayor riesgo.
+`estacionar_vehiculo.html` migrado a React con fallback Django siempre activo.
 
-**Estrategia:**
-1. Crear `POST /api/conductor/estacionar/` que llama al `use_case` existente
-2. Migrar por partes: primero selector vehículo + duración, después GPS + subcuadra, después confirm
-3. El formulario Django sigue activo como fallback hasta que React pase todos los tests en producción
+**Qué se implementó:**
+- `GET /api/conductor/datos-estacionar/` — datos frescos para el form (vehículos, opciones, subcuadras, saldo, horario)
+- `POST /api/conductor/estacionar/` — llama a `ejecutar_estacionamiento` use case, devuelve JSON, setea `notif_infraccion_pendiente` en sesión
+- `formulario_estacionar_conductor.js` — componente React con GPS, cascade subcuadra, tarjetas vehículo, botones duración, submit a API
+- `estacionar_vehiculo.html` actualizado: mount point React + fallback Django en `#formulario-estacionar-fallback`
 
-**Checklist antes de arrancar 4C:**
-- [ ] Smoke test completo del flujo estacionar como conductor (GPS → subcuadra → duración → confirm)
-- [ ] Verificar que el caso de abono activo bloquea correctamente el botón
+**Checklist smoke test en producción (próxima sesión):**
+- [ ] Flujo completo: seleccionar vehículo → GPS detecta subcuadra → elegir duración → confirmar → panel inicio actualizado
+- [ ] Caso abono activo: badge y bloqueo de confirmación
+- [ ] Caso fuera de horario: formulario bloqueado (opacidad)
+- [ ] Caso zona libre: no muestra sección duración, acepta confirm con $0
+- [ ] Eliminar vehículo desde la tarjeta React
+- [ ] Fallback Django sigue funcionando si se desactiva JS
 - [ ] 202+ tests OK
 
 ---
@@ -138,7 +143,7 @@ El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un ta
 - **Fase 3** ✅: `PanelEstado` en `inicio_usuarios.html` — timer de cuenta regresiva, polling 30s, estados múltiples. En producción.
 - **Fase 4A** ✅: `HistorialConductor` en `/mis_estacionamientos/` — paginación sin recarga, expand/collapse. Modal inline de renovar en `PanelEstado` — timer se actualiza sin recargar. `calcular_opciones_duracion` respeta `duracion_minima_min` en franja final.
 - **Fase 4B** ✅: `MisVehiculos` en `/inicio/` — badges 🟢/🔵/⚪, infracciones pendientes, links a historial. Fallback Django siempre presente.
-- **Fase 4C** 🔴 (próxima): FormularioEstacionar — `estacionar_vehiculo.html`. Ver sección 🔴 arriba.
+- **Fase 4C** ✅ (sesión 30): FormularioEstacionar — `estacionar_vehiculo.html`. Pendiente smoke test en prod. Ver sección 🔴 arriba.
 - **Fase 5**: Inspector en React — pantalla de verificación + GPS + infracciones.
 
 ---

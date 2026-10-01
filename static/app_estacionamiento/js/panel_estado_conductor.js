@@ -15,7 +15,7 @@
 "use strict";
 
 // Alias corto para React.createElement — habitual en código sin JSX
-const ce = React.createElement;
+var ce = React.createElement;
 const { useState, useEffect } = React;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -468,7 +468,7 @@ function PanelEstado({ urlDashboard, urlEstacionamientosActivos, urlEstacionar, 
   // ── Render: sin estacionamiento activo ──────────────────────────────────
   return ce("div", { className: "card" },
     ce("h3", null, "🚗 Estado del vehículo"),
-    ce("div", { className: "status-warn" }, "🟡 Sin estacionamiento activo"),
+    ce("div", { className: "status-warn" }, "🟡 Sin estacionamiento"),
 
     estado.saldo_insuficiente
       ? ce("div", null,
