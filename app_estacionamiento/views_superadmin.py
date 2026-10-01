@@ -373,6 +373,18 @@ def editar_municipio(request, municipio_id):
         if accion == "guardar_institucional":
             municipio.leyenda_horarios = request.POST.get("leyenda_horarios", "").strip()
             municipio.texto_ordenanza  = request.POST.get("texto_ordenanza", "").strip()
+            # Tamaño de fuente: validar rango 1-3 (ESC/POS: normal, doble alto, doble alto+ancho)
+            try:
+                fuente = int(request.POST.get("ticket_fuente_size", 2))
+                municipio.ticket_fuente_size = max(1, min(3, fuente))
+            except (ValueError, TypeError):
+                municipio.ticket_fuente_size = 2
+            # Tamaño del módulo QR: validar rango 1-8 (ESC/POS GS(k module size)
+            try:
+                qr = int(request.POST.get("ticket_qr_size", 4))
+                municipio.ticket_qr_size = max(1, min(8, qr))
+            except (ValueError, TypeError):
+                municipio.ticket_qr_size = 4
             municipio.save()
             messages.success(request, "Información institucional guardada.")
             return redirect("editar_municipio", municipio_id=municipio.id)

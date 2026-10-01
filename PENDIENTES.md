@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-01 (sesión 31-32 — Fase 4C: GPS chip + modal eliminar; Fase 5A: VerificadorInspector React)
+Última actualización: 2026-10-01 (sesión 33 — Ticket config superadmin: fuente_size + qr_size por municipio; impresora_bluetooth.js actualizado)
 
 ---
 
@@ -118,17 +118,21 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
 
 ## 🟢 Baja prioridad / Futuras versiones
 
-### Superadmin: configurar tamaño de fuente en ticket de infracción y QR
+### Superadmin: configurar tamaño de fuente en ticket de infracción y QR ✅ (sesión 33)
 
-El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un tamaño de fuente fijo. Diferentes impresoras térmicas y diferentes tamaños de papel pueden requerir ajustes de fuente. Propuesta:
+**Implementado:**
+- `Municipio.ticket_fuente_size` (1-3, default 2) → byte ESC/POS `GS ! n` para el modo base.
+- `Municipio.ticket_qr_size` (1-8, default 4) → módulo QR en `_qrEscPos()`.
+- Migración `0103_municipio_ticket_config.py`.
+- `editar_municipio.html` → sección "Configuración del ticket impreso" con dos `<select>`.
+- `views_superadmin.py` → `guardar_institucional` lee y valida ambos campos.
+- `ticket_infraccion.html` → `DATOS_ACTA` incluye `fuente_size` y `qr_size`.
+- `impresora_bluetooth.js` → `generarTicketInfraccion(d)` usa `d.fuente_size` y `d.qr_size` en vez de valores hardcodeados.
+  - `fuente_size=1` → base `0x00`; resaltado (patente/monto) `0x10`
+  - `fuente_size=2` → base `0x10`; resaltado `0x11` (default recomendado 58mm)
+  - `fuente_size=3` → base `0x11`; resaltado `0x11` (no puede ser más grande)
 
-1. Agregar `Municipio.ticket_fuente_size = IntegerField(default=14)` y `qr_fuente_size = IntegerField(default=12)` (o un campo único de escala: `ticket_escala_pct = IntegerField(default=100)`).
-2. Exponer el campo en `editar_municipio.html` → sección de impresión.
-3. Pasar el valor al template del ticket e inyectarlo como variable CSS o inline style en el contenedor principal.
-
-**Por qué vale la pena evaluarlo**: cada municipio puede tener impresoras distintas (58mm vs 80mm) y el texto puede quedar cortado o demasiado grande. Un campo configurable evita hardcodear y tener que deployar para ajustar la impresión.
-
-**Evaluación pendiente**: revisar si conviene un slider (1–3: pequeño/normal/grande) o un campo numérico libre. Un slider tipo `<input type="range" min="10" max="20">` es más amigable para un admin no técnico.
+**Pendiente:** smoke test en producción — verificar impresión real con distintos valores de fuente y QR.
 
 ---
 

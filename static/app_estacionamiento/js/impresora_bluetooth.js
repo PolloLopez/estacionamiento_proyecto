@@ -445,11 +445,37 @@ function _qrEscPos(texto, tamano) {
 /**
  * Genera un Uint8Array ESC/POS para el acta de infracción.
  * Siempre imprime QR nativo + URL como texto (doble seguridad).
+ *
+ * d.fuente_size: 1=normal · 2=doble alto (default) · 3=doble alto+ancho.
+ *   Configurable por municipio desde el panel superadmin (editar_municipio).
+ *   La patente y el monto siempre tienen un nivel más que el base.
+ *
+ * d.qr_size: módulo QR ESC/POS (1-8). Default 4 ≈ 1.5cm de lado.
+ *   Configurable por municipio desde el panel superadmin.
  */
 function generarTicketInfraccion(d) {
   var ESC = 27, GS = 29, LF = 10;
-  var ANCHO = 32;
-  var SEP = '--------------------------------';
+
+  // fuente_size configura el modo base del texto:
+  //   1 = normal     (GS ! 0x00) → máxima densidad de texto, para papel 58mm con texto pequeño
+  //   2 = doble alto (GS ! 0x10) → default recomendado para 58mm
+  //   3 = doble alto+ancho (GS ! 0x11) → solo para 80mm o si la fuente normal es muy grande
+  var fuente = d.fuente_size || 2;
+  var BYTE_BASE  = fuente === 1 ? 0x00 : fuente === 3 ? 0x11 : 0x10;
+  // Las "variables resaltadas" (patente y monto) siempre van un nivel más grande que el base:
+  //   Si base=normal → resaltado=doble alto
+  //   Si base=doble alto → resaltado=doble alto+ancho
+  //   Si base=doble alto+ancho → resaltado=doble alto+ancho (no puede ser más grande)
+  var BYTE_RESALTADO = fuente === 1 ? 0x10 : 0x11;
+
+  // Ancho de columnas disponibles según fuente:
+  //   normal: 32 chars/línea (impresora 58mm estándar)
+  //   doble-ancho: 16 chars/línea
+  var ANCHO = (fuente === 1) ? 32 : (BYTE_BASE === 0x11 ? 16 : 32);
+  // Ancho para el modo resaltado (doble-ancho → 16 chars)
+  var ANCHO_RES = (BYTE_RESALTADO === 0x11) ? 16 : 32;
+
+  var SEP = (ANCHO === 32) ? '--------------------------------' : '----------------';
 
   var buf = [];
 
@@ -457,13 +483,13 @@ function generarTicketInfraccion(d) {
     for (var i = 0; i < arguments.length; i++) buf.push(arguments[i]);
   }
 
-  function linea(s) {
-    var norm = _norm(s).substring(0, ANCHO * 2);
+  function linea(s, ancho) {
+    var max  = ancho || ANCHO;
+    var norm = _norm(s).substring(0, max * 2);
     for (var i = 0; i < norm.length; i++) buf.push(norm.charCodeAt(i));
     buf.push(LF);
   }
 
-  // ancho: número de columnas disponibles. Para modo doble-ancho usar ANCHO/2.
   function centrar(s, ancho) {
     ancho = ancho !== undefined ? ancho : ANCHO;
     var norm = _norm(s).substring(0, ancho);
@@ -471,9 +497,9 @@ function generarTicketInfraccion(d) {
     return Array(pad + 1).join(' ') + norm;
   }
 
-  // Init
+  // Init + modo base configurado por municipio
   push(ESC, 0x40);
-  push(GS, 0x21, 0x10);           // doble alto por defecto → texto ~2x más grande
+  push(GS, 0x21, BYTE_BASE);
 
   // Encabezado
   push(ESC, 0x61, 0x01);      // centro
@@ -488,11 +514,11 @@ function generarTicketInfraccion(d) {
   push(ESC, 0x45, 0x00);
   linea(SEP);
 
-  // Patente grande — en modo doble-ancho entran ANCHO/2 columnas
-  push(GS, 0x21, 0x11);       // doble alto+ancho
-  linea(centrar(d.patente, Math.floor(ANCHO / 2)));
-  push(GS, 0x21, 0x10);      // vuelve a doble alto (modo base)
-  linea(centrar(_norm(d.tipo_vehiculo)));    // doble alto, ANCHO completo
+  // Patente resaltada (un nivel más grande que el base)
+  push(GS, 0x21, BYTE_RESALTADO);
+  linea(centrar(d.patente, ANCHO_RES));
+  push(GS, 0x21, BYTE_BASE);      // vuelve al modo base
+  linea(centrar(_norm(d.tipo_vehiculo)));
   linea(SEP);
 
   // Datos
@@ -503,13 +529,13 @@ function generarTicketInfraccion(d) {
   linea('Fecha: ' + d.fecha + ' ' + d.hora + 'hs');
   linea(SEP);
 
-  // Monto — también en doble-ancho, idem patente
+  // Monto resaltado (mismo nivel que la patente)
   push(ESC, 0x61, 0x01);
-  push(GS, 0x21, 0x11);
+  push(GS, 0x21, BYTE_RESALTADO);
   push(ESC, 0x45, 0x01);
-  linea(centrar('$' + d.monto, Math.floor(ANCHO / 2)));
+  linea(centrar('$' + d.monto, ANCHO_RES));
   push(ESC, 0x45, 0x00);
-  push(GS, 0x21, 0x10);      // vuelve a doble alto (modo base)
+  push(GS, 0x21, BYTE_BASE);      // vuelve al modo base
   linea(SEP);
 
   // Inspector
@@ -556,13 +582,14 @@ function generarTicketInfraccion(d) {
     for (var oi = 0; oi < oLines.length; oi++) linea(oLines[oi]);
   }
 
-  // QR nativo ESC/POS + URL como texto de respaldo
+  // QR nativo ESC/POS + URL como texto de respaldo.
+  // qr_size configurable por municipio (default 4 ≈ 1.5cm en papel 58mm).
   push(ESC, 0x61, 0x01);      // centro
   linea('Paga online:');
-  var qrBytes = _qrEscPos(d.url_pago, 4);
+  var qrBytes = _qrEscPos(d.url_pago, d.qr_size || 4);
   for (var qi = 0; qi < qrBytes.length; qi++) buf.push(qrBytes[qi]);
   buf.push(LF);
-  // URL en texto (por si el modelo no soporta GS(k)
+  // URL en texto como respaldo (por si el modelo de impresora no soporta GS(k))
   push(ESC, 0x61, 0x01);
   linea(_norm(d.url_pago));
 
