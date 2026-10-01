@@ -1,5 +1,5 @@
 """
-API JSON para el frontend React — conductores.
+API JSON para el frontend React — conductores e inspectores.
 
 Cada endpoint devuelve JsonResponse puro (sin DRF, sin dependencias extra).
 Los datos replican la lógica de las vistas de template pero en formato JSON.
@@ -12,9 +12,11 @@ Por qué un archivo separado de views_conductor.py:
 
 Convención de nombres:
     - api_conductor_*: endpoints del panel del conductor
-    - Prefijo de URL: /api/conductor/
+    - api_inspector_*: endpoints del panel del inspector
+    - Prefijo de URL: /api/conductor/ y /api/inspector/
 """
 
+import re
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -39,6 +41,7 @@ from .services.descuentos_verificados import calcular_descuento_conductor
 from .utils import get_subcuadra_default, sanitizar_patente
 from .use_cases.estacionar_vehiculo import ejecutar_estacionamiento
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
+from .services_verificacion import verificar_estado_vehiculo
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -708,4 +711,114 @@ def api_conductor_estacionar(request):
         "redirect_url":    reverse(result["redirect"]),
         "info_infraccion": respuesta_infraccion,
         "warnings":        result.get("warnings", []),
+    })
+
+
+# ─── Endpoints del inspector ───────────────────────────────────────────────────
+
+@require_role("inspector")
+@require_POST
+def api_inspector_verificar(request):
+    """
+    POST /api/inspector/verificar/
+
+    Verifica una patente y devuelve su estado como JSON.
+    Reemplaza el POST de verificar_vehiculo() para el componente React del inspector.
+
+    Body (JSON): { "patente": "AA123BB", "subcuadra_id": 5 }
+
+    Respuesta OK:
+    {
+        "ok": true,
+        "patente": "AA123BB",
+        "estado": "IMPAGO",           # valor del enum EstadoVehiculo
+        "estado_label": "Sin pago",   # texto para mostrar
+        "css_class": "danger",        # clase de color para el componente
+        "necesita_infraccion": true,
+        "registrar_infraccion_url": "/inspectores/infraccion/?patente=AA123BB" | null,
+        "minutos_hasta_siguiente": null | 5,
+        "tipo_exencion": null | "discapacitado",
+    }
+
+    Respuesta error de horario:
+    { "ok": false, "error_code": "fuera_horario", "error": "..." }
+
+    Por qué no usamos request.POST.get() y en cambio usamos JSON:
+    El componente React envía fetch() con body JSON y Content-Type application/json,
+    igual que los otros endpoints del conductor en este mismo archivo.
+
+    Por qué se guarda subcuadra_inspector_id en la sesión:
+    registrar_infraccion() (vista Django) lee la subcuadra desde la sesión para
+    pre-cargar el formulario. Guardarla aquí mantiene el mismo comportamiento que
+    el template original, permitiendo que el fallback Django también funcione.
+    """
+    import json
+
+    usuario = request.user
+    municipio = usuario.municipio
+
+    # Verificar horario antes de procesar — igual que verificar_vehiculo() Django
+    # bloquear_sin_horario=True: domingo sin configurar = el inspector no actúa
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio, bloquear_sin_horario=True)
+    if not horario_activo:
+        return JsonResponse({
+            "ok":         False,
+            "error_code": "fuera_horario",
+            "error":      mensaje_horario or "Fuera del horario de cobro.",
+        }, status=403)
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "JSON inválido."}, status=400)
+
+    patente = sanitizar_patente(body.get("patente") or "")
+    if not patente:
+        return JsonResponse({"ok": False, "error": "Patente requerida."}, status=400)
+
+    subcuadra_id = body.get("subcuadra_id")
+
+    # Resolver subcuadra — guardarla en sesión para que registrar_infraccion() la use
+    subcuadra = None
+    if subcuadra_id:
+        subcuadra = Subcuadra.objects.filter(id=subcuadra_id, municipio=municipio).first()
+    if subcuadra:
+        request.session["subcuadra_inspector_id"] = subcuadra.id
+    else:
+        subcuadra = get_subcuadra_default(municipio)
+
+    # Auto-detectar tipo (123ABC = moto, todo lo demás = auto) — igual que el template
+    tipo = "moto" if re.match(r"^[0-9]{3}[A-Z]{3}$", patente) else "auto"
+
+    # Auto-cierre de estacionamientos vencidos ANTES de verificar
+    vehiculo_check = Vehiculo.objects.filter(patente=patente).first()
+    if vehiculo_check:
+        est_vencido = Estacionamiento.objects.filter(
+            vehiculo=vehiculo_check, estado="ACTIVO"
+        ).first()
+        if est_vencido:
+            expiracion = est_vencido.hora_inicio + timedelta(hours=float(est_vencido.duracion_horas))
+            if timezone.now() >= expiracion:
+                finalizar_estacionamiento_uc(est_vencido)
+
+        # Actualizar tipo si cambió (puede ocurrir con patentes de formato ambiguo)
+        if vehiculo_check.tipo != tipo:
+            vehiculo_check.tipo = tipo
+            vehiculo_check.save(update_fields=["tipo"])
+    else:
+        # Vehículo no registrado: crearlo para que haya trazabilidad en la BD
+        Vehiculo.objects.create(patente=patente, municipio=municipio, tipo=tipo)
+
+    resultado = verificar_estado_vehiculo(patente, usuario, subcuadra)
+
+    return JsonResponse({
+        "ok":                      True,
+        "patente":                 resultado.patente,
+        "estado":                  resultado.estado.value,
+        "estado_label":            resultado.estado_label(),
+        "css_class":               resultado.css_class(),
+        "necesita_infraccion":     resultado.necesita_infraccion(),
+        "registrar_infraccion_url": resultado.registrar_infraccion_url,
+        "minutos_hasta_siguiente": resultado.minutos_hasta_siguiente,
+        "tipo_exencion":           resultado.tipo_exencion,
     })

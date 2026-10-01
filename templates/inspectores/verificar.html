@@ -26,7 +26,7 @@
       </p>
     </div>
     {% else %}
-    <form method="post" id="form">
+    <form method="post" id="form" onsubmit="return false;">
         {% csrf_token %}
 
         <!-- Selector de subcuadra donde está patrullando el inspector.
@@ -76,171 +76,18 @@
           No corresponde verificar ni multar en esta subcuadra.
         </div>
 
+        <!-- React monta VerificadorInspector acá (verificar_inspector.js).
+             El wrapper conserva id="contenedor-patente" para que aplicarZonaLibreInspector()
+             siga mostrando/ocultando el área cuando la subcuadra es zona libre. -->
         <div id="contenedor-patente">
-          <input
-              id="patente"
-              name="patente"
-              oninput="this.value = this.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase()"
-              class="input-patente"
-              placeholder="AAA111"
-              autocomplete="off"
-              {% if not resultado %}autofocus{% endif %}
-          />
-          <!-- Botón de submit siempre visible: el inspector puede enviar
-               manualmente además del auto-submit por formato completo.
-               Siempre display:block para que funcione aunque haya errores de JS. -->
-          <button type="submit" id="btn-verificar"
-                  style="width:100%; margin-top:0.5rem; padding:0.7rem; font-size:1rem;
-                         background:var(--color-primary); color:white; border:none;
-                         border-radius:8px; cursor:pointer; font-weight:600; display:block;">
-            🔍 Verificar
-          </button>
+          <div id="verificar-inspector-react"
+               data-url-verificar="{% url 'api_inspector_verificar' %}"></div>
         </div>
     </form>
     {% endif %}{# fin {% if not horario_activo %} / {% else %} #}
 
-    <!-- RESULTADO -->
-    {% if resultado %}
-
-        {% if resultado.estado.name == "PAGADO" or resultado.estado.name == "EXENTO_TOTAL" or resultado.estado.name == "ABONO_ACTIVO" or resultado.exento_en_subcuadra_actual %}
-            <div class="box-resultado box-ok">
-                <div style="font-size:2rem;">✅</div>
-                <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
-                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.1rem 0;">
-                  {% if tipo_seleccionado == 'moto' %}🏍️ Moto{% else %}🚗 Auto{% endif %}
-                </p>
-                <h3>
-                    {% if resultado.estado.name == "EXENTO_TOTAL" %}Exento total
-                    {% elif resultado.estado.name == "EXENTO_PARCIAL" %}Exento en esta subcuadra
-                    {% elif resultado.estado.name == "ABONO_ACTIVO" %}Abono mensual activo
-                    {% else %}Pago activo{% endif %}
-                </h3>
-                {% if resultado.estado.name == "EXENTO_PARCIAL" and resultado.subcuadras_exentas %}
-                  <p style="font-size:0.82rem; margin-top:0.6rem; color:var(--color-text-muted); margin-bottom:0.4rem;">
-                    Tocá una zona para registrar la verificación:
-                  </p>
-                  <div style="display:flex; flex-wrap:wrap; gap:0.4rem; justify-content:center;">
-                    {% for s in resultado.subcuadras_exentas %}
-                    <form method="post" style="margin:0;">
-                      {% csrf_token %}
-                      <input type="hidden" name="patente" value="{{ resultado.patente }}">
-                      <input type="hidden" name="subcuadra_id" value="{{ s.id }}">
-                      <input type="hidden" name="tipo" value="{{ tipo_seleccionado }}">
-                      <button type="submit"
-                              style="padding:0.3rem 0.8rem; font-size:0.88rem; font-weight:700;
-                                     border-radius:20px; border:2px solid var(--color-primary);
-                                     background:{% if s.id == subcuadra_activa.id %}var(--color-primary){% else %}transparent{% endif %};
-                                     color:{% if s.id == subcuadra_activa.id %}white{% else %}var(--color-primary){% endif %};
-                                     cursor:pointer;">
-                        {{ s }}
-                      </button>
-                    </form>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-            </div>
-
-        {% elif resultado.estado.name == "PENDIENTE_PAGO" %}
-            <div class="box-resultado box-warn">
-                <div style="font-size:2rem;">⏳</div>
-                <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
-                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.1rem 0;">
-                  {% if tipo_seleccionado == 'moto' %}🏍️ Moto{% else %}🚗 Auto{% endif %}
-                </p>
-                <h3>En plazo de tolerancia</h3>
-                <p style="font-size:0.9rem; color:var(--color-text-muted);">
-                    No se puede infraccionar todavía. Revisá en unos minutos.
-                </p>
-            </div>
-
-        {% elif resultado.estado.name == "INFRACCION_RECIENTE" %}
-            <div class="box-resultado box-warn">
-                <div style="font-size:2rem;">⏱️</div>
-                <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
-                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.1rem 0;">
-                  {% if tipo_seleccionado == 'moto' %}🏍️ Moto{% else %}🚗 Auto{% endif %}
-                </p>
-                <h3>Ya fue infraccionado</h3>
-                <p style="font-size:0.9rem; color:var(--color-text-muted);">
-                    Tiene un acta reciente. Podés volver a infraccionar
-                    en aproximadamente <strong>{{ resultado.minutos_hasta_siguiente }} min</strong>.
-                </p>
-            </div>
-
-        {% else %}
-            <!-- IMPAGO / NO_REGISTRADO / EXENTO_PARCIAL fuera de su subcuadra -->
-            <div class="box-resultado box-danger">
-                <div style="font-size:2rem;">🚨</div>
-                <h2 style="margin:0.3rem 0;">{{ resultado.patente }}</h2>
-                <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0.1rem 0;">
-                  {% if tipo_seleccionado == 'moto' %}🏍️ Moto{% else %}🚗 Auto{% endif %}
-                </p>
-                <h3>
-                    {% if resultado.estado.name == "EXENTO_PARCIAL" %}
-                        Exento parcial — fuera de su subcuadra
-                    {% else %}
-                        {{ resultado.estado_label }}
-                    {% endif %}
-                </h3>
-                {% if resultado.estado.name == "EXENTO_PARCIAL" and resultado.subcuadras_exentas %}
-                  <p style="font-size:0.82rem; margin-top:0.5rem; color:var(--color-text-muted); margin-bottom:0.4rem;">
-                    Exención válida en (Elegi la subcuadra para registrar la verificación):
-                  </p>
-                  <div style="display:flex; flex-wrap:wrap; gap:0.4rem; justify-content:center;">
-                    {% for s in resultado.subcuadras_exentas %}
-                    <form method="post" style="margin:0;">
-                      {% csrf_token %}
-                      <input type="hidden" name="patente" value="{{ resultado.patente }}">
-                      <input type="hidden" name="subcuadra_id" value="{{ s.id }}">
-                      <input type="hidden" name="tipo" value="{{ tipo_seleccionado }}">
-                      <button type="submit"
-                              style="padding:0.3rem 0.8rem; font-size:0.88rem; font-weight:700;
-                                     border-radius:20px; border:2px solid var(--color-warning, #e67e22);
-                                     background:transparent; color:var(--color-warning, #e67e22); cursor:pointer;">
-                        {{ s }}
-                      </button>
-                    </form>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-                <!-- SIA: el inspector puede verificar antes de infraccionar -->
-                {% if horario_activo %}
-                <button type="button" class="btn btn-outline"
-                        onclick="abrirModalSia('{{ resultado.patente }}')"
-                        style="margin-bottom:0.5rem; padding:0.4rem 0.9rem; font-size:0.85rem;
-                               border-color:var(--color-text-muted); color:var(--color-text-muted);">
-                    ♿ SIA
-                </button>
-                {% endif %}
-                {% if resultado.necesita_infraccion %}
-                    {% if horario_activo %}
-                        <a class="btn btn-danger btn-big"
-                           href="{{ resultado.registrar_infraccion_url }}">
-                            🚨 INFRACCIONAR
-                        </a>
-                    {% else %}
-                        <p style="font-size:0.85rem; color:var(--color-text-muted); margin-top:0.6rem;">
-                            ⏰ {{ mensaje_horario }}
-                        </p>
-                    {% endif %}
-                {% endif %}
-            </div>
-        {% endif %}
-
-    {% endif %}
-
-    <!-- HISTORIAL DE PATENTES — solo visible dentro del horario -->
-    {% if historial and horario_activo %}
-    <div style="margin-top:1.2rem; text-align:left;">
-        <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.4rem;">Recientes:</p>
-        {% for p in historial %}
-        <button onclick="document.getElementById('patente').value='{{ p }}'; document.getElementById('form').submit();"
-                style="margin:2px; padding:4px 10px; font-size:0.9rem; letter-spacing:2px;
-                       background:var(--color-surface); border:1px solid var(--color-border);
-                       border-radius:6px; cursor:pointer; font-weight:700;">{{ p }}</button>
-        {% endfor %}
-    </div>
-    {% endif %}
+    <!-- RESULTADO e HISTORIAL son manejados por VerificadorInspector (verificar_inspector.js).
+         El fallback Django no muestra resultado porque el form tiene onsubmit="return false;". -->
 
 </div>
 
@@ -604,6 +451,12 @@ function seleccionarSubcuadraInspector(id) {
 <!-- jsQR: fallback para browsers sin BarcodeDetector (iOS Safari, Firefox).
      Chrome en Android usa BarcodeDetector nativo — no necesita esta librería. -->
 <script src="{% static 'app_estacionamiento/js/jsQR.min.js' %}" onerror="window._jsqrFailed=true"></script>
+
+<!-- React (UMD, sin build step — igual que el panel del conductor) -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<!-- Componente VerificadorInspector: input → fetch → resultado inline (Fase 5A) -->
+<script src="{% static 'app_estacionamiento/js/verificar_inspector.js' %}"></script>
 <script>
 // ── SIA: escaneo QR con cámara en tiempo real ────────────────────────────────
 
