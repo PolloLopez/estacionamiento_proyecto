@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-01 (sesión 33 — Ticket config superadmin: fuente_size + qr_size por municipio; impresora_bluetooth.js actualizado)
+Última actualización: 2026-10-01 (sesión 33 — Ticket config superadmin + Fase 5B: infracción + impresión BLE inline sin redirect)
 
 ---
 
@@ -149,7 +149,13 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
 - **Fase 4B** ✅: `MisVehiculos` en `/inicio/` — badges 🟢/🔵/⚪, infracciones pendientes, links a historial. Fallback Django siempre presente.
 - **Fase 4C** ✅ (sesión 30): FormularioEstacionar — `estacionar_vehiculo.html`. Pendiente smoke test en prod. Ver sección 🔴 arriba.
 - **Fase 5A** ✅ (sesión 32): `VerificadorInspector` — verificar.html migrado a React (inline, sin reload). Endpoint `POST /api/inspector/verificar/`. El cascade GPS/subcuadra y el modal SIA son JS vanilla sin cambios.
-- **Fase 5B**: Inspector en React — infracción + ticket + impresora inline (fix BLE binding).
+- **Fase 5B** ✅ (sesión 33): Inspector en React — infracción + ticket + impresora inline.
+  - `POST /api/inspector/registrar_infraccion/` — acepta multipart (foto + patente + subcuadra + GPS), devuelve `datos_acta` JSON.
+  - `FormularioInfraccion` — foto con preview, GPS chip, subcuadra del cascade, POST a la API.
+  - `ModalTicket` — confirmación + impresión BLE con lógica 2 copias, reintento, reconexión silenciosa.
+  - `verificar.html` — carga `impresora_bluetooth.js` antes del componente React. `data-url-registrar` y `data-geoloc` en el mount point.
+  - `views_inspector.py` — pasa `municipio` al contexto para el template.
+  - **Fix BLE**: el inspector ya no navega entre páginas → la sesión BLE sobrevive todo el flujo.
 
 ---
 

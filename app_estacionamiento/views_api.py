@@ -42,6 +42,7 @@ from .utils import get_subcuadra_default, sanitizar_patente
 from .use_cases.estacionar_vehiculo import ejecutar_estacionamiento
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
 from .services_verificacion import verificar_estado_vehiculo
+from .services_infracciones import ErrorInfraccion, crear_infraccion
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -822,3 +823,126 @@ def api_inspector_verificar(request):
         "minutos_hasta_siguiente": resultado.minutos_hasta_siguiente,
         "tipo_exencion":           resultado.tipo_exencion,
     })
+
+
+@require_role("inspector")
+@require_POST
+def api_inspector_registrar_infraccion(request):
+    """
+    POST /api/inspector/registrar_infraccion/
+    Body: multipart/form-data (porque incluye foto)
+      - patente       (string, requerido)
+      - subcuadra_id  (int, requerido)
+      - foto          (File, requerido: JPG/PNG/WEBP, máx 15 MB)
+      - gps_lat       (string, opcional)
+      - gps_lon       (string, opcional)
+      - gps_acc       (string, opcional)
+
+    Respuesta OK:
+    {
+        "ok": true,
+        "infraccion_id": 42,
+        "datos_acta": {
+            "municipio", "acta", "patente", "tipo_vehiculo",
+            "subcuadra", "motivo", "fecha", "hora", "monto",
+            "inspector", "legajo", "url_pago",
+            "leyenda_horarios", "texto_ordenanza",
+            "fuente_size", "qr_size", "segundos_pausa_copias"
+        }
+    }
+
+    Por qué multipart y no JSON:
+        La foto es un archivo binario. FormData es la forma estándar para
+        subir archivos desde el frontend sin base64 (menos overhead, más simple).
+
+    Por qué separado de registrar_infraccion() en views_inspector.py:
+        Esa vista devuelve redirect → template. Esta devuelve JSON para React.
+        El inspector en Fase 5B ya no navega a otra página; el acta se crea y
+        se imprime inline, manteniendo la sesión BLE activa.
+    """
+    usuario   = request.user
+    municipio = usuario.municipio
+
+    # Verificar horario antes de crear el acta
+    horario_activo, mensaje_horario = puede_estacionar_ahora(municipio, bloquear_sin_horario=True)
+    if not horario_activo:
+        return JsonResponse(
+            {"ok": False, "error": mensaje_horario or "Fuera del horario de cobro."},
+            status=403
+        )
+
+    patente = sanitizar_patente(request.POST.get("patente") or "")
+    if not patente:
+        return JsonResponse({"ok": False, "error": "Patente requerida."}, status=400)
+
+    subcuadra_id_raw = request.POST.get("subcuadra_id", "").strip()
+    if not subcuadra_id_raw:
+        return JsonResponse({"ok": False, "error": "Subcuadra requerida."}, status=400)
+
+    # Validar foto: tipo y tamaño antes de llamar al service.
+    # No es obligatoria por contrato (el inspector puede registrar sin foto si la cámara falla),
+    # pero si llega debe ser válida.
+    foto = request.FILES.get("foto")
+    if foto:
+        _TIPOS_VALIDOS = {"image/jpeg", "image/png", "image/webp"}
+        _TAMAÑO_MAX    = 15 * 1024 * 1024  # 15 MB
+        if foto.content_type not in _TIPOS_VALIDOS:
+            return JsonResponse(
+                {"ok": False, "error": "La foto debe ser JPG, PNG o WEBP."},
+                status=400
+            )
+        if foto.size > _TAMAÑO_MAX:
+            return JsonResponse(
+                {"ok": False, "error": f"La foto pesa {foto.size / 1024 / 1024:.1f} MB; el máximo es 15 MB."},
+                status=400
+            )
+
+    gps_lat = request.POST.get("gps_lat", "").strip() or None
+    gps_lon = request.POST.get("gps_lon", "").strip() or None
+    gps_acc = request.POST.get("gps_acc", "").strip() or None
+
+    try:
+        infraccion = crear_infraccion(
+            patente=patente,
+            subcuadra_id=subcuadra_id_raw,
+            inspector=usuario,
+            foto=foto,
+            gps_lat=gps_lat,
+            gps_lon=gps_lon,
+            gps_acc=gps_acc,
+        )
+    except ErrorInfraccion as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+
+    # Construir datos_acta: mismo objeto que DATOS_ACTA en ticket_infraccion.html,
+    # para que generarTicketInfraccion(d) funcione sin cambios.
+    inf = infraccion
+    if inf.inspector and inf.inspector.nombre:
+        inspector_nombre = f"{inf.inspector.nombre} {inf.inspector.apellido}"
+    elif inf.inspector:
+        inspector_nombre = inf.inspector.correo
+    else:
+        inspector_nombre = ""
+
+    datos_acta = {
+        "municipio":              municipio.nombre,
+        "acta":                   str(inf.numero_acta or inf.id),
+        "patente":                inf.vehiculo.patente,
+        "tipo_vehiculo":          inf.vehiculo.get_tipo_display(),
+        "subcuadra":              str(inf.subcuadra) if inf.subcuadra else "",
+        "motivo":                 inf.motivo or "",
+        "fecha":                  inf.creado_en.strftime("%d/%m/%Y") if inf.creado_en else "",
+        "hora":                   inf.creado_en.strftime("%H:%M") if inf.creado_en else "",
+        "monto":                  str(inf.monto),
+        "inspector":              inspector_nombre,
+        "legajo":                 (inf.inspector.numero_legajo or "") if inf.inspector else "",
+        "url_pago":               f"{request.scheme}://{request.get_host()}/pagar/{inf.vehiculo.patente}/",
+        "leyenda_horarios":       municipio.leyenda_horarios or "",
+        "texto_ordenanza":        municipio.texto_ordenanza or "",
+        # Configuración del ticket impreso (Fase ticket config, sesión 33)
+        "fuente_size":            municipio.ticket_fuente_size,
+        "qr_size":                municipio.ticket_qr_size,
+        "segundos_pausa_copias":  municipio.segundos_pausa_doble_copia,
+    }
+
+    return JsonResponse({"ok": True, "infraccion_id": inf.id, "datos_acta": datos_acta})

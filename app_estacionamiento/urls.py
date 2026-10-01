@@ -50,6 +50,9 @@ urlpatterns = [
     path("api/inspector/verificar/",
          views_api.api_inspector_verificar,
          name="api_inspector_verificar"),
+    path("api/inspector/registrar_infraccion/",
+         views_api.api_inspector_registrar_infraccion,
+         name="api_inspector_registrar_infraccion"),
 
     # =========================
     # 📱 PWA

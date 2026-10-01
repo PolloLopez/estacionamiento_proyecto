@@ -78,10 +78,15 @@
 
         <!-- React monta VerificadorInspector acá (verificar_inspector.js).
              El wrapper conserva id="contenedor-patente" para que aplicarZonaLibreInspector()
-             siga mostrando/ocultando el área cuando la subcuadra es zona libre. -->
+             siga mostrando/ocultando el área cuando la subcuadra es zona libre.
+             data-url-verificar: endpoint Fase 5A (verificar patente).
+             data-url-registrar: endpoint Fase 5B (crear acta, devuelve datos_acta para BLE).
+             data-geoloc:        "true"/"false" — si el superadmin habilitó GPS del inspector. -->
         <div id="contenedor-patente">
           <div id="verificar-inspector-react"
-               data-url-verificar="{% url 'api_inspector_verificar' %}"></div>
+               data-url-verificar="{% url 'api_inspector_verificar' %}"
+               data-url-registrar="{% url 'api_inspector_registrar_infraccion' %}"
+               data-geoloc="{{ municipio.geoloc_inspector_activa|lower }}"></div>
         </div>
     </form>
     {% endif %}{# fin {% if not horario_activo %} / {% else %} #}
@@ -455,7 +460,10 @@ function seleccionarSubcuadraInspector(id) {
 <!-- React (UMD, sin build step — igual que el panel del conductor) -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<!-- Componente VerificadorInspector: input → fetch → resultado inline (Fase 5A) -->
+<!-- impresora_bluetooth.js: funciones BLE globales usadas por VerificadorInspector (Fase 5B).
+     Debe cargarse ANTES que verificar_inspector.js para que los globals estén disponibles. -->
+<script src="{% static 'app_estacionamiento/js/impresora_bluetooth.js' %}"></script>
+<!-- Componente VerificadorInspector: verificar → infraccionar → imprimir inline (Fase 5A+5B) -->
 <script src="{% static 'app_estacionamiento/js/verificar_inspector.js' %}"></script>
 <script>
 // ── SIA: escaneo QR con cámara en tiempo real ────────────────────────────────
