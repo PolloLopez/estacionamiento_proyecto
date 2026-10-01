@@ -116,15 +116,14 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
 
 ---
 
-### Fase 6 — Fix SIA modal + tests endpoints inspector
+### Fase 6 — Fix SIA modal + tests endpoints inspector ✅ (sesión 34)
 
-**Fix puntual (antes de go-live):** en el modal SIA, el caso `PATENTE_NO_COINCIDE` genera un enlace `href` a `inspectores_registrar_infraccion`. Eso navega a otra página → rompe BLE. Fix: cambiar ese enlace para que llame a una función JS global `iniciarInfraccionInline(patente)` que el componente React exponga como `window.iniciarInfraccionInline`. El React component captura esa llamada y activa `setFase("formulario")` sin navegar.
+**Fix puntual:** en el modal SIA, el caso `PATENTE_NO_COINCIDE` generaba un `<a href>` a `inspectores_registrar_infraccion` → navegación → sesión BLE perdida.
 
-**Tests nuevos:**
-- `test_api_inspector_registrar_infraccion_ok` — POST con foto válida → 200, `datos_acta` correcto
-- `test_api_inspector_registrar_infraccion_sin_subcuadra` → 400
-- `test_api_inspector_registrar_infraccion_fuera_horario` → 403
-- `test_api_inspector_verificar_ok` — verificación básica (si no existe ya)
+**Implementado:**
+- `VerificadorInspector` expone `window.iniciarInfraccionInline(patente)` en un `useEffect`. Llama a `setResultado` + `setFase("formulario")` sin navegar.
+- `verificar.html`: nueva función `iniciarInfraccionDesdeModalSia(patente)` que cierra el modal y llama al hook de React. El `<a href>` pasa a ser `<button onclick>`. Fallback a la URL vieja si React no está disponible.
+- `tests.py`: clase `TestApiInspectorRegistrarInfraccion` con 4 tests: ok sin foto, sin subcuadra → 400, foto tipo inválido → 400, fuera de horario → 403, conductor no accede.
 
 ---
 
@@ -168,7 +167,9 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
   - `verificar.html` — carga `impresora_bluetooth.js` antes del componente React. `data-url-registrar` y `data-geoloc` en el mount point.
   - `views_inspector.py` — pasa `municipio` al contexto para el template.
   - **Fix BLE**: el inspector ya no navega entre páginas → la sesión BLE sobrevive todo el flujo.
-- **Fase 6** (pendiente): ver sección 🟡 abajo.
+- **Fase 6** ✅ (sesión 34): Fix SIA modal PATENTE_NO_COINCIDE + tests endpoint Fase 5B. Ver sección 🟡 arriba.
+- **Fase 7** (próxima): migrar `inicio_usuarios.html` (panel del conductor) a React.
+- **Fase 8** (pendiente): Panel del vendedor inline — `cobrar_infraccion.html` + BLE.
 
 ---
 

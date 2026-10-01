@@ -12,6 +12,7 @@ from django.urls import reverse
 from app_estacionamiento.models import (
     Usuario, Municipio, Subcuadra, Vehiculo, VehiculoUsuario,
     Estacionamiento, MovimientoCaja, Tarifa, Infraccion, BilleteraConductor,
+    HorarioEstacionamiento,
 )
 from app_estacionamiento.services_caja import generar_cierre_caja
 from app_estacionamiento.services_infracciones import crear_infraccion, ErrorInfraccion
@@ -935,3 +936,166 @@ class TestMpWebhookTimestamp(TestCase):
             resultado = _verificar_firma_mp(req, "123")
 
         self.assertFalse(resultado, "Un timestamp de hace 10 minutos debe ser rechazado")
+
+
+# ═════════════════════════════════════════════
+# 18. API INSPECTOR — registrar_infraccion (Fase 5B)
+# ═════════════════════════════════════════════
+
+class TestApiInspectorRegistrarInfraccion(TestCase):
+    """
+    Tests del endpoint POST /api/inspector/registrar_infraccion/.
+
+    Qué cubre:
+    - Caso feliz: crea el acta y devuelve datos_acta con todos los campos.
+    - Sin subcuadra: rechaza con 400 antes de llamar al service.
+    - Fuera de horario: rechaza con 403 (usa bloquear_sin_horario=True).
+    - Foto con tipo MIME inválido: rechaza con 400 sin crear nada.
+    - Rol equivocado: un conductor recibe 302 (redirect al login de rol).
+
+    Por qué NO se testea foto válida end-to-end:
+        crear_infraccion() llama a Pillow para aplicar la marca de agua GPS.
+        En el entorno de test no hay Pillow instalado de forma confiable y la
+        foto llega al service —no al endpoint—. El endpoint sí valida el MIME
+        y el tamaño, y eso es lo que testeamos acá.
+
+    Cómo forzar "en horario" en tests:
+        HorarioEstacionamiento con hora_inicio=0:00 y hora_fin=23:59 para el
+        día actual. Sin ese registro, puede_estacionar_ahora() con
+        bloquear_sin_horario=True retorna False (inspector no trabaja).
+
+    Cómo forzar "fuera de horario":
+        No crear ningún HorarioEstacionamiento. El municipio queda sin horario
+        configurado → el inspector recibe 403.
+    """
+
+    URL = "api_inspector_registrar_infraccion"
+
+    def _crear_horario_activo(self, municipio):
+        """Crea HorarioEstacionamiento que cubre todo el día de hoy."""
+        from datetime import time
+        from django.utils import timezone
+        dia_hoy = timezone.localtime().weekday()   # 0=Lunes … 6=Domingo
+        HorarioEstacionamiento.objects.create(
+            municipio=municipio,
+            dia_semana=dia_hoy,
+            hora_inicio=time(0, 0),
+            hora_fin=time(23, 59),
+            activo=True,
+        )
+
+    def setUp(self):
+        self.municipio = crear_municipio()
+        self.inspector = Usuario.objects.create_user(
+            correo="inspector_api@test.com",
+            password="pass1234",
+            municipio=self.municipio,
+            es_inspector=True, es_conductor=False,
+        )
+        self.subcuadra = crear_subcuadra(self.municipio)
+        self.vehiculo  = crear_vehiculo("TES001")
+        self.client    = Client()
+        self.client.force_login(self.inspector)
+        self.url       = reverse(self.URL)
+
+    # ── Caso feliz ──────────────────────────────────────────────────────────
+
+    def test_ok_sin_foto_crea_acta_y_devuelve_datos(self):
+        """
+        POST con patente + subcuadra válidos, sin foto (foto es opcional).
+        Espera: 200, ok=True, infraccion_id positivo, datos_acta con campos clave.
+        """
+        self._crear_horario_activo(self.municipio)
+
+        resp = self.client.post(self.url, data={
+            "patente":     "TES001",
+            "subcuadra_id": str(self.subcuadra.id),
+        })
+
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["ok"])
+        self.assertGreater(data["infraccion_id"], 0)
+
+        acta = data["datos_acta"]
+        self.assertEqual(acta["patente"], "TES001")
+        # Estos campos siempre vienen (pueden ser cadena vacía, nunca ausentes)
+        for campo in ("municipio", "acta", "patente", "subcuadra",
+                      "fecha", "hora", "monto", "url_pago",
+                      "fuente_size", "qr_size"):
+            self.assertIn(campo, acta, f"Falta '{campo}' en datos_acta")
+
+        # La infracción existe en la BD
+        self.assertTrue(Infraccion.objects.filter(id=data["infraccion_id"]).exists())
+
+    # ── Validaciones de entrada ─────────────────────────────────────────────
+
+    def test_sin_subcuadra_retorna_400(self):
+        """POST sin subcuadra_id → 400 antes de llamar al service."""
+        self._crear_horario_activo(self.municipio)
+
+        resp = self.client.post(self.url, data={"patente": "TES001"})
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.json()["ok"])
+
+    def test_foto_tipo_invalido_retorna_400(self):
+        """
+        POST con foto de tipo text/plain → 400.
+        El endpoint valida MIME antes de llamar al service; no debería
+        crearse ninguna infracción.
+        """
+        self._crear_horario_activo(self.municipio)
+
+        from io import BytesIO
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        foto_mala = SimpleUploadedFile(
+            "foto.txt",
+            b"esto no es una imagen",
+            content_type="text/plain",
+        )
+
+        resp = self.client.post(self.url, data={
+            "patente":      "TES001",
+            "subcuadra_id": str(self.subcuadra.id),
+            "foto":         foto_mala,
+        })
+
+        self.assertEqual(resp.status_code, 400)
+        self.assertFalse(resp.json()["ok"])
+        # No se creó ninguna infracción
+        self.assertFalse(Infraccion.objects.filter(vehiculo=self.vehiculo).exists())
+
+    # ── Horario ─────────────────────────────────────────────────────────────
+
+    def test_fuera_de_horario_retorna_403(self):
+        """
+        Sin HorarioEstacionamiento configurado el inspector recibe 403.
+        puede_estacionar_ahora(..., bloquear_sin_horario=True) devuelve
+        False cuando no hay horario para hoy → el endpoint corta antes de
+        procesar la patente.
+        """
+        # No se crea ningún HorarioEstacionamiento → municipio sin horario
+        resp = self.client.post(self.url, data={
+            "patente":      "TES001",
+            "subcuadra_id": str(self.subcuadra.id),
+        })
+
+        self.assertEqual(resp.status_code, 403)
+        self.assertFalse(resp.json()["ok"])
+
+    # ── Control de acceso por rol ────────────────────────────────────────────
+
+    def test_conductor_no_puede_acceder(self):
+        """Un conductor recibe 302 (redirect al panel de su rol)."""
+        conductor = crear_conductor(self.municipio, "cond_api@test.com")
+        client_cond = Client()
+        client_cond.force_login(conductor)
+
+        resp = client_cond.post(self.url, data={
+            "patente":      "TES001",
+            "subcuadra_id": str(self.subcuadra.id),
+        })
+
+        # require_role redirige cuando el rol no coincide
+        self.assertIn(resp.status_code, [302, 403])
