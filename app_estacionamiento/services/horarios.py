@@ -176,7 +176,7 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
 
     if not horario.activo:
         # Existe pero el admin lo deshabilitó explícitamente → día cerrado, no libre
-        resultado = (False, "El estacionamiento no está habilitado para el día de hoy.")
+        resultado = (False, "El estacionamiento medido, hoy no corre.")
         cache.set(cache_key, resultado, timeout=60)
         return resultado
 

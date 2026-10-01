@@ -1396,7 +1396,7 @@ table tr:hover { background: var(--color-surface-2); }
   /* Limitar el ancho máximo del contenido para no estirar en pantallas muy anchas.
      El container ya tiene padding lateral; acá solo lo centramos y le ponemos techo. */
   .container {
-    max-width: 1280px;
+   /* max-width: 1280px;*/
     margin-left: auto;
     margin-right: auto;
   }
