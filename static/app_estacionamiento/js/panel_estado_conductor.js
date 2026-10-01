@@ -71,12 +71,181 @@ function ContadorRegresivo({ horaFinUnix }) {
   );
 }
 
+// ── ModalRenovar ──────────────────────────────────────────────────────────────
+/**
+ * Modal inline para extender un estacionamiento activo sin salir del panel.
+ *
+ * Flujo:
+ *   1. Se abre al hacer clic en "🔄 Extender"
+ *   2. Llama a GET /api/conductor/estacionamiento/<id>/opciones-renovar/ para traer opciones y saldo
+ *   3. El conductor selecciona una opción
+ *   4. POST /api/conductor/estacionamiento/<id>/renovar/ con las horas elegidas
+ *   5. Al confirmar: llama a onRenovado(nuevaHoraFinUnix) para actualizar el panel sin recargar
+ *
+ * Por qué inline y no una página separada:
+ *   El conductor que extiende ya está viendo el panel con el timer contando.
+ *   Salir a otra página rompe el contexto visual. El modal mantiene todo en la misma pantalla.
+ */
+function ModalRenovar({ estId, urlOpcionesBase, urlRenovarBase, onRenovado, onCerrar }) {
+  const [fase,    setFase]    = useState("cargando"); // cargando | eligiendo | confirmando | error
+  const [datos,   setDatos]   = useState(null);
+  const [opcion,  setOpcion]  = useState(null); // la opción seleccionada { label, horas, costo }
+  const [mensaje, setMensaje] = useState(null);
+
+  // Arma la URL reemplazando el 0 placeholder por el id real
+  function urlConId(base) {
+    return base.replace("/0/", "/" + estId + "/");
+  }
+
+  // Carga las opciones al montar
+  useEffect(() => {
+    fetch(urlConId(urlOpcionesBase))
+      .then(r => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(data => {
+        setDatos(data);
+        setFase(data.opciones.length === 0 ? "sin-opciones" : "eligiendo");
+      })
+      .catch(() => {
+        setFase("error");
+        setMensaje("No pudimos cargar las opciones. Intentá de nuevo.");
+      });
+  }, []);
+
+  function confirmar() {
+    if (!opcion) return;
+    setFase("confirmando");
+
+    fetch(urlConId(urlRenovarBase), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Django requiere CSRF token en POST; lo leemos de la cookie
+        "X-CSRFToken": (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || "",
+      },
+      body: JSON.stringify({ horas_extra: opcion.horas }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          onRenovado(data.nueva_hora_fin_unix);
+        } else {
+          setFase("error");
+          setMensaje(data.error || "Error al renovar.");
+        }
+      })
+      .catch(() => {
+        setFase("error");
+        setMensaje("Error de red. Intentá de nuevo.");
+      });
+  }
+
+  // ── Estilos del overlay ─────────────────────────────────────────────────
+  const overlayStyle = {
+    position: "fixed", inset: "0",
+    background: "rgba(0,0,0,0.5)",
+    display: "flex", alignItems: "flex-end", justifyContent: "center",
+    zIndex: "1000",
+  };
+  const panelStyle = {
+    background: "var(--color-surface)",
+    borderRadius: "var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0",
+    padding: "1.25rem 1rem 2rem",
+    width: "100%", maxWidth: "480px",
+    boxShadow: "0 -4px 24px rgba(0,0,0,0.15)",
+  };
+
+  return ce("div", { style: overlayStyle, onClick: onCerrar },
+    ce("div", { style: panelStyle, onClick: e => e.stopPropagation() },
+
+      // Header del modal
+      ce("div", {
+        style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }
+      },
+        ce("h3", { style: { margin: 0 } }, "🔄 Extender estacionamiento"),
+        ce("button", {
+          type: "button",
+          onClick: onCerrar,
+          style: { background: "none", border: "none", fontSize: "1.4rem", cursor: "pointer", color: "var(--color-text-muted)" },
+        }, "×")
+      ),
+
+      // ── Estado: cargando ────────────────────────────────────────────────
+      fase === "cargando" && ce("p", {
+        style: { color: "var(--color-text-muted)", textAlign: "center", padding: "1rem 0" }
+      }, "Cargando opciones…"),
+
+      // ── Estado: sin opciones ────────────────────────────────────────────
+      fase === "sin-opciones" && ce("div", { className: "alert alert-warning" },
+        "⏰ Tu estacionamiento ya cubre hasta el cierre del horario. No hace falta extenderlo."
+      ),
+
+      // ── Estado: error ───────────────────────────────────────────────────
+      fase === "error" && ce("div", { className: "alert alert-danger" }, mensaje),
+
+      // ── Estado: eligiendo ───────────────────────────────────────────────
+      (fase === "eligiendo" || fase === "confirmando") && datos && ce("div", null,
+
+        // Saldo disponible
+        ce("div", {
+          style: {
+            display: "flex", justifyContent: "space-between",
+            marginBottom: "1rem", padding: "0.75rem 1rem",
+            background: "var(--color-surface-2)", borderRadius: "var(--radius-sm)",
+          }
+        },
+          ce("span", { style: { color: "var(--color-text-muted)", fontSize: "0.9rem" } }, "Saldo disponible"),
+          ce("strong", { style: { color: "var(--color-primary)" } }, "$" + Number(datos.saldo).toFixed(2))
+        ),
+
+        // Botones de opciones
+        ce("div", { style: { display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1rem" } },
+          ...datos.opciones.map(op =>
+            ce("button", {
+              key: op.horas,
+              type: "button",
+              className: "btn " + (opcion && opcion.horas === op.horas ? "btn-success" : "btn-outline"),
+              disabled: datos.saldo < op.costo,
+              onClick: () => setOpcion(op),
+              style: { fontSize: "1rem", padding: "0.6rem 1rem", fontWeight: "600" },
+              title: datos.saldo < op.costo ? "Saldo insuficiente" : "",
+            }, op.label)
+          )
+        ),
+
+        // Preview del costo seleccionado
+        opcion && ce("div", {
+          className: "alert alert-success",
+          style: { marginBottom: "1rem" }
+        },
+          "+" + opcion.label + " · Costo: $" + Number(opcion.costo).toFixed(2)
+        ),
+
+        // Botón confirmar
+        ce("button", {
+          type: "button",
+          className: "btn",
+          style: { width: "100%", fontSize: "1rem", padding: "0.75rem" },
+          disabled: !opcion || fase === "confirmando",
+          onClick: confirmar,
+        }, fase === "confirmando" ? "Procesando…" : "✅ Confirmar extensión")
+      )
+    )
+  );
+}
+
+
 // ── CardUnEstacionamiento ─────────────────────────────────────────────────────
 /**
  * Card para un solo estacionamiento activo (layout completo con patente, hora,
  * cuenta regresiva y botón Extender).
+ *
+ * onExtender: callback que abre el modal de renovar en el componente padre (PanelEstado).
+ * Así el modal vive en el nivel raíz y no se apila dentro de un card anidado.
  */
-function CardUnEstacionamiento({ est, urlEstacionar }) {
+function CardUnEstacionamiento({ est, urlEstacionar, onExtender }) {
   const horaFinStr = formatearHora(est.hora_fin_unix);
   const restanteMs = est.hora_fin_unix * 1000 - Date.now();
   const pocaTiempo = restanteMs > 0 && restanteMs < 5 * 60 * 1000;
@@ -101,7 +270,12 @@ function CardUnEstacionamiento({ est, urlEstacionar }) {
           ce(ContadorRegresivo, { horaFinUnix: est.hora_fin_unix })
         )
       ),
-      ce("a", { className: "btn btn-outline", href: est.url_renovar }, "🔄 Extender")
+      // Botón abre el modal inline en lugar de navegar a otra página
+      ce("button", {
+        type: "button",
+        className: "btn btn-outline",
+        onClick: () => onExtender(est.id),
+      }, "🔄 Extender")
     ),
 
     // Aviso si queda poco tiempo (< 5 min)
@@ -125,8 +299,9 @@ function CardUnEstacionamiento({ est, urlEstacionar }) {
 // ── ListaEstacionamientos ─────────────────────────────────────────────────────
 /**
  * Lista compacta para cuando hay múltiples vehículos estacionados al mismo tiempo.
+ * onExtender: callback que abre el modal de renovar (igual que en CardUnEstacionamiento).
  */
-function ListaEstacionamientos({ estacionamientos }) {
+function ListaEstacionamientos({ estacionamientos, onExtender }) {
   return ce("div", { style: { display: "flex", flexDirection: "column", gap: "0.4rem", marginTop: "0.5rem" } },
     ...estacionamientos.map(est =>
       ce("div", {
@@ -148,9 +323,10 @@ function ListaEstacionamientos({ estacionamientos }) {
             ce(ContadorRegresivo, { horaFinUnix: est.hora_fin_unix })
           )
         ),
-        ce("a", {
+        ce("button", {
+          type: "button",
           className: "btn btn-outline",
-          href: est.url_renovar,
+          onClick: () => onExtender(est.id),
           style: { fontSize: "0.78rem", padding: "0.2rem 0.5rem" },
         }, "🔄 Extender")
       )
@@ -165,9 +341,11 @@ function ListaEstacionamientos({ estacionamientos }) {
  *   - Polling cada 30s: GET /api/conductor/estacionamientos/activos/
  *   - Estados: cargando / error / fuera de horario / con estac. activos / sin estac.
  */
-function PanelEstado({ urlDashboard, urlEstacionamientosActivos, urlEstacionar, urlRecargar }) {
-  const [estado, setEstado] = useState(null); // null = todavía cargando
-  const [error,  setError]  = useState(null);
+function PanelEstado({ urlDashboard, urlEstacionamientosActivos, urlEstacionar, urlRecargar, urlOpcionesRenovarBase, urlRenovarBase }) {
+  const [estado,          setEstado]          = useState(null); // null = todavía cargando
+  const [error,           setError]           = useState(null);
+  // idEstacionamientoModal: null = modal cerrado, número = id del estac. a extender
+  const [idEstacionamientoModal, setIdEstacionamientoModal] = useState(null);
 
   // Carga inicial: estado completo del conductor
   useEffect(() => {
@@ -229,16 +407,42 @@ function PanelEstado({ urlDashboard, urlEstacionamientosActivos, urlEstacionar, 
 
   // ── Render: con estacionamientos activos ────────────────────────────────
   if (activos.length > 0) {
-    return ce("div", { className: "card" },
-      ce("h3", null, "🚗 Estado del vehículo"),
-      ce("div", { className: "status-ok" },
-        "🟢 " + (activos.length > 1
-          ? `${activos.length} vehículos activos`
-          : "Estacionamiento activo")
-      ),
-      activos.length === 1
-        ? ce(CardUnEstacionamiento, { est: activos[0], urlEstacionar })
-        : ce(ListaEstacionamientos, { estacionamientos: activos })
+    return ce("div", null,
+      // Modal de renovar (se renderiza por encima si idEstacionamientoModal está seteado)
+      idEstacionamientoModal && ce(ModalRenovar, {
+        estId:           idEstacionamientoModal,
+        urlOpcionesBase: urlOpcionesRenovarBase,
+        urlRenovarBase:  urlRenovarBase,
+        onCerrar:        () => setIdEstacionamientoModal(null),
+        // Al confirmar: actualiza la hora_fin del estacionamiento en el estado local
+        // sin necesidad de recargar la página ni llamar al dashboard completo.
+        onRenovado: (nuevaHoraFinUnix) => {
+          setIdEstacionamientoModal(null);
+          setEstado(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              estacionamientos_activos: prev.estacionamientos_activos.map(e =>
+                e.id === idEstacionamientoModal
+                  ? { ...e, hora_fin_unix: nuevaHoraFinUnix }
+                  : e
+              ),
+            };
+          });
+        },
+      }),
+
+      ce("div", { className: "card" },
+        ce("h3", null, "🚗 Estado del vehículo"),
+        ce("div", { className: "status-ok" },
+          "🟢 " + (activos.length > 1
+            ? activos.length + " vehículos activos"
+            : "Estacionamiento activo")
+        ),
+        activos.length === 1
+          ? ce(CardUnEstacionamiento, { est: activos[0], urlEstacionar, onExtender: setIdEstacionamientoModal })
+          : ce(ListaEstacionamientos, { estacionamientos: activos, onExtender: setIdEstacionamientoModal })
+      )
     );
   }
 
@@ -277,13 +481,22 @@ function PanelEstado({ urlDashboard, urlEstacionamientosActivos, urlEstacionar, 
   const mountEl = document.getElementById("panel-estado-react");
   if (!mountEl) return;
 
-  const urlDashboard              = mountEl.dataset.urlDashboard;
+  const urlDashboard               = mountEl.dataset.urlDashboard;
   const urlEstacionamientosActivos = mountEl.dataset.urlEstacionamientosActivos;
-  const urlEstacionar             = mountEl.dataset.urlEstacionar;
-  const urlRecargar               = mountEl.dataset.urlRecargar;
+  const urlEstacionar              = mountEl.dataset.urlEstacionar;
+  const urlRecargar                = mountEl.dataset.urlRecargar;
+  const urlOpcionesRenovarBase     = mountEl.dataset.urlOpcionesRenovarBase;
+  const urlRenovarBase             = mountEl.dataset.urlRenovarBase;
 
   const root = ReactDOM.createRoot(mountEl);
   root.render(
-    ce(PanelEstado, { urlDashboard, urlEstacionamientosActivos, urlEstacionar, urlRecargar })
+    ce(PanelEstado, {
+      urlDashboard,
+      urlEstacionamientosActivos,
+      urlEstacionar,
+      urlRecargar,
+      urlOpcionesRenovarBase,
+      urlRenovarBase,
+    })
   );
 })();
