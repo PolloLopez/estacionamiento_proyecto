@@ -125,23 +125,36 @@ def api_conductor_dashboard(request):
             puede_estacionar = True
             mensaje_horario  = None
 
-    # Saldo y verificación de mínimo para 1 hora
+    # Saldo y verificación de mínimo para la duración mínima del municipio
     saldo      = obtener_saldo_conductor(usuario, usuario.municipio)
     tarifa     = Tarifa.objects.filter(municipio=usuario.municipio).first() if usuario.municipio else None
     costo_hora = float(tarifa.precio_por_hora) if tarifa else None
+
+    # duracion_minima_minutos vive en Municipio (campo del modelo, default 30)
+    duracion_minima_min = (
+        usuario.municipio.duracion_minima_minutos
+        if usuario.municipio and hasattr(usuario.municipio, "duracion_minima_minutos")
+        else 30
+    )
+    # Costo para la duración mínima (ej: 30 min → 0.5 * precio_hora)
+    costo_duracion_minima = (
+        round(costo_hora * duracion_minima_min / 60, 2) if costo_hora else None
+    )
     saldo_insuficiente = (
         not dia_libre_hoy
-        and costo_hora is not None
-        and float(saldo) < costo_hora
+        and costo_duracion_minima is not None
+        and float(saldo) < costo_duracion_minima
     )
 
     return JsonResponse({
-        "saldo":              float(saldo),
-        "puede_estacionar":   puede_estacionar,
-        "mensaje_horario":    mensaje_horario,
-        "dia_libre_hoy":      dia_libre_hoy,
-        "saldo_insuficiente": saldo_insuficiente,
-        "costo_hora_min":     costo_hora,
+        "saldo":                  float(saldo),
+        "puede_estacionar":       puede_estacionar,
+        "mensaje_horario":        mensaje_horario,
+        "dia_libre_hoy":          dia_libre_hoy,
+        "saldo_insuficiente":     saldo_insuficiente,
+        "costo_hora_min":         costo_hora,
+        "duracion_minima_min":    duracion_minima_min,
+        "costo_duracion_minima":  costo_duracion_minima,
         "estacionamientos_activos": [
             _serializar_estacionamiento(e) for e in vigentes
         ],

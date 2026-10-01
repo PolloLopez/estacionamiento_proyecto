@@ -184,10 +184,10 @@ def puede_estacionar_ahora(municipio, bloquear_sin_horario=False):
         resultado = (
             False,
             (
-                f"El estacionamiento está habilitado de "
+                f"El estacionamiento medido es de "
                 f"{horario.hora_inicio.strftime('%H:%M')} a "
                 f"{horario.hora_fin.strftime('%H:%M')}. "
-                f"Actualmente son las {hora_actual.strftime('%H:%M')}."
+                f"Son las {hora_actual.strftime('%H:%M')}."
             ),
         )
         cache.set(cache_key, resultado, timeout=60)

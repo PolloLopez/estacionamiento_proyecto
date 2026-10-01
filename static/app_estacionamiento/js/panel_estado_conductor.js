@@ -253,18 +253,15 @@ function PanelEstado({ urlDashboard, urlEstacionamientosActivos, urlEstacionar, 
             className: "alert alert-warning",
             style: { margin: "0.75rem 0 0.5rem", fontSize: "0.9rem" },
           },
-            "⚠️ Tu saldo no alcanza para 1 hora",
-            estado.costo_hora_min
-              ? ` ($${Number(estado.costo_hora_min).toFixed(2)})`
+            // Muestra la duración mínima real del municipio, no "1 hora"
+            "⚠️ Tu saldo no alcanza para ",
+            estado.duracion_minima_min ? `${estado.duracion_minima_min} minutos` : "el mínimo",
+            estado.costo_duracion_minima
+              ? ` ($${Number(estado.costo_duracion_minima).toFixed(2)})`
               : "",
             ". Recargá antes de estacionar."
           ),
-          ce("div", { style: { display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.4rem" } },
-            ce("a", { className: "btn btn-primary", href: urlRecargar }, "💳 Recargar saldo"),
-            ce("a", { className: "btn btn-outline", href: urlEstacionar, style: { fontSize: "0.85rem" } },
-              "Estacionar igual"
-            )
-          )
+          ce("a", { className: "btn btn-primary", href: urlRecargar }, "💳 Recargar saldo")
         )
       : ce("a", { className: "btn", href: urlEstacionar }, "🛵 Estacionar 🚗")
   );

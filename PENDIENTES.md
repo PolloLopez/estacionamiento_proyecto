@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-09-30 (sesión 27 — UX subcuadra compacta, preselección de vehículo, API JSON fase 2)
+Última actualización: 2026-09-30 (sesión 28 — Fase 3 React completa: PanelEstado en producción, React desde static propio)
 
 ---
 
@@ -25,6 +25,32 @@
 
 ## 🔴 Alta prioridad
 
+### Fix — botón "🔄 Extender" da 404
+
+El componente `PanelEstado` (React) muestra un botón "Extender" que apunta a `/estacionar/renovar/<id>/`. Esa URL no está definida en `urls.py`. Implementar antes de Fase 4.
+
+**Qué hacer:** definir la vista `renovar_estacionamiento` en `views_conductor.py` + URL en `urls.py`. La vista puede ser un redirect a `estacionar_vehiculo.html` con el vehículo preseleccionado (camino más simple), o una pantalla propia de extensión.
+
+---
+
+### Fase 4 — Migración React incremental (sin Vite, UMD puro)
+
+**Estrategia:** migrar pantallas Django a React una por una, sin romper nada. Misma técnica que Fase 3 (UMD + `React.createElement`, sin JSX, sin build step). Orden de migración:
+
+1. **HistorialEstacionamientos** — tabla con historial del conductor (`/inicio/` → sección debajo del panel). Solo lectura, datos de la API, paginación.
+2. **FormularioEstacionar** — pantalla completa de `estacionar_vehiculo.html`. La más compleja (GPS, selector de vehículo, duración, abono, confirmación). Migrar por partes: primero el selector de vehículo, después el resto.
+3. **Inspector** — pantalla de verificación/infracción del inspector (Fase 5, próximo sprint).
+
+**Checklist antes de arrancar Fase 4:**
+- [ ] Fix botón "Extender" (404)
+- [ ] Testear Panel Estado fuera de horario (¿qué muestra?)
+- [ ] Testear Panel Estado sin estacionamiento activo (¿qué muestra?)
+- [ ] Testear flujo completo estacionar_vehiculo.html: GPS → subcuadra → duración → patente en botón → confirm
+- [ ] Testear que abono activo bloquea el botón correctamente
+- [ ] Smoke test completo por rol antes de deployar Fase 4 a main
+
+---
+
 ### Subir Railway a plan Pro ($20/mes) — backups automáticos
 
 Railway Hobby **no hace backups del PostgreSQL**. Si la base se corrompe, no hay recuperación. Para un sistema municipal con datos de ciudadanos esto es inaceptable.
@@ -47,6 +73,23 @@ railway run pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
 ### Bug — `/pagar/` sin login: "ESTACIONAR AHORA" visible fuera de horario
 
 `pago_publico/detalle_patente.html` muestra el botón "ESTACIONAR AHORA" aunque el municipio esté fuera de horario. Verificar si la vista `detalle_patente` chequea `puede_estacionar_ahora()` antes de renderizar el botón, y ocultarlo fuera de horario con mensaje explicativo (mismo patrón que `estacionar_vehiculo.html`).
+
+---
+
+### Saldo negativo para conductores (habilitado por superadmin, límite por admin municipal)
+
+Permitir que un conductor estacione aunque su saldo llegue a cero, hasta un límite negativo configurable.
+
+**Modelo:** agregar en `Municipio`:
+- `saldo_negativo_habilitado = BooleanField(default=False)` — superadmin habilita por municipio
+- `limite_saldo_negativo = DecimalField(max_digits=10, decimal_places=2, default=0)` — cuántos pesos puede quedar en negativo (ej: $500)
+
+**Impacto:**
+- `debitar_saldo_conductor()`: si `saldo_negativo_habilitado`, permitir llegar hasta `-limite_saldo_negativo`
+- `saldo_insuficiente` en la API: considerar el límite negativo disponible
+- UI conductor: aviso visual cuando está usando saldo negativo
+- UI admin: campo editable en `editar_municipio.html`
+- UI superadmin: checkbox en panel de municipio
 
 ---
 
@@ -96,15 +139,15 @@ El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un ta
 
 ### Migración frontend a React — hibridación incremental (sin DRF por ahora)
 
-**Estrategia actual:** Django como shell (navbar, routing, base), React como capa interactiva embebida. Sin DRF — `JsonResponse` puro hasta que la escala lo justifique.
+**Estrategia:** Django como shell (navbar, routing, base), React como capa interactiva embebida. Sin DRF — `JsonResponse` puro. Sin Vite — UMD + `React.createElement` (sin JSX, sin build step).
+
+**React se sirve desde static propio** (`static/app_estacionamiento/js/react.production.min.js` y `react-dom.production.min.js`) — no desde CDN externo.
 
 **Fases:**
-- **Fase 2** ✅ (esta sesión): API JSON pura — `views_api.py` con `GET /api/conductor/dashboard/` y `GET /api/conductor/estacionamientos/activos/`. Sin DRF, sin dependencias nuevas.
-- **Fase 3** (próxima): Componente `PanelEstado` en React — timer de cuenta regresiva + botón "Renovar", montado en `inicio_usuarios.html`. Primer componente React real en producción.
-- **Fase 4**: Flujo completo del conductor en React (estacionar, historial, perfil).
-- **Fase 5**: `verificar.html` del inspector en React (verificación + GPS + infracciones).
-
-**Pendiente antes de Fase 3:** validar en producción que `GET /api/conductor/dashboard/` y `/api/conductor/estacionamientos/activos/` devuelven los datos correctos con un conductor real logueado. Chequear en Network tab del navegador.
+- **Fase 2** ✅: API JSON — `views_api.py` con `GET /api/conductor/dashboard/` y `GET /api/conductor/estacionamientos/activos/`.
+- **Fase 3** ✅: `PanelEstado` en `inicio_usuarios.html` — timer de cuenta regresiva, polling 30s, estados múltiples. En producción.
+- **Fase 4** 🔴 (próxima): HistorialEstacionamientos + FormularioEstacionar. Ver sección 🔴 arriba.
+- **Fase 5**: Inspector en React — pantalla de verificación + GPS + infracciones.
 
 ---
 
