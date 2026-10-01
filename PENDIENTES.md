@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-01 (sesión 30 — Fase 4C React: FormularioEstacionar implementado)
+Última actualización: 2026-10-01 (sesión 31-32 — Fase 4C: GPS chip + modal eliminar; Fase 5A: VerificadorInspector React)
 
 ---
 
@@ -144,7 +144,8 @@ El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un ta
 - **Fase 4A** ✅: `HistorialConductor` en `/mis_estacionamientos/` — paginación sin recarga, expand/collapse. Modal inline de renovar en `PanelEstado` — timer se actualiza sin recargar. `calcular_opciones_duracion` respeta `duracion_minima_min` en franja final.
 - **Fase 4B** ✅: `MisVehiculos` en `/inicio/` — badges 🟢/🔵/⚪, infracciones pendientes, links a historial. Fallback Django siempre presente.
 - **Fase 4C** ✅ (sesión 30): FormularioEstacionar — `estacionar_vehiculo.html`. Pendiente smoke test en prod. Ver sección 🔴 arriba.
-- **Fase 5**: Inspector en React — pantalla de verificación + GPS + infracciones.
+- **Fase 5A** ✅ (sesión 32): `VerificadorInspector` — verificar.html migrado a React (inline, sin reload). Endpoint `POST /api/inspector/verificar/`. El cascade GPS/subcuadra y el modal SIA son JS vanilla sin cambios.
+- **Fase 5B**: Inspector en React — infracción + ticket + impresora inline (fix BLE binding).
 
 ---
 

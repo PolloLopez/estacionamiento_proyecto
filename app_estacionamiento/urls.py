@@ -47,6 +47,9 @@ urlpatterns = [
     path("api/conductor/estacionar/",
          views_api.api_conductor_estacionar,
          name="api_conductor_estacionar"),
+    path("api/inspector/verificar/",
+         views_api.api_inspector_verificar,
+         name="api_inspector_verificar"),
 
     # =========================
     # 📱 PWA

@@ -71,7 +71,11 @@ function obtenerCsrf() {
 
 // ── TarjetaVehiculo ───────────────────────────────────────────────────────────
 
-function TarjetaVehiculo({ vehiculo, seleccionado, onSeleccionar, urlEliminarBase, onEliminar }) {
+/**
+ * onPedirEliminar(vehiculo): el padre muestra el modal de confirmación y hace el fetch.
+ * La tarjeta no maneja directamente ni el confirm ni el fetch — responsabilidad única.
+ */
+function TarjetaVehiculo({ vehiculo, seleccionado, onSeleccionar, onPedirEliminar }) {
   var icono = vehiculo.tipo === "moto" ? "🛵" : "🚗";
   var estiloTarjeta = {
     flex: "1", minWidth: "130px", maxWidth: "180px",
@@ -85,19 +89,7 @@ function TarjetaVehiculo({ vehiculo, seleccionado, onSeleccionar, urlEliminarBas
   function eliminar(e) {
     e.stopPropagation();
     e.preventDefault();
-    if (!confirm("¿Eliminar " + vehiculo.patente + " de tu cuenta?")) return;
-    var url = urlEliminarBase.replace("/0/", "/" + vehiculo.id + "/");
-    // Usamos fetch para no recargar la página — actualizamos el estado localmente
-    fetch(url, {
-      method: "POST",
-      headers: { "X-CSRFToken": obtenerCsrf() },
-      credentials: "same-origin",
-      redirect: "follow",
-    }).then(function() {
-      onEliminar(vehiculo.id);
-    }).catch(function() {
-      alert("No se pudo eliminar el vehículo. Intentá de nuevo.");
-    });
+    onPedirEliminar(vehiculo);
   }
 
   return ce("div", { style: estiloTarjeta, onClick: function() { onSeleccionar(vehiculo); } },
@@ -125,6 +117,69 @@ function TarjetaVehiculo({ vehiculo, seleccionado, onSeleccionar, urlEliminarBas
         padding: "2px 5px", borderRadius: "4px",
       },
     }, "✕")
+  );
+}
+
+// ── ModalConfirmarEliminar ────────────────────────────────────────────────────
+//
+// Overlay de confirmación propio — reemplaza el confirm() nativo del browser,
+// que tiene estilo de sistema operativo y no puede personalizarse.
+// Se monta sobre toda la pantalla con fondo semitransparente.
+// Click fuera del card → cancela (mismo comportamiento que un dialog nativo).
+
+function ModalConfirmarEliminar({ vehiculo, onConfirmar, onCancelar }) {
+  return ce("div", {
+    // Overlay: cubre toda la pantalla
+    style: {
+      position: "fixed", inset: "0",
+      background: "rgba(0,0,0,0.48)",
+      zIndex: "1000",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "1rem",
+    },
+    onClick: onCancelar,
+  },
+    ce("div", {
+      // Card centrado: click interno no propaga al overlay
+      style: {
+        background: "var(--color-surface)",
+        borderRadius: "16px",
+        padding: "1.75rem 1.5rem 1.5rem",
+        maxWidth: "340px", width: "100%",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.22)",
+        textAlign: "center",
+      },
+      onClick: function(e) { e.stopPropagation(); },
+    },
+      ce("div", { style: { fontSize: "2.2rem", marginBottom: "0.5rem" } }, "🗑️"),
+      ce("h4", { style: { margin: "0 0 0.4rem", fontSize: "1.1rem" } },
+        "¿Eliminar vehículo?"
+      ),
+      ce("p", { style: { color: "var(--color-text-muted)", fontSize: "0.95rem", margin: "0 0 1.4rem" } },
+        "Vas a quitar ",
+        ce("strong", { style: { letterSpacing: "1.5px", color: "var(--color-text)" } }, vehiculo.patente),
+        " de tu cuenta."
+      ),
+      ce("div", { style: { display: "flex", gap: "0.6rem" } },
+        ce("button", {
+          type: "button",
+          className: "btn btn-outline",
+          style: { flex: "1", fontSize: "0.95rem" },
+          onClick: onCancelar,
+        }, "Cancelar"),
+        ce("button", {
+          type: "button",
+          className: "btn",
+          style: {
+            flex: "1", fontSize: "0.95rem",
+            background: "var(--color-danger, #c0392b)",
+            borderColor: "var(--color-danger, #c0392b)",
+            color: "#fff",
+          },
+          onClick: onConfirmar,
+        }, "Sí, eliminar")
+      )
+    )
   );
 }
 
@@ -160,17 +215,38 @@ function SeccionSubcuadra({
       })
     : (mostrarTodas ? subcuadras : []);
 
-  var labelGps = null;
-  if (gpsEstado === "detectando") labelGps = "📡 Detectando tu cuadra…";
-  if (gpsEstado === "fallo")      labelGps = "⚠️ No se pudo detectar la ubicación.";
+  // Chip de estado GPS: reemplaza el texto plano — inline junto al título para
+  // que el conductor vea el estado sin necesidad de buscar un párrafo aparte.
+  var chipGps = null;
+  if (gpsEstado === "detectando") {
+    chipGps = ce("span", { style: {
+      display: "inline-flex", alignItems: "center", gap: "0.3rem",
+      fontSize: "0.76rem", padding: "0.2rem 0.65rem", borderRadius: "20px",
+      background: "#e8f4fd", color: "#0077cc", border: "1px solid #b8daff",
+      fontWeight: "600", letterSpacing: "0",
+    }}, "📡 Detectando…");
+  } else if (gpsEstado === "detectado") {
+    chipGps = ce("span", { style: {
+      display: "inline-flex", alignItems: "center", gap: "0.3rem",
+      fontSize: "0.76rem", padding: "0.2rem 0.65rem", borderRadius: "20px",
+      background: "#d4edda", color: "#155724", border: "1px solid #c3e6cb",
+      fontWeight: "600",
+    }}, "📡 GPS activo");
+  } else if (gpsEstado === "fallo") {
+    chipGps = ce("span", { style: {
+      display: "inline-flex", alignItems: "center", gap: "0.3rem",
+      fontSize: "0.76rem", padding: "0.2rem 0.65rem", borderRadius: "20px",
+      background: "#fff3cd", color: "#856404", border: "1px solid #ffc107",
+      fontWeight: "600",
+    }}, "⚠️ Sin GPS");
+  }
 
   return ce("div", { style: { marginBottom: "1.2rem" } },
-    ce("h3", { style: { marginBottom: "0.4rem" } }, "📍 ¿Dónde estás?"),
-
-    // Status GPS (solo cuando está en curso o falló — el éxito se ve en la botonera)
-    labelGps && ce("p", {
-      style: { fontSize: "0.82rem", color: "var(--color-text-muted)", margin: "0 0 0.6rem" }
-    }, labelGps),
+    // Título + chip de estado GPS en la misma línea
+    ce("div", { style: { display: "flex", alignItems: "center", gap: "0.65rem", marginBottom: "0.75rem", flexWrap: "wrap" } },
+      ce("h3", { style: { margin: "0" } }, "📍 ¿Dónde estás?"),
+      chipGps,
+    ),
 
     // Input de calle — siempre visible, pre-llenado por GPS cuando detecta
     ce("div", { style: { display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.6rem" } },
@@ -286,6 +362,9 @@ function FormularioEstacionar({
   // Mostrar/ocultar form inline de agregar vehículo
   var [mostrarAgregar, setMostrarAgregar] = useState(false);
 
+  // Vehículo pendiente de eliminar: cuando no es null, se muestra el modal de confirmación
+  var [vehiculoAEliminar, setVehiculoAEliminar] = useState(null);
+
   // ── Fetch inicial de datos ───────────────────────────────────────────────
   useEffect(function() {
     fetch(urlDatos)
@@ -400,6 +479,27 @@ function FormularioEstacionar({
     });
   }
 
+  // ── Confirmar eliminación de vehículo ───────────────────────────────────
+  //
+  // El fetch vive acá (no en TarjetaVehiculo) porque necesita actualizar el
+  // estado del padre y mostrar el error de form si falla.
+  function confirmarEliminarVehiculo() {
+    if (!vehiculoAEliminar) return;
+    var url = urlEliminarBase.replace("/0/", "/" + vehiculoAEliminar.id + "/");
+    fetch(url, {
+      method: "POST",
+      headers: { "X-CSRFToken": obtenerCsrf() },
+      credentials: "same-origin",
+      redirect: "follow",
+    }).then(function() {
+      eliminarVehiculo(vehiculoAEliminar.id);
+      setVehiculoAEliminar(null);
+    }).catch(function() {
+      setVehiculoAEliminar(null);
+      setErrorForm("No se pudo eliminar el vehículo. Intentá de nuevo.");
+    });
+  }
+
   // ── Confirmar estacionamiento ────────────────────────────────────────────
   //
   // "sinServicio" (zonaLibre o dia_libre_hoy) → NO se registra.
@@ -481,6 +581,14 @@ function FormularioEstacionar({
 
   return ce("div", null,
 
+    // ── Modal eliminar vehículo ───────────────────────────────────────────
+    // Se renderiza sobre todo lo demás cuando el conductor toca ✕ en una tarjeta.
+    vehiculoAEliminar && ce(ModalConfirmarEliminar, {
+      vehiculo: vehiculoAEliminar,
+      onConfirmar: confirmarEliminarVehiculo,
+      onCancelar: function() { setVehiculoAEliminar(null); },
+    }),
+
     // ── Saldo disponible ──────────────────────────────────────────────────
     ce("div", {
       style: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "0.75rem 1.1rem", marginBottom: "1.2rem" }
@@ -558,8 +666,7 @@ function FormularioEstacionar({
               key: v.id, vehiculo: v,
               seleccionado: vehiculoSel && vehiculoSel.id === v.id,
               onSeleccionar: function(sel) { seleccionarVehiculo(sel); },
-              urlEliminarBase: urlEliminarBase,
-              onEliminar: eliminarVehiculo,
+              onPedirEliminar: function(veh) { setVehiculoAEliminar(veh); },
             });
           })
         )
@@ -576,8 +683,7 @@ function FormularioEstacionar({
               key: v.id, vehiculo: v,
               seleccionado: vehiculoSel && vehiculoSel.id === v.id,
               onSeleccionar: function(sel) { seleccionarVehiculo(sel); },
-              urlEliminarBase: urlEliminarBase,
-              onEliminar: eliminarVehiculo,
+              onPedirEliminar: function(veh) { setVehiculoAEliminar(veh); },
             });
           })
         )
