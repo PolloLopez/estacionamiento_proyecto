@@ -27,16 +27,17 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from .decorators import require_login, require_role
-from .models import AbonoMensual, Estacionamiento, Tarifa, Vehiculo
-from .services.saldo import debitar_saldo_conductor
-from .services.horarios import calcular_opciones_duracion
-from .utils import sanitizar_patente
-from .services.saldo import obtener_saldo_conductor
+from .models import AbonoMensual, Estacionamiento, Subcuadra, Tarifa, Vehiculo
+from .services.saldo import debitar_saldo_conductor, obtener_saldo_conductor
 from .services.horarios import (
+    calcular_opciones_duracion,
     puede_estacionar_ahora,
     es_dia_libre_conductor,
     cerrar_estacionamientos_vencidos_por_horario,
 )
+from .services.descuentos_verificados import calcular_descuento_conductor
+from .utils import get_subcuadra_default, sanitizar_patente
+from .use_cases.estacionar_vehiculo import ejecutar_estacionamiento
 from .use_cases.finalizar_estacionamiento import ejecutar as finalizar_estacionamiento_uc
 
 
@@ -409,4 +410,302 @@ def api_conductor_estacionamientos_activos(request):
     return JsonResponse({
         "estacionamientos": [_serializar_estacionamiento(e) for e in vigentes],
         "timestamp":        int(timezone.now().timestamp()),  # para que el cliente sepa cuán fresco es el dato
+    })
+
+
+@require_login
+@require_GET
+def api_conductor_datos_estacionar(request):
+    """
+    GET /api/conductor/datos-estacionar/
+
+    Datos necesarios para el formulario de estacionar React.
+    Equivalente JSON del GET de estacionar_vehiculo() en views_conductor.py.
+
+    Devuelve: vehículos, subcuadras, opciones de duración (auto y moto),
+    saldo, tarifa efectiva, flags de horario y geoloc.
+    """
+    from datetime import date as _date
+
+    usuario = request.user
+
+    tarifa_obj  = Tarifa.objects.filter(municipio=usuario.municipio).first()
+    tarifa_auto = tarifa_obj.precio_por_hora if tarifa_obj else Decimal("100")
+    tarifa_moto = (
+        tarifa_obj.precio_por_hora_moto
+        if tarifa_obj and tarifa_obj.precio_por_hora_moto
+        else tarifa_auto
+    )
+
+    dia_libre = bool(usuario.municipio and es_dia_libre_conductor(usuario.municipio))
+    puede, msg_horario = puede_estacionar_ahora(usuario.municipio)
+    fuera_de_horario = not puede and not dia_libre
+
+    # Descuento por conductor verificado (mismo cálculo que views_conductor)
+    if dia_libre:
+        t_auto_ef     = Decimal("0")
+        t_moto_ef     = Decimal("0")
+        descuento_pct = 0
+    else:
+        desc = calcular_descuento_conductor(usuario, usuario.municipio)
+        descuento_pct = float(desc)
+        if desc > 0:
+            factor    = 1 - desc / 100
+            t_auto_ef = (tarifa_auto * factor).quantize(Decimal("0.01"))
+            t_moto_ef = (tarifa_moto * factor).quantize(Decimal("0.01"))
+        else:
+            t_auto_ef = Decimal(str(tarifa_auto))
+            t_moto_ef = Decimal(str(tarifa_moto))
+
+    duracion_minima_min = tarifa_obj.duracion_minima_minutos if tarifa_obj else 30
+
+    # Opciones de duración separadas por tipo de vehículo
+    opciones_auto = calcular_opciones_duracion(
+        usuario.municipio, t_auto_ef,
+        duracion_minima_min=duracion_minima_min,
+    )
+    opciones_moto = calcular_opciones_duracion(
+        usuario.municipio, t_moto_ef,
+        duracion_minima_min=duracion_minima_min,
+    )
+
+    # Subcuadras (excluye "Zona Única" = default silencioso)
+    subcuadras = (
+        Subcuadra.objects
+        .filter(municipio=usuario.municipio)
+        .exclude(calle="Zona Única")
+        .order_by("calle", "altura")
+    )
+
+    # IDs de vehículos con abono mensual activo
+    _mes_actual = _date.today().replace(day=1)
+    ids_con_abono = set(
+        AbonoMensual.objects
+        .filter(municipio=usuario.municipio, mes=_mes_actual)
+        .values_list("vehiculo_id", flat=True)
+    )
+
+    # Últimos 3 vehículos distintos usados (para mostrarlos como "Recientes")
+    ids_recientes = []
+    visto = set()
+    for est in (
+        Estacionamiento.objects
+        .filter(usuario=usuario)
+        .order_by("-hora_inicio")
+        .select_related("vehiculo")[:30]
+    ):
+        if est.vehiculo_id not in visto:
+            visto.add(est.vehiculo_id)
+            ids_recientes.append(est.vehiculo_id)
+        if len(ids_recientes) >= 3:
+            break
+    ids_recientes_set = set(ids_recientes)
+
+    vehiculos_qs = (
+        Vehiculo.objects
+        .filter(vehiculousuario__usuario=usuario)
+        .distinct()
+    )
+
+    vehiculos_data = []
+    for v in vehiculos_qs:
+        vehiculos_data.append({
+            "id":           v.id,
+            "patente":      v.patente,
+            "tipo":         v.tipo,
+            "tipo_display": v.get_tipo_display(),
+            "tiene_abono":  v.id in ids_con_abono,
+            "exento":       bool(getattr(v, "exento_global", False)),
+            "es_reciente":  v.id in ids_recientes_set,
+        })
+    # Recientes primero, luego el resto por patente
+    vehiculos_data.sort(key=lambda v: (0 if v["es_reciente"] else 1, v["patente"]))
+
+    saldo = obtener_saldo_conductor(usuario, usuario.municipio)
+
+    return JsonResponse({
+        "saldo":                  float(saldo),
+        "dia_libre_hoy":          dia_libre,
+        "fuera_de_horario":       fuera_de_horario,
+        "mensaje_horario":        msg_horario,
+        "tarifa_hora_auto":       float(t_auto_ef),
+        "tarifa_hora_moto":       float(t_moto_ef),
+        "descuento_pct":          descuento_pct,
+        "vehiculos":              vehiculos_data,
+        "opciones_duracion_auto": [
+            {"horas": float(o["horas"]), "label": o["label"], "costo": float(o["costo"])}
+            for o in opciones_auto
+        ],
+        "opciones_duracion_moto": [
+            {"horas": float(o["horas"]), "label": o["label"], "costo": float(o["costo"])}
+            for o in opciones_moto
+        ],
+        "subcuadras": [
+            {
+                "id":        s.id,
+                "calle":     s.calle,
+                "altura":    s.altura,
+                "tipo_zona": s.tipo_zona,
+                "entre":     s.entre_calles,
+            }
+            for s in subcuadras
+        ],
+        "geoloc_activa":          bool(
+            usuario.municipio and getattr(usuario.municipio, "geoloc_conductor_activa", False)
+        ),
+        "selector_manual_activo": bool(
+            not usuario.municipio
+            or getattr(usuario.municipio, "selector_manual_conductor_activo", True)
+        ),
+        "url_subcuadra_cercana":  reverse("conductor_subcuadra_cercana"),
+    })
+
+
+@require_login
+@require_POST
+def api_conductor_estacionar(request):
+    """
+    POST /api/conductor/estacionar/
+
+    Registra un estacionamiento para el conductor.
+    Replica el flujo POST de estacionar_vehiculo() pero devuelve JSON en lugar
+    de redirigir, para que el componente React pueda manejar el resultado.
+
+    Body (JSON):
+        vehiculo_id         — int
+        horas               — float
+        subcuadra_id        — int|null
+        conductor_gps_lat   — str|null
+        conductor_gps_lon   — str|null
+
+    Respuesta OK:    { "ok": true, "redirect_url": "/...", "info_infraccion": {...}|null }
+    Respuesta error: { "ok": false, "error_code": "...", "error": "...", "redirect_url": "..."|null }
+
+    Por qué se setea request.session aquí:
+    notif_infraccion_pendiente vive en la sesión de Django para que inicio_usuarios()
+    pueda mostrarlo al volver. El endpoint de API es una vista Django normal, así que
+    request.session funciona igual que en cualquier otra vista.
+    """
+    import json
+
+    usuario = request.user
+
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "JSON inválido."}, status=400)
+
+    vehiculo_id       = body.get("vehiculo_id")
+    horas             = body.get("horas")
+    subcuadra_id      = body.get("subcuadra_id")
+    conductor_gps_lat = body.get("conductor_gps_lat") or None
+    conductor_gps_lon = body.get("conductor_gps_lon") or None
+
+    # ── Resolver vehículo ────────────────────────────────────────────────────
+    try:
+        vehiculo = Vehiculo.objects.get(
+            id=vehiculo_id, vehiculousuario__usuario=usuario
+        )
+    except Vehiculo.DoesNotExist:
+        return JsonResponse(
+            {"ok": False, "error": "Vehículo no encontrado.", "error_code": "vehiculo_no_encontrado"},
+            status=400,
+        )
+
+    # Estacionamiento ya activo para este vehículo
+    if Estacionamiento.objects.filter(vehiculo=vehiculo, estado="ACTIVO").exists():
+        return JsonResponse(
+            {"ok": False, "error": "El vehículo ya tiene un estacionamiento activo.", "error_code": "ya_activo"},
+            status=400,
+        )
+
+    # ── Validación de horario ─────────────────────────────────────────────────
+    # Los días libres omiten el chequeo de horario (igual que views_conductor).
+    if not es_dia_libre_conductor(usuario.municipio):
+        permitido, msg_horario = puede_estacionar_ahora(usuario.municipio)
+        if not permitido:
+            return JsonResponse(
+                {"ok": False, "error": msg_horario or "Fuera de horario.", "error_code": "fuera_horario"},
+                status=400,
+            )
+
+    # ── Validación de duración ────────────────────────────────────────────────
+    tarifa_obj   = Tarifa.objects.filter(municipio=usuario.municipio).first()
+    minutos_min  = tarifa_obj.duracion_minima_minutos if tarifa_obj else 30
+    try:
+        duracion         = Decimal(str(horas))
+        duracion_min_h   = Decimal(str(round(minutos_min / 60, 4)))
+        if duracion <= 0 or duracion < duracion_min_h:
+            raise ValueError()
+    except Exception:
+        return JsonResponse(
+            {"ok": False, "error": f"La duración mínima es {minutos_min} minutos.", "error_code": "duracion_invalida"},
+            status=400,
+        )
+
+    # ── Resolver subcuadra ────────────────────────────────────────────────────
+    if subcuadra_id:
+        subcuadra = (
+            Subcuadra.objects.filter(id=subcuadra_id, municipio=usuario.municipio).first()
+            or get_subcuadra_default(usuario.municipio)
+        )
+    else:
+        subcuadra = get_subcuadra_default(usuario.municipio)
+
+    # ── Ejecutar use case ─────────────────────────────────────────────────────
+    result = ejecutar_estacionamiento(
+        usuario, vehiculo, subcuadra, duracion,
+        gps_lat=conductor_gps_lat,
+        gps_lon=conductor_gps_lon,
+    )
+
+    if not result["ok"]:
+        error_code = result.get("error_code")
+        if error_code == "abono_activo":
+            return JsonResponse({
+                "ok":         False,
+                "error_code": "abono_activo",
+                "error":      "Abono mensual activo. No necesitás registrar estacionamiento por hora.",
+            }, status=400)
+        return JsonResponse({
+            "ok":           False,
+            "error_code":   error_code or "saldo_insuficiente",
+            "error":        "Saldo insuficiente. Cargá saldo para continuar.",
+            "redirect_url": reverse(result["redirect"]),
+        }, status=400)
+
+    # ── Notificación de infracción detectada ──────────────────────────────────
+    # Mismo comportamiento que views_conductor: si la infracción quedó pendiente,
+    # se guarda en sesión para mostrarla al llegar a inicio_usuarios.
+    info_inf = result.get("info_infraccion")
+    respuesta_infraccion = None
+    if info_inf:
+        if info_inf["anulada"]:
+            respuesta_infraccion = {
+                "anulada": True,
+                "mensaje": (
+                    f"✅ Infracción anulada — pagaste dentro del período de gracia "
+                    f"({info_inf['tolerancia_min']} min)."
+                ),
+            }
+        else:
+            # Guardar en sesión para que inicio_usuarios() la muestre al regresar
+            request.session["notif_infraccion_pendiente"] = {
+                "infraccion_id":        info_inf["infraccion_id"],
+                "monto":                str(info_inf["monto"]),
+                "tolerancia_min":       info_inf["tolerancia_min"],
+                "hora_verificacion":    info_inf["hora_verificacion"].isoformat(),
+                "hora_fin_gracia":      info_inf["hora_fin_gracia"].isoformat(),
+                "hora_estacionamiento": info_inf["hora_estacionamiento"].isoformat(),
+            }
+            respuesta_infraccion = {
+                "anulada": False,
+                "monto":   str(info_inf["monto"]),
+            }
+
+    return JsonResponse({
+        "ok":              True,
+        "redirect_url":    reverse(result["redirect"]),
+        "info_infraccion": respuesta_infraccion,
+        "warnings":        result.get("warnings", []),
     })
