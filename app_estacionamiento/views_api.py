@@ -27,7 +27,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from .decorators import require_login, require_role
-from .models import AbonoMensual, Estacionamiento, Tarifa
+from .models import AbonoMensual, Estacionamiento, Tarifa, Vehiculo
 from .services.saldo import debitar_saldo_conductor
 from .services.horarios import calcular_opciones_duracion
 from .utils import sanitizar_patente
@@ -154,6 +154,40 @@ def api_conductor_dashboard(request):
         and float(saldo) < costo_duracion_minima
     )
 
+    # Vehículos del conductor con infracciones pendientes y estado activo.
+    # Mismo patrón que inicio_usuarios(): annotate evita N+1, activos se cruzan en Python.
+    from django.db.models import Count, Q as DbQ
+    vehiculo_ids_activos = {e.vehiculo_id for e in vigentes}
+    patentes_con_abono   = {a.vehiculo.patente for a in abonos}
+    vehiculos_qs = (
+        Vehiculo.objects
+        .filter(vehiculousuario__usuario=usuario)
+        .annotate(
+            infracciones_pendientes=Count(
+                "infraccion",
+                filter=DbQ(infraccion__estado="pendiente"),
+            )
+        )
+        .distinct()
+        .order_by("patente")
+    )
+    vehiculos_data = []
+    for v in vehiculos_qs:
+        estacionamiento_activo_id = next(
+            (e.id for e in vigentes if e.vehiculo_id == v.id), None
+        )
+        vehiculos_data.append({
+            "id":                       v.id,
+            "patente":                  v.patente,
+            "tipo":                     v.tipo,
+            "tipo_display":             v.get_tipo_display(),
+            "tiene_estacionamiento_activo": v.id in vehiculo_ids_activos,
+            "estacionamiento_activo_id":    estacionamiento_activo_id,
+            "tiene_abono_activo":       v.patente in patentes_con_abono,
+            "infracciones_pendientes":  v.infracciones_pendientes,
+            "exento":                   bool(getattr(v, "exento_global", False) or getattr(v, "exento_parcial", False)),
+        })
+
     return JsonResponse({
         "saldo":                  float(saldo),
         "puede_estacionar":       puede_estacionar,
@@ -174,6 +208,7 @@ def api_conductor_dashboard(request):
             }
             for a in abonos
         ],
+        "vehiculos": vehiculos_data,
     })
 
 
