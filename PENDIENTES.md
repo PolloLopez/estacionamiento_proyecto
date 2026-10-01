@@ -76,6 +76,23 @@ railway run pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
 
 ---
 
+### Saldo negativo para conductores (habilitado por superadmin, límite por admin municipal)
+
+Permitir que un conductor estacione aunque su saldo llegue a cero, hasta un límite negativo configurable.
+
+**Modelo:** agregar en `Municipio`:
+- `saldo_negativo_habilitado = BooleanField(default=False)` — superadmin habilita por municipio
+- `limite_saldo_negativo = DecimalField(max_digits=10, decimal_places=2, default=0)` — cuántos pesos puede quedar en negativo (ej: $500)
+
+**Impacto:**
+- `debitar_saldo_conductor()`: si `saldo_negativo_habilitado`, permitir llegar hasta `-limite_saldo_negativo`
+- `saldo_insuficiente` en la API: considerar el límite negativo disponible
+- UI conductor: aviso visual cuando está usando saldo negativo
+- UI admin: campo editable en `editar_municipio.html`
+- UI superadmin: checkbox en panel de municipio
+
+---
+
 ### Superadmin: controlar declaración de domicilio electrónico en conductores
 
 Dos configuraciones nuevas en `Municipio`:
