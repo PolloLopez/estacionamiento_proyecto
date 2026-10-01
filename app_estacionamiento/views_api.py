@@ -18,6 +18,7 @@ Convención de nombres:
 from datetime import date, timedelta
 
 from django.http import JsonResponse
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
@@ -51,7 +52,7 @@ def _serializar_estacionamiento(est):
         "hora_fin_unix":    int(hora_fin.timestamp()),
         "duracion_horas":   float(est.duracion_horas),
         # URL para extender, lista para usar en el componente React sin conocer el patrón de URL
-        "url_renovar":      f"/estacionar/renovar/{est.id}/",
+        "url_renovar":      reverse("usuarios_renovar_estacionamiento", args=[est.id]),
     }
 
 
