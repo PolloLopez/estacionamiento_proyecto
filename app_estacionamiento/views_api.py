@@ -158,7 +158,8 @@ def api_conductor_dashboard(request):
     # Mismo patrón que inicio_usuarios(): annotate evita N+1, activos se cruzan en Python.
     from django.db.models import Count, Q as DbQ
     vehiculo_ids_activos = {e.vehiculo_id for e in vigentes}
-    patentes_con_abono   = {a.vehiculo.patente for a in abonos}
+    # Comparamos por vehiculo_id (no por patente) para evitar diferencias de formato/case
+    vehiculo_ids_con_abono = {a.vehiculo_id for a in abonos}
     vehiculos_qs = (
         Vehiculo.objects
         .filter(vehiculousuario__usuario=usuario)
@@ -183,7 +184,7 @@ def api_conductor_dashboard(request):
             "tipo_display":             v.get_tipo_display(),
             "tiene_estacionamiento_activo": v.id in vehiculo_ids_activos,
             "estacionamiento_activo_id":    estacionamiento_activo_id,
-            "tiene_abono_activo":       v.patente in patentes_con_abono,
+            "tiene_abono_activo":       v.id in vehiculo_ids_con_abono,
             "infracciones_pendientes":  v.infracciones_pendientes,
             "exento":                   bool(getattr(v, "exento_global", False) or getattr(v, "exento_parcial", False)),
         })
