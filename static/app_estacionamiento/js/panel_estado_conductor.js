@@ -145,30 +145,47 @@ function ModalRenovar({ estId, urlOpcionesBase, urlRenovarBase, onRenovado, onCe
   // ── Estilos del overlay ─────────────────────────────────────────────────
   const overlayStyle = {
     position: "fixed", inset: "0",
-    background: "rgba(0,0,0,0.5)",
+    background: "rgba(0,0,0,0.55)",
     display: "flex", alignItems: "flex-end", justifyContent: "center",
     zIndex: "1000",
   };
   const panelStyle = {
     background: "var(--color-surface)",
-    borderRadius: "var(--radius-lg, 12px) var(--radius-lg, 12px) 0 0",
-    padding: "1.25rem 1rem 2rem",
+    borderRadius: "16px 16px 0 0",
+    padding: "0 1.25rem 2.5rem",
     width: "100%", maxWidth: "480px",
-    boxShadow: "0 -4px 24px rgba(0,0,0,0.15)",
+    boxShadow: "0 -4px 32px rgba(0,0,0,0.2)",
   };
 
   return ce("div", { style: overlayStyle, onClick: onCerrar },
     ce("div", { style: panelStyle, onClick: e => e.stopPropagation() },
 
+      // Barra de arrastre visual (solo decorativa, indica que es un bottom sheet)
+      ce("div", { style: { display: "flex", justifyContent: "center", padding: "0.75rem 0 0.25rem" } },
+        ce("div", { style: { width: "40px", height: "4px", borderRadius: "2px", background: "var(--color-border)" } })
+      ),
+
       // Header del modal
       ce("div", {
-        style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }
+        style: {
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "0.75rem 0 1rem",
+          borderBottom: "1px solid var(--color-border)",
+          marginBottom: "1.25rem",
+        }
       },
-        ce("h3", { style: { margin: 0 } }, "🔄 Extender estacionamiento"),
+        ce("span", { style: { fontSize: "1.1rem", fontWeight: 700 } }, "🔄 Extender estacionamiento"),
         ce("button", {
           type: "button",
           onClick: onCerrar,
-          style: { background: "none", border: "none", fontSize: "1.4rem", cursor: "pointer", color: "var(--color-text-muted)" },
+          style: {
+            background: "var(--color-surface-2, #f3f4f6)",
+            border: "none", borderRadius: "50%",
+            width: "32px", height: "32px",
+            fontSize: "1.1rem", cursor: "pointer",
+            color: "var(--color-text-muted)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          },
         }, "×")
       ),
 
