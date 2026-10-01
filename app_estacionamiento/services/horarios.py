@@ -256,19 +256,49 @@ def calcular_opciones_duracion(municipio, tarifa_hora, hora_inicio_est=None, dur
         minutos_disponibles = 8 * 60
 
     # ── Casos de franja final ────────────────────────────────────────────────
-    # Se aplican solo para estacionamientos nuevos (no para renovaciones),
-    # porque en renovaciones el límite es el vencimiento del ticket actual,
-    # no el tiempo hasta el cierre desde ahora.
-    # Igual aplican a renovaciones también: si quedan < 30 min desde el vencimiento
-    # del ticket actual hasta el cierre, ofrecemos 30 min aunque exceda levemente.
+    # Cuando quedan pocos minutos para el cierre, generamos opciones razonables.
+    #
+    # Si el admin configuró un mínimo corto (< 30 min, ej: 10 min),
+    # respetamos ese mínimo también en la franja final — el conductor
+    # debe poder comprar 10 min si eso configuró el municipio.
+    # Si el mínimo es >= 30 (comportamiento habitual), mantenemos la lógica original
+    # de ofrecer 30 min o 1 hora aunque exceda levemente el cierre.
 
     if minutos_disponibles < 30:
-        # Últimos minutos del horario: única opción es 30 min.
+        if duracion_minima_min < 30 and duracion_minima_min <= minutos_disponibles:
+            # Mínimo corto configurado por el admin y caben en el tiempo disponible
+            horas_min = round(duracion_minima_min / 60, 4)
+            costo_min = round(horas_min * float(tarifa_hora), 2)
+            return [{"horas": horas_min, "label": f"{duracion_minima_min} min", "costo": costo_min}]
+        # Fallback: 30 min aunque exceda levemente el cierre (se auto-cierra al final del horario)
         costo = round(0.5 * float(tarifa_hora), 2)
         return [{"horas": 0.5, "label": "30 min", "costo": costo}]
 
     if minutos_disponibles < 60:
-        # Entre 30 y 60 min disponibles: ofrecer 1 hora aunque exceda el cierre.
+        if duracion_minima_min < 30:
+            # Mínimo corto: generar opciones desde el mínimo hasta los minutos disponibles
+            opciones = []
+            paso = duracion_minima_min  # ej: 10 min
+            minutos = paso
+            while minutos <= minutos_disponibles:
+                horas = round(minutos / 60, 4)
+                if minutos < 60:
+                    label = f"{minutos} min"
+                elif minutos == 60:
+                    label = "1 hora"
+                else:
+                    label = f"{minutos // 60}h {minutos % 60}min" if minutos % 60 else f"{minutos // 60} horas"
+                costo = round(horas * float(tarifa_hora), 2)
+                opciones.append({"horas": horas, "label": label, "costo": costo})
+                minutos += paso
+            # Si no entró ninguna opción (ej: mínimo 10 min pero solo quedan 5)
+            # ofrecemos el mínimo igual (el sistema lo cierra al vencer el horario)
+            if not opciones:
+                horas_min = round(duracion_minima_min / 60, 4)
+                costo_min = round(horas_min * float(tarifa_hora), 2)
+                opciones.append({"horas": horas_min, "label": f"{duracion_minima_min} min", "costo": costo_min})
+            return opciones
+        # Mínimo >= 30: ofrecer 1 hora aunque exceda el cierre (comportamiento original)
         # El sistema cierra el estacionamiento al finalizar el horario de todas formas.
         costo = round(1.0 * float(tarifa_hora), 2)
         return [{"horas": 1.0, "label": "1 hora", "costo": costo}]
