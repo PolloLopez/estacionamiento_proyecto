@@ -423,8 +423,10 @@ function PanelEstado({ urlDashboard, urlEstacionamientosActivos, urlEstacionar, 
   const activos = estado.estacionamientos_activos || [];
 
   // ── Render: con estacionamientos activos ────────────────────────────────
+  // React.Fragment evita agregar un div wrapper sin clase que rompe el flujo visual.
+  // El modal se renderiza por encima (fixed) y la card queda directamente en el DOM.
   if (activos.length > 0) {
-    return ce("div", null,
+    return ce(React.Fragment, null,
       // Modal de renovar (se renderiza por encima si idEstacionamientoModal está seteado)
       idEstacionamientoModal && ce(ModalRenovar, {
         estId:           idEstacionamientoModal,

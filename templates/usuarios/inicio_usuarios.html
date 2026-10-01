@@ -64,6 +64,7 @@
        Las URLs se pasan como data-* para que Django reverse() las calcule
        y el JS no tenga que conocer el patrón de rutas. -->
   <div id="panel-estado-react"
+       style="margin-top:1rem;"
        data-url-dashboard="{% url 'api_conductor_dashboard' %}"
        data-url-estacionamientos-activos="{% url 'api_conductor_estacionamientos_activos' %}"
        data-url-estacionar="{% url 'usuarios_estacionar_vehiculo' %}"
