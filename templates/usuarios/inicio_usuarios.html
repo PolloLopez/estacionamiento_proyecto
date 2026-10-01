@@ -295,12 +295,6 @@
 
 {% block extra_scripts %}
 
-{# ── React: PanelEstado ───────────────────────────────────────────────────────
-   React 18 + ReactDOM desde CDN (producción, minificado).
-   Se carga solo en esta página — no impacta al resto del sistema.
-   Cuando migremos a Vite en Fase 4 estos tres <script> desaparecen y
-   el bundle compilado los reemplaza. #}
-{# React 18.2.0 UMD servido desde static propio — sin depender de CDN externo #}
 <script src="{% static 'app_estacionamiento/js/react.production.min.js' %}"></script>
 <script src="{% static 'app_estacionamiento/js/react-dom.production.min.js' %}"></script>
 <script src="{% static 'app_estacionamiento/js/panel_estado_conductor.js' %}"></script>
