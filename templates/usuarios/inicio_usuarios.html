@@ -67,7 +67,9 @@
        data-url-dashboard="{% url 'api_conductor_dashboard' %}"
        data-url-estacionamientos-activos="{% url 'api_conductor_estacionamientos_activos' %}"
        data-url-estacionar="{% url 'usuarios_estacionar_vehiculo' %}"
-       data-url-recargar="{% url 'mp_iniciar_carga' %}">
+       data-url-recargar="{% url 'mp_iniciar_carga' %}"
+       data-url-opciones-renovar-base="{% url 'api_conductor_opciones_renovar' 0 %}"
+       data-url-renovar-base="{% url 'api_conductor_renovar' 0 %}">
     {# Fallback visible mientras React carga (spinner mínimo) #}
     <div class="card">
       <h3>🚗 Estado del vehículo</h3>

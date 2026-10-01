@@ -32,6 +32,15 @@ urlpatterns = [
     path("api/conductor/estacionamientos/activos/",
          views_api.api_conductor_estacionamientos_activos,
          name="api_conductor_estacionamientos_activos"),
+    path("api/conductor/historial/",
+         views_api.api_conductor_historial,
+         name="api_conductor_historial"),
+    path("api/conductor/estacionamiento/<int:est_id>/opciones-renovar/",
+         views_api.api_conductor_opciones_renovar,
+         name="api_conductor_opciones_renovar"),
+    path("api/conductor/estacionamiento/<int:est_id>/renovar/",
+         views_api.api_conductor_renovar,
+         name="api_conductor_renovar"),
 
     # =========================
     # 📱 PWA
