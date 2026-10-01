@@ -104,11 +104,18 @@
   {% endif %}
 </div>
 
-<!-- 🚗 MIS VEHÍCULOS -->
+<!-- 🚗 MIS VEHÍCULOS — React mount point -->
+<div id="mis-vehiculos-react"
+     data-url-dashboard="{% url 'api_conductor_dashboard' %}"
+     data-url-historial-base="{% url 'usuarios_historial_estacionamientos' %}"
+     data-url-infracciones-base="{% url 'mis_infracciones' %}"
+     data-url-agregar-vehiculo="{% url 'agregar_vehiculo' %}">
+</div>
+
+<!-- Fallback Django: React lo oculta al montar. Si React falla, esto queda visible. -->
 {% if vehiculos_conductor %}
-<div class="card" style="margin-top:1rem;">
+<div id="mis-vehiculos-fallback-django" class="card" style="margin-top:1rem;">
   <h3 style="margin-bottom:0.75rem;">🚗 Mis vehículos</h3>
-  <!-- max-height: muestra hasta 5 vehículos, el resto con scroll -->
   <div style="display:flex; flex-direction:column; gap:0; max-height:215px; overflow-y:auto;">
     {% for v in vehiculos_conductor %}
     <div style="display:flex; align-items:center; justify-content:space-between;
@@ -301,6 +308,7 @@
 <script src="{% static 'app_estacionamiento/js/react.production.min.js' %}"></script>
 <script src="{% static 'app_estacionamiento/js/react-dom.production.min.js' %}"></script>
 <script src="{% static 'app_estacionamiento/js/panel_estado_conductor.js' %}"></script>
+<script src="{% static 'app_estacionamiento/js/mis_vehiculos_conductor.js' %}"></script>
 
 {% if municipio_branding.minutos_alerta_push %}
 <script>
