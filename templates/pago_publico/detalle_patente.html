@@ -167,6 +167,23 @@
       ({{ estacionamiento_activo.duracion_horas|floatformat:"-2" }}h).
     </p>
   </div>
+  {% elif not puede_estacionar %}
+  {# Fuera de horario: mostrar aviso en lugar del formulario #}
+  <div class="card" style="margin-bottom:1.25rem; border-left:4px solid #e67e22;">
+    <h2 style="font-size:1.05rem; margin-bottom:0.5rem; color:#e67e22;">🕐 Fuera de horario</h2>
+    <p style="font-size:0.9rem; margin:0; color:var(--color-text);">
+      {% if mensaje_fuera_horario %}
+        {{ mensaje_fuera_horario }}
+      {% else %}
+        El estacionamiento medido no está activo en este momento.
+      {% endif %}
+    </p>
+    {% if municipio.leyenda_horarios %}
+    <p style="font-size:0.82rem; color:var(--color-text-muted); margin-top:0.5rem; white-space:pre-wrap;">
+      {{ municipio.leyenda_horarios }}
+    </p>
+    {% endif %}
+  </div>
   {% else %}
   <div class="card" style="margin-bottom:1.25rem;">
     <h2 style="font-size:1.05rem; margin-bottom:1rem;">🚗 Estacionar ahora</h2>

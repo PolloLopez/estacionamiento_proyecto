@@ -385,6 +385,19 @@ def editar_municipio(request, municipio_id):
                 municipio.ticket_qr_size = max(1, min(8, qr))
             except (ValueError, TypeError):
                 municipio.ticket_qr_size = 4
+            # Próximo número de acta: debe ser >= 1.
+            # No bajar el número si ya hay actas emitidas más allá de ese valor:
+            # eso generaría colisiones de numeración. La validación es solo de rango mínimo;
+            # la responsabilidad de no retroceder el número es del superadmin.
+            try:
+                numero = int(request.POST.get("proximo_numero_acta", 1))
+                municipio.proximo_numero_acta = max(1, numero)
+            except (ValueError, TypeError):
+                pass   # si el campo viene vacío o inválido, no modificar el valor actual
+            # Mostrar inspector: checkbox → presente en POST = True, ausente = False
+            municipio.mostrar_inspector_en_ticket = (
+                "mostrar_inspector_en_ticket" in request.POST
+            )
             municipio.save()
             messages.success(request, "Información institucional guardada.")
             return redirect("editar_municipio", municipio_id=municipio.id)
