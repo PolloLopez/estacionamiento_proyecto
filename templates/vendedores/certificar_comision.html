@@ -27,7 +27,13 @@
     {% if liquidacion.notas_tesorero %}
       <p><strong>Notas del tesorero:</strong> {{ liquidacion.notas_tesorero }}</p>
     {% endif %}
-    {% if not liquidacion.numero_comprobante and not liquidacion.comprobante_archivo and not liquidacion.notas_tesorero %}
+    {% if liquidacion.estado == "pendiente" %}
+      {# Sin paso previo de tesorero: el vendedor certifica recibo directamente #}
+      <p class="text-muted" style="font-size:0.85rem;">
+        ℹ️ El depósito no fue registrado en el sistema por tesorería.
+        Confirmá solo si ya recibiste el pago por otro medio (transferencia directa, efectivo, etc.).
+      </p>
+    {% elif not liquidacion.numero_comprobante and not liquidacion.comprobante_archivo and not liquidacion.notas_tesorero %}
       <p class="text-muted" style="font-size:0.85rem;">El tesorero no adjuntó comprobante ni notas.</p>
     {% endif %}
     <p style="font-size:1.8rem; font-weight:900; color:var(--color-primary); margin-top:0.75rem; text-align:center;">
