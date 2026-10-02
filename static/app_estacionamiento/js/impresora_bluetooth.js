@@ -152,16 +152,19 @@ async function reconectarImpresora() {
         // Esperamos el anuncio BLE (3s) antes de conectar: mucho más confiable
         // que llamar gatt.connect() en frío, especialmente después de navegar entre páginas.
         try {
-          var cx = await _conectarViaAnuncio(device, 3000);
+          // 6000ms: impresoras térmicas BLE baratas pueden tardar 2-5s en emitir
+          // el primer anuncio después de encenderse. 3s era demasiado ajustado.
+          var cx = await _conectarViaAnuncio(device, 6000);
           guardarInfoImpresora(device, cx.perfil);   // persiste perfil exitoso
           return cx;
         } catch (eAnuncio) {
           console.warn('[BLE] watchAdvertisements falló o timeout:', eAnuncio.message);
         }
 
-        // Fallback dentro del mismo dispositivo: connect directo con reintentos
+        // Fallback dentro del mismo dispositivo: connect directo con más reintentos
+        // (5 intentos, 1000ms de pausa: el device puede estar en estado "desconectando")
         try {
-          var cxDirecto = await _abrirConexionConReintentos(device, 3);
+          var cxDirecto = await _abrirConexionConReintentos(device, 5, 1000);
           guardarInfoImpresora(device, cxDirecto.perfil);
           return cxDirecto;
         } catch (eDirecto) {
@@ -220,9 +223,14 @@ async function _conectarViaAnuncio(device, timeoutMs) {
  * Intenta gatt.connect() hasta `intentos` veces con pausa entre reintentos.
  * Útil para el caso donde el dispositivo está en estado "desconectando"
  * (ej: copia 1 recién terminó y llamamos para copia 2).
+ *
+ * @param {BluetoothDevice} device
+ * @param {number} intentos   - Cantidad máxima de intentos (default 3)
+ * @param {number} pausaMs    - Pausa entre intentos en ms (default 600)
  */
-async function _abrirConexionConReintentos(device, intentos) {
+async function _abrirConexionConReintentos(device, intentos, pausaMs) {
   intentos = intentos || 3;
+  pausaMs  = pausaMs  || 600;
   var ultimoError;
   for (var i = 0; i < intentos; i++) {
     try {
@@ -231,7 +239,7 @@ async function _abrirConexionConReintentos(device, intentos) {
       ultimoError = e;
       console.warn('[BLE] gatt.connect() intento ' + (i + 1) + ' falló:', e.message);
       if (i < intentos - 1) {
-        await new Promise(function(r) { setTimeout(r, 600); });
+        await new Promise(function(r) { setTimeout(r, pausaMs); });
       }
     }
   }
@@ -353,7 +361,7 @@ async function reconectarSilencioso() {
 
     // Intentar vía anuncio BLE (más confiable, especialmente post-disconnect de copia 1)
     try {
-      var cx = await _conectarViaAnuncio(device, 3000);
+      var cx = await _conectarViaAnuncio(device, 6000);
       guardarInfoImpresora(device, cx.perfil);
       return cx;
     } catch (eAnuncio) {
@@ -361,7 +369,7 @@ async function reconectarSilencioso() {
     }
 
     // Fallback: connect directo con reintentos
-    var cxDirecto2 = await _abrirConexionConReintentos(device, 3);
+    var cxDirecto2 = await _abrirConexionConReintentos(device, 5, 1000);
     guardarInfoImpresora(device, cxDirecto2.perfil);
     return cxDirecto2;
   } catch (e) {
@@ -390,12 +398,14 @@ async function enviarImpresion(caracteristica, datos) {
 /** Normaliza texto a ASCII puro (impresoras básicas no soportan UTF-8). */
 function _norm(s) {
   return String(s || '')
-    .replace(/[áàâä]/gi, function(m) { return /[A-Z]/.test(m) ? 'A' : 'a'; })
-    .replace(/[éèêë]/gi, function(m) { return /[A-Z]/.test(m) ? 'E' : 'e'; })
-    .replace(/[íìîï]/gi, function(m) { return /[A-Z]/.test(m) ? 'I' : 'i'; })
-    .replace(/[óòôö]/gi, function(m) { return /[A-Z]/.test(m) ? 'O' : 'o'; })
-    .replace(/[úùûü]/gi, function(m) { return /[A-Z]/.test(m) ? 'U' : 'u'; })
+    .replace(/[áàâäã]/gi, function(m) { return /[A-Z]/.test(m) ? 'A' : 'a'; })
+    .replace(/[éèêë]/gi,  function(m) { return /[A-Z]/.test(m) ? 'E' : 'e'; })
+    .replace(/[íìîï]/gi,  function(m) { return /[A-Z]/.test(m) ? 'I' : 'i'; })
+    .replace(/[óòôöõ]/gi, function(m) { return /[A-Z]/.test(m) ? 'O' : 'o'; })
+    .replace(/[úùûü]/gi,  function(m) { return /[A-Z]/.test(m) ? 'U' : 'u'; })
     .replace(/ñ/g, 'n').replace(/Ñ/g, 'N')
+    .replace(/ç/g, 'c').replace(/Ç/g, 'C')
+    .replace(/ý/g, 'y').replace(/Ý/g, 'Y')
     .replace(/[^\x20-\x7E]/g, '?');
 }
 

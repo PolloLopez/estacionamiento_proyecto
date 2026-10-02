@@ -412,14 +412,32 @@ class TestFlujoCertificacionComision(TestCase):
         self.liquidacion.refresh_from_db()
         self.assertEqual(self.liquidacion.estado, "certificada")
 
-    def test_vendedor_no_puede_certificar_liquidacion_pendiente(self):
-        """El vendedor no puede certificar si el tesorero aún no depositó."""
+    def test_vendedor_puede_certificar_liquidacion_pendiente(self):
+        """
+        El vendedor puede certificar directamente desde 'pendiente'.
+        Esto permite municipios que no usan el flujo de tesorero en el sistema
+        (el vendedor confirma el recibo cuando recibió el pago por otro medio).
+        """
         client = Client()
         client.force_login(self.vendedor)
         client.post(reverse("certificar_comision", args=[self.liquidacion.id]))
         self.liquidacion.refresh_from_db()
-        # Debe seguir en pendiente (la view ignora el POST y redirige con warning)
-        self.assertNotEqual(self.liquidacion.estado, "certificada")
+        # El estado avanza directamente a certificada sin pasar por depositada
+        self.assertEqual(self.liquidacion.estado, "certificada")
+
+    def test_vendedor_no_puede_certificar_liquidacion_ya_certificada(self):
+        """No se puede volver a certificar una liquidación ya certificada."""
+        self.liquidacion.estado = "certificada"
+        self.liquidacion.save()
+
+        client = Client()
+        client.force_login(self.vendedor)
+        response = client.post(reverse("certificar_comision", args=[self.liquidacion.id]))
+        self.liquidacion.refresh_from_db()
+        # La view debe redirigir con warning y el estado no debe cambiar
+        self.assertEqual(self.liquidacion.estado, "certificada")
+        # No es 200 (la view siempre redirige)
+        self.assertNotEqual(response.status_code, 200)
 
     def test_conductor_no_puede_depositar(self):
         """Un conductor no tiene acceso a depositar_comision (403 o redirect)."""

@@ -779,6 +779,31 @@ function mostrarResultadoSia(tipo, html) {
 document.getElementById("modal-sia").addEventListener("click", function(e) {
     if (e.target === this) cerrarModalSia();
 });
+
+// ── Redirect desde flujo legacy (registrar_infraccion GET) ───────────────────
+// Si llega ?patente=XYZ en la URL (ej: bookmark viejo a /inspectores/infraccionar/),
+// esperamos que el componente React monte y exponga iniciarInfraccionInline(),
+// luego disparamos el formulario de infracción directamente.
+// Polling cada 100ms, máximo 4s; si el hook no aparece, se ignora silenciosamente
+// (el inspector puede ingresar la patente a mano normalmente).
+(function() {
+  var params  = new URLSearchParams(window.location.search);
+  var patente = (params.get("patente") || "").trim().toUpperCase();
+  if (!patente) return;
+
+  var intentos   = 0;
+  var maxIntentos = 40;  // 40 × 100ms = 4 segundos
+  var intervalo  = setInterval(function() {
+    intentos++;
+    if (typeof window.iniciarInfraccionInline === "function") {
+      clearInterval(intervalo);
+      window.iniciarInfraccionInline(patente);
+    } else if (intentos >= maxIntentos) {
+      clearInterval(intervalo);
+      console.warn("[verificar] iniciarInfraccionInline no disponible tras 4s para patente:", patente);
+    }
+  }, 100);
+})();
 </script>
 
 {% endblock %}

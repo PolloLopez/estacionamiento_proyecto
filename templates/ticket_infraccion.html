@@ -118,8 +118,8 @@
 
     <p><b>Inspector:</b></p>
     <p>
-      {% if infraccion.inspector.nombre %}
-        {{ infraccion.inspector.nombre }} {{ infraccion.inspector.apellido }}
+      {% if infraccion.inspector.first_name %}
+        {{ infraccion.inspector.first_name }} {{ infraccion.inspector.last_name }}
       {% else %}
         {{ infraccion.inspector.correo }}
       {% endif %}
@@ -201,7 +201,9 @@
 // Datos del acta pasados desde Django al contexto JS
 var DATOS_ACTA = {
   municipio:    "{{ infraccion.municipio.nombre|escapejs }}",
-  acta:         "{{ infraccion.id }}",
+  // numero_acta es el número correlativo oficial por municipio.
+  // Fallback a infraccion.id para actas anteriores a esa funcionalidad.
+  acta:         "{{ infraccion.numero_acta|default:infraccion.id }}",
   patente:      "{{ infraccion.vehiculo.patente|escapejs }}",
   tipo_vehiculo:"{{ infraccion.vehiculo.get_tipo_display|escapejs }}",
   subcuadra:    "{{ infraccion.subcuadra|default:''|escapejs }}",
@@ -209,7 +211,9 @@ var DATOS_ACTA = {
   fecha:        "{{ infraccion.creado_en|date:'d/m/Y' }}",
   hora:         "{{ infraccion.creado_en|date:'H:i' }}",
   monto:        "{{ infraccion.monto }}",
-  inspector:    "{% if infraccion.inspector.nombre %}{{ infraccion.inspector.nombre|escapejs }} {{ infraccion.inspector.apellido|escapejs }}{% else %}{{ infraccion.inspector.correo|escapejs }}{% endif %}",
+  // first_name/last_name son los campos reales de AbstractUser.
+  // nombre/apellido no existen → siempre caían al correo aunque el inspector tuviera nombre.
+  inspector:    "{% if infraccion.inspector.first_name %}{{ infraccion.inspector.first_name|escapejs }} {{ infraccion.inspector.last_name|escapejs }}{% else %}{{ infraccion.inspector.correo|escapejs }}{% endif %}",
   legajo:           "{{ infraccion.inspector.numero_legajo|default:''|escapejs }}",
   url_pago:         "{{ request.scheme }}://{{ request.get_host }}/pagar/{{ infraccion.vehiculo.patente }}/",
   leyenda_horarios:       "{{ infraccion.municipio.leyenda_horarios|default:''|escapejs }}",
