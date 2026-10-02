@@ -41,19 +41,21 @@
             <span id="gps-estado" style="font-weight:400; text-transform:none; margin-left:0.4rem;"></span>
           </label>
           <!-- Cascade Calle → Altura con autocomplete (datalist).
-               sel-calle: texto libre con sugerencias. sel-altura: teclado numérico con sugerencias. -->
-          <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+               sel-calle: texto libre con sugerencias. sel-altura: teclado numérico con sugerencias.
+               Zona Única (altura=0) se excluye del cascade — se asigna por GPS o desde el panel. -->
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
             <input id="sel-calle" list="list-calles" autocomplete="off"
-                   placeholder="Escribí la calle..."
-                   style="flex:1; min-width:110px; padding:0.5rem 0.65rem; border-radius:8px;
+                   placeholder="Calle..."
+                   style="flex:2; min-width:130px; padding:0.7rem 0.85rem; border-radius:10px;
                           border:2px solid var(--color-border); background:var(--color-surface);
-                          color:var(--color-text); font-size:0.9rem; font-weight:600;">
+                          color:var(--color-text); font-size:1.05rem; font-weight:700;">
             <datalist id="list-calles"></datalist>
-            <input id="sel-altura" list="list-alturas" inputmode="numeric" autocomplete="off"
-                   placeholder="Altura" disabled
-                   style="flex:1; min-width:80px; padding:0.5rem 0.65rem; border-radius:8px;
+            <input id="sel-altura" list="list-alturas"
+                   inputmode="{{ municipio.altura_solo_numeros|yesno:'numeric,' }}"
+                   autocomplete="off" placeholder="Altura" disabled
+                   style="flex:1; min-width:90px; padding:0.7rem 0.85rem; border-radius:10px;
                           border:2px solid var(--color-border); background:var(--color-surface);
-                          color:var(--color-text); font-size:0.9rem; font-weight:600;">
+                          color:var(--color-text); font-size:1.05rem; font-weight:700;">
             <datalist id="list-alturas"></datalist>
           </div>
           <!-- Referencia visual de intersección cuando el inspector elige una altura -->
@@ -137,7 +139,7 @@ function aplicarZonaLibreInspector(esLibre) {
 // Todos los listeners que dependen de él se registran condicionalmente.
 if (form && input) {
     // Placeholder genérico — el sistema acepta todos los formatos (auto y moto).
-    input.placeholder = "AAA111 / AA111BB / 123ABC";
+    input.placeholder = "AAA111 / AA111BB";
 
     input.addEventListener("input", () => {
         // Normalizar: solo letras y números, todo mayúscula.
@@ -209,9 +211,12 @@ window.onload = () => {
   var refEl       = document.getElementById("entre-calles-ref-inspector");
   if (!selCalle) return; // municipio con zona única — usa campo oculto directo
 
-  // Poblar datalist de calles con valores únicos
+  // Poblar datalist de calles con valores únicos.
+  // Excluir Zona Única (altura == 0): el inspector nunca debe seleccionarla
+  // manualmente; se asigna automáticamente por GPS o desde el panel de admin.
   var callesVistas = {};
   SUBCUADRAS_INS.forEach(function(s) {
+    if (s.altura == 0) return;   // Zona Única — excluida del cascade inspector
     if (!callesVistas[s.calle]) {
       callesVistas[s.calle] = true;
       var opt = document.createElement("option");
@@ -238,12 +243,15 @@ window.onload = () => {
   }
 
   // Puebla el datalist de alturas para la calle dada.
+  // Excluye Zona Única (altura=0) igual que el datalist de calles.
   function poblarAlturas(calle) {
     listAlturas.innerHTML = "";
     selAltura.value = "";
     hidden.value = "";
     mostrarRef(null);
-    var filtradas = SUBCUADRAS_INS.filter(function(s) { return s.calle === calle; });
+    var filtradas = SUBCUADRAS_INS.filter(function(s) {
+      return s.calle === calle && s.altura !== 0;
+    });
     filtradas.forEach(function(s) {
       var opt = document.createElement("option");
       opt.value = labelAltura(s);
@@ -258,8 +266,9 @@ window.onload = () => {
   //   2. Altura numérica exacta
   //   3. Texto de intersección parcial (insensible a mayúsculas)
   //   4. Altura numéricamente más cercana (fallback si escribió un número)
+  // Zona Única (altura=0) excluida del matching — no puede asignarse manualmente.
   function asignarSubcuadraInspector(calle, texto) {
-    var subs = SUBCUADRAS_INS.filter(function(s) { return s.calle === calle; });
+    var subs = SUBCUADRAS_INS.filter(function(s) { return s.calle === calle && s.altura !== 0; });
     if (!subs.length) return null;
     var textoLower = texto.toLowerCase().trim();
 

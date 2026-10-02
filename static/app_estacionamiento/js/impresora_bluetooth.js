@@ -95,6 +95,26 @@ function nombreMostrar(device) {
 }
 
 /**
+ * Extrae la MAC address del nombre del dispositivo Bluetooth.
+ *
+ * Chrome Android muestra el dispositivo en el picker como:
+ *   "Printer001 (DC:03:30:CE:28:95)"
+ * device.name contiene ese string completo, no solo "Printer001".
+ * Extraemos la MAC con regex y la usamos para identificar la impresora
+ * en el ticket de prueba, para que el inspector confirme que está
+ * conectado a su propia impresora y no a la de un compañero.
+ *
+ * Fallback: si el nombre no tiene MAC entre paréntesis, devuelve device.id.
+ */
+function extraerMac(device) {
+  if (device && device.name) {
+    var match = device.name.match(/\(([0-9A-F]{2}(?::[0-9A-F]{2}){5})\)/i);
+    if (match) return match[1];
+  }
+  return (device && device.id) ? device.id : 'desconocido';
+}
+
+/**
  * Guarda info del dispositivo activo para reconexión posterior.
  * Si se pasa `perfil`, también lo guarda para usarlo primero en la próxima conexión
  * y así saltear la iteración de perfiles conocidos (ahorra ~300-600ms por conexión).

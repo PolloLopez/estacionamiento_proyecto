@@ -345,6 +345,19 @@ class Municipio(models.Model):
         help_text="Si está desactivado, el conductor solo puede usar el GPS para indicar su ubicación.",
     )
 
+    # ── Formato de alturas en el selector de subcuadra del inspector ─────────
+    # Si True (default), el teclado del celular abre en modo numérico al tipear altura.
+    # Si False, abre teclado alfanumérico completo (municipios con alturas como "km 3.5").
+    altura_solo_numeros = models.BooleanField(
+        default=True,
+        verbose_name="Alturas solo numéricas (inspector)",
+        help_text=(
+            "Si está activo, el teclado del celular muestra solo números al ingresar "
+            "la altura en el selector de subcuadra del inspector. "
+            "Desactivar si el municipio usa alturas alfanuméricas (ej: Km 3.5, 150 bis)."
+        ),
+    )
+
     # ── Notificaciones push al conductor ─────────────────────────────────────
     # El SW (service worker) ya existe; estas flags habilitan el uso de la
     # Push API del navegador para notificaciones del SO (no solo in-app).

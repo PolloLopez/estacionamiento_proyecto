@@ -50,11 +50,27 @@ def manifest_json(request):
             {"src": request.build_absolute_uri(static("icons/icon-512.png")), "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
         ]
 
+    # start_url depende del rol: cada rol arranca en su pantalla principal.
+    # Sin esto, todos (incluso inspectores) veían el dashboard de conductor.
+    if request.user.is_authenticated:
+        if getattr(request.user, "es_inspector", False):
+            start_url = "/inspectores/"
+        elif getattr(request.user, "es_admin", False):
+            start_url = "/admin-estacionamientos/"
+        elif getattr(request.user, "es_vendedor", False):
+            start_url = "/vendedor/"
+        elif getattr(request.user, "es_tesorero", False):
+            start_url = "/tesorero/"
+        else:
+            start_url = "/inicio/"
+    else:
+        start_url = "/inicio/"
+
     manifest = {
         "name":             nombre,
         "short_name":       nombre,
         "description":      "Sistema municipal de estacionamiento medido",
-        "start_url":        "/inicio/",
+        "start_url":        start_url,
         "display":          "standalone",
         "background_color": "#ffffff",
         "theme_color":      color,
