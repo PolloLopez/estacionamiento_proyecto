@@ -181,7 +181,7 @@
 
     /* ─── SECTIONS ─── */
     section { padding: 5rem 2rem; }
-    .container { max-width: 100%; margin: 0 auto; }
+    .container { max-width: 1100px; margin: 0 auto; }
     .section-label {
       font-size: 0.78rem;
       font-weight: 700;
@@ -472,7 +472,7 @@
         <div class="lbl" data-lang-inline="en">User roles</div>
       </div>
       <div class="hero-stat">
-        <div class="num">130+</div>
+        <div class="num">200+</div>
         <div class="lbl" data-lang-inline="es">Tests automatizados</div>
         <div class="lbl" data-lang-inline="en">Automated tests</div>
       </div>
@@ -769,10 +769,11 @@
           <li data-lang="en">Infractions: void with reason, collect, PDF for court</li>
           <li data-lang="es">Estadísticas de inspectores: verificaciones, infracciones, efectividad + exportación Excel</li>
           <li data-lang="es">Auditoría de staff unificada: resumen diario/semanal/mensual de cobros por vendedor e infracciones por inspector</li>
-          <li data-lang="es">El admin puede cerrar su propia caja para que otro admin la certifique (flujo multi-oficina)</li>
+          <li data-lang="es">El admin incluye su propia caja en la rendición — se autocertifica al rendir. El tesorero valida el conjunto</li>
+          <li data-lang="en">Admin's own shift is self-certified when included in the settlement — treasurer validates the whole package</li>
           <li data-lang="en">Inspector stats: checks, infractions, effectiveness + Excel export</li>
-          <li data-lang="es">Rendiciones: selecciona cierres certificados, el sistema calcula totales y comisiones de vendedores automáticamente — con vista de detalle por cierre</li>
-          <li data-lang="en">Settlements: select certified shifts, system auto-calculates totals and vendor commissions — with per-shift detail view</li>
+          <li data-lang="es">Rendiciones: selecciona cierres del período (incluye la propia caja), el sistema calcula totales y comisiones automáticamente — con número de ticket municipal y detalle por cierre</li>
+          <li data-lang="en">Settlements: select shifts for the period (including own shift), system auto-calculates totals and commissions — with municipal ticket number and per-shift detail</li>
           <li data-lang="es">Branding municipal: logo, nombre del sistema, colores primarios y secundarios</li>
           <li data-lang="en">Municipal branding: logo, system name, primary and secondary colors</li>
           <li data-lang="es">Plantillas de documentos personalizables por tipo de comprobante</li>
@@ -800,8 +801,8 @@
           <li data-lang="en">Commission deposit with receipt: transfer number, attached bank file, and additional notes</li>
           <li data-lang="es">El vendedor ve el comprobante completo y certifica el recibo — flujo trazable de punta a punta</li>
           <li data-lang="en">Vendor sees the full receipt and certifies — end-to-end traceable flow</li>
-          <li data-lang="es">Certificar cierres de caja de admins pendientes</li>
-          <li data-lang="en">Certify pending admin shift closures</li>
+          <li data-lang="es">Certificar cierres de caja de admins (si el municipio lo requiere como paso previo)</li>
+          <li data-lang="en">Certify admin shift closures (if the municipality requires it as a prior step)</li>
           <li data-lang="es">Gestión de liquidaciones de plataforma (SaaS): borrador, comprobante de pago, historial</li>
           <li data-lang="en">Platform license payments (SaaS): draft, attach payment proof, history</li>
           <li data-lang="es">Auditoría total: quién validó qué y cuándo</li>
@@ -893,8 +894,8 @@
         <div class="step-content">
           <h4 data-lang="es">Rendición financiera en 3 pasos</h4>
           <h4 data-lang="en">3-step financial settlement</h4>
-          <p data-lang="es">① Vendedor/inspector cierra caja → Admin certifica cada cierre. ② Admin agrupa cierres en una rendición formal hacia tesorería (comisiones calculadas automáticamente). ③ Tesorero valida, deposita la comisión con comprobante bancario adjunto → Vendedor confirma recibo desde su panel.</p>
-          <p data-lang="en">① Vendor/inspector closes shift → Admin certifies each closing. ② Admin groups shifts into a formal treasury submission (commissions auto-calculated). ③ Treasurer validates, deposits the commission with an attached bank receipt → Vendor confirms receipt from their panel.</p>
+          <p data-lang="es">① Vendedor/inspector cierra caja → Admin certifica cada cierre (incluye su propia caja). ② Admin agrupa los cierres en una rendición con número de ticket municipal — el sistema calcula totales y comisiones automáticamente. ③ Tesorero valida, deposita comisiones con comprobante → Vendedor confirma recibo desde su panel.</p>
+          <p data-lang="en">① Vendor/inspector closes shift → Admin certifies each closing (including their own). ② Admin groups shifts into a settlement with an internal ticket number — system auto-calculates totals and commissions. ③ Treasurer validates, deposits commissions with receipt → Vendor confirms from their panel.</p>
         </div>
       </div>
     </div>
@@ -962,8 +963,8 @@
       <div class="security-item">
         <div class="sec-icon">✅</div>
         <div class="sec-content">
-          <h4 data-lang="es">130+ tests automatizados</h4>
-          <h4 data-lang="en">130+ automated tests</h4>
+          <h4 data-lang="es">200+ tests automatizados</h4>
+          <h4 data-lang="en">200+ automated tests</h4>
           <p data-lang="es">Cobertura de roles, flujos monetarios, tolerancia de gracia, multi-municipio, comisiones y webhooks. Todo cambio se verifica antes de llegar a producción.</p>
           <p data-lang="en">Coverage of roles, monetary flows, grace tolerance, multi-tenant, commissions, and webhooks. Every change is verified before reaching production.</p>
         </div>
@@ -988,8 +989,8 @@
       <div class="tech-pill"><strong>MercadoPago SDK</strong></div>
       <div class="tech-pill"><strong>django-allauth</strong> · Google OAuth</div>
       <div class="tech-pill"><strong>reportlab</strong> · PDF</div>
-      <div class="tech-pill"><strong>HTML + CSS propio</strong> · Sin JS frameworks</div>
-      <div class="tech-pill"><strong>130+ tests</strong> · Django TestCase</div>
+      <div class="tech-pill"><strong>React 18 UMD</strong> · Sin build step</div>
+      <div class="tech-pill"><strong>200+ tests</strong> · Django TestCase</div>
     </div>
 
     <div class="tech-details">
@@ -1002,8 +1003,8 @@
       <div class="tech-detail-card">
         <h4 data-lang-inline="es">Sin dependencias innecesarias</h4>
         <h4 data-lang-inline="en">No unnecessary dependencies</h4>
-        <p data-lang="es">El frontend usa HTML y CSS propio — sin React, sin Vue, sin jQuery. Cada dependencia del backend tiene un motivo justificado en el código.</p>
-        <p data-lang="en">The frontend uses plain HTML and CSS — no React, no Vue, no jQuery. Every backend dependency has a justified reason in the code.</p>
+        <p data-lang="es">Las pantallas interactivas usan React 18 via UMD — sin Vite, sin node_modules, sin build step. El resto es HTML y CSS propio. Cada dependencia tiene un motivo justificado.</p>
+        <p data-lang="en">Interactive screens use React 18 via UMD — no Vite, no node_modules, no build step. Everything else is plain HTML and CSS. Every dependency has a justified reason.</p>
       </div>
       <div class="tech-detail-card">
         <h4 data-lang-inline="es">Modelos bien definidos</h4>
