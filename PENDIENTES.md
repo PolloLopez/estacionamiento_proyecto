@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-02 (sesión 37/38 — Comisiones sin tesorero + auditoría impresora BLE completa: número acta, nombre inspector, timeouts, _norm, deprecar flujo A + fix test certificación comisión)
+Última actualización: 2026-10-02 (sesión 38 — GPS subcuadra en FormularioInfraccion, fix /pagar/ fuera de horario, UI superadmin número acta + mostrar inspector, _ultimoDevice BLE, test certificación comisión)
 
 ---
 
@@ -15,33 +15,15 @@
 
 ```
 1. Test e2e comisiones (🟡 abajo)
-2. Fix bug /pagar/ fuera de horario (🟡 abajo)
-3. Subir Railway a plan Pro (backups)
-4. Smoke test completo por rol
-5. Switch de dominio al municipio real
+2. Subir Railway a plan Pro (backups)
+3. Smoke test completo por rol
+4. Switch de dominio al municipio real
 ```
 
 ---
 
 ## 🔴 Alta prioridad
 
-### Bug — `/admin/impugnaciones/` botón "Aceptar" devuelve "Acción inválida" ✅ (sesión 36)
-
-**Causa:** navegadores mobile no incluían el `name/value` del submit button en el POST cuando `onclick` usaba `confirm()`. El botón de rechazar funcionaba por azar de orden de eventos.
-
-**Fix aplicado:** botones cambiados a `type="button"`. Un `<input type="hidden" name="accion">` recibe el valor vía JS antes de hacer `form.submit()`. El servidor siempre recibe el campo correctamente.
-
----
-
-### Superadmin — UI para `proximo_numero_acta` y `mostrar_inspector_en_ticket` (sesión 36)
-
-Se agregaron los campos en `models.py` y migración `0104`, pero falta la UI en `editar_municipio.html` y el guardado en `views_superadmin.py`. Sin esto, el superadmin no puede configurarlos desde el panel.
-
-**Qué hay que hacer:**
-- `editar_municipio.html` → sección "Configuración del acta" con input numérico para `proximo_numero_acta` y checkbox para `mostrar_inspector_en_ticket`.
-- `views_superadmin.py → guardar_institucional()` → leer y guardar ambos campos (validar que `proximo_numero_acta >= 1`).
-
----
 
 ### Fase 4C — FormularioEstacionar ✅ (sesión 30 — pendiente smoke test en producción)
 
@@ -83,6 +65,26 @@ railway run pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
 
 ## 🟡 Media prioridad
 
+### UX Inspector — panel de impresora confuso (detectado en campo, sesión 38)
+
+Problemas identificados usando el rol inspector con inspectores reales:
+
+- `id="estado-impresora"` y `id="details-impresora"` son confusos — el primero es un `<span>` de estado, el segundo un `<details>` de configuración. Renombrar para claridad.
+- Dos botones "Vincular impresora": uno en el banner de estado y otro dentro del `<details>` — duplicado innecesario que confunde.
+- La sección de configuración está colapsada como "Configuración avanzada", ocultando cosas básicas (como el botón de vincular) que el inspector necesita fácilmente.
+
+**Fix propuesto:** unificar en un solo botón de acción visible (vincular / reconectar), mostrar el estado de la impresora con texto claro, y dejar en el `<details>` solo opciones realmente avanzadas (test de impresión, alias).
+
+---
+
+### UX Inspector — tutorial al fondo del panel, inaccesible en campo (sesión 38)
+
+El tutorial `<!-- ── PIE DEL PANEL: tutorial + sugerencias ──── -->` está al final de `panel_inspectores.html`. En calle, el inspector scrollea difícilmente hasta ahí.
+
+**Fix propuesto:** mover el tutorial (o link al tutorial) al menú hamburguesa, donde ya viven las opciones secundarias. El inspector puede consultarlo sin perder el flujo principal.
+
+---
+
 ### UX — `/abono/` (conductor_pagar_abono)
 
 - Botón "Ver precio y confirmar" → renombrar a **"Confirmar — pagar $X"** donde $X es el precio real calculado. El conductor tiene que ver el monto antes de llegar al checkout, no después.
@@ -97,22 +99,15 @@ railway run pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
 
 ---
 
-### Bug — Inspector: impresora Bluetooth pide vinculación en cada impresión ✅ parcial (sesión 37)
+### Bug — Inspector: impresora Bluetooth pide vinculación en cada impresión ✅ resuelto (sesiones 37–38)
 
 **Diagnóstico completo (auditoría sesión 37):**
 - Bug de Chrome: `getDevices()` devuelve vacío al cargar una página fresca aunque el device siga emparejado en el SO.
 - **Flujo B (React inline en `verificar.html`)** no tiene el problema durante un flujo continuo (verificar → infraccionar → imprimir sin navegar). Sí aparece al recargar o volver a verificar.html.
 - **Flujo A (legacy `ticket_infraccion.html`)** lo produce siempre (page navigation).
 
-**Fixes aplicados (sesión 37):**
-- `watchAdvertisements()` timeout: 3000ms → 6000ms (impresoras lentas tardan 2-5s en emitir anuncio).
-- `_abrirConexionConReintentos()`: acepta parámetro `pausaMs`, ahora llamado con 5 intentos × 1000ms en reconexión post-navegación.
-- Igual en `reconectarSilencioso()`.
-
-**Pendiente — Flujo A (legacy):** ✅ deprecado (sesión 37)
-- GET a `/inspectores/infraccionar/?patente=XYZ` ahora redirige a `verificar.html?patente=XYZ`.
-- `verificar.html` lee el param y llama `iniciarInfraccionInline()` al montar React (polling 100ms/4s).
-- POST sigue funcionando como fallback silencioso (bookmarks externos, casos raros).
+**Fixes sesión 37:** timeouts BLE, deprecar flujo A legacy, redirect a verificar.html.
+**Fix sesión 38:** `_ultimoDevice` — variable de módulo que persiste el objeto `BluetoothDevice` entre impresiones. Primera acta del turno: un tap para vincular. Resto del turno: autoconecta silencioso. Confirmado funcionando por el usuario.
 
 ---
 
@@ -129,11 +124,6 @@ El comprobante de cobro del vendedor/inspector no se puede imprimir por Bluetoot
 
 ---
 
-### Bug — `/pagar/` sin login: "ESTACIONAR AHORA" visible fuera de horario
-
-`pago_publico/detalle_patente.html` muestra el botón "ESTACIONAR AHORA" aunque el municipio esté fuera de horario. Verificar si la vista `detalle_patente` chequea `puede_estacionar_ahora()` antes de renderizar el botón, y ocultarlo fuera de horario con mensaje explicativo (mismo patrón que `estacionar_vehiculo.html`).
-
----
 
 ### Saldo negativo para conductores (habilitado por superadmin, límite por admin municipal)
 
@@ -177,6 +167,25 @@ Prueba manual completa según `GUIA_TESTING_ROLES.md` → sección "TEST COMPLET
 ### Selector de subcuadra en `/pagar/` público (`detalle_patente.html`)
 
 La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja). Actualizar al mismo patrón `<datalist>` + matching por altura/intersección que ya tienen `estacionar_vehiculo.html`, `verificar.html` y `registrar_infraccion.html`.
+
+---
+
+### GPS subcuadra en FormularioInfraccion ✅ (sesión 38)
+
+El GPS del inspector se disparaba al cargar la página pero el resultado no estaba disponible al abrir el formulario de infracción. Se agregó un botón "📍 Detectar mi ubicación" dentro de `FormularioInfraccion` (React) que, al tocarlo, llama al endpoint `inspectores_subcuadra_cercana` y actualiza el selector vía `seleccionarSubcuadraInspector(data.id)`. Solo aparece si el municipio tiene más de una subcuadra (`#sel-calle` existe). Mismo patrón UX que el conductor.
+
+---
+
+### UI superadmin `proximo_numero_acta` y `mostrar_inspector_en_ticket` ✅ (sesión 38)
+
+- `editar_municipio.html` → subsección "📋 Numeración de actas" en la sección del ticket.
+- `views_superadmin.py → guardar_institucional()` → lee y guarda ambos campos.
+
+---
+
+### Bug — `/pagar/` fuera de horario: formulario de estacionar visible ✅ (sesión 38)
+
+`detalle_patente()` ahora llama a `puede_estacionar_ahora(municipio)` y pasa `puede_estacionar` + `mensaje_fuera_horario` al contexto. El template muestra un aviso naranja con el mensaje configurado (y la leyenda de horarios si existe) en lugar del formulario.
 
 ---
 
@@ -275,13 +284,12 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
 - **Fase 4B** ✅: `MisVehiculos` en `/inicio/` — badges 🟢/🔵/⚪, infracciones pendientes, links a historial. Fallback Django siempre presente.
 - **Fase 4C** ✅ (sesión 30): FormularioEstacionar — `estacionar_vehiculo.html`. Pendiente smoke test en prod. Ver sección 🔴 arriba.
 - **Fase 5A** ✅ (sesión 32): `VerificadorInspector` — verificar.html migrado a React (inline, sin reload). Endpoint `POST /api/inspector/verificar/`. El cascade GPS/subcuadra y el modal SIA son JS vanilla sin cambios.
-- **Fase 5B** ✅ (sesión 33): Inspector en React — infracción + ticket + impresora inline.
+- **Fase 5B** ✅ (sesión 33 + mejoras 38): Inspector en React — infracción + ticket + impresora inline.
   - `POST /api/inspector/registrar_infraccion/` — acepta multipart (foto + patente + subcuadra + GPS), devuelve `datos_acta` JSON.
-  - `FormularioInfraccion` — foto con preview, GPS chip, subcuadra del cascade, POST a la API.
+  - `FormularioInfraccion` — foto con preview, GPS chip, subcuadra del cascade, botón GPS de subcuadra (sesión 38), POST a la API.
   - `ModalTicket` — confirmación + impresión BLE con lógica 2 copias, reintento, reconexión silenciosa.
-  - `verificar.html` — carga `impresora_bluetooth.js` antes del componente React. `data-url-registrar` y `data-geoloc` en el mount point.
-  - `views_inspector.py` — pasa `municipio` al contexto para el template.
-  - **Fix BLE**: el inspector ya no navega entre páginas → la sesión BLE sobrevive todo el flujo.
+  - `verificar.html` — carga `impresora_bluetooth.js` antes del componente React.
+  - **Fix BLE**: `_ultimoDevice` persiste el device entre impresiones del turno (sesión 38).
 - **Fase 6** ✅ (sesión 34): Fix SIA modal PATENTE_NO_COINCIDE + tests endpoint Fase 5B. Ver sección 🟡 arriba.
 - **Fase 7** ✅ (sesión 35): migrar `inicio_usuarios.html` a React unificado. Ver sección 🟡 abajo.
 - **Fase 8** (pendiente): Panel del vendedor inline — `cobrar_infraccion.html` + BLE.
