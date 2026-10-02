@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-02 (sesión 36 — Número de acta correlativo, mostrar_inspector_en_ticket, fix cache tests, UX pendientes)
+Última actualización: 2026-10-02 (sesión 37 — Comisiones: vendedor puede certificar sin paso previo de tesorería)
 
 ---
 
@@ -160,6 +160,17 @@ Prueba manual completa según `GUIA_TESTING_ROLES.md` → sección "TEST COMPLET
 ### Selector de subcuadra en `/pagar/` público (`detalle_patente.html`)
 
 La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja). Actualizar al mismo patrón `<datalist>` + matching por altura/intersección que ya tienen `estacionar_vehiculo.html`, `verificar.html` y `registrar_infraccion.html`.
+
+---
+
+### Flujo comisiones — vendedor puede certificar sin tesorero ✅ (sesión 37)
+
+- `certificar_comision()` ahora acepta `estado='pendiente'` además de `'depositada'`.
+- El flujo con tesorero (pendiente → depositada → certificada) sigue funcionando igual.
+- El flujo sin tesorero (pendiente → certificada) permite al vendedor confirmar recibo directo.
+- `mis_comisiones.html`: botón "Confirmar recibo" aparece también en estado `pendiente`.
+- `certificar_comision.html`: aviso contextual cuando no hay depósito previo registrado.
+- Panel tesorero: descripción actualizada — marcar depositada es opcional.
 
 ---
 

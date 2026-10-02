@@ -982,16 +982,23 @@ def mis_comisiones(request):
 @require_role("vendedor")
 def certificar_comision(request, liquidacion_id):
     """
-    El vendedor certifica que recibió correctamente su comisión depositada.
-    Solo puede certificar liquidaciones en estado 'depositada'.
+    El vendedor certifica que recibió su comisión.
+
+    Acepta dos estados de entrada:
+    - 'depositada': flujo normal. Tesorería registró el depósito y el vendedor confirma recibo.
+    - 'pendiente':  flujo directo. El municipio no registra el depósito en el sistema
+                    (el tesorero no usa la plataforma), por lo que el vendedor certifica
+                    haber recibido el pago de forma externa, sin paso intermedio.
+
+    En ambos casos el estado pasa a 'certificada'.
     """
     vendedor    = request.user
     liquidacion = get_object_or_404(
         LiquidacionComision, id=liquidacion_id, vendedor=vendedor,
     )
 
-    if liquidacion.estado != "depositada":
-        messages.warning(request, "Esta liquidacion no esta lista para certificar.")
+    if liquidacion.estado not in ("pendiente", "depositada"):
+        messages.warning(request, "Esta liquidación no está disponible para certificar.")
         return redirect("mis_comisiones")
 
     if request.method == "POST":

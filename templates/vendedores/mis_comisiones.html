@@ -79,16 +79,21 @@
             </td>
             <td>
               {% if liq.estado == "depositada" %}
+                {# Tesorería ya registró el depósito — el vendedor confirma recibo #}
                 <a href="{% url 'certificar_comision' liq.id %}" class="btn"
                    style="font-size:0.82rem; padding:0.35rem 0.8rem; background:var(--color-primary); color:#fff;">
                   ✅ Certificar recibo
+                </a>
+              {% elif liq.estado == "pendiente" %}
+                {# Flujo sin tesorero: el vendedor puede confirmar recibo directamente #}
+                <a href="{% url 'certificar_comision' liq.id %}" class="btn btn-outline"
+                   style="font-size:0.82rem; padding:0.35rem 0.8rem;">
+                  ✅ Confirmar recibo
                 </a>
               {% elif liq.estado == "certificada" %}
                 <span class="text-muted" style="font-size:0.82rem;">
                   Cert. {{ liq.certificada_en|date:"d/m/Y H:i" }}
                 </span>
-              {% else %}
-                <span class="text-muted" style="font-size:0.82rem;">Esperando depósito</span>
               {% endif %}
             </td>
           </tr>
