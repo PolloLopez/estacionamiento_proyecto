@@ -43,6 +43,22 @@ var PERFILES_BLE = [
 var UUID_SERVICIOS_OPT = PERFILES_BLE.map(function(p) { return p.servicio; });
 var CHUNK_SIZE = 20;
 
+// ── Device en memoria ────────────────────────────────────────────────────────
+//
+// Chrome Android tiene un bug donde getDevices() devuelve [] incluso si el inspector
+// ya vinculó la impresora. El problema persiste aunque se reintente con delay.
+//
+// Solución: guardar el objeto BluetoothDevice en memoria (variable de módulo) la
+// primera vez que se conecta. Las conexiones siguientes lo usan directamente,
+// saltando getDevices() por completo. El objeto sobrevive mientras la página no
+// navegue a otra URL (en verificar.html el inspector puede registrar múltiples
+// actas en la misma sesión sin tener que vincular de nuevo).
+//
+// El objeto en memoria se pierde al cerrar/recargar la página. En ese caso
+// getDevices() es el primer intento; si sigue fallando, se abre el picker.
+
+var _ultimoDevice = null;
+
 // ── Persistencia en localStorage ────────────────────────────────────────────
 
 var _ALIAS_KEY = 'bleImpresoraAliases';
@@ -122,64 +138,117 @@ async function conectarImpresora() {
     optionalServices: UUID_SERVICIOS_OPT,
   });
   var conexion = await _abrirConexion(device);
-  guardarInfoImpresora(device, conexion.perfil);   // persiste device + perfil para reconexiones futuras
+  guardarInfoImpresora(device, conexion.perfil);
+  _ultimoDevice = device;   // guardar en memoria para reconexiones futuras sin getDevices()
   return conexion;
+}
+
+/**
+ * Intenta getDevices() hasta `intentos` veces con `pausaMs` entre cada una.
+ *
+ * Por qué existe: Chrome Android tiene un bug donde getDevices() devuelve []
+ * justo después de navegar a una nueva página, aunque el dispositivo siga en la
+ * lista de permisos. El problema es de timing (el stack BT se reinicializa de
+ * forma asíncrona tras la navegación). Reintentar con pausa corta resuelve la
+ * mayoría de los casos sin necesidad de ningún gesto del usuario.
+ *
+ * El mismo bug aparece justo después de un gatt.disconnect() explícito:
+ * Chrome marca el dispositivo como "en proceso de desconexión" y getDevices()
+ * puede devolver vacío hasta que termina ese ciclo.
+ *
+ * @returns {Promise<BluetoothDevice|null>}
+ */
+async function _getDevicePrimero(intentos, pausaMs) {
+  intentos = intentos || 3;
+  pausaMs  = pausaMs  || 700;
+  if (typeof navigator.bluetooth.getDevices !== 'function') return null;
+  for (var i = 0; i < intentos; i++) {
+    if (i > 0) {
+      await new Promise(function(r) { setTimeout(r, pausaMs); });
+    }
+    try {
+      var devs = await navigator.bluetooth.getDevices();
+      if (devs && devs.length) return devs[0];
+    } catch (e) {
+      console.warn('[BLE] getDevices intento ' + (i + 1) + ' falló:', e.message);
+    }
+  }
+  return null;
 }
 
 /**
  * Reconecta a la impresora guardada SIN mostrar diálogo de selección (si es posible).
  *
  * Estrategia en orden:
- *   1. getDevices() + watchAdvertisements → espera el anuncio BLE antes de conectar.
- *      La tasa de éxito es muy alta porque la conexión se hace cuando el dispositivo
- *      ya está activamente emitiendo.
- *   2. Si watchAdvertisements no disponible o timeout, reintenta gatt.connect() directo.
- *   3. Si getDevices() vacío → requestDevice() filtrado por nombre (diálogo mínimo
- *      con la impresora ya pre-seleccionada: el inspector toca una vez).
+ *   1. _getDevicePrimero() — getDevices() con reintentos (mitiga bug de Chrome post-navegación).
+ *   2. watchAdvertisements → espera el anuncio BLE antes de conectar.
+ *   3. Si watchAdvertisements no disponible o timeout, reintenta gatt.connect() directo.
+ *   4. Si getDevices() vacío tras todos los reintentos → null (el caller abre diálogo).
  *
  * Retorna { device, caracteristica, perfil } o null.
  */
 async function reconectarImpresora() {
   if (!navigator.bluetooth) return null;
 
-  // Intento 1: getDevices() + watchAdvertisements (reconexión completamente silenciosa)
+  // Intento 0: device en memoria (más confiable que getDevices() en Chrome Android).
+  // Se establece la primera vez que se conecta vía conectarImpresora() o reconectarImpresora().
+  // Persiste mientras la página no se recargue → el inspector puede hacer múltiples
+  // actas en la misma sesión sin tocar el picker de Bluetooth.
+  if (_ultimoDevice) {
+    try {
+      var cxMem = await _conectarViaAnuncio(_ultimoDevice, 6000);
+      guardarInfoImpresora(_ultimoDevice, cxMem.perfil);
+      return cxMem;
+    } catch (eAnuncio) {
+      console.warn('[BLE] device en memoria: watchAdvertisements falló, probando directo:', eAnuncio.message);
+    }
+    try {
+      var cxMemD = await _abrirConexionConReintentos(_ultimoDevice, 5, 1000);
+      guardarInfoImpresora(_ultimoDevice, cxMemD.perfil);
+      return cxMemD;
+    } catch (eDir) {
+      console.warn('[BLE] device en memoria: connect directo falló:', eDir.message);
+      // El device en memoria puede haber caducado (impresora apagada y re-encendida).
+      // Limpiar para no intentarlo de nuevo en vano.
+      _ultimoDevice = null;
+    }
+  }
+
+  // Intento 1: getDevices() con reintentos + watchAdvertisements
   if (typeof navigator.bluetooth.getDevices === 'function') {
     try {
-      var devs = await navigator.bluetooth.getDevices();
-      if (devs.length) {
-        var device = devs[0];
+      var device = await _getDevicePrimero(3, 700);
+      if (device) {
 
-        // Esperamos el anuncio BLE (3s) antes de conectar: mucho más confiable
-        // que llamar gatt.connect() en frío, especialmente después de navegar entre páginas.
+        // Esperamos el anuncio BLE antes de conectar: mucho más confiable que
+        // gatt.connect() en frío, especialmente tras navegar entre páginas.
+        // 6000ms: impresoras térmicas BLE baratas pueden tardar 2-5s.
         try {
-          // 6000ms: impresoras térmicas BLE baratas pueden tardar 2-5s en emitir
-          // el primer anuncio después de encenderse. 3s era demasiado ajustado.
           var cx = await _conectarViaAnuncio(device, 6000);
-          guardarInfoImpresora(device, cx.perfil);   // persiste perfil exitoso
+          guardarInfoImpresora(device, cx.perfil);
+          _ultimoDevice = device;   // guardar para futuras reconexiones
           return cx;
         } catch (eAnuncio) {
           console.warn('[BLE] watchAdvertisements falló o timeout:', eAnuncio.message);
         }
 
-        // Fallback dentro del mismo dispositivo: connect directo con más reintentos
-        // (5 intentos, 1000ms de pausa: el device puede estar en estado "desconectando")
+        // Fallback: connect directo con reintentos
+        // (5 intentos × 1000ms: el device puede estar en estado "desconectando")
         try {
           var cxDirecto = await _abrirConexionConReintentos(device, 5, 1000);
           guardarInfoImpresora(device, cxDirecto.perfil);
+          _ultimoDevice = device;   // guardar para futuras reconexiones
           return cxDirecto;
         } catch (eDirecto) {
           console.warn('[BLE] connect directo falló tras reintentos:', eDirecto.message);
         }
       }
     } catch (e) {
-      console.warn('[BLE] getDevices falló:', e.message);
+      console.warn('[BLE] error en reconectarImpresora:', e.message);
     }
   }
 
-  // getDevices() vacío: retornar null para que imprimirActa() abra UN diálogo
-  // limpio con acceptAllDevices. Antes se abría un diálogo filtrado por nombre
-  // aquí, pero si la impresora no aparecía el inspector veía DOS diálogos
-  // consecutivos → confuso y parecía un bug de la app.
+  // getDevices() vacío tras todos los reintentos: el caller abre el diálogo.
   return null;
 }
 
@@ -352,17 +421,31 @@ async function diagnosticarImpresora() {
  */
 async function reconectarSilencioso() {
   if (!navigator.bluetooth) return null;
-  if (typeof navigator.bluetooth.getDevices !== 'function') return null;
+
+  // Usar el device en memoria cuando está disponible: evita getDevices() completamente.
+  // Crítico para copia 2: el device está garantizado en memoria porque acabamos de usarlo.
+  var device = _ultimoDevice;
+
+  if (!device) {
+    // Fallback a getDevices() si no hay device en memoria (ej: recarga de página)
+    // Con reintentos: el bug de Chrome puede tardar en liberar el device tras disconnect.
+    try {
+      device = await _getDevicePrimero(3, 700);
+    } catch (e) {
+      console.warn('[BLE] getDevices falló en reconectarSilencioso:', e.message);
+    }
+  }
+
+  if (!device) return null;
+
   try {
-    var devs = await navigator.bluetooth.getDevices();
-    if (!devs.length) return null;
-    var device = devs[0];
     guardarInfoImpresora(device);
 
-    // Intentar vía anuncio BLE (más confiable, especialmente post-disconnect de copia 1)
+    // Vía anuncio BLE (más confiable post-disconnect)
     try {
       var cx = await _conectarViaAnuncio(device, 6000);
       guardarInfoImpresora(device, cx.perfil);
+      _ultimoDevice = device;
       return cx;
     } catch (eAnuncio) {
       console.warn('[BLE] watchAdvertisements silencioso falló:', eAnuncio.message);
@@ -371,6 +454,7 @@ async function reconectarSilencioso() {
     // Fallback: connect directo con reintentos
     var cxDirecto2 = await _abrirConexionConReintentos(device, 5, 1000);
     guardarInfoImpresora(device, cxDirecto2.perfil);
+    _ultimoDevice = device;
     return cxDirecto2;
   } catch (e) {
     console.warn('[BLE] reconexión silenciosa falló:', e.message);

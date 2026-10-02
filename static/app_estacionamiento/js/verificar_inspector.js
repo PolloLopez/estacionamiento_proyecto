@@ -339,24 +339,49 @@
         return;
       }
 
+      /*
+       * Estrategia de reconexión automática (sin gesto del usuario):
+       *
+       * 1. _ultimoDevice (de impresora_bluetooth.js): si el inspector ya usó la impresora
+       *    en esta sesión de página, el device object está en memoria. Esto cubre el caso
+       *    más común: varias actas seguidas en el mismo turno.
+       *
+       * 2. getDevices() con reintentos: si _ultimoDevice es null (primer acta del día o
+       *    página recargada), intentar getDevices() hasta 3 veces. Chrome Android tiene un
+       *    bug donde devuelve [] justo al inicializar la página aunque el permiso exista.
+       *
+       * 3. Si todo falla → botón manual. El click provee el gesto de usuario que
+       *    requestDevice() requiere para abrir el picker de Bluetooth.
+       */
       var dispositivoGuardado = null;
-      if (typeof navigator.bluetooth.getDevices === "function") {
-        try {
-          var devs = await navigator.bluetooth.getDevices();
-          if (devs.length) dispositivoGuardado = devs[0];
-        } catch (e) {
-          console.warn("[BLE] getDevices falló en auto-load:", e.message);
+
+      // Paso 1: device en memoria (var _ultimoDevice en impresora_bluetooth.js)
+      if (typeof _ultimoDevice !== "undefined" && _ultimoDevice) {
+        dispositivoGuardado = _ultimoDevice;
+      }
+
+      // Paso 2: getDevices() con reintentos
+      if (!dispositivoGuardado && typeof navigator.bluetooth.getDevices === "function") {
+        setEstadoImpresion("⏳ Buscando impresora…");
+        for (var intento = 0; intento < 3 && !dispositivoGuardado; intento++) {
+          if (intento > 0) await new Promise(function(r) { setTimeout(r, 700); });
+          try {
+            var devs = await navigator.bluetooth.getDevices();
+            if (devs && devs.length) dispositivoGuardado = devs[0];
+          } catch (e) {
+            console.warn("[BLE] getDevices intento " + (intento + 1) + ":", e.message);
+          }
         }
       }
 
       if (dispositivoGuardado) {
-        // Chrome tiene la impresora en su lista de permisos → reconexión silenciosa
+        // Reconexión automática (silenciosa)
         var nombre = (typeof nombreMostrar === "function")
           ? nombreMostrar(dispositivoGuardado) : "";
-        setEstadoImpresion("⏳ Buscando " + (nombre || "impresora") + "…");
+        setEstadoImpresion("⏳ Conectando a " + (nombre || "impresora") + "…");
         ejecutarImpresion();
       } else {
-        // getDevices() vacío (bug Chrome post-navegación) → necesitamos gesto del usuario
+        // Sin device disponible → botón manual (el click es el gesto que Chrome necesita)
         var infoGuardada = (typeof obtenerInfoImpresora === "function") ? obtenerInfoImpresora() : null;
         var nombreLabel = infoGuardada ? (infoGuardada.alias || infoGuardada.name || "") : "";
         setEstadoImpresion("🖨 Tocá para imprimir el acta");

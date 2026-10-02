@@ -406,28 +406,40 @@ async function intentarAutoImprimir() {
     return;
   }
 
-  // Solo getDevices(): silencioso, no requiere gesto.
+  /*
+   * getDevices() con reintentos — mitiga el bug de Chrome Android donde devuelve []
+   * justo al navegar a una nueva página, aunque el permiso siga vigente.
+   * Esperamos hasta 3 × 700ms = 2.1s antes de mostrar el botón manual.
+   * Si Chrome inicializó el stack BT, el primer intento ya devuelve el device.
+   */
   var dispositivoGuardado = null;
+  estado.textContent = '⏳ Buscando impresora...';
   if (typeof navigator.bluetooth.getDevices === 'function') {
-    try {
-      var devs = await navigator.bluetooth.getDevices();
-      if (devs.length) dispositivoGuardado = devs[0];
-    } catch (e) {
-      console.warn('[BLE] getDevices falló en auto-load:', e.message);
+    for (var intento = 0; intento < 3 && !dispositivoGuardado; intento++) {
+      if (intento > 0) await new Promise(function(r) { setTimeout(r, 700); });
+      try {
+        var devs = await navigator.bluetooth.getDevices();
+        if (devs && devs.length) dispositivoGuardado = devs[0];
+      } catch (e) {
+        console.warn('[BLE] getDevices intento ' + (intento + 1) + ':', e.message);
+      }
     }
   }
 
   if (dispositivoGuardado) {
-    // Chrome tiene la impresora en su lista de permisos.
-    // Mostramos el nombre mientras intentamos la reconexión automática.
+    // getDevices() devolvió el device → reconexión automática sin gesto del usuario.
     var nombreConocido = nombreMostrar(dispositivoGuardado);
-    estado.textContent = '⏳ Buscando ' + nombreConocido + '...';
+    estado.textContent = '⏳ Conectando a ' + nombreConocido + '...';
     imprimirActa();
   } else {
-    // Sin permiso previo, o getDevices() vacío (bug de Chrome).
-    // Revisamos si hay info en localStorage para mostrar un botón más informativo.
+    /*
+     * getDevices() vacío tras todos los reintentos: o la impresora nunca fue vinculada
+     * en este browser, o el bug de Chrome es más severo de lo esperado.
+     * El botón manual activa imprimirActa() con gesto de usuario, lo que habilita
+     * el fallback a requestDevice() (picker de dispositivos).
+     */
     var infoGuardada = obtenerInfoImpresora();
-    var nombreLabel = infoGuardada ? (infoGuardada.alias || infoGuardada.name || '') : '';
+    var nombreLabel  = infoGuardada ? (infoGuardada.alias || infoGuardada.name || '') : '';
     estado.textContent = '🖨 Tocá para imprimir el acta';
     if (btn) {
       btn.textContent = nombreLabel ? ('🖨 Conectar ' + nombreLabel) : '🖨 Imprimir acta';
