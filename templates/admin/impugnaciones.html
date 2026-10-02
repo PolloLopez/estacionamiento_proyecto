@@ -58,9 +58,14 @@
     {% endif %}
 
     {% if imp.estado == 'pendiente' %}
+    <!-- La acción va en un input hidden (no en el value del button) para evitar
+         el bug de navegadores mobile que no transmiten name/value de submit buttons
+         cuando el onclick devuelve true desde un confirm(). -->
     <form method="post" action="{% url 'resolver_impugnacion' imp.id %}"
+          id="form-imp-{{ imp.id }}"
           style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin-top:0.5rem;">
       {% csrf_token %}
+      <input type="hidden" name="accion" id="accion-{{ imp.id }}" value="">
       <div style="margin-bottom:0.5rem;">
         <label style="font-size:0.85rem; font-weight:600;">Resolución (opcional)</label>
         <textarea name="resolucion" rows="2"
@@ -70,16 +75,16 @@
                          color:var(--color-text); font-size:0.88rem; resize:vertical;"></textarea>
       </div>
       <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-        <button type="submit" name="accion" value="aceptar"
+        <button type="button"
                 class="btn"
                 style="background:var(--color-primary);"
-                onclick="return confirm('¿Aceptar impugnación y anular la infracción #{{ imp.infraccion.id }}?')">
+                onclick="resolverImpugnacion('{{ imp.id }}', 'aceptar', '¿Aceptar impugnación y anular la infracción #{{ imp.infraccion.id }}?')">
           ✅ Aceptar (anular infracción)
         </button>
-        <button type="submit" name="accion" value="rechazar"
+        <button type="button"
                 class="btn btn-outline"
                 style="color:var(--color-warning); border-color:var(--color-warning);"
-                onclick="return confirm('¿Rechazar la impugnación?')">
+                onclick="resolverImpugnacion('{{ imp.id }}', 'rechazar', '¿Rechazar la impugnación?')">
           ❌ Rechazar
         </button>
       </div>
@@ -99,4 +104,17 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Setea el campo hidden "accion" y submitea el form.
+// Separado del button value para evitar el bug de navegadores mobile
+// que no transmiten name/value de submit buttons cuando onclick usa confirm().
+function resolverImpugnacion(id, accion, mensaje) {
+  if (!confirm(mensaje)) return;
+  document.getElementById('accion-' + id).value = accion;
+  document.getElementById('form-imp-' + id).submit();
+}
+</script>
 {% endblock %}

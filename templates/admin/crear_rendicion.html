@@ -84,7 +84,15 @@
                        class="checkbox-cierre" onchange="actualizarTotales()" />
               </td>
               <td style="padding:0.5rem;">
-                {{ cierre.usuario.nombre }} {{ cierre.usuario.apellido }}
+                {{ cierre.usuario.first_name }} {{ cierre.usuario.last_name|default:cierre.usuario.correo }}
+                {% if cierre.usuario.id == admin_id %}
+                  <!-- Cierre del propio admin: se certifica automáticamente al incluirlo en la rendición -->
+                  <span style="font-size:0.75rem; font-weight:600; color:var(--color-primary);
+                               background:var(--color-bg-subtle,#f0f4ff); border-radius:4px;
+                               padding:0.05rem 0.4rem; margin-left:0.3rem; white-space:nowrap;">
+                    tu caja
+                  </span>
+                {% endif %}
                 <br><span style="font-size:0.78rem; color:var(--color-text-muted);">{{ cierre.usuario.get_rol_display }}</span>
               </td>
               <td style="padding:0.5rem; white-space:nowrap;">
@@ -156,6 +164,19 @@
         </p>
       </div>
 
+    </div>
+
+    {# ── Número de ticket / expediente municipal ── #}
+    <div class="card" style="margin-bottom:1rem;">
+      <label style="font-weight:600;">🔖 Número de ticket / expediente municipal (opcional)</label>
+      <input type="text" name="numero_ticket_tesoreria"
+             placeholder="Ej: EXP-2026-1042, Ticket #318..."
+             style="width:100%; margin-top:0.3rem; padding:0.45rem 0.6rem;
+                    border:1px solid var(--color-border); border-radius:6px;
+                    background:var(--color-bg); color:var(--color-text); font-size:0.9rem;" />
+      <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0.3rem 0 0;">
+        Referencia interna del municipio para identificar esta rendición en papel o en el sistema de expedientes.
+      </p>
     </div>
 
     {# ── Notas ── #}

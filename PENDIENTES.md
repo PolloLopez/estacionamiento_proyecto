@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-01 (sesión 33 — Ticket config superadmin + Fase 5B: infracción + impresión BLE inline sin redirect)
+Última actualización: 2026-10-02 (sesión 36 — Número de acta correlativo, mostrar_inspector_en_ticket, fix cache tests, UX pendientes)
 
 ---
 
@@ -24,6 +24,24 @@
 ---
 
 ## 🔴 Alta prioridad
+
+### Bug — `/admin/impugnaciones/` botón "Aceptar" devuelve "Acción inválida" ✅ (sesión 36)
+
+**Causa:** navegadores mobile no incluían el `name/value` del submit button en el POST cuando `onclick` usaba `confirm()`. El botón de rechazar funcionaba por azar de orden de eventos.
+
+**Fix aplicado:** botones cambiados a `type="button"`. Un `<input type="hidden" name="accion">` recibe el valor vía JS antes de hacer `form.submit()`. El servidor siempre recibe el campo correctamente.
+
+---
+
+### Superadmin — UI para `proximo_numero_acta` y `mostrar_inspector_en_ticket` (sesión 36)
+
+Se agregaron los campos en `models.py` y migración `0104`, pero falta la UI en `editar_municipio.html` y el guardado en `views_superadmin.py`. Sin esto, el superadmin no puede configurarlos desde el panel.
+
+**Qué hay que hacer:**
+- `editar_municipio.html` → sección "Configuración del acta" con input numérico para `proximo_numero_acta` y checkbox para `mostrar_inspector_en_ticket`.
+- `views_superadmin.py → guardar_institucional()` → leer y guardar ambos campos (validar que `proximo_numero_acta >= 1`).
+
+---
 
 ### Fase 4C — FormularioEstacionar ✅ (sesión 30 — pendiente smoke test en producción)
 
@@ -64,6 +82,35 @@ railway run pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
 ---
 
 ## 🟡 Media prioridad
+
+### UX — `/abono/` (conductor_pagar_abono)
+
+- Botón "Ver precio y confirmar" → renombrar a **"Confirmar — pagar $X"** donde $X es el precio real calculado. El conductor tiene que ver el monto antes de llegar al checkout, no después.
+- Inputs y selects del formulario: revisar estilos, tamaño táctil y consistencia con el resto del sistema.
+
+---
+
+### UX — Inspector `/inspectores/verificar/` (pantalla principal inspector)
+
+- Revisar en general la clase `pantalla`: padding, jerarquía visual, tamaño de botones para uso en calle.
+- El botón de infracción tiene que ser inconfundible y operable con una mano.
+
+---
+
+### Bug — Inspector: impresora Bluetooth pide vinculación en cada impresión
+
+La sesión BLE (`getDevices()`) se pierde entre prints aunque el inspector no navegue. Puede ser que `getDevices()` no devuelva el dispositivo si no hubo un gesto de usuario reciente, o que la reconexión automática falle silenciosamente.
+
+**Investigar:** si `impresora_bluetooth.js` intenta `getDevices()` antes de que el usuario interactúe con la impresora, el browser puede rechazarlo. Evaluar guardar el `deviceId` en `localStorage` y pedir re-autorización explícita solo cuando falla la reconexión, no siempre.
+
+---
+
+### UX — Admin `/admin-estacionamientos/`
+
+- Sección "ACCIONES RÁPIDAS" debería ir primero (se usa todo el tiempo).
+- Botones con clase `btn` que apuntan a `/admin-estacionamientos/` están mal estilizados — revisar padding/color.
+
+---
 
 ### Bug — `/pagar/` sin login: "ESTACIONAR AHORA" visible fuera de horario
 
@@ -113,6 +160,27 @@ Prueba manual completa según `GUIA_TESTING_ROLES.md` → sección "TEST COMPLET
 ### Selector de subcuadra en `/pagar/` público (`detalle_patente.html`)
 
 La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja). Actualizar al mismo patrón `<datalist>` + matching por altura/intersección que ya tienen `estacionar_vehiculo.html`, `verificar.html` y `registrar_infraccion.html`.
+
+---
+
+### Flujo rendición admin → tesorería ✅ (sesión 36)
+
+- `Rendicion.numero_ticket_tesoreria` (CharField, opcional) — migración `0105`.
+- `crear_rendicion()`: query GET y POST ahora incluyen el cierre propio del admin (`Q(certificado=True) | Q(usuario=admin)`).
+- Al incluir el cierre del admin en la rendición, se autocertifica con `certificado_por=admin` (la rendición es el acto formal; el tesorero valida el conjunto).
+- `crear_rendicion.html`: badge "tu caja" en el cierre propio, campo input para número de ticket/expediente, fix `first_name`/`last_name`.
+
+---
+
+### Número de acta correlativo por municipio ✅ (sesión 36)
+
+- `Infraccion.numero_acta` (PositiveIntegerField, null para actas viejas) — se asigna atómicamente con `select_for_update()` sobre `Municipio`.
+- `Municipio.proximo_numero_acta` — superadmin lo ajusta para continuar numeración de sistemas anteriores.
+- `Municipio.mostrar_inspector_en_ticket` — superadmin decide si el nombre del inspector aparece en el ticket impreso.
+- Migración `0104_numero_acta_config.py`.
+- Fix `views_api.py`: usa `first_name`/`last_name` (no `nombre`/`apellido`).
+- Fix cache stale en tests: `cache.clear()` en `setUp()` de `TestApiInspectorRegistrarInfraccion`.
+- **Pendiente:** UI superadmin para `proximo_numero_acta` y `mostrar_inspector_en_ticket` (ver 🔴 arriba).
 
 ---
 
