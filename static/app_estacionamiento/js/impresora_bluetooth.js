@@ -694,21 +694,61 @@ function generarTicketInfraccion(d) {
   return new Uint8Array(buf);
 }
 
-/** Ticket de prueba mínimo para verificar que la impresora recibe datos. */
-function generarTicketPrueba() {
+/**
+ * Ticket de prueba para identificar la impresora.
+ * Imprime alias, ID/MAC y hora para que el inspector confirme
+ * que está conectado a su propia impresora y no a la de un compañero.
+ *
+ * @param {string} alias    - Nombre asignado a la impresora (ej: "Impresora 3")
+ * @param {string} deviceId - ID del dispositivo Bluetooth (MAC en Android)
+ */
+function generarTicketPrueba(alias, deviceId) {
+  alias    = _norm(alias    || 'Sin nombre');
+  deviceId = _norm(deviceId || 'ID desconocido');
+
   var buf = [];
   function push() { for (var i = 0; i < arguments.length; i++) buf.push(arguments[i]); }
-  function linea(s) { for (var i = 0; i < s.length; i++) buf.push(s.charCodeAt(i)); buf.push(10); }
+  function linea(s) {
+    s = _norm(String(s));
+    for (var i = 0; i < s.length; i++) buf.push(s.charCodeAt(i));
+    buf.push(10);
+  }
 
-  push(27, 0x40);
-  push(27, 0x61, 0x01);
+  push(27, 0x40);               // ESC @ — inicializar impresora
+  push(27, 0x61, 0x01);         // ESC a 1 — centrar
+  push(27, 0x45, 0x01);         // ESC E 1 — negrita ON
+  linea('=== TICKET DE PRUEBA ===');
+  push(27, 0x45, 0x00);         // negrita OFF
+
+  // Nombre asignado a esta impresora (alias)
+  push(27, 0x61, 0x00);         // alinear izquierda
+  linea('');
   push(27, 0x45, 0x01);
-  linea('--- PRUEBA ---');
+  linea('Nombre:');
   push(27, 0x45, 0x00);
-  linea('Impresora OK');
-  linea(new Date().toLocaleTimeString());
+  linea('  ' + alias);
+
+  // MAC / ID del dispositivo Bluetooth
+  linea('');
+  push(27, 0x45, 0x01);
+  linea('ID (MAC):');
+  push(27, 0x45, 0x00);
+  linea('  ' + deviceId);
+
+  // Hora de impresión para confirmar que es ahora
+  linea('');
+  push(27, 0x45, 0x01);
+  linea('Hora:');
+  push(27, 0x45, 0x00);
+  linea('  ' + new Date().toLocaleTimeString('es-AR'));
+
+  push(27, 0x61, 0x01);         // centrar
+  linea('');
+  linea('Si ves tu nombre,');
+  linea('esta es tu impresora.');
+  linea('');
   push(10, 10, 10, 10);
-  push(29, 0x56, 0x42, 0x10);
+  push(29, 0x56, 0x42, 0x10);   // corte parcial
 
   return new Uint8Array(buf);
 }

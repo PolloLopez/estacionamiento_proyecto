@@ -55,79 +55,64 @@
   </div>
 
   <!-- ── Sección impresora BLE ──────────────────────────────────────── -->
-
-  <!-- BANNER: visible cuando no hay impresora vinculada.
-       El JS lo oculta si detecta una impresora guardada. -->
-  <div id="banner-sin-impresora" class="card"
-       style="margin-top:1.2rem; border:2px dashed var(--color-warning,#f59e0b);
-              background:var(--color-warning-bg,#fffbeb); text-align:center; padding:1.2rem;">
-    <div style="font-size:1.5rem; margin-bottom:0.4rem;">🖨</div>
-    <p style="font-weight:700; margin:0 0 0.3rem; color:var(--color-warning,#92400e);">
-      Sin impresora vinculada
-    </p>
-    <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0 0 0.9rem;">
-      Vinculá tu impresora <strong>una sola vez</strong> para imprimir actas automáticamente.
-    </p>
-    <button id="btn-conectar-banner" class="btn" style="font-size:0.95rem;"
-            onclick="accionConectar()">
-      🔌 Vincular impresora
-    </button>
-  </div>
-
-  <!-- ESTADO: visible cuando hay impresora vinculada (oculto hasta que el JS lo confirme) -->
-  <div id="cont-impresora-ok" style="display:none; text-align:center; margin-top:1rem;">
-    <span id="estado-impresora"
-          style="font-size:0.88rem; font-weight:600; color:var(--color-primary);">
-      🖨 Cargando...
-    </span>
-  </div>
-
-  <!-- Configuración avanzada (colapsada, disponible siempre) -->
-  <details id="details-impresora" style="margin-top:0.75rem;">
-    <summary style="font-size:0.82rem; color:var(--color-text-muted); cursor:pointer;
-                    list-style:none; text-align:center; user-select:none;">
-      ⚙️ Configurar impresora
+  <!-- Un solo punto de entrada: todo (vincular, renombrar, prueba, diagnóstico)
+       sale desde acá. Se abre automáticamente si no hay impresora vinculada. -->
+  <details id="panel-impresora" style="margin-top:1.2rem;">
+    <summary style="list-style:none; cursor:pointer; user-select:none;
+                    display:flex; align-items:center; justify-content:space-between;
+                    padding:0.85rem 1rem; border-radius:10px;
+                    background:var(--color-surface); border:1px solid var(--color-border);">
+      <span style="font-size:1rem; font-weight:600;">🖨️ Impresora</span>
+      <span id="impresora-resumen"
+            style="font-size:0.85rem; font-weight:600; color:var(--color-text-muted);">
+        detectando…
+      </span>
     </summary>
-    <div class="card" style="margin-top:0.75rem;">
-      <div style="display:flex; flex-direction:column; gap:0.5rem;">
 
-        <button id="btn-conectar" class="btn btn-outline" style="font-size:0.9rem;"
-                onclick="accionConectar()">
-          🔌 Vincular / cambiar impresora
-        </button>
+    <div class="card" style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.65rem;">
 
-        <!-- Renombrar: aparece tras vincular o si ya hay uno autorizado -->
-        <div id="cont-renombrar" style="display:none;">
-          <label style="font-size:0.82rem; color:var(--color-text-muted); display:block; margin-bottom:0.2rem;">
-            ✏️ Poné un nombre a tu impresora (para identificarla)
-          </label>
-          <div style="display:flex; gap:0.4rem;">
-            <input id="inp-alias" type="text" maxlength="30"
-                   placeholder="Ej: Mi impresora"
-                   style="flex:1; padding:0.5rem 0.7rem; border:1.5px solid var(--color-border);
-                          border-radius:8px; font-size:0.9rem; background:var(--color-surface);
-                          color:var(--color-text);">
-            <button class="btn" style="font-size:0.85rem; padding:0.5rem 0.8rem; white-space:nowrap;"
-                    onclick="accionRenombrar()">
-              Guardar
-            </button>
-          </div>
+      <!-- Vincular / cambiar impresora -->
+      <button id="btn-vincular" class="btn" style="font-size:0.95rem;"
+              onclick="accionConectar()">
+        🔌 Vincular impresora
+      </button>
+
+      <!-- Renombrar: solo aparece cuando hay un dispositivo detectado.
+           Cada inspector le pone nombre a su impresora para distinguirla
+           de las de sus compañeros (ej: "Impresora 3", "Mía"). -->
+      <div id="cont-renombrar" style="display:none;">
+        <label style="font-size:0.82rem; color:var(--color-text-muted); display:block; margin-bottom:0.3rem;">
+          ✏️ Nombre de esta impresora (para identificarla entre varias)
+        </label>
+        <div style="display:flex; gap:0.4rem;">
+          <input id="inp-alias" type="text" maxlength="30"
+                 placeholder="Ej: Impresora 3, La mía…"
+                 style="flex:1; padding:0.5rem 0.7rem; border:1.5px solid var(--color-border);
+                        border-radius:8px; font-size:0.9rem; background:var(--color-surface);
+                        color:var(--color-text);">
+          <button class="btn" style="font-size:0.85rem; padding:0.5rem 0.8rem; white-space:nowrap;"
+                  onclick="accionRenombrar()">
+            Guardar
+          </button>
         </div>
-
-        <button class="btn btn-outline" style="font-size:0.85rem; color:var(--color-text-muted);"
-                onclick="accionDiagnostico()">
-          🔍 Diagnóstico (ver servicios BLE)
-        </button>
-        <button class="btn btn-outline" style="font-size:0.85rem;"
-                onclick="accionPrueba()">
-          🧾 Imprimir ticket de prueba
-        </button>
-
       </div>
+
+      <!-- Ticket de prueba: imprime nombre + MAC para confirmar que es la impresora correcta -->
+      <button class="btn btn-outline" style="font-size:0.9rem;"
+              onclick="accionPrueba()">
+        🧾 Imprimir ticket de prueba
+      </button>
+
+      <!-- Diagnóstico: solo para soporte técnico -->
+      <button class="btn btn-outline" style="font-size:0.82rem; color:var(--color-text-muted);"
+              onclick="accionDiagnostico()">
+        🔍 Ver servicios BLE (diagnóstico)
+      </button>
+
       <pre id="log-impresora"
            style="font-size:0.72rem; background:var(--color-surface-2, #f4f4f4);
                   color:var(--color-text); border:1px solid var(--color-border);
-                  border-radius:6px; padding:0.6rem; margin-top:0.75rem;
+                  border-radius:6px; padding:0.6rem; margin-top:0.25rem;
                   white-space:pre-wrap; word-break:break-all; display:none;"></pre>
     </div>
   </details>
@@ -160,40 +145,54 @@
 
 <script src="{% static 'app_estacionamiento/js/impresora_bluetooth.js' %}"></script>
 <script>
-var estadoEl  = document.getElementById('estado-impresora');
-var bannerEl  = document.getElementById('banner-sin-impresora');
-var contOkEl  = document.getElementById('cont-impresora-ok');
-var logEl     = document.getElementById('log-impresora');
+var resumenEl  = document.getElementById('impresora-resumen');
+var panelEl    = document.getElementById('panel-impresora');
+var btnVincEl  = document.getElementById('btn-vincular');
+var logEl      = document.getElementById('log-impresora');
 
 function log(msg) {
   logEl.style.display = 'block';
   logEl.textContent   = msg;
 }
 
-/** Muestra el banner "sin impresora" y oculta el estado OK. */
+/** Muestra estado "sin impresora" y abre el panel automáticamente. */
 function mostrarSinImpresora() {
-  bannerEl.style.display = '';
-  contOkEl.style.display = 'none';
+  resumenEl.textContent  = 'sin vincular';
+  resumenEl.style.color  = 'var(--color-warning, #92400e)';
+  btnVincEl.textContent  = '🔌 Vincular impresora';
+  panelEl.open           = true;  // abrir para que el inspector vea el botón
 }
 
-/** Oculta el banner y muestra el estado OK con el nombre de la impresora. */
+/** Muestra el nombre de la impresora vinculada en el summary. */
 function mostrarImpresoraOk(nombre) {
-  bannerEl.style.display  = 'none';
-  contOkEl.style.display  = '';
-  estadoEl.textContent = '🖨 ' + nombre + ' vinculada';
+  resumenEl.textContent  = nombre + ' ✓';
+  resumenEl.style.color  = 'var(--color-primary)';
+  btnVincEl.textContent  = '🔄 Cambiar impresora';
 }
 
-// Al cargar: detectar si hay impresora guardada
+/** Muestra el campo de renombrado con el alias/placeholder del device. */
+function mostrarRenombrado(device) {
+  var cont = document.getElementById('cont-renombrar');
+  var inp  = document.getElementById('inp-alias');
+  if (!cont || !inp) return;
+  inp.value             = obtenerAlias(device.id) || '';
+  inp.placeholder       = device.name || 'Ej: Impresora 3';
+  cont.dataset.deviceId = device.id;
+  cont.style.display    = 'block';
+}
+
+// Al cargar: detectar si ya hay impresora autorizada (silencioso, sin diálogo).
 (async function() {
   if (!navigator.bluetooth) {
-    // Web Bluetooth no disponible: mostrar aviso en el banner
-    bannerEl.querySelector('p:last-of-type').textContent =
-      '⚠️ Web Bluetooth no disponible. Usá Chrome en Android para imprimir.';
-    bannerEl.querySelector('button').style.display = 'none';
+    resumenEl.textContent = '⚠️ Usá Chrome en Android';
+    resumenEl.style.color = 'var(--color-warning, #92400e)';
+    btnVincEl.disabled    = true;
+    btnVincEl.textContent = '⚠️ Web Bluetooth no disponible';
+    panelEl.open          = true;
     return;
   }
 
-  // Primero intentar getDevices() (silencioso, sin diálogo)
+  // Intentar getDevices() (sin diálogo del usuario)
   if (typeof navigator.bluetooth.getDevices === 'function') {
     try {
       var devs = await navigator.bluetooth.getDevices();
@@ -206,37 +205,23 @@ function mostrarImpresoraOk(nombre) {
     } catch(e) {}
   }
 
-  // getDevices() vacío o no disponible: revisar localStorage
+  // getDevices() vacío → intentar con localStorage como fallback
   var info = obtenerInfoImpresora();
   if (info) {
-    // Hay una impresora guardada pero no confirmada por el navegador.
-    // Mostramos el campo de alias con el ID del localStorage para que
-    // accionRenombrar() pueda guardar el alias aunque getDevices() esté vacío.
+    // Device guardado pero no confirmado por el navegador todavía
     mostrarImpresoraOk((info.alias || info.name || 'Impresora') + ' (no confirmada)');
     var cont = document.getElementById('cont-renombrar');
     var inp  = document.getElementById('inp-alias');
     if (cont && inp) {
-      inp.value = info.alias || '';
-      inp.placeholder = info.name || 'Ej: Mi impresora';
+      inp.value             = info.alias || '';
+      inp.placeholder       = info.name  || 'Ej: Impresora 3';
       cont.dataset.deviceId = info.id;
-      cont.style.display = 'block';
+      cont.style.display    = 'block';
     }
   } else {
-    // Sin impresora: dejar el banner visible
     mostrarSinImpresora();
   }
 })();
-
-// Muestra el campo de renombrado con el alias actual precargado
-function mostrarRenombrado(device) {
-  var cont = document.getElementById('cont-renombrar');
-  var inp  = document.getElementById('inp-alias');
-  if (!cont || !inp) return;
-  inp.value = obtenerAlias(device.id) || '';
-  inp.placeholder = device.name || 'Ej: Impresora entrada';
-  cont.dataset.deviceId = device.id;
-  cont.style.display = 'block';
-}
 
 function accionRenombrar() {
   var cont = document.getElementById('cont-renombrar');
@@ -244,46 +229,35 @@ function accionRenombrar() {
   if (!cont || !inp) return;
   var deviceId = cont.dataset.deviceId;
   var alias    = inp.value.trim();
-  if (!alias || !deviceId) return;
+  if (!alias || !deviceId) { log('Ingresá un nombre antes de guardar.'); return; }
   guardarAlias(deviceId, alias);
-  estadoEl.textContent = '🖨 ' + alias + ' autorizada';
+  mostrarImpresoraOk(alias);
   log('✅ Nombre guardado: "' + alias + '"');
 }
 
 async function accionConectar() {
-  // Deshabilitar ambos botones de vincular (banner + details)
-  var btnBanner  = document.getElementById('btn-conectar-banner');
-  var btnDetails = document.getElementById('btn-conectar');
-  [btnBanner, btnDetails].forEach(function(b) {
-    if (b) { b.disabled = true; b.textContent = '⏳ Buscando...'; }
-  });
-  log('Abriendo selector Bluetooth...');
+  btnVincEl.disabled    = true;
+  btnVincEl.textContent = '⏳ Buscando…';
+  log('Abriendo selector Bluetooth…');
   try {
-    var r = await conectarImpresora();
-    r.device.gatt.disconnect();
+    var r      = await conectarImpresora();
     var nombre = nombreMostrar(r.device);
-    log('✅ Vinculada: ' + (r.device.name || 'dispositivo BLE') + '\nPerfil: ' + r.perfil.servicio);
+    r.device.gatt.disconnect();
+    log('✅ Vinculada: ' + (r.device.name || 'BLE') + '\nPerfil: ' + r.perfil.servicio);
     mostrarImpresoraOk(nombre);
     mostrarRenombrado(r.device);
-    if (btnDetails) btnDetails.textContent = '🔄 Cambiar impresora';
-    if (btnBanner)  btnBanner.textContent  = '🔌 Vincular impresora';
-    // Abrir el panel de configuración para que el inspector vea el campo de alias.
-    // Cada inspector puede ponerle un nombre a su propia impresora (ej: "Mi Printer").
-    var detailsEl = document.getElementById('details-impresora');
-    if (detailsEl) detailsEl.open = true;
+    // Abrir el panel para que el inspector vea el campo de nombre enseguida
+    panelEl.open = true;
   } catch(e) {
     log('❌ ' + e.message);
-    [btnBanner, btnDetails].forEach(function(b) {
-      if (b) b.textContent = '🔌 Reintentar';
-    });
+    btnVincEl.textContent = '🔌 Reintentar';
+  } finally {
+    btnVincEl.disabled = false;
   }
-  [btnBanner, btnDetails].forEach(function(b) {
-    if (b) b.disabled = false;
-  });
 }
 
 async function accionDiagnostico() {
-  log('Conectando para diagnóstico...');
+  log('Conectando para diagnóstico…');
   try {
     var info = await diagnosticarImpresora();
     log(info);
@@ -293,16 +267,20 @@ async function accionDiagnostico() {
 }
 
 async function accionPrueba() {
-  log('Conectando...');
+  log('Conectando…');
   try {
     var r = await reconectarImpresora();
-    if (!r) {
-      r = await conectarImpresora();
-    }
-    log('Conectada. Enviando ticket de prueba...');
-    await enviarImpresion(r.caracteristica, generarTicketPrueba());
+    if (!r) { r = await conectarImpresora(); }
+
+    // Obtener alias y MAC del device conectado para imprimirlos en el ticket.
+    // Así cada inspector confirma visualmente que tiene su propia impresora.
+    var alias    = nombreMostrar(r.device);
+    var deviceId = r.device.id || 'desconocido';
+
+    log('Conectada. Enviando ticket de prueba…');
+    await enviarImpresion(r.caracteristica, generarTicketPrueba(alias, deviceId));
     r.device.gatt.disconnect();
-    log('✅ Ticket enviado. Si no imprimió, revisá los servicios con Diagnóstico.');
+    log('✅ Ticket enviado.\nNombre: ' + alias + '\nID: ' + deviceId);
   } catch(e) {
     log('❌ ' + e.message);
   }
