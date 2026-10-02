@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-02 (sesión 37 — Comisiones sin tesorero + auditoría impresora BLE completa: número acta, nombre inspector, timeouts, _norm, deprecar flujo A)
+Última actualización: 2026-10-02 (sesión 37/38 — Comisiones sin tesorero + auditoría impresora BLE completa: número acta, nombre inspector, timeouts, _norm, deprecar flujo A + fix test certificación comisión)
 
 ---
 
