@@ -99,17 +99,35 @@ function nombreMostrar(device) {
  *
  * Chrome Android muestra el dispositivo en el picker como:
  *   "Printer001 (DC:03:30:CE:28:95)"
- * device.name contiene ese string completo, no solo "Printer001".
- * Extraemos la MAC con regex y la usamos para identificar la impresora
- * en el ticket de prueba, para que el inspector confirme que está
- * conectado a su propia impresora y no a la de un compañero.
+ * IMPORTANTE: device.name solo contiene el nombre BT advertised ("Printer001").
+ * La MAC entre paréntesis la agrega Chrome en su UI, no está en device.name.
  *
- * Fallback: si el nombre no tiene MAC entre paréntesis, devuelve device.id.
+ * Estrategia de extracción:
+ *  1. Intentar parsear MAC de device.name (funciona si la impresora emite su MAC en el nombre)
+ *  2. Intentar extraer MAC de device.id: Chrome Android lo genera como UUID donde
+ *     los últimos 12 hex chars (sin guiones) son los bytes de la MAC.
+ *     Ej: "00000000-0000-0000-0000-dc0330ce2895" → "DC:03:30:CE:28:95"
+ *  3. Fallback: devolver device.id tal cual (es único aunque no sea la MAC)
  */
 function extraerMac(device) {
+  // Intento 1: MAC en el nombre advertised (algunos modelos la incluyen)
   if (device && device.name) {
-    var match = device.name.match(/\(([0-9A-F]{2}(?::[0-9A-F]{2}){5})\)/i);
-    if (match) return match[1];
+    var matchNombre = device.name.match(/\(([0-9A-F]{2}(?::[0-9A-F]{2}){5})\)/i);
+    if (matchNombre) return matchNombre[1].toUpperCase();
+  }
+  // Intento 2: extraer MAC de device.id (UUID de Chrome Android)
+  // Formato típico: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  // Los últimos 12 hex chars = 6 bytes = MAC
+  if (device && device.id) {
+    var soloHex = device.id.replace(/-/g, '');
+    if (soloHex.length >= 12) {
+      var ultimos = soloHex.slice(-12);
+      if (/^[0-9a-f]{12}$/i.test(ultimos)) {
+        return (ultimos.slice(0,2) + ':' + ultimos.slice(2,4) + ':' +
+                ultimos.slice(4,6) + ':' + ultimos.slice(6,8) + ':' +
+                ultimos.slice(8,10) + ':' + ultimos.slice(10,12)).toUpperCase();
+      }
+    }
   }
   return (device && device.id) ? device.id : 'desconocido';
 }
@@ -652,14 +670,18 @@ function generarTicketInfraccion(d) {
   push(GS, 0x21, BYTE_BASE);      // vuelve al modo base
   linea(SEP);
 
-  // Inspector
-  push(ESC, 0x61, 0x00);
-  push(ESC, 0x45, 0x01);
-  linea('Inspector:');
-  push(ESC, 0x45, 0x00);
-  linea(_norm(d.inspector));
-  if (d.legajo) linea('Legajo: ' + d.legajo);
-  linea(SEP);
+  // Inspector: solo se imprime si el municipio habilitó mostrar_inspector_en_ticket.
+  // Cuando está desactivado, d.inspector llega como "" → omitir todo el bloque
+  // para no imprimir "Inspector:" seguido de una línea vacía.
+  if (d.inspector) {
+    push(ESC, 0x61, 0x00);
+    push(ESC, 0x45, 0x01);
+    linea('Inspector:');
+    push(ESC, 0x45, 0x00);
+    linea(_norm(d.inspector));
+    if (d.legajo) linea('Legajo: ' + d.legajo);
+    linea(SEP);
+  }
 
   // Divide un texto largo en líneas de ancho máximo `ancho` chars.
   function wrap(s, ancho) {
@@ -683,17 +705,48 @@ function generarTicketInfraccion(d) {
     return lines;
   }
 
-  // Leyenda de horarios y texto de ordenanza (si el municipio los configuró)
+  // Leyenda de horarios y Marco legal/Ordenanza.
+  // Tamaño y negrita configurables por superadmin (pie_fuente_size, pie_negrita).
+  // Default: normal (0x00, 32 chars/línea) sin negrita — maximiza texto en el pie.
+  // Los labels ("Horarios:" y "Marco legal:") se diferencian entre sí:
+  //   - Horarios: label siempre en negrita
+  //   - Marco legal: label con subrayado
+  // El contenido de ambas secciones sigue la config del superadmin.
+  var pieFuente = d.pie_fuente_size || 1;
+  var BYTE_PIE  = pieFuente === 3 ? 0x11 : pieFuente === 2 ? 0x10 : 0x00;
+  var ANCHO_PIE = (BYTE_PIE === 0x11) ? 16 : 32;
+  var SEP_PIE   = (ANCHO_PIE === 16) ? '----------------' : '--------------------------------';
+
   if (d.leyenda_horarios) {
     push(ESC, 0x61, 0x00);
-    linea(SEP);
-    var hLines = wrap(d.leyenda_horarios, ANCHO);
+    push(GS, 0x21, BYTE_PIE);
+    linea(SEP_PIE);
+    // Label siempre en negrita para distinguir la sección
+    push(ESC, 0x45, 0x01);
+    linea('Horarios:');
+    push(ESC, 0x45, 0x00);
+    // Contenido: negrita si el superadmin lo configuró
+    if (d.pie_negrita) push(ESC, 0x45, 0x01);
+    var hLines = wrap(d.leyenda_horarios, ANCHO_PIE);
     for (var hi = 0; hi < hLines.length; hi++) linea(hLines[hi]);
+    if (d.pie_negrita) push(ESC, 0x45, 0x00);
   }
   if (d.texto_ordenanza) {
-    linea(SEP);
-    var oLines = wrap(d.texto_ordenanza, ANCHO);
+    push(ESC, 0x61, 0x00);
+    push(GS, 0x21, BYTE_PIE);
+    linea(SEP_PIE);
+    // Label con subrayado para distinguirlo del label de Horarios
+    push(ESC, 0x2D, 0x01);
+    linea('Marco legal:');
+    push(ESC, 0x2D, 0x00);
+    if (d.pie_negrita) push(ESC, 0x45, 0x01);
+    var oLines = wrap(d.texto_ordenanza, ANCHO_PIE);
     for (var oi = 0; oi < oLines.length; oi++) linea(oLines[oi]);
+    if (d.pie_negrita) push(ESC, 0x45, 0x00);
+  }
+  // Restaurar modo base del cuerpo del ticket antes del QR
+  if (d.leyenda_horarios || d.texto_ordenanza) {
+    push(GS, 0x21, BYTE_BASE);
   }
 
   // QR nativo ESC/POS + URL como texto de respaldo.

@@ -563,6 +563,21 @@ class Municipio(models.Model):
         verbose_name="Tamaño del módulo QR del ticket (1-8)",
         help_text="Módulo QR ESC/POS. 3=pequeño · 4=normal · 6=grande. Default: 4.",
     )
+    # ticket_pie_fuente_size controla el tamaño de las secciones del pie del ticket:
+    # "Leyenda de horarios" y "Marco legal / Ordenanza".
+    # Son texto denso → default 1 (normal) para maximizar caracteres por línea.
+    # Usa los mismos valores que ticket_fuente_size (byte GS 0x21).
+    ticket_pie_fuente_size = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name="Tamaño de fuente del pie (leyenda + ordenanza)",
+        help_text="1=normal (recomendado) · 2=doble alto · 3=doble alto+ancho",
+    )
+    # Si True, el texto de leyenda de horarios y marco legal se imprime en negrita.
+    ticket_pie_negrita = models.BooleanField(
+        default=False,
+        verbose_name="Negrita en el pie (leyenda + ordenanza)",
+        help_text="Activo: imprime en negrita la leyenda de horarios y el marco legal.",
+    )
 
     # ── Numeración de actas ──────────────────────────────────────────────────
     # El superadmin configura este valor para continuar la numeración de un

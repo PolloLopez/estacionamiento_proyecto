@@ -403,6 +403,16 @@ def editar_municipio(request, municipio_id):
             municipio.mostrar_inspector_en_ticket = (
                 "mostrar_inspector_en_ticket" in request.POST
             )
+            # Tamaño de fuente del pie (leyenda + ordenanza): rango 1-3, default 1 (normal)
+            try:
+                pie_fuente = int(request.POST.get("ticket_pie_fuente_size", 1))
+                municipio.ticket_pie_fuente_size = max(1, min(3, pie_fuente))
+            except (ValueError, TypeError):
+                municipio.ticket_pie_fuente_size = 1
+            # Negrita en el pie: checkbox
+            municipio.ticket_pie_negrita = (
+                "ticket_pie_negrita" in request.POST
+            )
             municipio.save()
             messages.success(request, "Información institucional guardada.")
             return redirect("editar_municipio", municipio_id=municipio.id)

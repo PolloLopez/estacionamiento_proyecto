@@ -250,6 +250,9 @@ async function accionPrueba() {
     var alias = nombreMostrar(r.device);
     var mac   = extraerMac(r.device);  // "DC:03:30:CE:28:95" — la que muestra Chrome al vincular
 
+    // Log de debug: ver qué contienen device.name y device.id en este dispositivo.
+    // Útil para confirmar si la MAC se extrae correctamente o viene de device.id.
+    console.log('[impresora] device.name:', r.device.name, '| device.id:', r.device.id, '| mac extraída:', mac);
     log('Conectada. Enviando ticket de prueba…');
     await enviarImpresion(r.caracteristica, generarTicketPrueba(alias, mac));
     r.device.gatt.disconnect();

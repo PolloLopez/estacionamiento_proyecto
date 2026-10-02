@@ -951,6 +951,9 @@ def api_inspector_registrar_infraccion(request):
         "fuente_size":            municipio.ticket_fuente_size,
         "qr_size":                municipio.ticket_qr_size,
         "segundos_pausa_copias":  municipio.segundos_pausa_doble_copia,
+        # Formato del pie del ticket (leyenda de horarios + marco legal/ordenanza)
+        "pie_fuente_size":        municipio.ticket_pie_fuente_size,
+        "pie_negrita":            municipio.ticket_pie_negrita,
     }
 
     return JsonResponse({"ok": True, "infraccion_id": inf.id, "datos_acta": datos_acta})

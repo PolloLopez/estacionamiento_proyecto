@@ -534,6 +534,54 @@
 
               </div>
             </div>
+
+            {# ── Formato del pie del ticket (leyenda de horarios + marco legal) ── #}
+            <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--color-border);">
+              <p style="font-size:0.85rem; font-weight:700; margin:0 0 0.35rem;">📄 Pie del ticket — Leyenda de horarios y Marco legal</p>
+              <p style="font-size:0.8rem; color:var(--color-text-muted); margin:0 0 0.75rem;">
+                Controla el tamaño y el estilo del texto de ambas secciones del pie.<br>
+                Las secciones siempre se diferencian entre sí por el label: "Horarios:" en negrita, "Marco legal:" con subrayado.
+              </p>
+              <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-start;">
+
+                <div style="flex:1; min-width:160px;">
+                  <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.25rem;">
+                    Tamaño de fuente del pie
+                  </label>
+                  <select name="ticket_pie_fuente_size"
+                          style="width:100%; padding:0.4rem 0.6rem; border-radius:6px;
+                                 border:1px solid var(--color-border); background:var(--color-surface);
+                                 color:var(--color-text); font-size:0.88rem;">
+                    <option value="1" {% if municipio.ticket_pie_fuente_size == 1 %}selected{% endif %}>
+                      1 — Normal (recomendado — cabe más texto)
+                    </option>
+                    <option value="2" {% if municipio.ticket_pie_fuente_size == 2 %}selected{% endif %}>
+                      2 — Doble alto
+                    </option>
+                    <option value="3" {% if municipio.ticket_pie_fuente_size == 3 %}selected{% endif %}>
+                      3 — Doble alto + ancho
+                    </option>
+                  </select>
+                  <small style="color:var(--color-text-muted);">Aplica a la leyenda de horarios y al marco legal.</small>
+                </div>
+
+                <div style="flex:1; min-width:160px; padding-top:0.25rem;">
+                  <label style="font-size:0.82rem; font-weight:600; display:block; margin-bottom:0.5rem;">
+                    Negrita en el texto del pie
+                  </label>
+                  <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                    <input type="checkbox" name="ticket_pie_negrita"
+                           {% if municipio.ticket_pie_negrita %}checked{% endif %}
+                           style="width:18px; height:18px; cursor:pointer;">
+                    <span style="font-size:0.88rem;">Imprimir en negrita la leyenda y el marco legal</span>
+                  </label>
+                  <small style="color:var(--color-text-muted); display:block; margin-top:0.3rem;">
+                    Los labels ("Horarios:" y "Marco legal:") siempre se diferencian independientemente de esta opción.
+                  </small>
+                </div>
+
+              </div>
+            </div>
           </div>
 
           <button type="submit" class="btn" style="width:100%; margin-top:1rem;">💾 Guardar información institucional</button>
