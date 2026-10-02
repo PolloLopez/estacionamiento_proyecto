@@ -551,6 +551,26 @@ class Municipio(models.Model):
         help_text="Módulo QR ESC/POS. 3=pequeño · 4=normal · 6=grande. Default: 4.",
     )
 
+    # ── Numeración de actas ──────────────────────────────────────────────────
+    # El superadmin configura este valor para continuar la numeración de un
+    # sistema anterior (ej: el municipio viene de actas en papel hasta el #5000).
+    # Cada vez que se crea una infracción se lee este valor y se incrementa
+    # atómicamente en crear_infraccion() del service.
+    proximo_numero_acta = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Próximo número de acta",
+        help_text="Número que se asignará al próximo acta creada. El superadmin lo ajusta para continuar numeración anterior.",
+    )
+
+    # ── Configuración del ticket impreso — inspector ─────────────────────────
+    # Si False, el nombre del inspector NO se imprime en el ticket de infracción.
+    # Útil para municipios que usan agentes anónimos o prefieren no identificarlos.
+    mostrar_inspector_en_ticket = models.BooleanField(
+        default=True,
+        verbose_name="Mostrar inspector en ticket",
+        help_text="Si está activo, el nombre del inspector aparece en el acta impresa.",
+    )
+
     # ── Facturación de la plataforma ─────────────────────────────────────────
     # Estos campos configuran cuánto le cobra Leandro (superadmin) a cada municipio
     # por usar el sistema. El tesorero del municipio rinde contra estos valores.
@@ -1253,6 +1273,17 @@ class Infraccion(models.Model):
         max_digits=8, decimal_places=1,
         null=True, blank=True,
         verbose_name="Precisión GPS (metros)",
+    )
+
+    # ── Número de acta correlativo ────────────────────────────────────────────
+    # Número oficial del acta de infracción (correlativo por municipio).
+    # El superadmin configura el primer número en Municipio.proximo_numero_acta
+    # para continuar la numeración de sistemas anteriores.
+    # Es null en infracciones creadas antes de esta funcionalidad.
+    numero_acta = models.PositiveIntegerField(
+        null=True, blank=True,
+        verbose_name="Número de acta",
+        help_text="Número correlativo del acta. Asignado automáticamente al crear la infracción.",
     )
 
     class Meta:

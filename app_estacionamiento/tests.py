@@ -985,6 +985,13 @@ class TestApiInspectorRegistrarInfraccion(TestCase):
         )
 
     def setUp(self):
+        # Limpiar caché entre tests: puede_estacionar_ahora() cachea el resultado
+        # 60 segundos. Como los tests corren en transacciones que hacen rollback,
+        # el municipio reutiliza el mismo ID entre tests del mismo TestCase.
+        # Sin esta limpieza, un test que crea horario contamina al siguiente.
+        from django.core.cache import cache
+        cache.clear()
+
         self.municipio = crear_municipio()
         self.inspector = Usuario.objects.create_user(
             correo="inspector_api@test.com",

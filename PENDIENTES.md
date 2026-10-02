@@ -116,6 +116,15 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
 
 ---
 
+### Fase 7 — inicio_usuarios.html migrado a React unificado ✅ (sesión 35)
+
+**Qué se implementó:**
+- `panel_conductor.js` (nuevo): componente raíz `PanelConductor` con un solo fetch a `/api/conductor/dashboard/`. Sub-componentes: `SaldoCard` (ocultar/mostrar saldo, billetera virtual), `PanelEstadoConductor` (estado/timer/estacionar), `AbonoBanner`, `MisVehiculos` (acordeón cerrado por defecto).
+- `inicio_usuarios.html`: eliminados grid-2, card de perfil, secciones Django de abonos y mis-vehículos. Mount point único `#panel-conductor-react` con 10 data-* URLs. Fallback Django visible si React no monta en 3s.
+- `base.html`: nombre del conductor (`first_name`) agregado como ítem informativo en el menú hamburguesa, reemplazando la card de perfil que se eliminó.
+
+---
+
 ### Fase 6 — Fix SIA modal + tests endpoints inspector ✅ (sesión 34)
 
 **Fix puntual:** en el modal SIA, el caso `PATENTE_NO_COINCIDE` generaba un `<a href>` a `inspectores_registrar_infraccion` → navegación → sesión BLE perdida.
@@ -168,7 +177,7 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
   - `views_inspector.py` — pasa `municipio` al contexto para el template.
   - **Fix BLE**: el inspector ya no navega entre páginas → la sesión BLE sobrevive todo el flujo.
 - **Fase 6** ✅ (sesión 34): Fix SIA modal PATENTE_NO_COINCIDE + tests endpoint Fase 5B. Ver sección 🟡 arriba.
-- **Fase 7** (próxima): migrar `inicio_usuarios.html` (panel del conductor) a React.
+- **Fase 7** ✅ (sesión 35): migrar `inicio_usuarios.html` a React unificado. Ver sección 🟡 abajo.
 - **Fase 8** (pendiente): Panel del vendedor inline — `cobrar_infraccion.html` + BLE.
 
 ---

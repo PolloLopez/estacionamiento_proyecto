@@ -917,15 +917,23 @@ def api_inspector_registrar_infraccion(request):
     # Construir datos_acta: mismo objeto que DATOS_ACTA en ticket_infraccion.html,
     # para que generarTicketInfraccion(d) funcione sin cambios.
     inf = infraccion
-    if inf.inspector and inf.inspector.nombre:
-        inspector_nombre = f"{inf.inspector.nombre} {inf.inspector.apellido}"
-    elif inf.inspector:
-        inspector_nombre = inf.inspector.correo
+
+    # mostrar_inspector_en_ticket: el superadmin decide si el nombre del inspector
+    # aparece en el acta impresa (por municipio).
+    # Por qué no hardcodearlo: algunos municipios prefieren anonimizar al inspector
+    # por seguridad o por política interna. El admin del municipio tiene trazabilidad
+    # completa desde el panel aunque no aparezca en el ticket.
+    if municipio.mostrar_inspector_en_ticket and inf.inspector:
+        nombre = inf.inspector.first_name or ""
+        apellido = inf.inspector.last_name or ""
+        inspector_nombre = f"{nombre} {apellido}".strip() or inf.inspector.correo
     else:
         inspector_nombre = ""
 
     datos_acta = {
         "municipio":              municipio.nombre,
+        # numero_acta es el número oficial del acta (correlativo por municipio).
+        # Fallback a inf.id para infracciones creadas antes de esta funcionalidad.
         "acta":                   str(inf.numero_acta or inf.id),
         "patente":                inf.vehiculo.patente,
         "tipo_vehiculo":          inf.vehiculo.get_tipo_display(),

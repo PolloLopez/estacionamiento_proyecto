@@ -5,37 +5,145 @@
 {% block content %}
 <div class="container">
 
-<div class="grid grid-2">
+<!-- Mount point único: SaldoCard + PanelEstado + AbonoBanner + MisVehiculos.
+     Las URLs se pasan como data-* para que Django reverse() las calcule.
+     panel_conductor.js marca data-react-montado="1" al montar; el script inline
+     usa ese atributo para decidir si muestra el fallback Django después de 3s. -->
+<div id="panel-conductor-react"
+     data-url-dashboard="{% url 'api_conductor_dashboard' %}"
+     data-url-estacionamientos-activos="{% url 'api_conductor_estacionamientos_activos' %}"
+     data-url-estacionar="{% url 'usuarios_estacionar_vehiculo' %}"
+     data-url-recargar="{% url 'mp_iniciar_carga' %}"
+     data-url-opciones-renovar-base="{% url 'api_conductor_opciones_renovar' 0 %}"
+     data-url-renovar-base="{% url 'api_conductor_renovar' 0 %}"
+     data-url-historial="{% url 'usuarios_historial_estacionamientos' %}"
+     data-url-infracciones="{% url 'mis_infracciones' %}"
+     data-url-agregar-vehiculo="{% url 'agregar_vehiculo' %}"
+     data-url-pagar-abono="{% url 'conductor_pagar_abono' %}">
+  {# Fallback mínimo visible mientras React carga (o si falla) #}
+  <div class="card" style="margin-bottom:1rem;">
+    <p style="color:var(--color-text-muted); margin:0;">Cargando panel…</p>
+  </div>
+</div>
 
-  <!-- 👤 PERFIL -->
-  <div class="card">
-    <h2>👤 {% if request.user.nombre %}{{ request.user.nombre }}{% if request.user.apellido %} {{ request.user.apellido }}{% endif %}{% else %}{{ request.user.correo }}{% endif %}</h2>
-
-    <p class="info">
-      💰 Saldo: ${{ saldo_conductor }}
+<!-- Fallback Django: solo visible si React no monta en 3s (JS roto, CDN caído, etc.) -->
+<div id="panel-conductor-fallback" style="display:none;">
+  <div class="card" style="margin-bottom:1rem;">
+    <p class="info">💰 Saldo: ${{ saldo_conductor }}</p>
+    {% if saldo_conductor < 100 %}<p class="danger">⚠️ Saldo bajo</p>{% endif %}
+    <a href="{% url 'mp_iniciar_carga' %}" class="btn btn-outline"
+       style="font-size:0.85rem;">💳 Cargar saldo</a>
+  </div>
+  <div class="card" style="margin-bottom:1rem;">
+    <h3>🚗 Estado del vehículo</h3>
+    <p style="color:var(--color-text-muted); margin:0;">
+      <a href="{% url 'usuarios_estacionar_vehiculo' %}" class="btn">🛵 Estacionar 🚗</a>
     </p>
+  </div>
+</div>
 
-    {% if saldo_conductor < 100 %}
-      <p class="danger">⚠️ Saldo bajo</p>
-    {% endif %}
+{# ── INFRACCIÓN PENDIENTE DETECTADA AL ESTACIONAR ───────────────────────── #}
+{% if notif_infraccion %}
+<div class="card" style="margin-bottom:1rem; border-left:4px solid var(--color-danger,#c0392b); padding:1.25rem;">
+  <h4 style="margin-bottom:0.75rem; color:var(--color-danger,#c0392b);">
+    ⚠️ Tenés una infracción pendiente
+  </h4>
+  <p style="margin-bottom:0.75rem;">
+    Tu vehículo tenía una infracción pendiente de <strong>${{ notif_infraccion.monto }}</strong>
+    cuando registraste el estacionamiento. El período de gracia ya venció.
+  </p>
+  <div style="overflow-x:auto;">
+    <table style="font-size:0.88rem; margin-bottom:1rem; border-collapse:collapse; min-width:300px;">
+      <tr>
+        <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">🔍 Verificado por inspector</td>
+        <td><strong>{{ notif_infraccion.hora_verificacion|date:"d/m/Y H:i:s" }}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">⏱ Fin período de gracia{% if notif_infraccion.tolerancia_min %} ({{ notif_infraccion.tolerancia_min }} min){% endif %}</td>
+        <td><strong>{{ notif_infraccion.hora_fin_gracia|date:"d/m/Y H:i:s" }}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">🚗 Estacionamiento registrado</td>
+        <td><strong>{{ notif_infraccion.hora_estacionamiento|date:"d/m/Y H:i:s" }}</strong></td>
+      </tr>
+    </table>
+  </div>
+  <a href="{% url 'mis_infracciones' %}" class="btn btn-sm"
+     style="background:var(--color-danger,#c0392b); color:#fff; font-size:0.9rem;">
+    Ir a pagar la infracción (${{ notif_infraccion.monto }})
+  </a>
+</div>
+{% endif %}
 
-    {# ── Domicilio electrónico ──────────────────────────────────────── #}
-    {# Email formal para notificaciones del municipio (distinto al correo de acceso) #}
-    <details style="margin-top:0.75rem; border-top:1px solid var(--color-border); padding-top:0.6rem;">
-      <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
-                      color:var(--color-text-muted); list-style:none; user-select:none;
-                      display:flex; align-items:center; gap:0.4rem;">
-        📬 Notificacion digital
-        {% if request.user.domicilio_electronico %}
-          <span style="font-size:0.78rem; font-weight:400; color:var(--color-primary);
-                       background:var(--color-bg-subtle,#f0f4ff); border-radius:4px;
-                       padding:0.05rem 0.4rem; margin-left:0.3rem;">configurado</span>
+{# ── NOTIFICACIONES DEL SISTEMA ─────────────────────────────────────────── #}
+{% if notificaciones_nuevas %}
+  {% for notif in notificaciones_nuevas %}
+    <div class="alert {% if '✅' in notif.mensaje %}alert-success{% else %}alert-warning{% endif %}"
+         style="margin-top:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+      <span>{{ notif.mensaje }}</span>
+      <form method="post" action="{% url 'marcar_notificacion_leida' notif.id %}" style="margin:0;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline"
+                style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
+          Entendido
+        </button>
+      </form>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{# ── BANNER DE VERIFICACIÓN ─────────────────────────────────────────────── #}
+{% if request.user.es_conductor and not notificaciones_nuevas %}
+  {% if request.user.es_verificado %}
+    {# Verificado y sin notificaciones: estado normal, no mostramos nada #}
+  {% elif solicitud_verificacion and solicitud_verificacion.estado == "pendiente" %}
+    <div class="alert alert-warning" style="margin-top:1rem;">
+      <span>⏳ <strong>Verificación pendiente</strong> — el admin está revisando tus datos.</span>
+    </div>
+  {% elif solicitud_verificacion and solicitud_verificacion.estado == "rechazada" %}
+    <div class="alert alert-danger" style="margin-top:1rem;">
+      <span>❌ <strong>Verificación rechazada.</strong>
+        {% if solicitud_verificacion.notas_admin %}
+          Motivo: {{ solicitud_verificacion.notas_admin }}
         {% endif %}
-      </summary>
-      <div style="margin-top:0.6rem; font-size:0.85rem; color:var(--color-text-muted); margin-bottom:0.5rem;">
-        Email para notificaciones oficiales del municipio.
-        (Distinto al correo de acceso)
-      </div>
+      </span>
+      <a href="{% url 'solicitar_verificacion' %}" class="btn btn-outline"
+         style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
+        Reenviar solicitud
+      </a>
+    </div>
+  {% else %}
+    <div style="margin-top:1rem; font-size:0.85rem; color:var(--color-text-muted);
+                display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+      <span>💡 Podés
+        <a href="{% url 'solicitar_verificacion' %}" style="color:var(--color-primary);">
+          verificar tu identidad
+        </a>
+        para acceder a exenciones (vecino, frentista, etc.).
+      </span>
+    </div>
+  {% endif %}
+{% endif %}
+
+{# ── PIE DEL PANEL: domicilio electrónico + tutorial + sugerencias ──────── #}
+<div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--color-border);">
+
+  <!-- Domicilio electrónico: colapsado por defecto, accesible sin ocupar pantalla. -->
+  <details style="margin-bottom:0.75rem;">
+    <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
+                    color:var(--color-text-muted); list-style:none; user-select:none;
+                    display:flex; align-items:center; gap:0.4rem;">
+      📬 Notificación digital
+      {% if request.user.domicilio_electronico %}
+        <span style="font-size:0.78rem; font-weight:400; color:var(--color-primary);
+                     background:var(--color-bg-subtle,#f0f4ff); border-radius:4px;
+                     padding:0.05rem 0.4rem; margin-left:0.3rem;">configurado</span>
+      {% endif %}
+    </summary>
+    <div class="card" style="margin-top:0.5rem; padding:0.85rem 1rem;">
+      <p style="margin:0 0 0.5rem; font-size:0.84rem; color:var(--color-text-muted);">
+        Email para notificaciones oficiales del municipio (distinto al correo de acceso).
+      </p>
       <form method="post" action="{% url 'guardar_domicilio_electronico' %}">
         {% csrf_token %}
         <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
@@ -57,224 +165,9 @@
         </p>
         {% endif %}
       </form>
-    </details>
-  </div>
-
-  <!-- 🚗 ESTADO VEHÍCULO — componente React (panel_estado_conductor.js)
-       Las URLs se pasan como data-* para que Django reverse() las calcule
-       y el JS no tenga que conocer el patrón de rutas. -->
-  <div id="panel-estado-react"
-       style="margin-top:1rem;"
-       data-url-dashboard="{% url 'api_conductor_dashboard' %}"
-       data-url-estacionamientos-activos="{% url 'api_conductor_estacionamientos_activos' %}"
-       data-url-estacionar="{% url 'usuarios_estacionar_vehiculo' %}"
-       data-url-recargar="{% url 'mp_iniciar_carga' %}"
-       data-url-opciones-renovar-base="{% url 'api_conductor_opciones_renovar' 0 %}"
-       data-url-renovar-base="{% url 'api_conductor_renovar' 0 %}">
-    {# Fallback visible mientras React carga (spinner mínimo) #}
-    <div class="card">
-      <h3>🚗 Estado del vehículo</h3>
-      <p style="color:var(--color-text-muted); margin:0;">Cargando…</p>
     </div>
-  </div>
+  </details>
 
-</div>
-
-<!-- 📅 ABONOS MENSUALES ACTIVOS -->
-<div class="card" style="margin-top:1rem;">
-  <div class="page-header" style="margin-bottom:0.5rem;">
-    <h3 style="margin:0;">📅 Abono mensual</h3>
-    <a href="{% url 'conductor_pagar_abono' %}" class="btn btn-outline"
-       style="font-size:0.85rem; padding:0.3rem 0.8rem;">+ Pagar abono</a>
-  </div>
-  {% if abonos_activos %}
-    {% for abono in abonos_activos %}
-      <div style="display:flex; align-items:center; gap:0.75rem; padding:0.35rem 0;">
-        <span style="font-size:1.1rem;">✅</span>
-        <div>
-          <strong>{{ abono.vehiculo.patente }}</strong>
-          <span style="color:var(--color-text-muted); font-size:0.9rem;">
-            — {{ abono.vehiculo.get_tipo_display }} — acceso libre este mes
-          </span>
-        </div>
-      </div>
-    {% endfor %}
-  {% else %}
-    <p class="text-muted" style="margin:0; font-size:0.9rem;">No tenés abono activo.</p>
-  {% endif %}
-</div>
-
-<!-- 🚗 MIS VEHÍCULOS — React mount point -->
-<div id="mis-vehiculos-react"
-     data-url-dashboard="{% url 'api_conductor_dashboard' %}"
-     data-url-historial-base="{% url 'usuarios_historial_estacionamientos' %}"
-     data-url-infracciones-base="{% url 'mis_infracciones' %}"
-     data-url-agregar-vehiculo="{% url 'agregar_vehiculo' %}">
-</div>
-
-<!-- Fallback Django: React lo oculta al montar. Si React falla, esto queda visible. -->
-{% if vehiculos_conductor %}
-<div id="mis-vehiculos-fallback-django" class="card" style="margin-top:1rem;">
-  <h3 style="margin-bottom:0.75rem;">🚗 Mis vehículos</h3>
-  <div style="display:flex; flex-direction:column; gap:0; max-height:215px; overflow-y:auto;">
-    {% for v in vehiculos_conductor %}
-    <div style="display:flex; align-items:center; justify-content:space-between;
-                flex-wrap:wrap; gap:0.5rem; padding:0.5rem 0;
-                {% if not forloop.last %}border-bottom:1px solid var(--color-border);{% endif %}">
-      <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-        {% if v.tiene_estacionamiento_activo %}
-          <span title="Estacionado ahora">🟢</span>
-        {% else %}
-          <span style="opacity:0.35;" title="Sin estacionamiento">⚪</span>
-        {% endif %}
-        <strong style="letter-spacing:1px;">{{ v.patente }}</strong>
-        <span style="color:var(--color-text-muted); font-size:0.88rem;">{{ v.get_tipo_display }}</span>
-        {% if v.infracciones_pendientes > 0 %}
-          <span style="font-size:0.8rem; color:var(--color-danger, #c0392b); font-weight:700;"
-                title="{{ v.infracciones_pendientes }} infracción(es) pendiente(s)">
-            ⚠️ {{ v.infracciones_pendientes }}
-          </span>
-        {% endif %}
-        {% if v.exento_global or v.exento_parcial %}
-          <span style="font-size:0.75rem; background:var(--color-primary); color:#fff;
-                       border-radius:4px; padding:0.1rem 0.35rem;" title="Exento ANDIS/SIA">
-            🏷️ exento
-          </span>
-        {% endif %}
-      </div>
-      <div style="display:flex; gap:0.35rem;">
-        <a href="{% url 'usuarios_historial_estacionamientos' %}?patente={{ v.patente }}"
-           class="btn btn-outline" style="font-size:0.78rem; padding:0.2rem 0.55rem;"
-           title="Historial de estacionamientos">📜</a>
-        <a href="{% url 'mis_infracciones' %}?patente={{ v.patente }}"
-           class="btn btn-outline" style="font-size:0.78rem; padding:0.2rem 0.55rem;"
-           title="Ver infracciones">⚠️</a>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-  <div style="margin-top:0.6rem;">
-    <a href="{% url 'agregar_vehiculo' %}" class="btn btn-outline"
-       style="font-size:0.82rem;">+ Agregar vehículo</a>
-  </div>
-</div>
-{% endif %}
-
-<!-- ⚠️ INFRACCIÓN PENDIENTE DETECTADA AL ESTACIONAR -->
-{% if notif_infraccion %}
-<div class="card" style="margin-bottom:1rem; border-left:4px solid var(--color-danger, #c0392b); padding:1.25rem;">
-  <h4 style="margin-bottom:0.75rem; color:var(--color-danger, #c0392b);">
-    ⚠️ Tenés una infracción pendiente
-  </h4>
-  <p style="margin-bottom:0.75rem;">
-    Tu vehículo tenía una infracción pendiente de <strong>${{ notif_infraccion.monto }}</strong>
-    cuando registraste el estacionamiento. El período de gracia ya venció.
-  </p>
-  <div style="overflow-x:auto;">
-  <table style="font-size:0.88rem; margin-bottom:1rem; border-collapse:collapse; min-width:300px;">
-    <tr>
-      <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">🔍 Verificado por inspector</td>
-      <td><strong>{{ notif_infraccion.hora_verificacion|date:"d/m/Y H:i:s" }}</strong></td>
-    </tr>
-    <tr>
-      <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">⏱ Fin período de gracia{% if notif_infraccion.tolerancia_min %} ({{ notif_infraccion.tolerancia_min }} min){% endif %}</td>
-      <td><strong>{{ notif_infraccion.hora_fin_gracia|date:"d/m/Y H:i:s" }}</strong></td>
-    </tr>
-    <tr>
-      <td style="padding:0.25rem 0.75rem 0.25rem 0; color:var(--color-muted);">🚗 Estacionamiento registrado</td>
-      <td><strong>{{ notif_infraccion.hora_estacionamiento|date:"d/m/Y H:i:s" }}</strong></td>
-    </tr>
-  </table>
-  </div>
-  <a href="{% url 'mis_infracciones' %}" class="btn btn-sm"
-     style="background:var(--color-danger, #c0392b); color:#fff; font-size:0.9rem;">
-    Ir a pagar la infracción (${{ notif_infraccion.monto }})
-  </a>
-</div>
-{% endif %}
-
-<!-- 🔔 NOTIFICACIONES DEL SISTEMA (resultado de verificación, etc.) -->
-{% if notificaciones_nuevas %}
-  {% for notif in notificaciones_nuevas %}
-    <div class="alert {% if '✅' in notif.mensaje %}alert-success{% else %}alert-warning{% endif %}"
-         style="margin-top:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-      <span>{{ notif.mensaje }}</span>
-      <form method="post" action="{% url 'marcar_notificacion_leida' notif.id %}" style="margin:0;">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline"
-                style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
-          Entendido
-        </button>
-      </form>
-    </div>
-  {% endfor %}
-{% endif %}
-
-<!-- ✅ BANNER DE ESTADO DE VERIFICACIÓN (solo si no hay notificación activa) -->
-{% if request.user.es_conductor and not notificaciones_nuevas %}
-  {% if request.user.es_verificado %}
-    {# Ya verificado y sin notificaciones: no mostramos nada, es el estado normal #}
-  {% elif solicitud_verificacion and solicitud_verificacion.estado == "pendiente" %}
-    <div class="alert alert-warning" style="margin-top:1rem;">
-      <span>⏳ <strong>Verificación pendiente</strong> — el admin está revisando tus datos.</span>
-    </div>
-  {% elif solicitud_verificacion and solicitud_verificacion.estado == "rechazada" %}
-    <div class="alert alert-danger" style="margin-top:1rem;">
-      <span>❌ <strong>Verificación rechazada.</strong>
-        {% if solicitud_verificacion.notas_admin %}
-          Motivo: {{ solicitud_verificacion.notas_admin }}
-        {% endif %}
-      </span>
-      <a href="{% url 'solicitar_verificacion' %}" class="btn btn-outline"
-         style="font-size:0.85rem; padding:0.3rem 0.8rem; white-space:nowrap;">
-        Reenviar solicitud
-      </a>
-    </div>
-  {% else %}
-    {# Sin solicitud → invitar a verificarse (opcional, no bloquea ninguna función) #}
-    <div style="margin-top:1rem; font-size:0.85rem; color:var(--color-text-muted);
-                display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
-      <span>💡 Podés
-        <a href="{% url 'solicitar_verificacion' %}" style="color:var(--color-primary);">
-          verificar tu identidad
-        </a>
-        para acceder a exenciones (vecino, frentista, etc.).
-      </span>
-    </div>
-  {% endif %}
-{% endif %}
-
-<!-- 📊 ACCIONES -->
-<div class="grid grid-3" style="margin-top:1rem;">
-    <div class="card">
-    <h4>💰 Cargar saldo</h4>
-      <a class="btn btn-outline" href="{% url 'mp_iniciar_carga' %}">
-        Cargar con MercadoPago
-      </a>
-    </div>
-
-
-  <div class="card">
-    <h4>📜 Estacionamientos</h4>
-    <a class="btn btn-outline"
-       href="{% url 'usuarios_historial_estacionamientos' %}">
-      Historial
-    </a>
-  </div>
-
-
-  <div class="card">
-    <h4>⚠️ Infracciones</h4>
-    <a class="btn btn-outline"
-       href="{% url 'mis_infracciones' %}">
-      Ver
-    </a>
-  </div>
-
-</div>
-
-<!-- ── PIE DEL PANEL: tutorial + sugerencias ─────────────────────── -->
-<div style="margin-top:2rem; padding-top:1rem; border-top:1px solid var(--color-border);">
   <details style="margin-bottom:0.5rem;">
     <summary style="cursor:pointer; font-size:0.85rem; font-weight:600;
                     color:var(--color-text-muted); list-style:none; user-select:none;
@@ -287,41 +180,48 @@
         <li>💰 <strong>Cargá saldo</strong> con MercadoPago desde "Cargar saldo", o acercate a un punto de venta autorizado.</li>
         <li>🅿️ <strong>Estacioná</strong> tocando "Estacionar" → ingresá la patente y la duración → confirmá. El sistema debita el costo de tu saldo.</li>
         <li>⏱ <strong>Seguí el tiempo</strong> desde esta pantalla: ves cuánto falta y podés renovar antes de que venza.</li>
-        <li>⚠️ <strong>Si tenés una infracción</strong>, pagala desde "Mis infracciones". Si creés que fue incorrecta, podés impugnarla desde el detalle de la infracción.</li>
+        <li>⚠️ <strong>Si tenés una infracción</strong>, pagala desde "Mis infracciones". Si creés que fue incorrecta, podés impugnarla desde el detalle.</li>
         <li>📅 <strong>Abono mensual</strong>: te olvidas de gestionarlo y es más económico.</li>
       </ol>
     </div>
   </details>
+
   <p style="font-size:0.85rem; color:var(--color-text-muted); margin:0; text-align:center;">
     💡 ¿Tenés alguna sugerencia? <a href="{% url 'enviar_sugerencia' %}" style="color:var(--color-primary);">Enviala acá →</a>
   </p>
+
 </div>
 
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
-
 <script src="{% static 'app_estacionamiento/js/react.production.min.js' %}"></script>
 <script src="{% static 'app_estacionamiento/js/react-dom.production.min.js' %}"></script>
-<script src="{% static 'app_estacionamiento/js/panel_estado_conductor.js' %}"></script>
-<script src="{% static 'app_estacionamiento/js/mis_vehiculos_conductor.js' %}"></script>
+<script src="{% static 'app_estacionamiento/js/panel_conductor.js' %}"></script>
+
+<!-- Muestra fallback Django si React no montó en 3s (panel_conductor.js marca data-react-montado). -->
+<script>
+(function () {
+  setTimeout(function () {
+    var mount    = document.getElementById("panel-conductor-react");
+    var fallback = document.getElementById("panel-conductor-fallback");
+    // Si React no marcó data-react-montado en 3 segundos (JS roto, CDN caído, etc.)
+    // mostramos el fallback Django para que el conductor pueda operar igual.
+    if (mount && mount.dataset.reactMontado !== "1" && fallback) {
+      mount.style.display    = "none";
+      fallback.style.display = "block";
+    }
+  }, 3000);
+}());
+</script>
 
 {% if municipio_branding.minutos_alerta_push %}
 <script>
 // ── Suscripción Web Push ─────────────────────────────────────────────────────
-// Solo se activa si el municipio tiene minutos_alerta_push > 0 (configurado
-// por el superadmin en editar_municipio.html).
-// Pide permiso al conductor la primera vez; si ya lo otorgó, solo registra
-// la suscripción (no vuelve a mostrar el diálogo).
 (function () {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    // El browser no soporta push — no hacer nada (sin ruido para el usuario)
-    return;
-  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) { return; }
 
-  // Convierte la clave pública VAPID de base64url a Uint8Array
-  // (formato que pide pushManager.subscribe)
   function base64UrlToUint8Array(base64url) {
     var padding = '='.repeat((4 - base64url.length % 4) % 4);
     var base64  = (base64url + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -331,46 +231,28 @@
     return arr;
   }
 
-  // Envía la suscripción al backend para guardarla en BD
   function guardarSuscripcion(suscripcion) {
     var datos = suscripcion.toJSON();
     fetch('{% url "push_suscribir" %}', {
       method:  'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken':  '{{ csrf_token }}',
-      },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
       body: JSON.stringify(datos),
-    }).catch(function(err) {
-      console.warn('[push] Error guardando suscripción:', err);
-    });
+    }).catch(function(err) { console.warn('[push] Error guardando suscripción:', err); });
   }
 
-  // Flujo principal: obtener clave VAPID → suscribirse → guardar
   navigator.serviceWorker.ready.then(function (registro) {
-    // Primero traemos la clave pública VAPID del servidor
     return fetch('{% url "push_vapid_public_key" %}')
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        var vapidPublicKey = data.publicKey;
-        if (!vapidPublicKey) return;
-
-        // Suscribirse — si ya tiene permiso no muestra ningún diálogo
+        if (!data.publicKey) return;
         return registro.pushManager.subscribe({
           userVisibleOnly:      true,
-          applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
+          applicationServerKey: base64UrlToUint8Array(data.publicKey),
         });
       })
-      .then(function(suscripcion) {
-        if (suscripcion) {
-          guardarSuscripcion(suscripcion);
-        }
-      })
+      .then(function(suscripcion) { if (suscripcion) { guardarSuscripcion(suscripcion); } })
       .catch(function(err) {
-        // 'NotAllowedError' = el conductor rechazó el permiso → no hacer nada
-        if (err.name !== 'NotAllowedError') {
-          console.warn('[push] No se pudo suscribir:', err);
-        }
+        if (err.name !== 'NotAllowedError') { console.warn('[push] No se pudo suscribir:', err); }
       });
   });
 }());
