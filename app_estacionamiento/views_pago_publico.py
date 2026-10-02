@@ -40,7 +40,7 @@ from .models import (
     Infraccion, Municipio, PagoPublico, Subcuadra, Tarifa, Vehiculo,
     AbonoMensual, Estacionamiento,
 )
-from .services.horarios import obtener_tarifa_hora
+from .services.horarios import obtener_tarifa_hora, puede_estacionar_ahora
 from .use_cases.procesar_pago_publico import ejecutar as procesar_pago_publico
 from .utils import sanitizar_patente
 
@@ -211,6 +211,11 @@ def detalle_patente(request, patente):
     # Tarifa vigente para calcular costos en el frontend
     tarifa = Tarifa.objects.filter(municipio=municipio).first()
 
+    # Horario: el conductor público no puede estacionar fuera de horario.
+    # bloquear_sin_horario=False → si no hay horario configurado, se permite
+    # (mismo criterio que el conductor registrado en estacionar_vehiculo.html).
+    puede_estacionar, mensaje_fuera_horario = puede_estacionar_ahora(municipio)
+
     return render(request, "pago_publico/detalle_patente.html", {
         "patente":                 patente,
         "municipio":               municipio,
@@ -227,6 +232,8 @@ def detalle_patente(request, patente):
         "tarifa_moto_json":        json.dumps(float(tarifa.precio_por_hora_moto)) if tarifa and hasattr(tarifa, 'precio_por_hora_moto') else "0",
         "precio_abono_auto_json":  json.dumps(float(tarifa.precio_abono_auto)) if tarifa else "0",
         "precio_abono_moto_json":  json.dumps(float(tarifa.precio_abono_moto)) if tarifa else "0",
+        "puede_estacionar":        puede_estacionar,
+        "mensaje_fuera_horario":   mensaje_fuera_horario,
     })
 
 
