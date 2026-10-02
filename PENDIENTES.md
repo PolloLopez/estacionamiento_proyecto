@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-01 (sesión 31-32 — Fase 4C: GPS chip + modal eliminar; Fase 5A: VerificadorInspector React)
+Última actualización: 2026-10-01 (sesión 33 — Ticket config superadmin + Fase 5B: infracción + impresión BLE inline sin redirect)
 
 ---
 
@@ -116,19 +116,43 @@ La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja)
 
 ---
 
+### Fase 7 — inicio_usuarios.html migrado a React unificado ✅ (sesión 35)
+
+**Qué se implementó:**
+- `panel_conductor.js` (nuevo): componente raíz `PanelConductor` con un solo fetch a `/api/conductor/dashboard/`. Sub-componentes: `SaldoCard` (ocultar/mostrar saldo, billetera virtual), `PanelEstadoConductor` (estado/timer/estacionar), `AbonoBanner`, `MisVehiculos` (acordeón cerrado por defecto).
+- `inicio_usuarios.html`: eliminados grid-2, card de perfil, secciones Django de abonos y mis-vehículos. Mount point único `#panel-conductor-react` con 10 data-* URLs. Fallback Django visible si React no monta en 3s.
+- `base.html`: nombre del conductor (`first_name`) agregado como ítem informativo en el menú hamburguesa, reemplazando la card de perfil que se eliminó.
+
+---
+
+### Fase 6 — Fix SIA modal + tests endpoints inspector ✅ (sesión 34)
+
+**Fix puntual:** en el modal SIA, el caso `PATENTE_NO_COINCIDE` generaba un `<a href>` a `inspectores_registrar_infraccion` → navegación → sesión BLE perdida.
+
+**Implementado:**
+- `VerificadorInspector` expone `window.iniciarInfraccionInline(patente)` en un `useEffect`. Llama a `setResultado` + `setFase("formulario")` sin navegar.
+- `verificar.html`: nueva función `iniciarInfraccionDesdeModalSia(patente)` que cierra el modal y llama al hook de React. El `<a href>` pasa a ser `<button onclick>`. Fallback a la URL vieja si React no está disponible.
+- `tests.py`: clase `TestApiInspectorRegistrarInfraccion` con 4 tests: ok sin foto, sin subcuadra → 400, foto tipo inválido → 400, fuera de horario → 403, conductor no accede.
+
+---
+
 ## 🟢 Baja prioridad / Futuras versiones
 
-### Superadmin: configurar tamaño de fuente en ticket de infracción y QR
+### Superadmin: configurar tamaño de fuente en ticket de infracción y QR ✅ (sesión 33)
 
-El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un tamaño de fuente fijo. Diferentes impresoras térmicas y diferentes tamaños de papel pueden requerir ajustes de fuente. Propuesta:
+**Implementado:**
+- `Municipio.ticket_fuente_size` (1-3, default 2) → byte ESC/POS `GS ! n` para el modo base.
+- `Municipio.ticket_qr_size` (1-8, default 4) → módulo QR en `_qrEscPos()`.
+- Migración `0103_municipio_ticket_config.py`.
+- `editar_municipio.html` → sección "Configuración del ticket impreso" con dos `<select>`.
+- `views_superadmin.py` → `guardar_institucional` lee y valida ambos campos.
+- `ticket_infraccion.html` → `DATOS_ACTA` incluye `fuente_size` y `qr_size`.
+- `impresora_bluetooth.js` → `generarTicketInfraccion(d)` usa `d.fuente_size` y `d.qr_size` en vez de valores hardcodeados.
+  - `fuente_size=1` → base `0x00`; resaltado (patente/monto) `0x10`
+  - `fuente_size=2` → base `0x10`; resaltado `0x11` (default recomendado 58mm)
+  - `fuente_size=3` → base `0x11`; resaltado `0x11` (no puede ser más grande)
 
-1. Agregar `Municipio.ticket_fuente_size = IntegerField(default=14)` y `qr_fuente_size = IntegerField(default=12)` (o un campo único de escala: `ticket_escala_pct = IntegerField(default=100)`).
-2. Exponer el campo en `editar_municipio.html` → sección de impresión.
-3. Pasar el valor al template del ticket e inyectarlo como variable CSS o inline style en el contenedor principal.
-
-**Por qué vale la pena evaluarlo**: cada municipio puede tener impresoras distintas (58mm vs 80mm) y el texto puede quedar cortado o demasiado grande. Un campo configurable evita hardcodear y tener que deployar para ajustar la impresión.
-
-**Evaluación pendiente**: revisar si conviene un slider (1–3: pequeño/normal/grande) o un campo numérico libre. Un slider tipo `<input type="range" min="10" max="20">` es más amigable para un admin no técnico.
+**Pendiente:** smoke test en producción — verificar impresión real con distintos valores de fuente y QR.
 
 ---
 
@@ -145,7 +169,39 @@ El ticket de infracción (`ticket_infraccion.html`) y el QR de pago tienen un ta
 - **Fase 4B** ✅: `MisVehiculos` en `/inicio/` — badges 🟢/🔵/⚪, infracciones pendientes, links a historial. Fallback Django siempre presente.
 - **Fase 4C** ✅ (sesión 30): FormularioEstacionar — `estacionar_vehiculo.html`. Pendiente smoke test en prod. Ver sección 🔴 arriba.
 - **Fase 5A** ✅ (sesión 32): `VerificadorInspector` — verificar.html migrado a React (inline, sin reload). Endpoint `POST /api/inspector/verificar/`. El cascade GPS/subcuadra y el modal SIA son JS vanilla sin cambios.
-- **Fase 5B**: Inspector en React — infracción + ticket + impresora inline (fix BLE binding).
+- **Fase 5B** ✅ (sesión 33): Inspector en React — infracción + ticket + impresora inline.
+  - `POST /api/inspector/registrar_infraccion/` — acepta multipart (foto + patente + subcuadra + GPS), devuelve `datos_acta` JSON.
+  - `FormularioInfraccion` — foto con preview, GPS chip, subcuadra del cascade, POST a la API.
+  - `ModalTicket` — confirmación + impresión BLE con lógica 2 copias, reintento, reconexión silenciosa.
+  - `verificar.html` — carga `impresora_bluetooth.js` antes del componente React. `data-url-registrar` y `data-geoloc` en el mount point.
+  - `views_inspector.py` — pasa `municipio` al contexto para el template.
+  - **Fix BLE**: el inspector ya no navega entre páginas → la sesión BLE sobrevive todo el flujo.
+- **Fase 6** ✅ (sesión 34): Fix SIA modal PATENTE_NO_COINCIDE + tests endpoint Fase 5B. Ver sección 🟡 arriba.
+- **Fase 7** ✅ (sesión 35): migrar `inicio_usuarios.html` a React unificado. Ver sección 🟡 abajo.
+- **Fase 8** (pendiente): Panel del vendedor inline — `cobrar_infraccion.html` + BLE.
+
+---
+
+### Smoke test Fases 5A + 5B en producción (pendiente)
+
+**Fase 5A:**
+- [ ] Verificar patente → resultado inline sin recarga
+- [ ] GPS preselecciona subcuadra correctamente
+- [ ] Sonidos y vibración funcionan
+- [ ] Botón ♿ SIA abre el modal SIA correctamente
+- [ ] Historial de patentes recientes se muestra
+- [ ] Zona libre oculta el componente correctamente
+
+**Fase 5B:**
+- [ ] Click "🚨 INFRACCIONAR" → muestra `FormularioInfraccion` sin navegar
+- [ ] GPS chip pide ubicación (si `geoloc_inspector_activa=True`)
+- [ ] Foto: abre cámara trasera, muestra preview, permite retomar
+- [ ] Submit → `POST /api/inspector/registrar_infraccion/` → crea el acta
+- [ ] `ModalTicket` aparece con confirmación del acta
+- [ ] BLE: si la impresora ya estaba conectada (Fase 5A) → imprime sin diálogo
+- [ ] "Nueva verificación" vuelve al input de patente sin recarga
+
+**Bug potencial:** el modal SIA tiene un enlace hardcodeado a `inspectores_registrar_infraccion` cuando `PATENTE_NO_COINCIDE`. Ese enlace navega → rompe el BLE. Fix pendiente: Fase 6 o fix puntual.
 
 ---
 

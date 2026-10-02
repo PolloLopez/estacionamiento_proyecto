@@ -216,35 +216,52 @@ def crear_infraccion(
     lon_decimal = _a_decimal(gps_lon)
     acc_decimal = _a_decimal(gps_acc)
 
-    # Intentar crear con foto. Si el storage (Cloudinary) falla, guardar sin foto
-    # para no perder el acta. El inspector puede agregar la foto manualmente si hace falta.
-    try:
-        infraccion = Infraccion.objects.create(
-            vehiculo=vehiculo,
-            inspector=inspector,
-            municipio=municipio,
-            subcuadra=subcuadra,
-            estacionamiento=estacionamiento,
-            foto=foto_final,
-            monto=monto,
-            gps_lat=lat_decimal,
-            gps_lon=lon_decimal,
-            gps_acc=acc_decimal,
+    # ── Crear la infracción + asignar número de acta ─────────────────────────
+    # Tomamos el número de acta del municipio con select_for_update para evitar
+    # que dos inspectores simultáneos obtengan el mismo número.
+    # Por qué no usamos F() solo: necesitamos leer el valor ANTES de incrementar
+    # para asignarlo a la infracción en el mismo atomic block.
+    # Por qué atomic aquí y no en la vista: el service es la única fuente de verdad
+    # para crear infracciones; la vista no debe conocer este detalle de implementación.
+    with transaction.atomic():
+        from app_estacionamiento.models import Municipio as _Municipio
+        municipio_locked = _Municipio.objects.select_for_update().get(pk=municipio.pk)
+        numero_acta = municipio_locked.proximo_numero_acta
+        _Municipio.objects.filter(pk=municipio.pk).update(
+            proximo_numero_acta=municipio_locked.proximo_numero_acta + 1
         )
-    except Exception as e:
-        logger.error("Error al guardar foto de infraccion (¿Cloudinary?): %s", e)
-        infraccion = Infraccion.objects.create(
-            vehiculo=vehiculo,
-            inspector=inspector,
-            municipio=municipio,
-            subcuadra=subcuadra,
-            estacionamiento=estacionamiento,
-            foto=None,
-            monto=monto,
-            gps_lat=lat_decimal,
-            gps_lon=lon_decimal,
-            gps_acc=acc_decimal,
-        )
+
+        # Intentar crear con foto. Si el storage (Cloudinary) falla, guardar sin foto
+        # para no perder el acta. El inspector puede agregar la foto manualmente.
+        try:
+            infraccion = Infraccion.objects.create(
+                vehiculo=vehiculo,
+                inspector=inspector,
+                municipio=municipio,
+                subcuadra=subcuadra,
+                estacionamiento=estacionamiento,
+                foto=foto_final,
+                monto=monto,
+                numero_acta=numero_acta,
+                gps_lat=lat_decimal,
+                gps_lon=lon_decimal,
+                gps_acc=acc_decimal,
+            )
+        except Exception as e:
+            logger.error("Error al guardar foto de infraccion (¿Cloudinary?): %s", e)
+            infraccion = Infraccion.objects.create(
+                vehiculo=vehiculo,
+                inspector=inspector,
+                municipio=municipio,
+                subcuadra=subcuadra,
+                estacionamiento=estacionamiento,
+                foto=None,
+                monto=monto,
+                numero_acta=numero_acta,
+                gps_lat=lat_decimal,
+                gps_lon=lon_decimal,
+                gps_acc=acc_decimal,
+            )
 
     # Trazabilidad: marcar que la última verificación generó infracción
     ultima_verificacion = VerificacionInspector.objects.filter(

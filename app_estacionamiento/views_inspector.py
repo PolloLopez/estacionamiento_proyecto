@@ -142,14 +142,15 @@ def verificar_vehiculo(request):
     if request.method == "POST" and not horario_activo:
         # Ignorar el POST: mostrar el template con el aviso de horario sin resultado
         return render(request, "inspectores/verificar.html", {
-            "resultado": None,
-            "historial": historial,
-            "modo": modo,
-            "subcuadras": subcuadras,
-            "subcuadra_activa": subcuadra_activa,
+            "resultado":         None,
+            "historial":         historial,
+            "modo":              modo,
+            "subcuadras":        subcuadras,
+            "subcuadra_activa":  subcuadra_activa,
             "tipo_seleccionado": tipo_seleccionado,
-            "horario_activo": False,
-            "mensaje_horario": mensaje_horario,
+            "horario_activo":    False,
+            "mensaje_horario":   mensaje_horario,
+            "municipio":         municipio,
         })
 
     if request.method == "POST":
@@ -195,14 +196,17 @@ def verificar_vehiculo(request):
             request.session["historial"] = historial[:5]
 
     return render(request, "inspectores/verificar.html", {
-        "resultado": resultado,
-        "historial": historial,
-        "modo": modo,
-        "subcuadras": subcuadras,
-        "subcuadra_activa": subcuadra_activa,
-        "tipo_seleccionado": tipo_seleccionado,
-        "horario_activo": horario_activo,
-        "mensaje_horario": mensaje_horario,
+        "resultado":            resultado,
+        "historial":            historial,
+        "modo":                 modo,
+        "subcuadras":           subcuadras,
+        "subcuadra_activa":     subcuadra_activa,
+        "tipo_seleccionado":    tipo_seleccionado,
+        "horario_activo":       horario_activo,
+        "mensaje_horario":      mensaje_horario,
+        # Necesario para data-geoloc en el mount point React (Fase 5B):
+        # controla si FormularioInfraccion pide GPS al inspector.
+        "municipio":            municipio,
     })
 
 

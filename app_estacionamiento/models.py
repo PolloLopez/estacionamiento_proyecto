@@ -530,6 +530,47 @@ class Municipio(models.Model):
         help_text="Ej: Ordenanza N° 1234/2023 — Estacionamiento Medido Municipal.",
     )
 
+    # ── Configuración del ticket de infracción (impresora térmica 58mm) ──────
+    # ticket_fuente_size controla el tamaño base del texto en el acta impresa.
+    # Se traduce al byte GS 0x21 n de ESC/POS:
+    #   1 = normal    → GS ! 0x00 (texto estándar, cabe más contenido)
+    #   2 = doble alto → GS ! 0x10 (default; más legible en papel 58mm)
+    #   3 = doble alto+ancho → GS ! 0x11 (solo para impresoras con papel 80mm)
+    # La patente y el monto siempre tienen un nivel más que el base.
+    ticket_fuente_size = models.PositiveSmallIntegerField(
+        default=2,
+        verbose_name="Tamaño de fuente del ticket (1-3)",
+        help_text="1=normal · 2=doble alto (recomendado 58mm) · 3=doble alto+ancho (80mm)",
+    )
+    # ticket_qr_size es el parámetro de módulo QR en el comando GS ( k de ESC/POS.
+    # Rango 1-16; valores prácticos para 58mm: 3 (pequeño) a 6 (grande).
+    # Default 4 ≈ 1.5cm de lado, legible a distancia normal de lectura.
+    ticket_qr_size = models.PositiveSmallIntegerField(
+        default=4,
+        verbose_name="Tamaño del módulo QR del ticket (1-8)",
+        help_text="Módulo QR ESC/POS. 3=pequeño · 4=normal · 6=grande. Default: 4.",
+    )
+
+    # ── Numeración de actas ──────────────────────────────────────────────────
+    # El superadmin configura este valor para continuar la numeración de un
+    # sistema anterior (ej: el municipio viene de actas en papel hasta el #5000).
+    # Cada vez que se crea una infracción se lee este valor y se incrementa
+    # atómicamente en crear_infraccion() del service.
+    proximo_numero_acta = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Próximo número de acta",
+        help_text="Número que se asignará al próximo acta creada. El superadmin lo ajusta para continuar numeración anterior.",
+    )
+
+    # ── Configuración del ticket impreso — inspector ─────────────────────────
+    # Si False, el nombre del inspector NO se imprime en el ticket de infracción.
+    # Útil para municipios que usan agentes anónimos o prefieren no identificarlos.
+    mostrar_inspector_en_ticket = models.BooleanField(
+        default=True,
+        verbose_name="Mostrar inspector en ticket",
+        help_text="Si está activo, el nombre del inspector aparece en el acta impresa.",
+    )
+
     # ── Facturación de la plataforma ─────────────────────────────────────────
     # Estos campos configuran cuánto le cobra Leandro (superadmin) a cada municipio
     # por usar el sistema. El tesorero del municipio rinde contra estos valores.
@@ -1232,6 +1273,17 @@ class Infraccion(models.Model):
         max_digits=8, decimal_places=1,
         null=True, blank=True,
         verbose_name="Precisión GPS (metros)",
+    )
+
+    # ── Número de acta correlativo ────────────────────────────────────────────
+    # Número oficial del acta de infracción (correlativo por municipio).
+    # El superadmin configura el primer número en Municipio.proximo_numero_acta
+    # para continuar la numeración de sistemas anteriores.
+    # Es null en infracciones creadas antes de esta funcionalidad.
+    numero_acta = models.PositiveIntegerField(
+        null=True, blank=True,
+        verbose_name="Número de acta",
+        help_text="Número correlativo del acta. Asignado automáticamente al crear la infracción.",
     )
 
     class Meta:

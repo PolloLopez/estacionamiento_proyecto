@@ -214,6 +214,11 @@ var DATOS_ACTA = {
   url_pago:         "{{ request.scheme }}://{{ request.get_host }}/pagar/{{ infraccion.vehiculo.patente }}/",
   leyenda_horarios:       "{{ infraccion.municipio.leyenda_horarios|default:''|escapejs }}",
   texto_ordenanza:        "{{ infraccion.municipio.texto_ordenanza|default:''|escapejs }}",
+  // Configuración del ticket configurable por el superadmin en editar_municipio.
+  // fuente_size: 1=normal · 2=doble alto (default) · 3=doble alto+ancho
+  // qr_size: módulo QR ESC/POS (1-8). Default 4.
+  fuente_size:            {{ infraccion.municipio.ticket_fuente_size|default:2 }},
+  qr_size:                {{ infraccion.municipio.ticket_qr_size|default:4 }},
   // 0 = pedir confirmación antes de la segunda copia; >0 = pausa automática en ms
   segundos_pausa_copias:  {{ infraccion.municipio.segundos_pausa_doble_copia }},
 };
