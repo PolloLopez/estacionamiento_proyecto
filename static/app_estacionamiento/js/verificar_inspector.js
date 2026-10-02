@@ -125,18 +125,21 @@
   // ─── FormularioInfraccion ─────────────────────────────────────────────────
   // Paso 2: foto + subcuadra + GPS → POST API → datos_acta
 
-  function FormularioInfraccion({ patente, urlRegistrar, geolocActiva, onCancelar, onExito }) {
-    var [foto,      setFoto]      = useState(null);    // File
-    var [fotoUrl,   setFotoUrl]   = useState(null);    // preview URL
-    var [enviando,  setEnviando]  = useState(false);
-    var [error,     setError]     = useState(null);
-    var [gpsLat,    setGpsLat]    = useState(null);
-    var [gpsLon,    setGpsLon]    = useState(null);
-    var [gpsAcc,    setGpsAcc]    = useState(null);
-    var [gpsEstado, setGpsEstado] = useState(geolocActiva ? "esperando" : "desactivado");
+  function FormularioInfraccion({ patente, urlRegistrar, urlSubcuadraCercana, geolocActiva, onCancelar, onExito }) {
+    var [foto,           setFoto]           = useState(null);    // File
+    var [fotoUrl,        setFotoUrl]        = useState(null);    // preview URL
+    var [enviando,       setEnviando]       = useState(false);
+    var [error,          setError]          = useState(null);
+    var [gpsLat,         setGpsLat]         = useState(null);
+    var [gpsLon,         setGpsLon]         = useState(null);
+    var [gpsAcc,         setGpsAcc]         = useState(null);
+    var [gpsEstado,      setGpsEstado]      = useState(geolocActiva ? "esperando" : "desactivado");
+    // Estado separado para la detección de subcuadra por GPS
+    var [subcuadraGps,   setSubcuadraGps]   = useState("inactivo"); // "inactivo"|"detectando"|"ok"|"fallo"
     var fotoInputRef = useRef(null);
 
-    // Solicitar GPS al montar (si el superadmin lo habilitó para este municipio)
+    // Solicitar GPS al montar (si el superadmin lo habilitó para este municipio).
+    // Solo captura coordenadas para la metadata del acta — no detecta subcuadra todavía.
     useEffect(function () {
       if (!geolocActiva || !navigator.geolocation) {
         if (geolocActiva) setGpsEstado("error");
@@ -153,6 +156,39 @@
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }, []);
+
+    // Detectar subcuadra más cercana usando GPS.
+    // Mismo flujo que el inspector en verificar.html pero dentro del formulario React,
+    // para que el inspector pueda re-detectar en el momento de infraccionar.
+    function detectarSubcuadraPorGps() {
+      // Solo disponible si el municipio tiene selector de ubicación (>1 subcuadra)
+      if (!document.getElementById("sel-calle")) return;
+      if (!navigator.geolocation || !urlSubcuadraCercana) return;
+
+      setSubcuadraGps("detectando");
+
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          var url = urlSubcuadraCercana +
+                    "?lat=" + pos.coords.latitude +
+                    "&lon=" + pos.coords.longitude;
+          fetch(url, { credentials: "same-origin" })
+            .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+            .then(function (data) {
+              if (!data.id) { setSubcuadraGps("fallo"); return; }
+              // Reutiliza la función global de verificar.html que actualiza
+              // el cascade JS vanilla (calle → altura → subcuadra_sel)
+              if (typeof seleccionarSubcuadraInspector === "function") {
+                seleccionarSubcuadraInspector(data.id);
+              }
+              setSubcuadraGps("ok");
+            })
+            .catch(function () { setSubcuadraGps("fallo"); });
+        },
+        function () { setSubcuadraGps("fallo"); },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    }
 
     function manejarFoto(e) {
       var archivo = e.target.files && e.target.files[0];
@@ -233,8 +269,38 @@
         }, "✕ Cancelar")
       ),
 
-      // GPS chip
+      // GPS chip (metadata del acta: lat/lon que se guarda en la DB)
       ce(GpsChip, { lat: gpsLat, lon: gpsLon, acc: gpsAcc, gpsEstado: gpsEstado }),
+
+      // Botón GPS de subcuadra: solo se muestra si el municipio tiene selector de ubicación
+      // (municipios con zona única tienen un campo hidden — no hay #sel-calle visible)
+      document.getElementById("sel-calle")
+        ? ce("div", { style: { marginBottom: "0.75rem" } },
+            ce("button", {
+              type:     "button",
+              disabled: subcuadraGps === "detectando",
+              onClick:  detectarSubcuadraPorGps,
+              style: {
+                padding: "0.5rem 1rem", fontSize: "0.9rem", cursor: "pointer",
+                border: "1px solid var(--color-border)", borderRadius: "8px",
+                background: "var(--color-surface)", color: "var(--color-text)",
+                opacity: subcuadraGps === "detectando" ? "0.6" : "1",
+              },
+            },
+              subcuadraGps === "detectando" ? "⏳ Detectando…" : "📍 Detectar mi ubicación"
+            ),
+            // Chip de resultado de la detección de subcuadra
+            subcuadraGps === "ok"
+              ? ce("span", {
+                  style: { marginLeft: "0.5rem", fontSize: "0.85rem", color: "#1a7a4a", fontWeight: "600" }
+                }, "✅ Subcuadra detectada")
+              : subcuadraGps === "fallo"
+                ? ce("span", {
+                    style: { marginLeft: "0.5rem", fontSize: "0.85rem", color: "#c0392b" }
+                  }, "❌ No encontrada — seleccioná a mano")
+                : null
+          )
+        : null,
 
       // Foto: input oculto + botón custom
       ce("input", {
@@ -586,7 +652,7 @@
   // ─── VerificadorInspector ─────────────────────────────────────────────────
   // Componente raíz. Gestiona la "fase" del flujo del inspector.
 
-  function VerificadorInspector({ urlVerificar, urlRegistrar, geolocActiva }) {
+  function VerificadorInspector({ urlVerificar, urlRegistrar, urlSubcuadraCercana, geolocActiva }) {
     var [fase,      setFase]      = useState("verificar");
     var [patente,   setPatente]   = useState("");
     var [cargando,  setCargando]  = useState(false);
@@ -727,11 +793,12 @@
     // FASE: formulario (foto + subcuadra + GPS)
     if (fase === "formulario" && resultado) {
       return ce(FormularioInfraccion, {
-        patente:      resultado.patente,
-        urlRegistrar: urlRegistrar,
-        geolocActiva: geolocActiva,
-        onCancelar:   cancelarFormulario,
-        onExito:      recibirTicket,
+        patente:              resultado.patente,
+        urlRegistrar:         urlRegistrar,
+        urlSubcuadraCercana:  urlSubcuadraCercana,
+        geolocActiva:         geolocActiva,
+        onCancelar:           cancelarFormulario,
+        onExito:              recibirTicket,
       });
     }
 
@@ -809,10 +876,11 @@
 
     ReactDOM.render(
       ce(VerificadorInspector, {
-        urlVerificar: contenedor.dataset.urlVerificar,
-        urlRegistrar: contenedor.dataset.urlRegistrar,
+        urlVerificar:        contenedor.dataset.urlVerificar,
+        urlRegistrar:        contenedor.dataset.urlRegistrar,
+        urlSubcuadraCercana: contenedor.dataset.urlSubcuadraCercana,
         // "true" / "false" como string desde data-* del template
-        geolocActiva: contenedor.dataset.geoloc === "true",
+        geolocActiva:        contenedor.dataset.geoloc === "true",
       }),
       contenedor
     );
