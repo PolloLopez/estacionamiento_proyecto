@@ -220,14 +220,30 @@ def registrar_infraccion(request):
     Permite al inspector labrar un acta de infracción para una patente.
     Recibe la patente por GET (desde verificar_vehiculo) o POST.
     Delega la lógica de creación al service crear_infraccion().
+
+    GET — flujo deprecado: redirige a verificar.html (React), que maneja
+    todo el ciclo verificar → infraccionar → imprimir sin navegación de página.
+    El redirect preserva ?patente= para que React abra el formulario directamente.
+    POST — se mantiene como fallback por si hay bookmarks o links externos viejos.
     """
     usuario = request.user
     municipio = getattr(usuario, "municipio", None)
     if not municipio:
         return redirect("login")
+
+    # ── GET: redirigir al flujo React en verificar.html ────────────────────────
+    # El flujo legacy causaba page navigation → Chrome perdía la sesión BLE.
+    # verificar.html lee ?patente= y llama iniciarInfraccionInline() al montar React.
+    if request.method == "GET":
+        patente_get = request.GET.get("patente", "").strip().upper()
+        url_verificar = reverse("inspectores_verificar_vehiculo")
+        if patente_get:
+            url_verificar += f"?patente={patente_get}"
+        return redirect(url_verificar)
+
     mensaje = None
 
-    patente = request.GET.get("patente") or request.POST.get("patente")
+    patente = request.POST.get("patente")
 
     if not patente:
         return redirect("inspectores_verificar_vehiculo")

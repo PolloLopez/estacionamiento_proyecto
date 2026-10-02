@@ -1,6 +1,6 @@
 # Pendientes — Estacionamiento Medido Municipal
 
-Última actualización: 2026-10-02 (sesión 37 — Comisiones: vendedor puede certificar sin paso previo de tesorería)
+Última actualización: 2026-10-02 (sesión 37/38 — Comisiones sin tesorero + auditoría impresora BLE completa: número acta, nombre inspector, timeouts, _norm, deprecar flujo A + fix test certificación comisión)
 
 ---
 
@@ -97,11 +97,28 @@ railway run pg_dump $DATABASE_URL > backup_$(date +%Y%m%d).sql
 
 ---
 
-### Bug — Inspector: impresora Bluetooth pide vinculación en cada impresión
+### Bug — Inspector: impresora Bluetooth pide vinculación en cada impresión ✅ parcial (sesión 37)
 
-La sesión BLE (`getDevices()`) se pierde entre prints aunque el inspector no navegue. Puede ser que `getDevices()` no devuelva el dispositivo si no hubo un gesto de usuario reciente, o que la reconexión automática falle silenciosamente.
+**Diagnóstico completo (auditoría sesión 37):**
+- Bug de Chrome: `getDevices()` devuelve vacío al cargar una página fresca aunque el device siga emparejado en el SO.
+- **Flujo B (React inline en `verificar.html`)** no tiene el problema durante un flujo continuo (verificar → infraccionar → imprimir sin navegar). Sí aparece al recargar o volver a verificar.html.
+- **Flujo A (legacy `ticket_infraccion.html`)** lo produce siempre (page navigation).
 
-**Investigar:** si `impresora_bluetooth.js` intenta `getDevices()` antes de que el usuario interactúe con la impresora, el browser puede rechazarlo. Evaluar guardar el `deviceId` en `localStorage` y pedir re-autorización explícita solo cuando falla la reconexión, no siempre.
+**Fixes aplicados (sesión 37):**
+- `watchAdvertisements()` timeout: 3000ms → 6000ms (impresoras lentas tardan 2-5s en emitir anuncio).
+- `_abrirConexionConReintentos()`: acepta parámetro `pausaMs`, ahora llamado con 5 intentos × 1000ms en reconexión post-navegación.
+- Igual en `reconectarSilencioso()`.
+
+**Pendiente — Flujo A (legacy):** ✅ deprecado (sesión 37)
+- GET a `/inspectores/infraccionar/?patente=XYZ` ahora redirige a `verificar.html?patente=XYZ`.
+- `verificar.html` lee el param y llama `iniciarInfraccionInline()` al montar React (polling 100ms/4s).
+- POST sigue funcionando como fallback silencioso (bookmarks externos, casos raros).
+
+---
+
+### Bug — `ticket.html` (cobro estacionamiento) no tiene impresión BLE
+
+El comprobante de cobro del vendedor/inspector no se puede imprimir por Bluetooth. Solo hay `window.print()` del navegador, que no muestra la impresora térmica. Para municipios donde el vendedor cobra en la calle y necesita darle comprobante al conductor, esto es un gap operativo. Diseñar ticket BLE de cobro similar a `generarTicketInfraccion()`.
 
 ---
 
@@ -160,6 +177,16 @@ Prueba manual completa según `GUIA_TESTING_ROLES.md` → sección "TEST COMPLET
 ### Selector de subcuadra en `/pagar/` público (`detalle_patente.html`)
 
 La pantalla de pago público todavía usa `<select>` encadenados (cascada vieja). Actualizar al mismo patrón `<datalist>` + matching por altura/intersección que ya tienen `estacionar_vehiculo.html`, `verificar.html` y `registrar_infraccion.html`.
+
+---
+
+### Auditoría impresora BLE — fixes aplicados ✅ (sesión 37)
+
+- `ticket_infraccion.html` DATOS_ACTA: `infraccion.id` → `infraccion.numero_acta|default:infraccion.id` (número correlativo correcto en el ticket impreso).
+- `ticket_infraccion.html`: `inspector.nombre`/`apellido` → `first_name`/`last_name` (nombre real del inspector en el ticket, no solo el correo).
+- `impresora_bluetooth.js` `_norm()`: agregados `ã`, `õ`, `ç`, `Ç`, `ý`, `Ý` (antes aparecían como `?` en el papel).
+- `impresora_bluetooth.js` `watchAdvertisements()` timeout: 3000ms → 6000ms en `reconectarImpresora()` y `reconectarSilencioso()`.
+- `impresora_bluetooth.js` `_abrirConexionConReintentos()`: acepta parámetro `pausaMs`; llamado con 5 reintentos × 1000ms en los fallbacks post-navegación.
 
 ---
 
