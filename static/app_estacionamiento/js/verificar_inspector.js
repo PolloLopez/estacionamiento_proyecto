@@ -136,25 +136,35 @@
     var [gpsEstado,      setGpsEstado]      = useState(geolocActiva ? "esperando" : "desactivado");
     // Estado separado para la detección de subcuadra por GPS
     var [subcuadraGps,   setSubcuadraGps]   = useState("inactivo"); // "inactivo"|"detectando"|"ok"|"fallo"
+    var [subcuadraNombre, setSubcuadraNombre] = useState("");        // nombre legible de la subcuadra detectada
     var fotoInputRef = useRef(null);
 
-    // Solicitar GPS al montar (si el superadmin lo habilitó para este municipio).
-    // Solo captura coordenadas para la metadata del acta — no detecta subcuadra todavía.
+    // Al montar el formulario:
+    // 1. Solicitar GPS coords para metadata del acta (si el superadmin lo habilitó).
+    // 2. Auto-detectar subcuadra por GPS si aún no hay una seleccionada manualmente.
+    //    Esto evita que el inspector tenga que tocar "Detectar" cada vez.
     useEffect(function () {
-      if (!geolocActiva || !navigator.geolocation) {
-        if (geolocActiva) setGpsEstado("error");
-        return;
+      // Capturar coordenadas del acta
+      if (geolocActiva && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            setGpsLat(pos.coords.latitude.toFixed(5));
+            setGpsLon(pos.coords.longitude.toFixed(5));
+            setGpsAcc(Math.round(pos.coords.accuracy));
+            setGpsEstado("ok");
+          },
+          function () { setGpsEstado("error"); },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      } else if (geolocActiva) {
+        setGpsEstado("error");
       }
-      navigator.geolocation.getCurrentPosition(
-        function (pos) {
-          setGpsLat(pos.coords.latitude.toFixed(5));
-          setGpsLon(pos.coords.longitude.toFixed(5));
-          setGpsAcc(Math.round(pos.coords.accuracy));
-          setGpsEstado("ok");
-        },
-        function () { setGpsEstado("error"); },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
+
+      // Auto-detectar subcuadra si no hay una seleccionada todavía
+      if (!obtenerSubcuadraId() && document.getElementById("sel-calle") &&
+          navigator.geolocation && urlSubcuadraCercana) {
+        detectarSubcuadraPorGps();
+      }
     }, []);
 
     // Detectar subcuadra más cercana usando GPS.
@@ -180,6 +190,11 @@
               // el cascade JS vanilla (calle → altura → subcuadra_sel)
               if (typeof seleccionarSubcuadraInspector === "function") {
                 seleccionarSubcuadraInspector(data.id);
+              }
+              // Guardar el nombre para mostrarlo en el chip
+              if (typeof SUBCUADRAS_INS !== "undefined") {
+                var sub = SUBCUADRAS_INS.find(function(s) { return s.id == data.id; });
+                if (sub) setSubcuadraNombre(sub.calle + " " + sub.altura);
               }
               setSubcuadraGps("ok");
             })
@@ -289,11 +304,11 @@
             },
               subcuadraGps === "detectando" ? "⏳ Detectando…" : "📍 Detectar mi ubicación"
             ),
-            // Chip de resultado de la detección de subcuadra
+            // Chip de resultado: muestra el nombre de la subcuadra detectada
             subcuadraGps === "ok"
               ? ce("span", {
                   style: { marginLeft: "0.5rem", fontSize: "0.85rem", color: "#1a7a4a", fontWeight: "600" }
-                }, "✅ Subcuadra detectada")
+                }, "✅ " + (subcuadraNombre || "Subcuadra detectada"))
               : subcuadraGps === "fallo"
                 ? ce("span", {
                     style: { marginLeft: "0.5rem", fontSize: "0.85rem", color: "#c0392b" }
@@ -552,8 +567,13 @@
         setEstadoImpresion("⏳ Imprimiendo copia 2 de 2…");
         await enviarImpresion(conexion.caracteristica, bytes);
         conexion.device.gatt.disconnect();
-        setEstadoImpresion("✅ 2 copias enviadas a la impresora.");
+
+        // Mostrar confirmación brevemente y volver al inicio automáticamente.
+        // El inspector no tiene que tocar nada entre un acta y el siguiente.
+        setEstadoImpresion("✅ 2 copias impresas. Volviendo…");
         setBotonVisible(false);
+        await new Promise(function (r) { setTimeout(r, 1800); });
+        onNuevaVerificacion();
 
       } catch (e) {
         console.warn("[BLE] envío falló:", e.message);
@@ -810,7 +830,7 @@
         onChange:     manejarInput,
         onKeyDown:    manejarKeydown,
         className:    "input-patente",
-        placeholder:  "AAA111 / AA111BB / 123ABC",
+        placeholder:  "AAA111 / AA111BB",
         autoComplete: "off",
         disabled:     cargando,
       }),

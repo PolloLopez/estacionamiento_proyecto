@@ -285,6 +285,27 @@
             </div>
           </div>
 
+          {# ── Formato de alturas (inspector) ── #}
+          <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
+            <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.3rem; text-transform:uppercase; letter-spacing:0.5px;">
+              🔢 Formato de alturas (inspector)
+            </p>
+            <p style="font-size:0.8rem; color:var(--color-text-muted); margin-bottom:0.6rem;">
+              Define si el teclado del celular abre en modo numérico o alfanumérico cuando el inspector ingresa la altura de la subcuadra.
+            </p>
+            <div style="margin-bottom:0.6rem;">
+              <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;">
+                <input type="checkbox" name="altura_solo_numeros"
+                       {% if municipio.altura_solo_numeros %}checked{% endif %}>
+                <span style="font-size:0.85rem; font-weight:600;">Alturas solo numéricas</span>
+              </label>
+              <small style="color:var(--color-text-muted); display:block; margin-top:0.2rem; padding-left:1.4rem;">
+                Activo (por defecto): teclado numérico en Android al ingresar altura.<br>
+                Desactivar si el municipio usa alturas con letras (ej: Km 3.5, 150 bis).
+              </small>
+            </div>
+          </div>
+
           {# ── Notificaciones push ── #}
           <div style="border-top:1px solid var(--color-border); padding-top:0.75rem; margin:0.75rem 0;">
             <p style="font-size:0.82rem; font-weight:700; color:var(--color-text-muted); margin-bottom:0.3rem; text-transform:uppercase; letter-spacing:0.5px;">

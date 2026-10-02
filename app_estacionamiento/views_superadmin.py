@@ -321,6 +321,11 @@ def editar_municipio(request, municipio_id):
                 request.POST.get("selector_manual_conductor_activo") == "on"
             )
 
+            # Formato de alturas en el selector del inspector (numérico vs alfanumérico)
+            municipio.altura_solo_numeros = (
+                request.POST.get("altura_solo_numeros") == "on"
+            )
+
             # Notificaciones push: minutos de alerta antes del vencimiento
             try:
                 minutos_push = int(request.POST.get("minutos_alerta_push", 10))

@@ -168,6 +168,22 @@
         {% elif request.user.es_inspector %}
           <li><a href="{% url 'panel_inspectores' %}">Inicio</a></li>
           <li><a href="{% url 'inspectores_verificar_vehiculo' %}">Verificar</a></li>
+          <li style="padding:0; border-top:1px solid var(--color-border); margin-top:0.25rem;">
+            <details>
+              <summary style="padding:0.55rem 1rem; cursor:pointer; list-style:none;
+                              user-select:none; font-size:0.9rem; font-weight:600;">
+                📖 ¿Cómo usar el panel?
+              </summary>
+              <ol style="margin:0; padding:0.4rem 1rem 0.75rem 2.2rem;
+                         font-size:0.83rem; line-height:1.5; display:flex; flex-direction:column; gap:0.45rem;">
+                <li>🔍 <strong>Verificá el vehículo</strong>: tocá "Verificar vehículo" e ingresá la patente. El sistema indica si está al día o en infracción.</li>
+                <li>🚨 <strong>Registrá un acta</strong>: si hay infracción, abrí el formulario, detectá tu ubicación con GPS, sacá la foto y confirmá.</li>
+                <li>♿ <strong>SIA</strong>: antes de confirmar podés escanear el QR ANDIS. Si es válido, no se labra infracción.</li>
+                <li>🖨 <strong>Impresión automática</strong>: el acta se imprime en 2 copias al confirmar. Vinculá tu impresora desde "🖨️ Impresora" (solo la primera vez).</li>
+                <li>🧾 <strong>Cerrá tu turno</strong>: al terminar usá "Cerrar caja" para generar la rendición diaria.</li>
+              </ol>
+            </details>
+          </li>
 
         {% elif request.user.es_vendedor %}
           <li><a href="{% url 'panel_vendedor' %}">Inicio</a></li>
