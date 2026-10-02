@@ -1759,7 +1759,7 @@ def admin_rendiciones(request):
 @require_role("admin")
 def crear_rendicion(request):
     """
-    El admin genera una rendición a tesorería seleccionando cierres de caja certificados.
+    El admin genera una rendición a tesorería seleccionando cierres de caja.
 
     Los totales se calculan automáticamente desde los CierreCaja seleccionados:
     - total_efectivo    = suma de cierre.total_efectivo
@@ -1768,16 +1768,24 @@ def crear_rendicion(request):
                            son lo mismo: no es efectivo que el admin manipula físicamente)
     - total_neto        = total_efectivo + total_digital
     - El admin NO puede escribir los montos — solo certifica lo que el sistema calculó.
+
+    Cierres elegibles:
+    - Cierres de vendedores/inspectores: deben estar certificados por el admin.
+    - Cierre propio del admin: se autocertifica al incluirse en la rendición
+      (la rendición es el acto de certificación del propio admin).
+      El tesorero valida la rendición completa, cubriendo así el control sobre el cierre del admin.
     """
     from django.db import transaction as db_transaction
 
     municipio = request.user.municipio
+    admin     = request.user
 
     if request.method == "POST":
-        periodo      = request.POST.get("periodo", "").strip()
-        notas        = request.POST.get("notas", "").strip()
-        cierre_ids   = request.POST.getlist("cierre_ids")
-        comprobante  = request.FILES.get("comprobante_archivo")
+        periodo        = request.POST.get("periodo", "").strip()
+        notas          = request.POST.get("notas", "").strip()
+        numero_ticket  = request.POST.get("numero_ticket_tesoreria", "").strip()
+        cierre_ids     = request.POST.getlist("cierre_ids")
+        comprobante    = request.FILES.get("comprobante_archivo")
 
         if not periodo:
             messages.error(request, "Indicá el período.")
@@ -1794,16 +1802,21 @@ def crear_rendicion(request):
             return redirect("crear_rendicion")
 
         with db_transaction.atomic():
-            # Traer solo cierres del municipio, certificados y aún sin rendir.
+            # Traer cierres elegibles del municipio sin rendir.
+            # Elegibles: certificados (vendedores/inspectores) O el propio cierre del admin
+            # (que se autocertifica al incluirse — ver docstring).
             # select_for_update evita race conditions si dos admins operan simultáneamente.
             cierres = CierreCaja.objects.select_for_update().filter(
                 id__in=cierre_ids_int,
                 usuario__municipio=municipio,
-                certificado=True,
                 rendicion__isnull=True,
+            ).filter(
+                Q(certificado=True) | Q(usuario=admin)
             )
 
-            if cierres.count() != len(cierre_ids_int):
+            # Evaluar el queryset una sola vez para evitar múltiples queries al mismo conjunto.
+            lista_cierres = list(cierres)
+            if len(lista_cierres) != len(cierre_ids_int):
                 messages.error(
                     request,
                     "Algunos cierres seleccionados no son válidos (ya rendidos, no certificados o de otro municipio)."
@@ -1831,23 +1844,36 @@ def crear_rendicion(request):
                 hasta=Max("fecha_cierre"),
             )
 
-            cantidad_cierres = cierres.count()
+            cantidad_cierres = len(lista_cierres)
 
             rendicion = Rendicion.objects.create(
-                municipio           = municipio,
-                admin               = request.user,
-                periodo             = periodo,
-                fecha_desde         = fechas["desde"].date() if fechas["desde"] else date.today(),
-                fecha_hasta         = fechas["hasta"].date() if fechas["hasta"] else date.today(),
-                total_efectivo      = total_efectivo,
-                total_digital       = total_digital,
-                total_neto          = total_neto,
-                notas_tesorero      = notas,
-                comprobante_archivo = comprobante,
+                municipio                = municipio,
+                admin                   = admin,
+                periodo                 = periodo,
+                fecha_desde             = fechas["desde"].date() if fechas["desde"] else date.today(),
+                fecha_hasta             = fechas["hasta"].date() if fechas["hasta"] else date.today(),
+                total_efectivo          = total_efectivo,
+                total_digital           = total_digital,
+                total_neto              = total_neto,
+                notas_tesorero          = notas,
+                comprobante_archivo     = comprobante,
+                numero_ticket_tesoreria = numero_ticket,
             )
 
-            # Vincular cada cierre a esta rendición (auditoría)
-            cierres.update(rendicion=rendicion)
+            # Vincular cada cierre a esta rendición.
+            # El cierre propio del admin (si estaba sin certificar) se autocertifica acá:
+            # la rendición es el acto formal de certificación, el tesorero valida el conjunto.
+            ahora = timezone.now()
+            for cierre in lista_cierres:
+                if not cierre.certificado:
+                    cierre.certificado    = True
+                    cierre.certificado_en  = ahora
+                    cierre.certificado_por = admin
+                    cierre.rendicion       = rendicion
+                    cierre.save(update_fields=["certificado", "certificado_en", "certificado_por", "rendicion"])
+                else:
+                    cierre.rendicion = rendicion
+                    cierre.save(update_fields=["rendicion"])
 
             # Crear liquidaciones de comisión por cada vendedor incluido en la rendición.
             # Se agrupa la ganancia_usuario de los cierres de vendedores (no inspectores).
@@ -1875,11 +1901,13 @@ def crear_rendicion(request):
         )
         return redirect("admin_rendiciones")
 
-    # GET: mostrar cierres disponibles (certificados y sin rendir)
+    # GET: mostrar cierres disponibles (certificados y sin rendir, más el cierre propio del admin).
+    # El cierre del admin aparece aunque no esté certificado — se autocertifica al rendir.
     cierres_pendientes = CierreCaja.objects.filter(
         usuario__municipio=municipio,
-        certificado=True,
         rendicion__isnull=True,
+    ).filter(
+        Q(certificado=True) | Q(usuario=admin)
     ).select_related("usuario").order_by("fecha_cierre")
 
     # Pre-calcular totales de todos los cierres disponibles para mostrar en el resumen
@@ -1896,6 +1924,7 @@ def crear_rendicion(request):
         "cierres_pendientes":  cierres_pendientes,
         "totales_disponibles": totales_disponibles,
         "hoy":                 date.today(),
+        "admin_id":            admin.id,
     })
 
 
@@ -2911,6 +2940,8 @@ def pdf_rendicion(request, rendicion_id):
     Descarga el PDF de una rendición específica.
     Accesible tanto para el admin que la creó como para tesorería.
     """
+    from django.http import HttpResponse
+
     municipio = getattr(request.user, "municipio", None)
 
     # El admin solo puede ver las rendiciones de su municipio.

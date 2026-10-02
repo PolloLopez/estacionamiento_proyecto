@@ -1757,6 +1757,13 @@ class Rendicion(models.Model):
     notas_tesorero  = models.TextField(blank=True, verbose_name='Observaciones del tesorero')
     notas_admin     = models.TextField(blank=True, verbose_name='Respuesta del admin')
 
+    # Número de ticket o expediente municipal para trazabilidad interna
+    numero_ticket_tesoreria = models.CharField(
+        max_length=100, blank=True, default="",
+        verbose_name="Número de ticket / expediente municipal",
+        help_text="Referencia interna del municipio para esta rendición (folio, expediente, etc.). Opcional.",
+    )
+
     creado_en    = models.DateTimeField(auto_now_add=True)
     tesorero     = models.ForeignKey(
         Usuario, on_delete=models.SET_NULL, null=True, blank=True,
